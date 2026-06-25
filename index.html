@@ -23,6 +23,35 @@
     
     <!-- Stylesheet -->
     <link rel="stylesheet" href="styles.css">
+
+    <!-- Favicon: inline SVG of the SJ mark (no extra request) -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='none' stroke='%232b74db' stroke-width='6'/%3E%3Cpath d='M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z' fill='%23ffaa00'/%3E%3C/svg%3E">
+
+    <!-- Canonical + social preview image -->
+    <link rel="canonical" href="https://www.sj-eng.co.il/">
+    <meta property="og:image" content="https://www.sj-eng.co.il/assets/mountain_powerlines.png">
+    <meta name="twitter:card" content="summary_large_image">
+
+    <!-- Preload hero background (improves Largest Contentful Paint) -->
+    <link rel="preload" as="image" href="assets/mountain_powerlines.png">
+
+    <!-- Structured data for local search (Google) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "ProfessionalService",
+      "name": "SJ הנדסת חשמל",
+      "description": "תכנון, ייעוץ ושרטוט מערכות חשמל בסמכות מהנדס חשמל מורשה.",
+      "telephone": "+972-53-530-2887",
+      "url": "https://www.sj-eng.co.il",
+      "areaServed": "IL",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "בת ים",
+        "addressCountry": "IL"
+      }
+    }
+    </script>
 </head>
 <body>
     <!-- Cursor Glow Spotlight -->
@@ -191,11 +220,11 @@
     <section id="client-logos" class="section-container reveal" style="--delay:200ms">
       <h2 class="section-title">לקוחות שלנו</h2>
       <div class="logos-grid">
-        <img src="assets/client_logo_placeholder.png" alt="לקוח 1" class="client-logo" />
-        <img src="assets/client_logo_placeholder.png" alt="לקוח 2" class="client-logo" />
-        <img src="assets/client_logo_placeholder.png" alt="לקוח 3" class="client-logo" />
-        <img src="assets/client_logo_placeholder.png" alt="לקוח 4" class="client-logo" />
-        <img src="assets/client_logo_placeholder.png" alt="לקוח 5" class="client-logo" />
+        <img src="assets/client_logo_placeholder.png" alt="לקוח 1" class="client-logo" loading="lazy" decoding="async" width="160" height="80" />
+        <img src="assets/client_logo_placeholder.png" alt="לקוח 2" class="client-logo" loading="lazy" decoding="async" width="160" height="80" />
+        <img src="assets/client_logo_placeholder.png" alt="לקוח 3" class="client-logo" loading="lazy" decoding="async" width="160" height="80" />
+        <img src="assets/client_logo_placeholder.png" alt="לקוח 4" class="client-logo" loading="lazy" decoding="async" width="160" height="80" />
+        <img src="assets/client_logo_placeholder.png" alt="לקוח 5" class="client-logo" loading="lazy" decoding="async" width="160" height="80" />
       </div>
     </section>
 
