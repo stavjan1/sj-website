@@ -11,6 +11,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&family=Rubik:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <style>
         :root {
@@ -190,7 +192,26 @@
 
             <div class="divider">או</div>
 
-            <button type="button" class="auth-btn auth-btn-google" id="google-btn">
+            <!-- Google One-Tap rendered button -->
+            <div id="g_id_onload"
+                 data-client_id="GOOGLE_CLIENT_ID_PLACEHOLDER"
+                 data-context="signin"
+                 data-ux_mode="popup"
+                 data-callback="handleGoogleCredential"
+                 data-auto_prompt="false">
+            </div>
+            <div class="g_id_signin"
+                 data-type="standard"
+                 data-shape="rectangular"
+                 data-theme="filled_black"
+                 data-text="signin_with"
+                 data-size="large"
+                 data-locale="he"
+                 data-width="340"
+                 id="google-gsi-btn">
+            </div>
+            <!-- Fallback custom button (shown if GIS not loaded) -->
+            <button type="button" class="auth-btn auth-btn-google" id="google-btn" style="display:none">
                 <svg width="19" height="19" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
                 המשך עם Google
             </button>
@@ -255,16 +276,60 @@
     </main>
 
     <script>
-        /* Option A: the SALE app performs the real authentication.
-           This page is the branded front door and hands off to /sale/. */
-        const APP_URL = 'sale/';
-        const pwEl = document.getElementById('auth-password');
+        const APP_URL = 'https://tdelectric.pro/';
+        const GOOGLE_CLIENT_ID = 'GOOGLE_CLIENT_ID_PLACEHOLDER';
 
+        /* ---- Password toggle ---- */
+        const pwEl = document.getElementById('auth-password');
         document.getElementById('toggle-pw').addEventListener('click', () => {
-            pwEl.type = pwEl.type === 'password' ? 'text' : 'password';
+            const shown = pwEl.type === 'text';
+            pwEl.type = shown ? 'password' : 'text';
         });
-        document.getElementById('auth-form').addEventListener('submit', e => { e.preventDefault(); window.location.href = APP_URL; });
-        document.getElementById('google-btn').addEventListener('click', () => { window.location.href = APP_URL; });
+
+        /* ---- Email/Password form submit ---- */
+        document.getElementById('auth-form').addEventListener('submit', e => {
+            e.preventDefault();
+            const email = document.getElementById('auth-email').value.trim();
+            const pass  = document.getElementById('auth-password').value;
+            if (!email || !pass) return;
+            // Hand off to the actual app — it handles auth
+            window.location.href = APP_URL;
+        });
+
+        /* ---- Google Identity Services callback ---- */
+        function handleGoogleCredential(response) {
+            // response.credential is a JWT ID token
+            // Decode to get user info (for display/logging)
+            const payload = JSON.parse(atob(response.credential.split('.')[1]));
+            console.log('Google Sign-In:', payload.email, payload.name);
+
+            // Store session hint and redirect to app
+            sessionStorage.setItem('gsi_email', payload.email);
+            sessionStorage.setItem('gsi_name',  payload.name);
+            sessionStorage.setItem('gsi_picture', payload.picture);
+
+            // Redirect to the services app
+            window.location.href = APP_URL;
+        }
+
+        /* ---- Show fallback Google button if GIS not loaded ---- */
+        window.addEventListener('load', () => {
+            const gsiBtn = document.getElementById('google-gsi-btn');
+            const fallback = document.getElementById('google-btn');
+            if (GOOGLE_CLIENT_ID === 'GOOGLE_CLIENT_ID_PLACEHOLDER') {
+                // No client ID yet — show styled fallback that redirects
+                if (gsiBtn) gsiBtn.style.display = 'none';
+                if (fallback) {
+                    fallback.style.display = 'flex';
+                    fallback.addEventListener('click', () => {
+                        // Will be replaced with real OAuth once Client ID is set
+                        alert('Google Sign-In ייפעל לאחר הגדרת OAuth Client ID ב-Google Cloud Console.');
+                    });
+                }
+            }
+        });
+
+        /* ---- Nav links ---- */
         document.getElementById('to-register').addEventListener('click', () => { window.location.href = APP_URL; });
         document.getElementById('forgot-link').addEventListener('click', () => { window.location.href = APP_URL; });
     </script>
