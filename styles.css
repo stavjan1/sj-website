@@ -328,18 +328,13 @@ img {
 
 /* Hero background sunset pylon image */
 .hero-bg-image {
-    background-image: url('assets/mountain_powerlines.png');
+    background-image:
+        linear-gradient(rgba(9, 13, 30, 0.55), rgba(9, 9, 11, 0.80)),
+        url('assets/mountain_powerlines.png');
     background-size: cover;
     background-position: center;
     position: absolute;
     inset: 0;
-    z-index: -1;
-}
-    position: absolute;
-    inset: 0;
-    background-image: linear-gradient(rgba(18, 53, 108, 0.45), rgba(9, 9, 11, 0.95)), url('https://images.unsplash.com/photo-1509395062183-67c5ad6faff9?auto=format&fit=crop&w=1920&q=80');
-    background-size: cover;
-    background-position: center;
     z-index: 0;
 }
 
