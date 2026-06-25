@@ -1,0 +1,6 @@
+# Netlify Redirects
+# Redirect bare root requests
+/ /index.html 200
+
+# Handle all routes for SPA-like behavior (keeps HTML pages)
+/articles /articles.html 200

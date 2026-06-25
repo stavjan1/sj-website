@@ -149,7 +149,7 @@ function initStatsCounter() {
 }
 
 /**
- * 6. Contact Form Validation and Submission (Mock Server)
+ * 6. Contact Form Validation and Submission (Netlify Forms)
  */
 function initContactForm() {
     const form = document.getElementById('contact-form');
@@ -164,7 +164,6 @@ function initContactForm() {
         // Basic inputs
         const name = document.getElementById('form-name').value.trim();
         const phone = document.getElementById('form-phone').value.trim();
-        const email = document.getElementById('form-email').value.trim();
         
         if (!name || !phone) {
             showFeedback('אנא מלא את כל שדות החובה (*)', 'error');
@@ -178,20 +177,31 @@ function initContactForm() {
             return;
         }
         
-        // Disable submit button and show spinner/loading state
+        // Disable submit button and show loading state
         submitBtn.disabled = true;
         const originalText = submitBtn.textContent;
         submitBtn.textContent = 'שולח...';
         
-        // Mock API Call (delay 1.5 seconds)
-        setTimeout(() => {
+        // Encode form data for Netlify Forms
+        const formData = new FormData(form);
+        const body = new URLSearchParams(formData).toString();
+        
+        fetch('/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body
+        })
+        .then(() => {
             submitBtn.disabled = false;
             submitBtn.textContent = originalText;
-            
-            // Success state
-            showFeedback('תודה! פנייתך התקבלה בהצלחה. נציג מטעמנו יחזור אליך בהקדם.', 'success');
+            showFeedback('תודה! פנייתך התקבלה בהצלחה. נחזור אליך בהקדם האפשרי 🎉', 'success');
             form.reset();
-        }, 1500);
+        })
+        .catch(() => {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+            showFeedback('שגיאה בשליחה. אנא נסה שוב או פנה אלינו ישירות בטלפון.', 'error');
+        });
     });
     
     function showFeedback(message, type) {
