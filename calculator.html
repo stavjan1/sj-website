@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מחשבון מפלי מתח | SJ הנדסת חשמל</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Page‑specific tweaks */
+        .calc-container {
+            background: var(--glass-background);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--border-radius-lg);
+            padding: 40px 24px;
+            max-width: 500px;
+            margin: 120px auto;
+            box-shadow: var(--glass-shadow);
+        }
+        .calc-container h2 {
+            text-align: center;
+            margin-bottom: 24px;
+            font-size: 2rem;
+        }
+        .calc-field {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 16px;
+        }
+        .calc-field label {
+            margin-bottom: 4px;
+            font-weight: 500;
+            color: var(--color-text-gray);
+        }
+        .calc-field input, .calc-field select {
+            padding: 8px 12px;
+            border: 1px solid var(--glass-border);
+            border-radius: var(--border-radius-sm);
+            background: rgba(255,255,255,0.05);
+            color: var(--color-text-white);
+        }
+        .calc-result {
+            margin-top: 24px;
+            font-size: 1.2rem;
+            text-align: center;
+            color: var(--color-accent-amber);
+        }
+        .btn-calc {
+            width: 100%;
+            padding: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Re‑use the same header as index -->
+    <header class="main-header" id="main-header">
+        <div class="header-container">
+            <a href="index.html" class="logo-area">
+                <svg class="logo-svg" viewBox="0 0 100 100" width="40" height="40">
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 2" class="logo-circle"/>
+                    <path d="M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z" fill="currentColor" class="logo-bolt"/>
+                </svg>
+                <div class="logo-text">
+                    <span class="logo-brand">SJ</span>
+                    <span class="logo-subbrand">הנדסת חשמל</span>
+                </div>
+            </a>
+            <nav class="desktop-nav" role="navigation" aria-label="תפריט ראשי">
+                <a href="#" class="nav-link" id="link-services">שירותים</a>
+                <a href="#" class="nav-link" id="link-certs">הסמכות</a>
+                <a href="articles.html" class="nav-link" id="link-articles">מדריכים</a>
+                <a href="login.html" class="nav-link" id="link-login">התחברות</a>
+                <a href="#contact" class="btn-primary" id="btn-header-contact">שיחת ייעוץ</a>
+            </nav>
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="פתח תפריט">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </header>
+    <main>
+        <section class="calc-container">
+            <h2>מחשבון מפלי מתח</h2>
+            <div class="calc-field">
+                <label for="calc-current">זרם (אמפר)</label>
+                <input type="number" id="calc-current" placeholder="לדוגמה: 10" step="any" />
+            </div>
+            <div class="calc-field">
+                <label for="calc-length">אורך (מטר)</label>
+                <input type="number" id="calc-length" placeholder="לדוגמה: 30" step="any" />
+            </div>
+            <div class="calc-field">
+                <label for="calc-material">חומר המוליך</label>
+                <select id="calc-material">
+                    <option value="copper" selected>נחושת (ρ≈0.017 Ω·mm²/m)</option>
+                    <option value="aluminium">אלומיניום (ρ≈0.028 Ω·mm²/m)</option>
+                </select>
+            </div>
+            <button class="btn-primary btn-calc" id="btn-calc">חשב מפל</button>
+            <div class="calc-result" id="calc-result"></div>
+        </section>
+    </main>
+    <footer class="main-footer" role="contentinfo">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <div class="brand-title">SJ הנדסת חשמל</div>
+                <div class="brand-tagline">תכנון, ייעוץ ושרטוט מערכות חשמל</div>
+            </div>
+            <div class="footer-links">
+                <a href="#services">שירותים</a>
+                <a href="#certificates">הסמכות</a>
+                <a href="login.html">התחברות</a>
+                <a href="articles.html">מדריכים</a>
+                <a href="#contact">יצירת קשר</a>
+            </div>
+            <div class="footer-copy">
+                <p>&copy; 2026 SJ הנדסת חשמל. כל הזכויות שמורות.</p>
+            </div>
+        </div>
+    </footer>
+    <script>
+        // Simple voltage‑drop calculator (demo version)
+        const calcBtn = document.getElementById('btn-calc');
+        const resultEl = document.getElementById('calc-result');
+        calcBtn.addEventListener('click', () => {
+            const I = parseFloat(document.getElementById('calc-current').value) || 0;
+            const L = parseFloat(document.getElementById('calc-length').value) || 0;
+            const material = document.getElementById('calc-material').value;
+            const rho = material === 'copper' ? 0.017 : 0.028; // Ω·mm²/m
+            const A = 4; // mm² – assumed section for demo
+            const R = (rho * L) / A; // Ω
+            const V = I * R; // V
+            const rounded = Math.round(V * 100) / 100;
+            resultEl.textContent = `מפל המתח המשוער: ${rounded} V`;
+        });
+    </script>
+</body>
+</html>

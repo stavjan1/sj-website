@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מחולל הצעות מחיר | SJ הנדסת חשמל</title>
+
+    <!-- Access control: members-only area (requires Netlify Identity login) -->
+    <meta name="robots" content="noindex">
+    <style id="auth-gate">body{visibility:hidden}</style>
+    <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+    <script src="/auth-guard.js"></script>
+
+    <!-- Google Fonts: Heebo for Hebrew, Rubik/Outfit for numbers/UI, David/Frank Ruhl for PDF -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Rubik:wght@300;400;500;700&family=David+Libre:wght@400;700&family=Frank+Ruhl+Libre:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- html2pdf.js for high-quality client-side PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <!-- Google Identity Services client for Google Drive Integration -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    
+    <!-- Custom styling -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon">SJ</div>
+                <div class="logo-text">
+                    <span class="brand-name">SJ הנדסת חשמל</span>
+                    <span class="brand-sub">מערכת הצעות מחיר</span>
+                </div>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-btn active" id="tab-projects" onclick="switchTab('projects')">
+                    <i class="fa-solid fa-folder-open"></i>
+                    <span>ניהול פרויקטים</span>
+                </button>
+                <button class="nav-btn" id="tab-wizard" onclick="switchTab('wizard')">
+                    <i class="fa-solid fa-calculator"></i>
+                    <span>צ'אט תמחור וחומרים</span>
+                </button>
+                <button class="nav-btn" id="tab-create" onclick="switchTab('create')">
+                    <i class="fa-solid fa-file-invoice-dollar"></i>
+                    <span>עורך הצעות מחיר</span>
+                </button>
+                <button class="nav-btn" id="tab-history" onclick="switchTab('history')">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>היסטוריית הצעות</span>
+                </button>
+                <button class="nav-btn" id="tab-settings" onclick="switchTab('settings')">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>הגדרות מערכת</span>
+                </button>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <span class="version">גרסה 4.0 (Projects & AI Agents)</span>
+            </div>
+        </aside>
+        
+        <!-- Main Workspace -->
+        <main class="main-content">
+            
+            <!-- Active Project Banner -->
+            <div class="active-project-banner" id="project-banner">
+                <span class="banner-label"><i class="fa-solid fa-folder-open text-accent"></i> פרויקט פעיל:</span>
+                <span class="banner-value" id="active-project-name">אין פרויקט טעון (בחר או צור פרויקט תחילה)</span>
+                <span class="banner-badge" id="active-project-status" style="display:none;">טיוטה</span>
+                <span id="banner-sync-indicator" style="margin-right:auto; display:none; align-items:center; gap:6px; color:var(--text-secondary); font-size:0.8rem;">
+                    <i class="fa-solid fa-arrows-rotate fa-spin text-success" style="color:var(--color-success)"></i> <span>מסנכרן ענן...</span>
+                </span>
+            </div>
+            
+            <!-- Tab: Projects Manager -->
+            <section id="panel-projects" class="content-panel active">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-folder-open"></i> ניהול פרויקטים</h2>
+                    <p class="section-subtitle">נהל את שלב התמחור והצעת המחיר לכל לקוח תחת פרויקט ייעודי.</p>
+                </div>
+                
+                <div class="split-view">
+                    <!-- Right side: Create Project -->
+                    <div class="control-side">
+                        <div class="section-card">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-folder-plus text-accent"></i> יצירת פרויקט חדש</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label for="new-project-name">שם הפרויקט / לקוח</label>
+                                    <input type="text" id="new-project-name" placeholder="לדוגמה: וילה בקיסריה - יוסי כהן">
+                                </div>
+                                <button class="btn btn-accent" style="width:100%;" onclick="createNewProject()">
+                                    <i class="fa-solid fa-plus"></i> צור פרויקט חדש
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Left side: Projects List -->
+                    <div class="preview-side" style="background-color: var(--bg-card); padding: 20px;">
+                        <h3 style="margin-bottom:14px;"><i class="fa-solid fa-list-check text-accent"></i> פרויקטים קיימים</h3>
+                        <div id="projects-list-container" class="projects-list">
+                            <!-- Dynamically loaded by script -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Tab: Pricing Chat (מומחה תמחור ועבודה) -->
+            <section id="panel-wizard" class="content-panel">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-calculator text-accent"></i> צ'אט תמחור וחומרים (סוכן AI)</h2>
+                    <p class="section-subtitle">שיחה מנוהלת עם מומחה תמחור וניהול עבודה לזיהוי נקודות עיוורון, חישוב חומרים והשוואת מחירים (ארכה).</p>
+                </div>
+                
+                <div class="split-view">
+                    
+                    <!-- Right Side: Gemini Chat Box -->
+                    <div class="control-side" style="display:flex; flex-direction:column; height:calc(100vh - 160px);">
+                        <div class="chat-container">
+                            <div class="chat-messages" id="chat-messages-log">
+                                <div class="chat-bubble system">
+                                    שלום סתיו! אני סוכן ה-AI המומחה שלך לתמחור וניהול עבודות חשמל.
+                                    תאר לי את העבודה שאתה רוצה לתמחר (למשל: "התקנת עמדת טעינה במרחק 15 מטר מהלוח"), 
+                                    ואני אעזור לך לחשב עלויות, לאתר חומרים נדרשים, להשוות מחירים בשוק (כמו באתר ארכה) ולזהות נקודות עיוורון.
+                                </div>
+                            </div>
+                            
+                            <div class="chat-suggestions">
+                                <button class="chip" onclick="sendSuggestedChatPrompt('התקנת עמדת טעינה לרכב חשמלי בחניון תת-קרקעי במרחק 15 מטר מהלוח')">עמדת טעינה</button>
+                                <button class="chip" onclick="sendSuggestedChatPrompt('החלפת לוח חשמל דירתי חד פאזי ללוח תלת פאזי 3x25 כולל מפסקים חדשים')">החלפת לוח</button>
+                                <button class="chip" onclick="sendSuggestedChatPrompt('בדיקת תקינות הארקה והתנגדות בידוד מגר לדירת 4 חדרים')">בדיקת הארקה</button>
+                            </div>
+                            
+                            <div class="chat-input-area">
+                                <textarea id="chat-user-input" rows="2" placeholder="כתוב כאן הודעה למומחה התמחור..." onkeydown="handleChatKeyDown(event)"></textarea>
+                                <button class="btn btn-accent" id="btn-send-chat" onclick="sendChatMessage()">
+                                    <i class="fa-solid fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Left Side: Estimate Summary Dashboard -->
+                    <div class="preview-side" style="background-color: var(--bg-card);">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-boxes-packing text-accent"></i> טיוטת אומדן עלויות וחומרים</h3>
+                            <p class="card-subtitle">סיכום החומרים והתמחור שהופקו מהשיחה עם ה-AI. לחץ על 'ייצא להצעה' כדי לנסח קובץ מוכן.</p>
+                        </div>
+                        <div class="card-body" style="overflow-y:auto; flex-grow:1; display:flex; flex-direction:column; gap:16px;">
+                            
+                            <div class="results-price-summary">
+                                <span class="lbl">אומדן מחיר עבודה (עבודה בלבד):</span>
+                                <input type="number" id="wizard-labor-price" class="readonly-highlight" style="width:120px; text-align:center;" value="0" oninput="calculateWizardTotal()">
+                            </div>
+                            
+                            <div class="results-materials-header">
+                                <h5>רשימת חומרים נלווים:</h5>
+                                <p class="card-subtitle">סמן את החומרים שברצונך לכלול בהצעת המחיר הסופית</p>
+                            </div>
+                            
+                            <div id="wizard-materials-list" class="helper-materials-checklist">
+                                <div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:20px;">
+                                    אין חומרים באומדן. התחל שיחה עם ה-AI כדי לפרק עבודה לחומרים.
+                                </div>
+                            </div>
+                            
+                            <div class="ai-helper-tips" id="wizard-tips-box" style="display:none;"></div>
+                            
+                            <button class="btn btn-success" id="btn-export-to-quote" style="margin-top:auto; width:100%; font-size:1.05rem;" onclick="exportChatToQuote()">
+                                <i class="fa-solid fa-file-export"></i>
+                                <span>ייצא להצעת מחיר (סוכן ניסוח)</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                </div>
+            </section>
+            
+            <!-- Tab: Create / Edit Quote (עורך הצעות מחיר) -->
+            <section id="panel-create" class="content-panel">
+                <div class="split-view">
+                    
+                    <!-- Right Side: Form and Controls -->
+                    <div class="control-side">
+                        <!-- Manual Form Edit Card -->
+                        <div class="section-card">
+                            <div class="card-header flex-header">
+                                <h3><i class="fa-solid fa-pen-to-square"></i> עריכת פרטי הצעת המחיר</h3>
+                            </div>
+                            <div class="card-body">
+                                <form id="quote-form" oninput="updatePreviewFromForm()">
+                                    
+                                    <!-- Row 1: Client & Date -->
+                                    <div class="form-grid-2">
+                                        <div class="form-group">
+                                            <label for="form-client-name">שם הלקוח / חברה</label>
+                                            <input type="text" id="form-client-name" required placeholder="למשל: משה לוי">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="form-client-sub">פרטי לקוח נוספים (כתובת/טלפון)</label>
+                                            <input type="text" id="form-client-sub" placeholder="למשל: רחוב הרצל 10, תל אביב | 054-1234567">
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Row 2: Subject & Meta -->
+                                    <div class="form-grid-3">
+                                        <div class="form-group">
+                                            <label for="form-quote-subject">נושא הצעת המחיר</label>
+                                            <input type="text" id="form-quote-subject" required placeholder="למשל: תכנון חשמל לדירת 4 חדרים">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="form-quote-number">מספר הצעה</label>
+                                            <div class="input-with-button">
+                                                <input type="text" id="form-quote-number" required placeholder="למשל: 2026-102">
+                                                <button type="button" class="btn btn-secondary btn-small" onclick="autoDetectQuoteNumber(true)" title="סרוק מהדרייב"><i class="fa-solid fa-arrows-rotate"></i></button>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="form-quote-date">תאריך</label>
+                                            <input type="date" id="form-quote-date" required>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Section: Work Items (Dynamic Table) -->
+                                    <div class="form-section">
+                                        <div class="section-subheader">
+                                            <h4>סעיפי העבודה והתמחור (דינמי)</h4>
+                                            <div style="display:flex; gap: 8px;">
+                                                <button type="button" class="btn btn-small btn-secondary" onclick="openSternDrawer()">
+                                                    <i class="fa-solid fa-search"></i> מחירון שטרן
+                                                </button>
+                                                <button type="button" class="btn btn-small btn-secondary" onclick="addWorkItemRow()">
+                                                    <i class="fa-solid fa-plus"></i> הוסף סעיף
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="form-group" style="margin-bottom: 14px; display: flex; flex-direction: row; align-items: center; gap: 10px; background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color);">
+                                            <input type="checkbox" id="form-itemized-prices-toggle" onchange="toggleItemizedPrices(this.checked)" style="width: 18px; height: 18px; cursor: pointer; margin: 0;">
+                                            <label for="form-itemized-prices-toggle" style="font-weight: 600; cursor: pointer; margin: 0; user-select: none; color: var(--text-primary);">אפשר תמחור מפורט לפי סעיפים (מחיר לכל סעיף)</label>
+                                        </div>
+                                        
+                                        <div id="work-items-container" class="work-items-list">
+                                            <!-- Dynamically filled by script -->
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Row 3: Pricing -->
+                                    <div class="form-grid-3">
+                                        <div class="form-group">
+                                            <label for="form-base-price">מחיר בסיס כולל (ש"ח)</label>
+                                            <input type="number" id="form-base-price" min="0" step="any" placeholder="0.00" oninput="calculateTotal()">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="form-vat-type">מע"מ</label>
+                                            <select id="form-vat-type" onchange="calculateTotal()">
+                                                <option value="exempt" selected>פטור ממע"מ (עוסק פטור)</option>
+                                                <option value="exclude">לא כולל מע"מ (נוסף 17%)</option>
+                                                <option value="include">כולל מע"מ (17%)</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="form-final-price">מחיר סופי (ש"ח)</label>
+                                            <input type="text" id="form-final-price" readonly class="readonly-highlight">
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Row 4: Summary / Terms -->
+                                    <div class="form-group">
+                                        <label for="form-summary">הערות / תנאי תשלום</label>
+                                        <textarea id="form-summary" rows="3" placeholder="למשל: תנאי תשלום: 50% מקדמה עם אישור ההצעה..."></textarea>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Left Side: Live PDF Preview -->
+                    <div class="preview-side">
+                        <div class="preview-toolbar">
+                            <span><i class="fa-solid fa-eye text-accent"></i> תצוגה מקדימה (A4)</span>
+                            <div class="preview-actions">
+                                <button class="btn btn-success" onclick="downloadPDF()">
+                                    <i class="fa-solid fa-file-pdf"></i>
+                                    <span>הורד PDF</span>
+                                </button>
+                                <button class="btn btn-accent" id="btn-save-drive" onclick="uploadPDFToDrive()">
+                                    <i class="fa-brands fa-google-drive"></i>
+                                    <span>שמור בדרייב</span>
+                                </button>
+                                <button class="btn btn-secondary" onclick="shareWhatsApp()">
+                                    <i class="fa-solid fa-share-nodes"></i>
+                                    <span>שתף בוואטסאפ</span>
+                                </button>
+                                <button class="btn btn-secondary" onclick="saveToHistory()">
+                                    <i class="fa-solid fa-floppy-disk"></i>
+                                    <span>שמור פרויקט</span>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- The actual sheet container -->
+                        <div class="sheet-scroller">
+                            <div id="quote-pdf-sheet" class="a4-sheet">
+                                <!-- Watermark background container -->
+                                <div class="pdf-watermark" id="pdf-watermark-bg"></div>
+                                
+                                <div class="pdf-wrapper">
+                                    <!-- Header structure matching Word template perfectly -->
+                                    <header class="pdf-header">
+                                        <div class="pdf-header-grid">
+                                            <!-- Right column: Recipient Info -->
+                                            <div class="pdf-recipient-column">
+                                                <div class="recipient-label">לכבוד:</div>
+                                                <div class="recipient-name" id="pdf-client-name">שם הלקוח</div>
+                                                <div class="recipient-sub" id="pdf-client-sub">כתובת הלקוח / טלפון</div>
+                                            </div>
+                                            
+                                            <!-- Center column: Logo & Business Titles -->
+                                            <div class="pdf-logo-column" id="pdf-logo-area">
+                                                <div class="pdf-logo-wrapper" id="pdf-logo-container">
+                                                    <svg viewBox="0 0 100 100" class="pdf-logo-svg" id="fallback-logo">
+                                                        <circle cx="50" cy="50" r="46" fill="#0f172a" stroke="#3b82f6" stroke-width="3" />
+                                                        <path d="M 32 40 C 32 28, 68 28, 68 40 C 68 52, 32 48, 32 60 C 32 72, 68 72, 68 60" fill="none" stroke="#60a5fa" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+                                                        <path d="M 58 46 L 58 70 C 58 80, 32 80, 32 70" fill="none" stroke="#3b82f6" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+                                                    </svg>
+                                                </div>
+                                                <div class="pdf-company-title" id="pdf-comp-title">SJ הנדסת חשמל</div>
+                                                <div class="pdf-company-subtitle" id="pdf-comp-sub">תכנון ויעוץ חשמל</div>
+                                                <div class="pdf-company-owner" id="pdf-comp-owner">סתיו ג'אן</div>
+                                            </div>
+                                            
+                                            <!-- Left column: Date & Quote Info -->
+                                            <div class="pdf-meta-column">
+                                                <div class="meta-item">
+                                                    <span id="pdf-date" class="meta-val-date">21/06/2026</span>
+                                                </div>
+                                                <div class="meta-item">
+                                                    <span class="meta-val-number">הצעת מחיר מס': <span id="pdf-number">2026-101</span></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </header>
+                                    
+                                    <!-- Divider Line below logo -->
+                                    <div class="pdf-header-divider"></div>
+                                    
+                                    <!-- Title -->
+                                    <div class="pdf-title-container">
+                                        <h1 class="pdf-title">הצעת מחיר ל<span id="pdf-subject">נושא הצעה</span></h1>
+                                        <div class="underline-bar"></div>
+                                    </div>
+                                    
+                                    <!-- Work Items Details List / Table -->
+                                    <div class="pdf-content-area">
+                                        <div id="pdf-work-items" class="pdf-items-list">
+                                            <!-- Dynamically filled by script -->
+                                        </div>
+                                        
+                                        <!-- Summary Notes -->
+                                        <div class="pdf-summary-box">
+                                            <div class="summary-title">פירוט תנאים נוספים:</div>
+                                            <div class="summary-text" id="pdf-summary"></div>
+                                        </div>
+                                        
+                                        <!-- Exclusions warning -->
+                                        <div class="pdf-warning-box">
+                                            המחיר לא כולל איתור או תיקון תקלות במידה וימצאו ממצאים חריגים !
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Pricing and Footer -->
+                                    <div class="pdf-footer-section">
+                                        <div class="pdf-price-row">
+                                            <span class="price-label">סה"כ לתשלום:</span>
+                                            <span class="price-val" id="pdf-total-price">0 ש"ח</span>
+                                        </div>
+                                        <div class="price-sub-label" id="pdf-vat-label">פטור ממע"מ ; ישולם בסוף העבודה</div>
+                                        
+                                        <!-- Footer lines -->
+                                        <div class="pdf-footer-line"></div>
+                                        <footer class="pdf-company-footer">
+                                            <div class="footer-row font-bold">
+                                                <span>SJ הנדסת חשמל</span>
+                                                <span class="bullet">|</span>
+                                                <span>סתיו ג'אן</span>
+                                                <span class="bullet">|</span>
+                                                <span>עוסק פטור: 207382920</span>
+                                            </div>
+                                            <div class="footer-row text-secondary">
+                                                <span>אימייל: info@sj-eng.co.il</span>
+                                                <span class="bullet">|</span>
+                                                <span>סלולרי: 053-530-2887</span>
+                                                <span class="bullet">|</span>
+                                                <span>אתר: www.sj-eng.co.il</span>
+                                            </div>
+                                            <div class="footer-row text-secondary">
+                                                <span>כתובת: דרך בן גוריון 138, בת ים, יחידה 1304</span>
+                                            </div>
+                                            <div class="footer-notice">
+                                                הצעת מחיר זו תקפה לשלושה חודשים. עם אישור וחתימת הלקוח תשמש כהסכם לביצוע העבודה בהתאם לאמור בה.
+                                            </div>
+                                        </footer>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Tab: History -->
+            <section id="panel-history" class="content-panel">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-clock-rotate-left"></i> היסטוריית הצעות מחיר</h2>
+                    <p class="section-subtitle">ניהול, עריכה והורדה מחדש של הצעות מחיר שהופקו בעבר.</p>
+                </div>
+                
+                <div class="history-controls">
+                    <div class="search-bar">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="history-search" placeholder="חפש לפי שם לקוח או נושא..." oninput="filterHistory()">
+                    </div>
+                    <div class="history-actions">
+                        <button class="btn btn-secondary" onclick="exportHistoryData()">
+                            <i class="fa-solid fa-file-export"></i> ייצוא נתונים
+                        </button>
+                        <button class="btn btn-secondary" onclick="importHistoryClick()">
+                            <i class="fa-solid fa-file-import"></i> ייבוא נתונים
+                        </button>
+                        <input type="file" id="import-file" style="display: none;" onchange="importHistoryData(event)">
+                    </div>
+                </div>
+                
+                <div class="history-table-wrapper">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>מספר הצעה</th>
+                                <th>תאריך</th>
+                                <th>לקוח</th>
+                                <th>נושא</th>
+                                <th>מחיר</th>
+                                <th>סטטוס</th>
+                                <th>פעולות</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-list">
+                            <!-- Dynamically loaded by script -->
+                        </tbody>
+                    </table>
+                    <div class="empty-state" id="history-empty">
+                        <i class="fa-solid fa-file-invoice"></i>
+                        <p>אין הצעות מחיר שמורות במערכת.</p>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Tab: Settings -->
+            <section id="panel-settings" class="content-panel">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-sliders"></i> הגדרות מערכת</h2>
+                    <p class="section-subtitle">הגדרת מפתח ה-API של Gemini, שילוב Google Drive, תמונות רקע/לוגו ומאגר ניסוחים.</p>
+                </div>
+                
+                <div class="settings-grid">
+                    <!-- Column 1: API & Drive Configuration -->
+                    <div style="display:flex; flex-direction:column; gap:20px;">
+                        <div class="section-card">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-key text-accent"></i> מפתח API של Gemini</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label for="settings-gemini-key">Gemini API Key</label>
+                                    <input type="password" id="settings-gemini-key" placeholder="הכנס את ה-API Key שלך">
+                                    <p class="input-help">
+                                        מפתח ה-API נשמר בדפדפן שלך בלבד.
+                                        תוכל להפיק מפתח בחינם ב-
+                                        <a href="https://aistudio.google.com/" target="_blank" class="text-link">Google AI Studio <i class="fa-solid fa-arrow-up-right-from-square"></i></a>.
+                                    </p>
+                                </div>
+                                <button class="btn btn-accent" onclick="saveGeminiKey()">שמור מפתח API</button>
+                            </div>
+                        </div>
+                        
+                        <div class="section-card">
+                            <div class="card-header">
+                                <h3><i class="fa-brands fa-google-drive text-accent"></i> חיבור ל-Google Drive</h3>
+                            </div>
+                            <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
+                                <div class="form-group" style="margin-bottom:0">
+                                    <label for="settings-drive-client-id">Google Client ID (מזהה לקוח OAuth)</label>
+                                    <input type="text" id="settings-drive-client-id" placeholder="הכנס את מזהה לקוח ה-OAuth שלך">
+                                    <p class="input-help">נדרש כדי לבצע אימות מול חשבון ה-Google שלך לשמירה ישירה של קבצים.</p>
+                                </div>
+                                <div class="form-group" style="margin-bottom:0">
+                                    <label for="settings-drive-folder-id">מזהה תיקיית הצעות מחיר (מנוהל אוטומטית)</label>
+                                    <input type="text" id="settings-drive-folder-id" readonly style="background: rgba(255,255,255,0.05); cursor: not-allowed;" placeholder="יזוהה אוטומטית לאחר התחברות">
+                                    <p class="input-help" id="drive-folder-path-status" style="margin-top: 5px; font-weight: 500; line-height: 1.6;">
+                                        <i class="fa-solid fa-file-pdf"></i> קובצי PDF יישמרו בתיקייה הנבחרת<br>
+                                        <i class="fa-solid fa-database"></i> גיבוי וסנכרון נתונים: <strong>תיקיית מערכת מוסתרת (.sysdata)</strong>
+                                    </p>
+                                </div>
+                                <div class="drive-conn-status">
+                                    <span id="drive-status" class="status-disconnected"><i class="fa-solid fa-circle-dot"></i> מנותק</span>
+                                    <button class="btn btn-accent" id="btn-connect-drive" onclick="connectGoogleDrive()">גבה את עבודתך ע"י יצירת תיקיית הצעות מחיר ב-DRIVE של גוגל</button>
+                                </div>
+                                <div id="drive-folder-select-container" style="margin-top: 10px;"></div>
+                                <p class="input-help text-danger" style="margin-top: 10px; color: var(--color-danger); font-weight: 500; font-size: 0.85rem; line-height: 1.5;">
+                                    <i class="fa-solid fa-triangle-exclamation"></i> 
+                                    שים לב: ללא גיבוי ב-Google Drive, הפרויקטים וההיסטוריה יישמרו מקומית בלבד. במקרה של ניקוי נתוני גלישה או סגירת הדפדפן (אם לא סומן "זכור אותי במכשיר זה"), <strong>כל המידע שלך עלול להימחק לצמיתות!</strong>
+                                </p>
+                                <div class="drive-sync-controls" id="drive-sync-section" style="display:none; flex-direction:column; gap:12px; margin-top:8px; border-top:1px solid var(--border-color); padding-top:14px;">
+                                    <div style="display:flex; flex-direction:row; gap:10px; width:100%; align-items:center;">
+                                        <button class="btn btn-secondary" style="flex-grow:1;" id="btn-sync-cloud" onclick="manualSyncFromCloud()">
+                                            <i class="fa-solid fa-cloud-arrow-down"></i> סנכרן כעת מהענן
+                                        </button>
+                                        <span id="sync-spinner" style="display:none; align-items:center; justify-content:center; color:var(--color-success)">
+                                            <i class="fa-solid fa-spinner fa-spin" style="font-size:1.4rem;"></i>
+                                        </span>
+                                    </div>
+                                    <button class="btn btn-secondary" id="btn-recover-backup" onclick="recoverDriveBackup()" style="font-size: 0.82rem; padding: 10px; width: 100%; text-align: center; font-weight: 600; border: 1px dashed rgba(255,255,255,0.15); background: rgba(255,255,255,0.02);">
+                                        <i class="fa-solid fa-rotate-left"></i> כבר יש לך היסטוריה והיא נמחקה? כנראה שביצעת שינוי ידני בדרייב. שלוף גיבוי
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Column 2: Business Info & Phrasing Database -->
+                    <div class="section-card">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-briefcase"></i> פרטי העסק והתאמה אישית</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="settings-business-form">
+                                <div class="form-grid-2">
+                                    <div class="form-group">
+                                        <label for="set-biz-name">שם העסק / עצמאי</label>
+                                        <input type="text" id="set-biz-name" value="SJ הנדסת חשמל">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="set-biz-owner">שם בעלים</label>
+                                        <input type="text" id="set-biz-owner" value="סתיו ג'אן">
+                                    </div>
+                                </div>
+                                <div class="form-grid-2">
+                                    <div class="form-group">
+                                        <label for="set-biz-id">ח.פ / עוסק מורשה / פטור</label>
+                                        <input type="text" id="set-biz-id" value="עוסק פטור: 207382920">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="set-biz-phone">טלפון סלולרי</label>
+                                        <input type="text" id="set-biz-phone" value="053-530-2887">
+                                    </div>
+                                </div>
+                                <div class="form-grid-2">
+                                    <div class="form-group">
+                                        <label for="set-biz-email">אימייל</label>
+                                        <input type="email" id="set-biz-email" value="info@sj-eng.co.il">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="set-biz-web">אתר אינטרנט</label>
+                                        <input type="text" id="set-biz-web" value="www.sj-eng.co.il">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="set-biz-address">כתובת העסק</label>
+                                    <input type="text" id="set-biz-address" value="דרך בן גוריון 138, בת ים, יחידה 1304">
+                                </div>
+                                
+                                <!-- File Uploaders -->
+                                <div class="form-grid-2" style="border-top:1px solid var(--border-color); padding-top:16px; margin-top:16px;">
+                                    <div class="form-group">
+                                        <label>העלאת לוגו החברה</label>
+                                        <input type="file" id="settings-logo-file" accept="image/*" style="display:none;" onchange="handleImageUpload(event, 'logo')">
+                                        <div class="file-uploader-box">
+                                            <button type="button" class="btn btn-secondary btn-small" onclick="document.getElementById('settings-logo-file').click()">בחר לוגו...</button>
+                                            <button type="button" class="btn btn-danger btn-small" onclick="clearUploadedImage('logo')">מחק</button>
+                                        </div>
+                                        <div class="img-preview-box" id="logo-settings-preview"></div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>תמונת רקע (מפת ישראל)</label>
+                                        <input type="file" id="settings-bg-file" accept="image/*" style="display:none;" onchange="handleImageUpload(event, 'bg')">
+                                        <div class="file-uploader-box">
+                                            <button type="button" class="btn btn-secondary btn-small" onclick="document.getElementById('settings-bg-file').click()">בחר רקע...</button>
+                                            <button type="button" class="btn btn-danger btn-small" onclick="clearUploadedImage('bg')">מחק</button>
+                                        </div>
+                                        <div class="img-preview-box" id="bg-settings-preview"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Logo Placement Settings -->
+                                <div class="logo-styling-section" style="border-top:1px solid var(--border-color); padding-top:16px; margin-top:16px;">
+                                    <h4>הגדרות מיקום וגודל הלוגו</h4>
+                                    <div class="form-grid-2" style="margin-top:10px;">
+                                        <div class="form-group">
+                                            <label for="set-logo-align">יישור לוגו בכותרת</label>
+                                            <select id="set-logo-align" onchange="updateLogoStyles()">
+                                                <option value="right">ימין</option>
+                                                <option value="center" selected>מרכז</option>
+                                                <option value="left">שמאל</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="set-logo-width">רוחב הלוגו: <span id="val-logo-width">75px</span></label>
+                                            <input type="range" id="set-logo-width" min="40" max="300" value="75" oninput="updateLogoStyles()">
+                                        </div>
+                                    </div>
+                                    <div class="form-grid-2">
+                                        <div class="form-group">
+                                            <label for="set-logo-margin-top">מרווח עליון (פיקסלים): <span id="val-logo-margin-top">0px</span></label>
+                                            <input type="range" id="set-logo-margin-top" min="0" max="100" value="0" oninput="updateLogoStyles()">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="set-logo-margin-bottom">מרווח תחתון (פיקסלים): <span id="val-logo-margin-bottom">10px</span></label>
+                                            <input type="range" id="set-logo-margin-bottom" min="0" max="100" value="10" oninput="updateLogoStyles()">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Pricing settings -->
+                                <div class="pricing-settings-section" style="border-top:1px solid var(--border-color); padding-top:16px; margin-top:16px;">
+                                    <h4>הגדרות תצוגת מחיר</h4>
+                                    <div class="form-group" style="margin-top:10px;">
+                                        <label class="toggle-container" style="display:flex; flex-direction:row; align-items:center; gap:10px; cursor:pointer;">
+                                            <input type="checkbox" id="set-show-itemized-prices" onchange="updatePriceDisplayMode()" style="width:20px; height:20px;">
+                                            <span class="toggle-label" style="font-weight:600;">הצג תמחור מפורט לפי סעיפים במסמך ה-PDF (טבלת מחירון)</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Phrasing/Draft Library Database -->
+                                <div class="phrasing-section" style="border-top:1px solid var(--border-color); padding-top:16px; margin-top:16px; margin-bottom:16px;">
+                                    <h4>מאגר ניסוחים לתיאורי עבודה (לסוכן הניסוח)</h4>
+                                    <p class="card-subtitle" style="margin-bottom:8px;">הדבק כאן את מאגר הניסוחים שלך. סוכן ה-AI ישתמש בו כמודל לניסוח הצעות מחיר חדשות.</p>
+                                    <div class="form-group">
+                                        <textarea id="set-phrasing-db" rows="8" placeholder="הדבק את מאגר הניסוחים כאן..."></textarea>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="set-biz-terms">תנאי תשלום והערות ברירת מחדל</label>
+                                    <textarea id="set-biz-terms" rows="4">תנאי תשלום:
+• 50% מקדמה עם אישור הצעת המחיר ותחילת העבודה.
+• 50% הנותרים עם מסירת התוכניות הסופיות.
+הערות נוספות:
+• כל שינוי בתוכניות לאחר שלב האישור הראשוני עשוי לגרור תוספת תשלום.
+• ליווי מול חברת החשמל אינו כולל את אגרות הבדיקה של חברת החשמל.</textarea>
+                                </div>
+                                <button type="button" class="btn btn-success" onclick="saveBusinessSettings()">שמור הגדרות עסק</button>
+                             </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Column 2 Addon: Profile settings & Logout -->
+                    <div class="section-card" style="margin-top: 20px;">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-user-gear"></i> פרופיל משתמש פעיל</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="user-profile-card">
+                                <div class="user-profile-header">
+                                    <i class="fa-solid fa-circle-user" style="font-size: 1.8rem;"></i>
+                                    <span id="profile-username-display">טוען...</span>
+                                </div>
+                                <div class="user-profile-field" style="margin-top: 10px;">
+                                    <span>שם משתמש:</span>
+                                    <span id="profile-field-username">-</span>
+                                </div>
+                                <div class="user-profile-field">
+                                    <span>תחום עיסוק נוכחי:</span>
+                                    <span id="profile-field-profession">-</span>
+                                </div>
+                                <div class="form-group" style="margin-top: 14px;">
+                                    <label for="settings-profession-input">עדכן תחום עיסוק</label>
+                                    <div style="display: flex; gap: 8px;">
+                                        <input type="text" id="settings-profession-input" placeholder="למשל: גנן, מהנדס בניין, שף" style="flex-grow: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; font-family: inherit; width: 100%;">
+                                        <button type="button" class="btn btn-accent" onclick="updateUserProfileProfession()" style="padding: 8px 16px; font-size: 0.9rem; white-space: nowrap;">עדכן</button>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-danger btn-full" onclick="handleUserLogout()" style="margin-top: 15px;">
+                                    <i class="fa-solid fa-power-off"></i> התנתק ונעילת מערכת
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Column 2 Addon 2: Security settings -->
+                    <div class="section-card" id="settings-security-card" style="margin-top: 20px;">
+                        <div class="card-header">
+                            <h3><i class="fa-solid fa-user-shield"></i> עדכון פרטי אבטחה</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="form-update-credentials" onsubmit="handleUpdateCredentials(event)" style="display: flex; flex-direction: column; gap: 14px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label for="settings-change-username">שם משתמש חדש</label>
+                                    <input type="text" id="settings-change-username" required placeholder="הזן שם משתמש חדש">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label for="settings-change-password">סיסמה חדשה</label>
+                                    <input type="password" id="settings-change-password" required placeholder="הזן סיסמה חדשה">
+                                </div>
+                                <button type="submit" class="btn btn-accent btn-full" style="margin-top: 5px;">
+                                    <i class="fa-solid fa-save"></i> עדכן שם משתמש וסיסמה
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+        </main>
+        
+    </div>
+
+    <!-- Collapsible Stern Pricing Sidebar / Drawer -->
+    <div class="stern-drawer" id="stern-pricing-drawer">
+        <div class="drawer-header">
+            <h3><i class="fa-solid fa-calculator"></i> מחירון א. שטרן</h3>
+            <button class="btn-close" onclick="closeSternDrawer()">&times;</button>
+        </div>
+        <div class="drawer-search">
+            <div class="search-bar" style="max-width: 100%;">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="stern-search-input" placeholder="חפש במחירון שטרן..." oninput="filterSternPricing()">
+            </div>
+        </div>
+        <div class="drawer-body">
+            <div id="stern-results-list" class="stern-results-container">
+                <!-- Loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Sleek Lock Screen Container (Login / Register) -->
+    <div id="lock-screen" class="lock-screen-container" style="display: none;">
+        <div class="lock-card">
+            <div class="lock-logo">
+                <i class="fa-solid fa-file-invoice-dollar lock-icon"></i>
+                <h2>מערכת הצעות מחיר | SJ</h2>
+                <p>כניסה מאובטחת וסנכרון ענן אישי</p>
+            </div>
+
+            <!-- Google Authentication (Easiest & Recommended) -->
+            <div class="google-auth-box" style="margin-bottom: 20px; padding: 20px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px;">
+                <button type="button" class="btn btn-full" onclick="handleGoogleLogin()" style="background: #fff; color: #1f2937; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: transform 0.2s; cursor: pointer; width: 100%;">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google Logo" style="width: 18px; height: 18px;">
+                    <span>התחבר באמצעות Google</span>
+                </button>
+                
+                <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 15px;">
+                    <input type="checkbox" id="lock-remember-me" checked style="width: 16px; height: 16px; cursor: pointer;">
+                    <label for="lock-remember-me" style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; user-select: none;">זכור אותי במכשיר זה</label>
+                </div>
+
+                <!-- Expandable Client ID settings -->
+                <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;">
+                    <button type="button" onclick="toggleGoogleConfig()" style="background: none; border: none; color: var(--color-accent); font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; margin: 0 auto;">
+                        <i class="fa-solid fa-cog"></i> <span>הגדרות חיבור Google API</span>
+                    </button>
+                    <div id="google-config-section" style="display: none; margin-top: 10px; text-align: right;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="lock-google-client-id" style="font-size: 0.75rem; color: var(--text-muted);">Google Client ID</label>
+                            <input type="text" id="lock-google-client-id" placeholder="הזן מזהה לקוח של גוגל" style="font-size: 0.8rem; padding: 8px 12px; margin-top: 4px; width: 100%; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: #fff;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; color: var(--text-muted); font-size: 0.8rem;">
+                <div style="flex-grow: 1; height: 1px; background: rgba(255,255,255,0.08);"></div>
+                <span>או כניסה מקומית</span>
+                <div style="flex-grow: 1; height: 1px; background: rgba(255,255,255,0.08);"></div>
+            </div>
+            
+            <!-- Toggle Tabs -->
+            <div class="lock-tabs">
+                <button class="lock-tab-btn active" id="tab-login" onclick="toggleLockForm('login')">התחברות</button>
+                <button class="lock-tab-btn" id="tab-register" onclick="toggleLockForm('register')">הרשמה</button>
+            </div>
+            
+            <!-- Login Form -->
+            <form id="form-login-user" onsubmit="handleUserLogin(event)" class="lock-form active">
+                <div class="form-group">
+                    <label for="login-username">שם משתמש</label>
+                    <input type="text" id="login-username" required placeholder="הזן שם משתמש">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">סיסמה</label>
+                    <input type="password" id="login-password" required placeholder="הזן סיסמה">
+                </div>
+                <button type="submit" class="btn btn-accent btn-full" style="margin-top: 10px;">התחבר למערכת</button>
+            </form>
+            
+            <!-- Register Form -->
+            <form id="form-register-user" onsubmit="handleUserRegister(event)" class="lock-form">
+                <div class="form-group">
+                    <label for="reg-username">שם משתמש חדש</label>
+                    <input type="text" id="reg-username" required placeholder="למשל: סתיו">
+                </div>
+                <div class="form-group">
+                    <label for="reg-password">סיסמה</label>
+                    <input type="password" id="reg-password" required placeholder="צור סיסמה">
+                </div>
+                <div class="form-group">
+                    <label for="reg-profession">תחום עיסוק / התמחות</label>
+                    <input type="text" id="reg-profession" required placeholder="למשל: חשמלאי מוסמך, גנן, שף">
+                </div>
+                <button type="submit" class="btn btn-accent btn-full" style="margin-top: 10px;">צור משתמש והתחבר</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Profession prompt modal for new Google users -->
+    <div id="google-profession-modal" class="lock-screen-container" style="display: none; z-index: 100000; background: radial-gradient(circle at center, rgba(15, 23, 42, 0.98) 0%, rgba(2, 6, 23, 0.99) 100%);">
+        <div class="lock-card">
+            <div class="lock-logo">
+                <i class="fa-solid fa-circle-user lock-icon"></i>
+                <h2>שלום! ברוך הבא</h2>
+                <p>כדי שסוכן ה-AI יוכל להתאים את עצמו אליך במדויק, אנא הזן את תחום העיסוק שלך:</p>
+            </div>
+            <form onsubmit="saveGoogleUserProfession(event)" style="text-align: right; display: flex; flex-direction: column; gap: 16px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="google-reg-profession">תחום עיסוק / התמחות</label>
+                    <input type="text" id="google-reg-profession" required placeholder="למשל: חשמלאי מוסמך, גנן, שף, מתקין עמדות טעינה" style="width: 100%; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(15, 23, 42, 0.5); padding: 12px 16px; color: #fff; font-family: inherit; font-size: 0.95rem;">
+                </div>
+                <button type="submit" class="btn btn-accent btn-full" style="margin-top: 10px;">סיום והמשך לאפליקציה</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Application Script -->
+    <script src="app.js"></script>
+</body>
+</html>

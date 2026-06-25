@@ -1,0 +1,10 @@
+# Local Netlify CLI state / cache
+.netlify/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.log
+
+# Build output (none for this static site, kept for safety)
+node_modules/

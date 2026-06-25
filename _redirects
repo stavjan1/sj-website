@@ -1,6 +1,13 @@
 # Netlify Redirects
-# Redirect bare root requests
-/ /index.html 200
 
-# Handle all routes for SPA-like behavior (keeps HTML pages)
-/articles /articles.html 200
+# Clean URLs
+/login        /login.html        200
+/calculator   /calculator.html   200
+/articles     /articles.html     200
+
+# Client area (the app itself enforces login client-side via auth-guard.js)
+/sale         /sale/index.html   200
+/app          /sale/index.html   301
+
+# Root
+/             /index.html        200
