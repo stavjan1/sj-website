@@ -146,6 +146,50 @@ img {
     border-color: rgba(255, 255, 255, 0.3);
 }
 
+/* Staff / Employee entry button — golden "exclusive access" */
+.btn-staff {
+    background: linear-gradient(135deg, rgba(212, 160, 20, 0.14) 0%, rgba(255, 200, 40, 0.08) 100%);
+    color: #f0c040;
+    padding: 12px 28px;
+    font-size: 1rem;
+    font-weight: 700;
+    border-radius: 50px;
+    border: 1px solid rgba(240, 190, 40, 0.45);
+    box-shadow: 0 0 18px rgba(240, 190, 40, 0.1);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: var(--transition-smooth);
+}
+
+.btn-staff:hover {
+    transform: translateY(-2px);
+    background: linear-gradient(135deg, rgba(212, 160, 20, 0.28) 0%, rgba(255, 200, 40, 0.18) 100%);
+    box-shadow: 0 6px 28px rgba(240, 190, 40, 0.28);
+    border-color: rgba(240, 190, 40, 0.8);
+    color: #ffe066;
+}
+
+/* Nav staff link variant */
+.nav-link-staff {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid rgba(240, 190, 40, 0.4);
+    border-radius: 10px;
+    padding: 7px 14px;
+    color: #f0c040;
+    background: rgba(240, 190, 40, 0.06);
+    transition: var(--transition-smooth);
+}
+
+.nav-link-staff:hover {
+    background: rgba(240, 190, 40, 0.14);
+    border-color: rgba(240, 190, 40, 0.7);
+    color: #ffe066;
+}
+
 /* Header & Navigation */
 .main-header {
     position: fixed;
@@ -1587,7 +1631,11 @@ img {
 }
 
 .certs-see-all {
-    text-align: center;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 16px 32px;
     margin-top: 28px;
 }
 
@@ -1604,6 +1652,24 @@ img {
 .certs-see-all-link:hover {
     color: #fff;
     gap: 10px;
+}
+
+.certs-verify-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.85rem;
+    transition: var(--transition-smooth);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 6px 12px;
+}
+
+.certs-verify-link:hover {
+    color: rgba(255, 255, 255, 0.85);
+    border-color: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.04);
 }
 
 /* Footer */
