@@ -20,6 +20,14 @@ function showAdminTabIfNeeded() {
 function adminSaveGeminiKey() {
     const key = (document.getElementById('admin-gemini-key')?.value || '').trim();
     if (!key) { showToast('הזן מפתח תחילה', 'error'); return; }
+    if (/googleusercontent\.com/i.test(key)) {
+        showToast('זהו מזהה OAuth (Client ID) ולא מפתח API. צור מפתח Gemini ב-aistudio.google.com/apikey — הוא מתחיל ב-AIza.', 'error');
+        return;
+    }
+    if (!/^AIza[0-9A-Za-z_\-]{20,}$/.test(key)) {
+        showToast('המפתח לא נראה תקין — מפתח Gemini מתחיל ב-AIza. ודא שהעתקת את כולו ללא רווחים.', 'error');
+        return;
+    }
     saveGlobalGeminiKey(key);
     appState.settings.geminiApiKey = key;
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
@@ -114,29 +122,50 @@ function getEffectiveModel() {
     return null; // both exhausted
 }
 function updateQuotaUI() {
-    const model = selectedGeminiModel;
-    const used  = getDailyUsage(model);
-    const limit = MODEL_QUOTAS[model];
-    const pct   = Math.min(100, Math.round((used / limit) * 100));
+    const model  = selectedGeminiModel;
+    const used   = getWeightedUsage(model);
+    const budget = WEIGHTED_DAILY_BUDGET[model] || 100;
+    const pct    = Math.min(100, Math.round((used / budget) * 100));
     const offset = MODEL_CIRCUMFERENCE * (1 - pct / 100);
 
     const arc = document.getElementById('quota-arc');
     if (arc) {
         arc.style.strokeDashoffset = offset;
-        arc.style.stroke = pct >= 100 ? '#f05252' : pct >= 80 ? '#f0c040' : 'var(--color-accent)';
+        arc.style.stroke = pct >= 100 ? '#f05252' : pct >= 75 ? '#f0c040' : 'var(--color-accent)';
     }
     const pctEl = document.getElementById('quota-pct');
     if (pctEl) pctEl.textContent = pct + '%';
-    const usedEl = document.getElementById('quota-used');
-    if (usedEl) usedEl.textContent = used;
-    const limitEl = document.getElementById('quota-limit');
-    if (limitEl) limitEl.textContent = limit;
     const nameEl = document.getElementById('quota-model-name');
-    if (nameEl) nameEl.textContent = (model === 'gemini-2.0-flash' ? 'Flash 2.0' : 'Flash 1.5') + ' היום';
+    if (nameEl) nameEl.textContent = (model === 'gemini-2.0-flash' ? 'Flash 2.0' : 'Flash 1.5') + ' · היום';
+    // Legacy element (may be absent after redesign) — guard.
+    const usedEl = document.getElementById('quota-used');
+    if (usedEl) usedEl.textContent = Math.round(used);
 }
 function changeGeminiModel(model) {
     selectedGeminiModel = model;
     updateQuotaUI();
+}
+
+// Weighted "AI engine load": grows with message length and thinking time, so it
+// reflects real compute intensity instead of a crude X/30 request counter.
+const WEIGHTED_DAILY_BUDGET = { 'gemini-2.0-flash': 100, 'gemini-1.5-flash': 100 };
+function computeRequestCost(messageChars, latencyMs) {
+    const base = 1.2;
+    const lengthFactor = Math.min((messageChars || 0) / 350, 4);  // longer prompts cost more
+    const timeFactor   = Math.min((latencyMs || 0) / 1500, 4);    // slower "thinking" costs more
+    return base + lengthFactor + timeFactor;                      // ~1.2 .. 9.2 units per request
+}
+function getWeightedUsage(model) {
+    return parseFloat(localStorage.getItem('sj_aiload_' + model + '_' + _todayKey()) || '0');
+}
+function addWeightedUsage(model, messageChars, latencyMs) {
+    const next = getWeightedUsage(model) + computeRequestCost(messageChars, latencyMs);
+    localStorage.setItem('sj_aiload_' + model + '_' + _todayKey(), next.toFixed(2));
+    updateQuotaUI();
+}
+function setQuotaCharging(on) {
+    const ring = document.getElementById('quota-ring');
+    if (ring) ring.classList.toggle('charging', !!on);
 }
 
 function getGeminiApiKey() {
@@ -147,6 +176,62 @@ function getGeminiApiKey() {
 }
 function saveGlobalGeminiKey(key) {
     localStorage.setItem('sj_gemini_key_global', key);
+}
+
+// Single entry point for every Gemini call.
+// Strategy: try the server proxy first (key stays server-side, works for ALL users
+// and on every domain). Only if the proxy isn't deployed / has no key configured
+// (501/404) do we fall back to a personal AIza key stored locally.
+async function callGemini(model, payload) {
+    let proxyRes = null;
+    try {
+        proxyRes = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model, ...payload })
+        });
+    } catch (e) {
+        proxyRes = null; // network error / local file testing → fall through to personal key
+    }
+    // If the proxy answered (including a real Google error like 400/403), use it —
+    // EXCEPT when it signals "not available / no server key" (404 = not deployed, 501 = no key).
+    if (proxyRes && proxyRes.status !== 404 && proxyRes.status !== 501) {
+        return proxyRes;
+    }
+
+    const personalKey = getGeminiApiKey();
+    if (personalKey) {
+        return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${personalKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    }
+
+    // Neither a server key nor a personal key is configured.
+    return new Response(JSON.stringify({
+        error: { message: 'שירות ה-AI אינו מוגדר עדיין. הגדר את GEMINI_API_KEY בשרת (Cloudflare Pages), או הזן מפתח אישי בלשונית הגדרות.' }
+    }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+}
+
+// Turn any failed Gemini/proxy response into a clear Hebrew message.
+async function readGeminiError(response) {
+    try {
+        const data = await response.json();
+        if (data && data.error && data.error.message) {
+            const m = data.error.message;
+            if (/API key not valid|invalid authentication|API_KEY_INVALID|OAuth 2/i.test(m)) {
+                return 'מפתח ה-AI אינו תקין. ודא שהוגדר מפתח Gemini תקין (מתחיל ב-AIza) — בשרת או בהגדרות.';
+            }
+            return m;
+        }
+    } catch (e) {
+        if (response.status === 404) {
+            return 'שירות ה-AI אינו זמין כאן (ייתכן שמריצים בבדיקה מקומית ללא שרת). נסה באתר החי.';
+        }
+        return `שגיאת שרת AI (${response.status}).`;
+    }
+    return 'שגיאה בתקשורת עם שירות ה-AI.';
 }
 
 // ==========================================================================
@@ -167,12 +252,12 @@ let appState = {
             web: 'www.sj-eng.co.il',
             address: 'דרך בן גוריון 138, בת ים, יחידה 1304',
             terms: `תנאי תשלום:
-ג€¢ 50% מקדמה עם אישור הצעת המחיר ותחילת העבודה.
-ג€¢ 50% הנותרים עם מסירת התוכניות הסופיות.
+• 50% מקדמה עם אישור הצעת המחיר ותחילת העבודה.
+• 50% הנותרים עם מסירת התוכניות הסופיות.
 
 הערות נוספות:
-ג€¢ כל שינוי בתוכניות לאחר שלב האישור הראשוני עשוי לגרור תוספת תשלום.
-ג€¢ ליווי מול חברת החשמל אינו כולל את אגרות הבדיקה של חברת החשמל.`
+• כל שינוי בתוכניות לאחר שלב האישור הראשוני עשוי לגרור תוספת תשלום.
+• ליווי מול חברת החשמל אינו כולל את אגרות הבדיקה של חברת החשמל.`
         }
     },
     currentQuote: {
@@ -664,7 +749,7 @@ function saveBusinessSettings() {
 function saveGeminiKey() {
     const key = document.getElementById('settings-gemini-key').value.trim();
     appState.settings.geminiApiKey = key;
-    saveGlobalGeminiKey(key); // שמור גלובלית ג€” כל המשתמשים משתמשים במפתח הזה
+    saveGlobalGeminiKey(key); // שמור גלובלית — כל המשתמשים משתמשים במפתח הזה
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
     syncDatabaseToDrive(true);
@@ -935,7 +1020,7 @@ function updatePreviewFromForm() {
                 <tr>
                     <th style="width: 8%; text-align: center;">סעיף</th>
                     <th style="width: 72%;">תיאור ותכולת העבודה</th>
-                    <th style="width: 20%; text-align: left;">מחיר (ג‚×)</th>
+                    <th style="width: 20%; text-align: left;">מחיר (₪)</th>
                 </tr>
             </thead>
             <tbody>
@@ -951,7 +1036,7 @@ function updatePreviewFromForm() {
                     <div style="font-weight: 700; color: var(--pdf-primary); text-decoration: underline; margin-bottom: 4px;">${item.title || 'סעיף ללא כותרת'}</div>
                     <div style="white-space: pre-line; line-height: 1.5; color: var(--pdf-text-main); font-size: 0.9rem;">${item.description || 'אין פירוט לסעיף זה'}</div>
                 </td>
-                <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight: 700; text-align: left; color: var(--pdf-primary);">${formatPriceString(item.price || 0)} ג‚×</td>
+                <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight: 700; text-align: left; color: var(--pdf-primary);">${formatPriceString(item.price || 0)} ₪</td>
             `;
             tbody.appendChild(tr);
         });
@@ -1021,20 +1106,13 @@ async function sendChatMessage() {
         return;
     }
     
-    const apiKey = getGeminiApiKey();
-    if (!apiKey) {
-        showToast('אנא הגדר מפתח Gemini API במסך ההגדרות תחילה', 'error');
-        switchTab('settings');
-        return;
-    }
-
     const effectiveModel = getEffectiveModel();
     if (!effectiveModel) {
         showToast('המכסה היומית נוצלה עבור שני המודלים. נסה שוב מחר.', 'error');
         return;
     }
     if (effectiveModel !== selectedGeminiModel) {
-        showToast(`מכסת Flash 2.0 נוצלה ג€” עובר אוטומטית ל-Flash 1.5`, 'error');
+        showToast(`מכסת Flash 2.0 נוצלה — עובר אוטומטית ל-Flash 1.5`, 'error');
         document.getElementById('gemini-model-select').value = effectiveModel;
         changeGeminiModel(effectiveModel);
     }
@@ -1062,22 +1140,21 @@ async function sendChatMessage() {
     
     const systemInstructionText = getProfessionSystemInstruction();
 
+    const _t0 = performance.now();
+    setQuotaCharging(true);
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${effectiveModel}:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                systemInstruction: { parts: [{ text: systemInstructionText }] },
-                contents: activeProject.chatHistory
-            })
+        const response = await callGemini(effectiveModel, {
+            systemInstruction: { parts: [{ text: systemInstructionText }] },
+            contents: activeProject.chatHistory
         });
 
         if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error?.message || 'שגיאה בתקשורת עם שרת Gemini');
+            throw new Error(await readGeminiError(response));
         }
 
         incrementDailyUsage(effectiveModel);
+        addWeightedUsage(effectiveModel, userText.length, performance.now() - _t0);
+        setQuotaCharging(false);
 
         const data = await response.json();
         const responseText = data.candidates[0].content.parts[0].text;
@@ -1130,6 +1207,7 @@ async function sendChatMessage() {
     } catch (err) {
         console.error(err);
         showTypingIndicator(false);
+        setQuotaCharging(false);
         showToast('אירעה שגיאה בצ\'אט: ' + err.message, 'error');
     }
 }
@@ -1212,7 +1290,7 @@ function renderMaterialsChecklist(materials) {
             <input type="checkbox" id="mat-chk-${idx}" ${mat.checked ? 'checked' : ''} onchange="toggleMaterialChecked(${idx}, this.checked)">
             <div class="material-check-text">
                 <span class="material-item-name">${mat.name}</span>
-                <span class="material-item-details">(${mat.details}) - <b style="color:var(--color-success)">${mat.price} ג‚×</b></span>
+                <span class="material-item-details">(${mat.details}) - <b style="color:var(--color-success)">${mat.price} ₪</b></span>
             </div>
         `;
         container.appendChild(row);
@@ -1249,13 +1327,6 @@ async function exportChatToQuote() {
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (!proj) return;
     
-    const apiKey = getGeminiApiKey();
-    if (!apiKey) {
-        showToast('אנא הגדר מפתח Gemini API במסך ההגדרות תחילה', 'error');
-        switchTab('settings');
-        return;
-    }
-
     const effectiveModel = getEffectiveModel();
     if (!effectiveModel) {
         showToast('המכסה היומית נוצלה עבור שני המודלים. נסה שוב מחר.', 'error');
@@ -1277,7 +1348,7 @@ async function exportChatToQuote() {
     
     // Checked materials list
     const checkedMats = (proj.materials || []).filter(m => m.checked);
-    const checkedMatsText = checkedMats.map(m => `ג€¢ ${m.name} (${m.details}) - ${m.price} ג‚×`).join('\n');
+    const checkedMatsText = checkedMats.map(m => `• ${m.name} (${m.details}) - ${m.price} ₪`).join('\n');
     const materialsCost = checkedMats.reduce((sum, m) => sum + m.price, 0);
     const estimatedCost = (proj.laborPrice || 0) + materialsCost;
     
@@ -1325,22 +1396,21 @@ ${checkedMatsText}
 }
 `;
 
+    const _t0 = performance.now();
+    setQuotaCharging(true);
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${effectiveModel}:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: { responseMimeType: "application/json" }
-            })
+        const response = await callGemini(effectiveModel, {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json" }
         });
 
         if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error?.message || 'שגיאה בניסוח מול Gemini API');
+            throw new Error(await readGeminiError(response));
         }
-        
+
         incrementDailyUsage(effectiveModel);
+        addWeightedUsage(effectiveModel, prompt.length, performance.now() - _t0);
+        setQuotaCharging(false);
 
         const data = await response.json();
         const resultText = data.candidates[0].content.parts[0].text;
@@ -1369,6 +1439,7 @@ ${checkedMatsText}
         console.error(err);
         showToast('שגיאה בניסוח על ידי AI: ' + err.message, 'error');
     } finally {
+        setQuotaCharging(false);
         btn.disabled = false;
         btn.innerHTML = origText;
     }
@@ -1558,7 +1629,7 @@ function renderSternList(items) {
                 <div class="stern-card-unit">${item.unit ? 'פירוט/יחידה: ' + item.unit : ''}</div>
             </div>
             <div class="stern-card-action">
-                <div class="stern-card-price">${formatPriceString(item.price)} ג‚×</div>
+                <div class="stern-card-price">${formatPriceString(item.price)} ₪</div>
                 <button class="btn btn-accent btn-small" onclick="addSternItemToQuote(${index})">
                     <i class="fa-solid fa-plus"></i> הוסף
                 </button>
@@ -2210,10 +2281,10 @@ async function manualLegacyScan() {
     }
 }
 
-// Google Drive Picker ג€” lets user browse and pick any folder
+// Google Drive Picker — lets user browse and pick any folder
 function openDrivePicker() {
     if (!googleAccessToken) {
-        showToast('יש לחבר Google Drive תחילה ג€” לחץ "חבר Drive" בהגדרות', 'error');
+        showToast('יש לחבר Google Drive תחילה — לחץ "חבר Drive" בהגדרות', 'error');
         return;
     }
     if (typeof gapi === 'undefined' || typeof google === 'undefined') {
@@ -2241,11 +2312,11 @@ function openDrivePicker() {
                     .build();
                 picker.setVisible(true);
             } catch (innerErr) {
-                showToast('שגיאה בפתיחת בוחר התיקיות ג€” יש לחבר מחדש ל-Drive', 'error');
+                showToast('שגיאה בפתיחת בוחר התיקיות — יש לחבר מחדש ל-Drive', 'error');
             }
         });
     } catch (e) {
-        showToast('שגיאה בטעינת Google Picker ג€” יש לחבר מחדש ל-Drive', 'error');
+        showToast('שגיאה בטעינת Google Picker — יש לחבר מחדש ל-Drive', 'error');
     }
 }
 
@@ -2260,7 +2331,7 @@ async function smartSyncFromDrive() {
         await manualSyncFromCloud();
         // Step 2: if still no projects, try backup recovery
         if (projectsList.length === 0) {
-            showToast('לא נמצא קובץ סנכרון ג€” מחפש גיבויים...', 'error');
+            showToast('לא נמצא קובץ סנכרון — מחפש גיבויים...', 'error');
             await recoverDriveBackup();
         }
         // Step 3: if still nothing, scan for legacy data
@@ -2361,7 +2432,7 @@ async function syncDatabaseFromDrive(silent = false) {
                 }
             }
         } else {
-            // No sync file found ג€” try to recover old JSON files before first write
+            // No sync file found — try to recover old JSON files before first write
             const recovered = await scanForLegacyData(syncFolderId);
             if (recovered) {
                 if (recovered.settings) {
@@ -3144,12 +3215,12 @@ function resetAppState() {
                 web: 'www.sj-eng.co.il',
                 address: 'דרך בן גוריון 138, בת ים, יחידה 1304',
                 terms: `תנאי תשלום:
-ג€¢ 50% מקדמה עם אישור הצעת המחיר ותחילת העבודה.
-ג€¢ 50% הנותרים עם מסירת התוכניות הסופיות.
+• 50% מקדמה עם אישור הצעת המחיר ותחילת העבודה.
+• 50% הנותרים עם מסירת התוכניות הסופיות.
 
 הערות נוספות:
-ג€¢ כל שינוי בתוכניות לאחר שלב האישור הראשוני עשוי לגרור תוספת תשלום.
-ג€¢ ליווי מול חברת החשמל אינו כולל את אגרות הבדיקה של חברת החשמל.`
+• כל שינוי בתוכניות לאחר שלב האישור הראשוני עשוי לגרור תוספת תשלום.
+• ליווי מול חברת החשמל אינו כולל את אגרות הבדיקה של חברת החשמל.`
             }
         },
         currentQuote: {
@@ -3199,12 +3270,12 @@ function resetAppState() {
     if (bizAddress) bizAddress.value = 'דרך בן גוריון 138, בת ים, יחידה 1304';
     const bizTerms = document.getElementById('set-biz-terms');
     if (bizTerms) bizTerms.value = `תנאי תשלום:
-ג€¢ 50% מקדמה עם אישור הצעת המחיר ותחילת העבודה.
-ג€¢ 50% הנותרים עם מסירת התוכניות הסופיות.
+• 50% מקדמה עם אישור הצעת המחיר ותחילת העבודה.
+• 50% הנותרים עם מסירת התוכניות הסופיות.
 
 הערות נוספות:
-ג€¢ כל שינוי בתוכניות לאחר שלב האישור הראשוני עשוי לגרור תוספת תשלום.
-ג€¢ ליווי מול חברת החשמל אינו כולל את אגרות הבדיקה של חברת החשמל.`;
+• כל שינוי בתוכניות לאחר שלב האישור הראשוני עשוי לגרור תוספת תשלום.
+• ליווי מול חברת החשמל אינו כולל את אגרות הבדיקה של חברת החשמל.`;
 
     const logoAlign = document.getElementById('set-logo-align');
     if (logoAlign) logoAlign.value = 'center';

@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initCursorGlow();
     initFaqAccordion();
     initCertsAccordion();
+    initGuidesCarousel();
 });
 
 
@@ -293,6 +294,77 @@ function initFaqAccordion() {
             }
         });
     });
+}
+
+/**
+ * 10. Guides carousel (homepage) — scroll-snap row of guide cards
+ *     Direction-agnostic: uses scrollIntoView + start-edge distance (RTL-safe).
+ */
+function _guideSlides() {
+    const track = document.getElementById('guides-track');
+    return track ? Array.from(track.querySelectorAll('.guide-slide')) : [];
+}
+
+function currentGuideIndex() {
+    const track = document.getElementById('guides-track');
+    const slides = _guideSlides();
+    if (!track || !slides.length) return 0;
+    const t = track.getBoundingClientRect();
+    let best = 0, bestDist = Infinity;
+    slides.forEach((s, i) => {
+        const r = s.getBoundingClientRect();
+        // In RTL the inline-start edge is the right edge; measure distance to track start.
+        const dist = Math.abs(r.right - t.right);
+        if (dist < bestDist) { bestDist = dist; best = i; }
+    });
+    return best;
+}
+
+function goToGuide(i) {
+    const slides = _guideSlides();
+    if (!slides[i]) return;
+    slides[i].scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+}
+
+function moveGuides(dir) {
+    const slides = _guideSlides();
+    if (!slides.length) return;
+    let next = currentGuideIndex() + dir;
+    next = Math.max(0, Math.min(slides.length - 1, next));
+    goToGuide(next);
+}
+
+function updateGuidesDots() {
+    const idx = currentGuideIndex();
+    document.querySelectorAll('#guides-dots .gdot').forEach((d, i) => {
+        d.classList.toggle('active', i === idx);
+    });
+}
+
+function initGuidesCarousel() {
+    const track = document.getElementById('guides-track');
+    const dotsWrap = document.getElementById('guides-dots');
+    const slides = _guideSlides();
+    if (!track || !slides.length) return;
+
+    if (dotsWrap) {
+        dotsWrap.innerHTML = '';
+        slides.forEach((_, i) => {
+            const b = document.createElement('button');
+            b.className = 'gdot' + (i === 0 ? ' active' : '');
+            b.type = 'button';
+            b.setAttribute('aria-label', 'מדריך ' + (i + 1));
+            b.addEventListener('click', () => goToGuide(i));
+            dotsWrap.appendChild(b);
+        });
+    }
+
+    let raf;
+    track.addEventListener('scroll', () => {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(updateGuidesDots);
+    }, { passive: true });
+    updateGuidesDots();
 }
 
 

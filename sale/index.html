@@ -185,8 +185,8 @@
                                 <span class="quota-pct-text" id="quota-pct">0%</span>
                             </div>
                             <div class="quota-info-text">
-                                <span id="quota-used-label">ניצלת <b id="quota-used">0</b>/<b id="quota-limit">30</b></span>
-                                <span id="quota-model-name">Flash 2.0 היום</span>
+                                <span class="quota-load-label">צריכת מנוע AI</span>
+                                <span id="quota-model-name">Flash 2.0 · היום</span>
                             </div>
                         </div>
                     </div>
@@ -571,7 +571,7 @@
 
                                 <p class="input-help" style="color:var(--color-accent); font-weight:500; font-size:0.85rem; line-height:1.6;">
                                     <i class="fa-solid fa-shield-halved"></i>
-                                    לשמירת פרטיותך ופרטיות לקוחותיך — מומלץ לחבר את ה-Drive האישי שלך. המידע נשמר אצלך בלבד ולא מועלה לשום שרת חיצוני.
+                                    לשמירה מקסימלית על המידע האישי שלך ושל לקוחותיך — קיימת אפשרות לשמור את הנתונים ב-Drive האישי שלך במקום בשרתי החברה.
                                 </p>
 
                                 <!-- Single smart sync button (shown when connected) -->
@@ -778,7 +778,7 @@
                             <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
                                 <p class="input-help">מפתח זה ישמש את <strong>כל המשתמשים</strong> באתר. לא נשמר ב-GitHub. מופק מ-<a href="https://aistudio.google.com/apikey" target="_blank" class="text-link">Google AI Studio</a>.</p>
                                 <div class="form-group" style="margin-bottom:0;">
-                                    <input type="password" id="admin-gemini-key" placeholder="AIza... או AQ....">
+                                    <input type="password" id="admin-gemini-key" placeholder="AIza... (מפתח Gemini מ-AI Studio)">
                                 </div>
                                 <button class="btn btn-accent" onclick="adminSaveGeminiKey()">
                                     <i class="fa-solid fa-save"></i> שמור מפתח לכל המשתמשים

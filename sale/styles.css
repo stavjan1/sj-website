@@ -391,6 +391,24 @@ body {
     font-size: 0.72rem;
     color: var(--text-muted);
 }
+.quota-load-label { color: var(--text-primary); font-weight: 600; }
+
+/* "Charging" state while a request is in flight — premium animated feel */
+.quota-ring.charging::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    border-top-color: var(--color-accent);
+    animation: quotaSpin 0.85s linear infinite;
+}
+.quota-ring.charging { animation: quotaPulse 1.4s ease-in-out infinite; }
+@keyframes quotaSpin { to { transform: rotate(360deg); } }
+@keyframes quotaPulse {
+    0%, 100% { filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0)); }
+    50% { filter: drop-shadow(0 0 7px var(--color-accent)); }
+}
 
 /* Cards */
 .section-card {

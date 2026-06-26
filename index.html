@@ -409,47 +409,54 @@
                 <div class="section-header reveal">
                     <h2 class="section-title">מדריכים ומאמרים מקצועיים</h2>
                     <div class="title-underline"></div>
-                    <p class="section-desc">ידע מקצועי על תכנון חשמל, רישוי ועבודה מול רשויות</p>
+                    <p class="section-desc">ידע מהשטח: עזרה ראשונה בחשמל לבית, אבחון תקלות ותכנון מול הרשויות</p>
                 </div>
-                <div class="articles-grid">
-                    <article class="article-card reveal" style="--delay: 0ms">
-                        <div class="article-badge">אבחון תקלות</div>
-                        <h3 class="article-title">הפחת קופץ גם אחרי ניתוק ההארקה? כך תאתר את הבעיה</h3>
-                        <p class="article-excerpt">
-                            כשמנתקים את ההארקה מהלוח והפחת עדיין קופץ — הסיבה כמעט תמיד אחת: הפאזה או האפס נוגעים פיזית בקיר, בצינור מתכתי, או שהם בתוך שלולית מים. הפחת מגיב על קצר לאדמה ולא על עומס. שיטה: נתק קונדוקטורים אחד-אחד עד שהקפיצות נפסקות — כך תמקד את הקטע הפגוע.
-                        </p>
-                        <a href="#contact" class="article-link">לייעוץ מהנדס &larr;</a>
-                    </article>
+                <div class="guides-carousel reveal">
+                    <button class="guides-nav prev" type="button" aria-label="הקודם" onclick="moveGuides(-1)">&rsaquo;</button>
+                    <div class="guides-track" id="guides-track">
 
-                    <article class="article-card reveal" style="--delay: 150ms">
-                        <div class="article-badge">אבחון תקלות</div>
-                        <h3 class="article-title">RCD קופץ כל הזמן? רשימת הבדיקות הנכונה לפי סדר</h3>
-                        <p class="article-excerpt">
-                            לפני שמחליפים מפסק פחת — בדקו: (1) נתקו מכשירים אחד-אחד עד שהקפיצות נפסקות, (2) בדקו מכונת כביסה/מדיח/מקרר — אלו הגורמים השכיחים ביותר לזרם דליפה, (3) בדקו צינורות חשמל לחות בדרג לאחר נזילה. זרם דליפה של 30mA מספיק כדי להפעיל RCD — גם בלי תקלה "קלאסית".
-                        </p>
-                        <a href="#contact" class="article-link">לייעוץ מהנדס &larr;</a>
-                    </article>
+                        <a href="articles.html#g1" class="article-card guide-slide">
+                            <div class="article-badge firstaid">עזרה ראשונה למי שאינו חשמלאי</div>
+                            <h3 class="article-title">הפחת קפץ ולא עולה? כך מחזירים חשמל בעצמך</h3>
+                            <p class="article-excerpt">מורידים את כל המאמ"תים, מרימים את הפחת, ואז מעלים מעגל-מעגל עד שמזהים מי מפיל אותו — אותו משאירים למטה והשאר חוזר לעבוד. כך כל הבית עובד ויודעים בדיוק מה תקול.</p>
+                            <span class="article-link">להמשך המדריך &larr;</span>
+                        </a>
 
-                    <article class="article-card reveal" style="--delay: 300ms">
-                        <div class="article-badge">הגדלת חיבור</div>
-                        <h3 class="article-title">הגדלת חיבור חשמל מחברת החשמל — כל השלבים בפועל</h3>
-                        <p class="article-excerpt">
-                            התהליך: בקשה רשמית + תשריט מצב קיים + חישוב עומסים חתום ע"י מהנדס → חברת החשמל מוציאה תנאי חיבור → הגשת תוכניות מאושרות → ביצוע + בדיקת חשמלאי בודק → חיבור. הנקודה שרוב הלקוחות מפספסים: חברת החשמל לא מאשרת חיבור ישיר מעל 80A ביחיד ללא מהנדס חשמל מורשה.
-                        </p>
-                        <a href="#contact" class="article-link">קבל ייעוץ ראשוני &larr;</a>
-                    </article>
+                        <a href="articles.html#g3" class="article-card guide-slide">
+                            <div class="article-badge diagnostics">אבחון תקלות</div>
+                            <h3 class="article-title">ניתקתם את ההארקה והפחת עדיין קופץ?</h3>
+                            <p class="article-excerpt">כמעט תמיד הסיבה אחת: הפאזה או האפס נוגעים פיזית בקיר רטוב, בצינור מתכת או בשלולית מים בקופסת הסתעפות. הפחת מגיב לדליפה לאדמה — לא להארקה של הלוח.</p>
+                            <span class="article-link">להמשך המדריך &larr;</span>
+                        </a>
 
-                    <article class="article-card reveal" style="--delay: 450ms">
-                        <div class="article-badge">טיפ מקצועי</div>
-                        <h3 class="article-title">מנוע תלת-פאזי מהמם ולא מסתובב? חפש פאזה חסרה</h3>
-                        <p class="article-excerpt">
-                            רעש "הממה" חזק ממנוע שלא מסתובב הוא סימן קלאסי לפאזה חסרה (Single Phasing). בדוק עם מולטימטר על כל שלוש הפאזות בכניסה ללוח המנוע — מספיק שפאזה אחת נפלה (נתיך שנפח, מגע פגום בקונטקטור) כדי שהמנוע ינסה לעלות ויתחמם במהירות. אל תשאיר אותו עובד — סיכון ממשי לשרפה.
-                        </p>
-                        <a href="#contact" class="article-link">לייעוץ תעשייתי &larr;</a>
-                    </article>
+                        <a href="articles.html#g2" class="article-card guide-slide">
+                            <div class="article-badge firstaid">עזרה ראשונה למי שאינו חשמלאי</div>
+                            <h3 class="article-title">מאתרים מכשיר חשמלי תקול — בלי חשמלאי</h3>
+                            <p class="article-excerpt">אחרי שמצאתם איזה מעגל מפיל את הפחת, נתקו ממנו את המכשירים אחד-אחד. ברגע שהפחת מסכים לעלות — המכשיר האחרון שניתקתם הוא האשם.</p>
+                            <span class="article-link">להמשך המדריך &larr;</span>
+                        </a>
+
+                        <a href="articles.html#g5" class="article-card guide-slide">
+                            <div class="article-badge field">טיפים מהשטח</div>
+                            <h3 class="article-title">השקע מתחמם? זה מתחיל לפני שריפה</h3>
+                            <p class="article-excerpt">שקע או תקע שמתחממים = חיבור רופף. המגע הרופף יוצר חום ששורף ומחמיר את עצמו. שכיח במזגנים, דודים וקומקומים על שקע ישן. ריח פלסטיק חרוך = מפסיקים מיד.</p>
+                            <span class="article-link">להמשך המדריך &larr;</span>
+                        </a>
+
+                        <a href="articles.html#g8" class="article-card guide-slide">
+                            <div class="article-badge planning">תכנון ורישוי</div>
+                            <h3 class="article-title">הגדלת חיבור חשמל — השלבים בפועל</h3>
+                            <p class="article-excerpt">בקשה רשמית ← חישוב עומסים חתום ← תנאי חיבור ← תוכניות מאושרות ← בדיקת חשמלאי בודק ← חיבור. מה שמפספסים: מעל 80A חד-פאזי לא מאשרים בלי מהנדס מורשה.</p>
+                            <span class="article-link">להמשך המדריך &larr;</span>
+                        </a>
+
+                    </div>
+                    <button class="guides-nav next" type="button" aria-label="הבא" onclick="moveGuides(1)">&lsaquo;</button>
                 </div>
+                <div class="guides-dots" id="guides-dots" aria-hidden="true"></div>
+
                 <div class="section-cta-row reveal">
-                    <a href="#contact" class="btn-primary">יש לך שאלה הנדסית? שאל אותנו ←</a>
+                    <a href="articles.html" class="btn-primary">לכל המדריכים והמאמרים ←</a>
                 </div>
             </div>
         </section>
