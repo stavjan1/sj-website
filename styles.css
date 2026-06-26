@@ -178,10 +178,12 @@ img {
     gap: 6px;
     border: 1px solid rgba(240, 190, 40, 0.4);
     border-radius: 10px;
-    padding: 7px 14px;
+    padding: 6px 12px;
     color: #f0c040;
     background: rgba(240, 190, 40, 0.06);
     transition: var(--transition-smooth);
+    white-space: nowrap;
+    font-size: 0.85rem;
 }
 
 .nav-link-staff:hover {
@@ -263,15 +265,16 @@ img {
 .desktop-nav {
     display: flex;
     align-items: center;
-    gap: 24px;
+    gap: 14px;
 }
 
 .nav-link {
-    font-size: 0.95rem;
+    font-size: 0.88rem;
     font-weight: 500;
     color: var(--color-text-gray);
     position: relative;
     padding: 6px 0;
+    white-space: nowrap;
 }
 
 .nav-link::after {
@@ -1664,6 +1667,12 @@ img {
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     padding: 6px 12px;
+}
+
+/* eze.co.il-style section CTA row */
+.section-cta-row {
+    text-align: center;
+    margin-top: 36px;
 }
 
 .certs-verify-link:hover {
