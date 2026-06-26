@@ -3,6 +3,73 @@
 // Projects Manager & Dual-Agent AI Architecture (Pricing & Phrasing)
 // ==========================================================================
 
+// ==========================================================================
+// Gemini model selection + daily quota
+// ==========================================================================
+let selectedGeminiModel = 'gemini-2.0-flash';
+const MODEL_QUOTAS = { 'gemini-2.0-flash': 30, 'gemini-1.5-flash': 100 };
+const MODEL_CIRCUMFERENCE = 138.2; // 2π×22
+
+function _todayKey() {
+    return new Date().toISOString().slice(0, 10); // "2026-06-26"
+}
+function getDailyUsage(model) {
+    const raw = localStorage.getItem('sj_quota_' + model + '_' + _todayKey());
+    return parseInt(raw || '0', 10);
+}
+function incrementDailyUsage(model) {
+    const key = 'sj_quota_' + model + '_' + _todayKey();
+    localStorage.setItem(key, (getDailyUsage(model) + 1).toString());
+    updateQuotaUI();
+}
+function isQuotaExceeded(model) {
+    return getDailyUsage(model) >= MODEL_QUOTAS[model];
+}
+function getEffectiveModel() {
+    if (!isQuotaExceeded(selectedGeminiModel)) return selectedGeminiModel;
+    // Auto-fallback
+    const fallback = selectedGeminiModel === 'gemini-2.0-flash' ? 'gemini-1.5-flash' : null;
+    if (fallback && !isQuotaExceeded(fallback)) return fallback;
+    return null; // both exhausted
+}
+function updateQuotaUI() {
+    const model = selectedGeminiModel;
+    const used  = getDailyUsage(model);
+    const limit = MODEL_QUOTAS[model];
+    const pct   = Math.min(100, Math.round((used / limit) * 100));
+    const offset = MODEL_CIRCUMFERENCE * (1 - pct / 100);
+
+    const arc = document.getElementById('quota-arc');
+    if (arc) {
+        arc.style.strokeDashoffset = offset;
+        arc.style.stroke = pct >= 100 ? '#f05252' : pct >= 80 ? '#f0c040' : 'var(--color-accent)';
+    }
+    const pctEl = document.getElementById('quota-pct');
+    if (pctEl) pctEl.textContent = pct + '%';
+    const usedEl = document.getElementById('quota-used');
+    if (usedEl) usedEl.textContent = used;
+    const limitEl = document.getElementById('quota-limit');
+    if (limitEl) limitEl.textContent = limit;
+    const nameEl = document.getElementById('quota-model-name');
+    if (nameEl) nameEl.textContent = (model === 'gemini-2.0-flash' ? 'Flash 2.0' : 'Flash 1.5') + ' היום';
+}
+function changeGeminiModel(model) {
+    selectedGeminiModel = model;
+    updateQuotaUI();
+}
+
+// Global (shared) Gemini API key — admin sets once, everyone benefits
+function getGeminiApiKey() {
+    // Prefer user-specific key, then global fallback
+    return appState.settings.geminiApiKey
+        || localStorage.getItem('sj_gemini_key_global')
+        || '';
+}
+function saveGlobalGeminiKey(key) {
+    localStorage.setItem('sj_gemini_key_global', key);
+}
+
+// ==========================================================================
 // Global state variables
 let appState = {
     settings: {
@@ -77,6 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('.app-container').style.display = 'flex';
         initUserSession();
     }
+    updateQuotaUI(); // initialize the quota ring on page load
 });
 
 function getActiveUser() {
@@ -463,7 +531,9 @@ function saveBusinessSettings() {
 }
 
 function saveGeminiKey() {
-    appState.settings.geminiApiKey = document.getElementById('settings-gemini-key').value.trim();
+    const key = document.getElementById('settings-gemini-key').value.trim();
+    appState.settings.geminiApiKey = key;
+    saveGlobalGeminiKey(key); // שמור גלובלית — כל המשתמשים משתמשים במפתח הזה
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
     syncDatabaseToDrive(true);
@@ -820,27 +890,38 @@ async function sendChatMessage() {
         return;
     }
     
-    const apiKey = appState.settings.geminiApiKey;
+    const apiKey = getGeminiApiKey();
     if (!apiKey) {
         showToast('אנא הגדר מפתח Gemini API במסך ההגדרות תחילה', 'error');
         switchTab('settings');
         return;
     }
-    
+
+    const effectiveModel = getEffectiveModel();
+    if (!effectiveModel) {
+        showToast('המכסה היומית נוצלה עבור שני המודלים. נסה שוב מחר.', 'error');
+        return;
+    }
+    if (effectiveModel !== selectedGeminiModel) {
+        showToast(`מכסת Flash 2.0 נוצלה — עובר אוטומטית ל-Flash 1.5`, 'error');
+        document.getElementById('gemini-model-select').value = effectiveModel;
+        changeGeminiModel(effectiveModel);
+    }
+
     const inputArea = document.getElementById('chat-user-input');
     const userText = inputArea.value.trim();
     if (!userText) return;
-    
+
     const activeProject = projectsList.find(p => p.id === activeProjectId);
     if (!activeProject) return;
-    
+
     // Add user message to state
     activeProject.chatHistory.push({
         role: 'user',
         parts: [{ text: userText }]
     });
     saveProjects();
-    
+
     // Render and scroll to bottom
     renderChatHistory(activeProject.chatHistory);
     inputArea.value = '';
@@ -851,27 +932,25 @@ async function sendChatMessage() {
     const systemInstructionText = getProfessionSystemInstruction();
 
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${effectiveModel}:generateContent?key=${apiKey}`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                systemInstruction: {
-                    parts: [{ text: systemInstructionText }]
-                },
+                systemInstruction: { parts: [{ text: systemInstructionText }] },
                 contents: activeProject.chatHistory
             })
         });
-        
+
         if (!response.ok) {
             const errData = await response.json();
             throw new Error(errData.error?.message || 'שגיאה בתקשורת עם שרת Gemini');
         }
-        
+
+        incrementDailyUsage(effectiveModel);
+
         const data = await response.json();
         const responseText = data.candidates[0].content.parts[0].text;
-        
+
         // Save reply to history
         activeProject.chatHistory.push({
             role: 'model',
@@ -1039,13 +1118,19 @@ async function exportChatToQuote() {
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (!proj) return;
     
-    const apiKey = appState.settings.geminiApiKey;
+    const apiKey = getGeminiApiKey();
     if (!apiKey) {
         showToast('אנא הגדר מפתח Gemini API במסך ההגדרות תחילה', 'error');
         switchTab('settings');
         return;
     }
-    
+
+    const effectiveModel = getEffectiveModel();
+    if (!effectiveModel) {
+        showToast('המכסה היומית נוצלה עבור שני המודלים. נסה שוב מחר.', 'error');
+        return;
+    }
+
     const btn = document.getElementById('btn-export-to-quote');
     const origText = btn.innerHTML;
     btn.disabled = true;
@@ -1110,30 +1195,26 @@ ${checkedMatsText}
 `;
 
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${effectiveModel}:generateContent?key=${apiKey}`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{
-                    parts: [{ text: prompt }]
-                }],
-                generationConfig: {
-                    responseMimeType: "application/json"
-                }
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { responseMimeType: "application/json" }
             })
         });
-        
+
         if (!response.ok) {
             const errData = await response.json();
             throw new Error(errData.error?.message || 'שגיאה בניסוח מול Gemini API');
         }
         
+        incrementDailyUsage(effectiveModel);
+
         const data = await response.json();
         const resultText = data.candidates[0].content.parts[0].text;
         const result = JSON.parse(resultText);
-        
+
         // Sync quote editor
         proj.quoteData.subject = result.subject || proj.quoteData.subject;
         proj.quoteData.items = result.items || [];

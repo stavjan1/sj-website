@@ -129,9 +129,38 @@
             
             <!-- Tab: Pricing Chat (מומחה תמחור ועבודה) -->
             <section id="panel-wizard" class="content-panel">
-                <div class="section-header">
-                    <h2><i class="fa-solid fa-calculator text-accent"></i> צ'אט תמחור וחומרים (סוכן AI)</h2>
-                    <p class="section-subtitle">שיחה מנוהלת עם מומחה תמחור וניהול עבודה לזיהוי נקודות עיוורון, חישוב חומרים והשוואת מחירים (ארכה).</p>
+                <div class="section-header" style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+                    <div>
+                        <h2><i class="fa-solid fa-calculator text-accent"></i> צ'אט תמחור וחומרים (סוכן AI)</h2>
+                        <p class="section-subtitle">שיחה מנוהלת עם מומחה תמחור וניהול עבודה לזיהוי נקודות עיוורון, חישוב חומרים והשוואת מחירים.</p>
+                    </div>
+
+                    <!-- Model selector + quota ring -->
+                    <div class="model-quota-bar">
+                        <div class="model-selector-wrap">
+                            <label class="model-lbl">מודל AI</label>
+                            <select id="gemini-model-select" onchange="changeGeminiModel(this.value)" class="model-select-input">
+                                <option value="gemini-2.0-flash">⚡ Flash 2.0 (מומלץ)</option>
+                                <option value="gemini-1.5-flash">Flash 1.5 (גיבוי)</option>
+                            </select>
+                        </div>
+                        <div class="quota-ring-wrap">
+                            <div class="quota-ring" id="quota-ring">
+                                <svg width="56" height="56" viewBox="0 0 56 56">
+                                    <circle cx="28" cy="28" r="22" fill="none" stroke="var(--border-color)" stroke-width="5"/>
+                                    <circle cx="28" cy="28" r="22" fill="none" stroke="var(--color-accent)" stroke-width="5"
+                                        stroke-dasharray="138.2" stroke-dashoffset="138.2"
+                                        id="quota-arc" stroke-linecap="round"
+                                        style="transform:rotate(-90deg); transform-origin:28px 28px; transition:stroke-dashoffset 0.6s ease, stroke 0.4s;"/>
+                                </svg>
+                                <span class="quota-pct-text" id="quota-pct">0%</span>
+                            </div>
+                            <div class="quota-info-text">
+                                <span id="quota-used-label">ניצלת <b id="quota-used">0</b>/<b id="quota-limit">30</b></span>
+                                <span id="quota-model-name">Flash 2.0 היום</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="split-view">
