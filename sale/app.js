@@ -21,11 +21,11 @@ function adminSaveGeminiKey() {
     const key = (document.getElementById('admin-gemini-key')?.value || '').trim();
     if (!key) { showToast('הזן מפתח תחילה', 'error'); return; }
     if (/googleusercontent\.com/i.test(key)) {
-        showToast('זהו מזהה OAuth (Client ID) ולא מפתח API. צור מפתח Gemini ב-aistudio.google.com/apikey — הוא מתחיל ב-AIza.', 'error');
+        showToast('זהו מזהה OAuth (Client ID) ולא מפתח API. צור מפתח Gemini ב-aistudio.google.com/apikey.', 'error');
         return;
     }
-    if (!/^AIza[0-9A-Za-z_\-]{20,}$/.test(key)) {
-        showToast('המפתח לא נראה תקין — מפתח Gemini מתחיל ב-AIza. ודא שהעתקת את כולו ללא רווחים.', 'error');
+    if (key.length < 20) {
+        showToast('המפתח נראה קצר מדי — ודא שהעתקת אותו במלואו ללא רווחים.', 'error');
         return;
     }
     saveGlobalGeminiKey(key);
@@ -1218,6 +1218,24 @@ function sendSuggestedChatPrompt(text) {
         input.value = text;
         sendChatMessage();
     }
+}
+
+// "Generate full materials list" — asks the AI for an exhaustive, itemized list
+// (including the smallest accessories) based on the conversation so far. Reuses the
+// chat pipeline, so the returned JSON auto-populates the materials checklist + labor price.
+function generateMaterialsList() {
+    if (!activeProjectId) {
+        showToast('אנא בחר או צור פרויקט תחילה כדי לבנות רשימת חומרים', 'error');
+        switchTab('projects');
+        return;
+    }
+    const activeProject = projectsList.find(p => p.id === activeProjectId);
+    if (!activeProject || !activeProject.chatHistory || activeProject.chatHistory.length === 0) {
+        showToast('תאר תחילה את העבודה בצ\'אט, ואז אבנה רשימת חומרים מלאה', 'error');
+        return;
+    }
+    const prompt = 'בהתבסס על כל מה שתואר עד כה בשיחה, צור עכשיו רשימת חומרים ואביזרים מלאה ומפורטת לפרויקט הזה — כולל כל הפריטים הקטנים שקל לשכוח (דיבלים, ברגים, מהדקים, סופיות כבל, שרוולים, סרט בידוד, קופסאות הסתעפות, מובילים ותעלות, נעלי כבל, מפסקים אוטומטיים זעירים, צינורות הגנה ועוד). לכל פריט ציין שם, כמות או פירוט, ומחיר רכש משוער בשקלים. אל תשמיט פריטים — עדיף לכלול יותר מדי מאשר לפספס אביזר. סיים בגוש JSON מעודכן כרגיל כדי שרשימת החומרים תתעדכן אוטומטית.';
+    sendSuggestedChatPrompt(prompt);
 }
 
 function handleChatKeyDown(event) {
@@ -3065,10 +3083,9 @@ function updateUserProfileUI() {
         appState.settings.profession = professionKey;
     }
     
-    // Hide profession-update row for Google users (they don't need a username field)
-    const isGoogle = (user && user.isGoogleUser) || !!googleAccessToken;
+    // Profession update is available to ALL users — it sets the AI agent's expertise.
     const professionSection = document.getElementById('settings-profession-section');
-    if (professionSection) professionSection.style.display = isGoogle ? 'none' : 'block';
+    if (professionSection) professionSection.style.display = 'block';
 }
 
 function updateUserProfileProfession() {

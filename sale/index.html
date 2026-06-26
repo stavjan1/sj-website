@@ -236,6 +236,9 @@
                             <div class="results-materials-header">
                                 <h5>רשימת חומרים נלווים:</h5>
                                 <p class="card-subtitle">סמן את החומרים שברצונך לכלול בהצעת המחיר הסופית</p>
+                                <button type="button" class="btn btn-secondary btn-small" onclick="generateMaterialsList()" style="margin-top:8px;width:100%;">
+                                    <i class="fa-solid fa-list-check"></i> צור רשימת חומרים מלאה מה-AI
+                                </button>
                             </div>
                             
                             <div id="wizard-materials-list" class="helper-materials-checklist">
@@ -608,11 +611,17 @@
                                     <span>תחום עיסוק נוכחי:</span>
                                     <span id="profile-field-profession">-</span>
                                 </div>
-                                <!-- profession update — hidden for Google users by JS -->
+                                <!-- profession update — sets the AI agent's expertise (available to all users) -->
                                 <div id="settings-profession-section" style="margin-top:14px;">
-                                    <label for="settings-profession-input" style="font-size:.85rem;color:var(--text-muted);">תחום עיסוק</label>
+                                    <label for="settings-profession-input" style="font-size:.85rem;color:var(--text-muted);">תחום עיסוק (קובע את התמחות סוכן ה-AI)</label>
                                     <div style="display:flex;gap:8px;margin-top:6px;">
-                                        <input type="text" id="settings-profession-input" placeholder="מהנדס חשמל, חשמלאי..." style="flex-grow:1;background:rgba(255,255,255,0.05);border:1px solid var(--border-color);color:#fff;padding:8px 12px;border-radius:8px;font-family:inherit;">
+                                        <select id="settings-profession-input" style="flex-grow:1;background:rgba(255,255,255,0.05);border:1px solid var(--border-color);color:#fff;padding:8px 12px;border-radius:8px;font-family:inherit;cursor:pointer;">
+                                            <option value="electrician">חשמלאי / מהנדס חשמל</option>
+                                            <option value="charger_installer">מתקין עמדות טעינה לרכב חשמלי</option>
+                                            <option value="solar_installer">מתקין מערכות סולאריות (PV)</option>
+                                            <option value="renovator">קבלן שיפוצים וגמר פנים</option>
+                                            <option value="contractor">קבלן עבודות בנייה ושלד</option>
+                                        </select>
                                         <button type="button" class="btn btn-accent" onclick="updateUserProfileProfession()" style="padding:8px 14px;font-size:.9rem;white-space:nowrap;">עדכן</button>
                                     </div>
                                 </div>

@@ -271,7 +271,7 @@ body {
     flex-wrap: wrap;
 }
 .project-search-input-wrap {
-    flex: 1;
+    flex: 1 1 100%;
     min-width: 180px;
     position: relative;
     display: flex;
@@ -279,13 +279,13 @@ body {
 }
 .project-search-input-wrap i {
     position: absolute;
-    right: 12px;
+    left: 12px;
     color: var(--text-muted);
     pointer-events: none;
 }
-.project-search-input-wrap input {
+.project-search-input-wrap input[type="text"] {
     width: 100%;
-    padding: 9px 36px 9px 12px;
+    padding: 9px 12px 9px 36px;
     background: var(--bg-input);
     border: 1px solid var(--border-color);
     border-radius: 8px;
@@ -306,6 +306,8 @@ body {
     font-size: 0.88rem;
     padding: 8px 10px;
     cursor: pointer;
+    flex: 1 1 0;
+    min-width: 0;
 }
 
 /* Project status badge */
