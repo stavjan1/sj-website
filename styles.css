@@ -329,8 +329,8 @@ img {
 /* Hero background – Alpine mountains with power lines */
 .hero-bg-image {
     background-image:
-        linear-gradient(rgba(9, 13, 30, 0.50), rgba(9, 9, 11, 0.75)),
-        url('assets/hero-bg.jpg');
+        linear-gradient(rgba(9, 13, 30, 0.38), rgba(9, 9, 11, 0.68)),
+        url('assets/hero_powerlines.webp');
     background-size: cover;
     background-position: center 40%;
     position: absolute;
