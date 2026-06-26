@@ -1,11 +1,4 @@
-# Cloudflare Pages Redirects
+# Only non-obvious redirects live here.
+# CF Pages serves .html files and index.html in subdirs automatically.
 
-# Clean URLs (serve .html at path without extension)
-/login        /login.html           200
-/calculator   /calculator.html      200
-
-# Staff app
-/sale         /sale/index.html      200
-/app          /sale/index.html      301
-
-# www → apex (CF Pages handles this automatically via custom domain settings)
+/app    /sale/    301
