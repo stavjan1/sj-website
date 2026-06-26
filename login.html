@@ -222,6 +222,12 @@
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
                 החיבור מוצפן ומאובטח · נתוניך נשמרים בפרטיות
             </p>
+
+            <div style="margin-top:18px;padding:14px 16px;background:rgba(0,180,255,0.05);border:1px solid rgba(0,180,255,0.14);border-radius:12px;font-size:.8rem;line-height:1.65;color:var(--auth-muted);text-align:right;">
+                <strong style="color:#7fd0ff;display:block;margin-bottom:4px;">🔒 הגנת הפרטיות שלך</strong>
+                אנו לא מתחזקים שרתים ולא שומרים אצלנו שום מידע.
+                לאחר ההתחברות תתבקש לאשר גישה ל-<strong style="color:var(--auth-ink);">Google Drive האישי שלך</strong> — שם נשמרים כל הנתונים, ישירות אצלך בלבד. אף גורם חיצוני אינו יכול לגשת אליהם.
+            </div>
         </section>
 
         <!-- Marketing panel (left in RTL) -->
@@ -292,23 +298,19 @@
             const email = document.getElementById('auth-email').value.trim();
             const pass  = document.getElementById('auth-password').value;
             if (!email || !pass) return;
-            // Hand off to the actual app — it handles auth
+            // Signal to the app that this user is authenticated so lock-screen is skipped
+            sessionStorage.setItem('sj_logged_in_user', email);
             window.location.href = APP_URL;
         });
 
         /* ---- Google Identity Services callback ---- */
         function handleGoogleCredential(response) {
-            // response.credential is a JWT ID token
-            // Decode to get user info (for display/logging)
             const payload = JSON.parse(atob(response.credential.split('.')[1]));
-            console.log('Google Sign-In:', payload.email, payload.name);
-
-            // Store session hint and redirect to app
+            // Signal to the app — same key it checks in DOMContentLoaded
+            sessionStorage.setItem('sj_logged_in_user', payload.email);
             sessionStorage.setItem('gsi_email', payload.email);
             sessionStorage.setItem('gsi_name',  payload.name);
             sessionStorage.setItem('gsi_picture', payload.picture);
-
-            // Redirect to the services app
             window.location.href = APP_URL;
         }
 
