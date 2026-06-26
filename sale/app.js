@@ -172,7 +172,9 @@ function getGeminiApiKey() {
     const key = appState.settings.geminiApiKey
         || localStorage.getItem('sj_gemini_key_global')
         || '';
-    return (key && key.length > 15 && key !== 'null' && key !== 'undefined') ? key : '';
+    const valid = key && key.length > 15 && key !== 'null' && key !== 'undefined'
+        && !/googleusercontent\.com/i.test(key); // ignore an OAuth client-id mistakenly stored as a key
+    return valid ? key : '';
 }
 function saveGlobalGeminiKey(key) {
     localStorage.setItem('sj_gemini_key_global', key);
