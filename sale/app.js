@@ -298,7 +298,7 @@ function formatHebrewDate(dateString) {
 function switchTab(tabId) {
     // If attempting to go to pricing or quote tabs without an active project, block it
     if ((tabId === 'wizard' || tabId === 'create') && !activeProjectId) {
-        showToast('אנא בחר או צור פרויקט ׳חילה בלשוני׳ ניהול פרויקטים', 'error');
+        showToast('אנא בחר או צור פרויקט תחילה בלשונית ניהול פרויקטים', 'error');
         switchTab('projects');
         return;
     }
@@ -1016,7 +1016,7 @@ function updatePriceDisplayMode() {
 // ==========================================================================
 async function sendChatMessage() {
     if (!activeProjectId) {
-        showToast('אנא בחר או צור פרויקט ׳חילה בלשוני׳ ניהול פרויקטים', 'error');
+        showToast('אנא בחר או צור פרויקט תחילה בלשונית ניהול פרויקטים', 'error');
         switchTab('projects');
         return;
     }
@@ -2989,12 +2989,10 @@ function updateUserProfileUI() {
         appState.settings.profession = professionKey;
     }
     
-    // Hide security settings card for Google Auth users
-    const securityCard = document.getElementById('settings-security-card');
-    if (securityCard) {
-        const isGoogle = (user && user.isGoogleUser) || !!googleAccessToken;
-        securityCard.style.display = isGoogle ? 'none' : 'block';
-    }
+    // Hide profession-update row for Google users (they don't need a username field)
+    const isGoogle = (user && user.isGoogleUser) || !!googleAccessToken;
+    const professionSection = document.getElementById('settings-profession-section');
+    if (professionSection) professionSection.style.display = isGoogle ? 'none' : 'block';
 }
 
 function updateUserProfileProfession() {

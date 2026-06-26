@@ -67,6 +67,10 @@
                     <i class="fa-solid fa-clock-rotate-left"></i>
                     <span>היסטוריית הצעות</span>
                 </button>
+                <button class="nav-btn" id="tab-business" onclick="switchTab('business')">
+                    <i class="fa-solid fa-briefcase"></i>
+                    <span>פרטי עסק</span>
+                </button>
                 <button class="nav-btn" id="tab-settings" onclick="switchTab('settings')">
                     <i class="fa-solid fa-sliders"></i>
                     <span>הגדרות מערכת</span>
@@ -547,11 +551,7 @@
                                 <h3><i class="fa-brands fa-google-drive text-accent"></i> חיבור ל-Google Drive</h3>
                             </div>
                             <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
-                                <div class="form-group" style="margin-bottom:0">
-                                    <label for="settings-drive-client-id">Google Client ID (מזהה לקוח OAuth)</label>
-                                    <input type="text" id="settings-drive-client-id" placeholder="הכנס את מזהה לקוח ה-OAuth שלך">
-                                    <p class="input-help">נדרש כדי לבצע אימות מול חשבון ה-Google שלך לשמירה ישירה של קבצים.</p>
-                                </div>
+                                <input type="hidden" id="settings-drive-client-id">
 
                                 <!-- Drive connect row -->
                                 <div class="drive-conn-status">
@@ -569,9 +569,9 @@
                                     <i class="fa-solid fa-database"></i> גיבוי וסנכרון: <strong>.sysdata</strong> (מוסתרת)
                                 </p>
 
-                                <p class="input-help" style="color:var(--color-danger); font-weight:500; font-size:0.85rem; line-height:1.5;">
-                                    <i class="fa-solid fa-triangle-exclamation"></i>
-                                    ללא Drive — הנתונים נשמרים מקומית בלבד ועלולים להימחק.
+                                <p class="input-help" style="color:var(--color-accent); font-weight:500; font-size:0.85rem; line-height:1.6;">
+                                    <i class="fa-solid fa-shield-halved"></i>
+                                    לשמירת פרטיותך ופרטיות לקוחותיך — מומלץ לחבר את ה-Drive האישי שלך. המידע נשמר אצלך בלבד ולא מועלה לשום שרת חיצוני.
                                 </p>
 
                                 <!-- Single smart sync button (shown when connected) -->
@@ -589,11 +589,56 @@
                         </div>
                     </div>
                     
-                    <!-- Column 2: Business Info & Phrasing Database -->
+                    <!-- Column 2: Profile only -->
                     <div class="section-card">
                         <div class="card-header">
-                            <h3><i class="fa-solid fa-briefcase"></i> פרטי העסק והתאמה אישית</h3>
+                            <h3><i class="fa-solid fa-user-gear"></i> פרופיל משתמש</h3>
                         </div>
+                        <div class="card-body">
+                            <div class="user-profile-card">
+                                <div class="user-profile-header">
+                                    <i class="fa-solid fa-circle-user" style="font-size: 1.8rem;"></i>
+                                    <span id="profile-username-display">טוען...</span>
+                                </div>
+                                <div class="user-profile-field" style="margin-top: 10px;">
+                                    <span>שם משתמש:</span>
+                                    <span id="profile-field-username">-</span>
+                                </div>
+                                <div class="user-profile-field">
+                                    <span>תחום עיסוק נוכחי:</span>
+                                    <span id="profile-field-profession">-</span>
+                                </div>
+                                <!-- profession update — hidden for Google users by JS -->
+                                <div id="settings-profession-section" style="margin-top:14px;">
+                                    <label for="settings-profession-input" style="font-size:.85rem;color:var(--text-muted);">תחום עיסוק</label>
+                                    <div style="display:flex;gap:8px;margin-top:6px;">
+                                        <input type="text" id="settings-profession-input" placeholder="מהנדס חשמל, חשמלאי..." style="flex-grow:1;background:rgba(255,255,255,0.05);border:1px solid var(--border-color);color:#fff;padding:8px 12px;border-radius:8px;font-family:inherit;">
+                                        <button type="button" class="btn btn-accent" onclick="updateUserProfileProfession()" style="padding:8px 14px;font-size:.9rem;white-space:nowrap;">עדכן</button>
+                                    </div>
+                                </div>
+                                <!-- hidden inputs for security card compatibility -->
+                                <input type="hidden" id="settings-change-username">
+                                <input type="hidden" id="settings-change-password">
+                                <button type="button" class="btn btn-danger btn-full" onclick="handleUserLogout()" style="margin-top:16px;">
+                                    <i class="fa-solid fa-power-off"></i> התנתק ונעילת מערכת
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- hidden security card (kept for JS refs) -->
+                    <div id="settings-security-card" style="display:none;"></div>
+                </div>
+            </section>
+
+            <!-- Business Panel -->
+            <section id="panel-business" class="content-panel">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-briefcase"></i> פרטי העסק והצעת המחיר</h2>
+                    <p class="section-subtitle">פרטי החברה, לוגו, רקע ותנאי תשלום שיופיעו בכל הצעת מחיר שתייצא.</p>
+                </div>
+                <div class="settings-grid">
+                    <div class="section-card">
+                        <div class="card-header"><h3><i class="fa-solid fa-building"></i> פרטי החברה</h3></div>
                         <div class="card-body">
                             <form id="settings-business-form">
                                 <div class="form-grid-2">
@@ -630,78 +675,6 @@
                                     <label for="set-biz-address">כתובת העסק</label>
                                     <input type="text" id="set-biz-address" value="דרך בן גוריון 138, בת ים, יחידה 1304">
                                 </div>
-                                
-                                <!-- File Uploaders -->
-                                <div class="form-grid-2" style="border-top:1px solid var(--border-color); padding-top:16px; margin-top:16px;">
-                                    <div class="form-group">
-                                        <label>העלאת לוגו החברה</label>
-                                        <input type="file" id="settings-logo-file" accept="image/*" style="display:none;" onchange="handleImageUpload(event, 'logo')">
-                                        <div class="file-uploader-box">
-                                            <button type="button" class="btn btn-secondary btn-small" onclick="document.getElementById('settings-logo-file').click()">בחר לוגו...</button>
-                                            <button type="button" class="btn btn-danger btn-small" onclick="clearUploadedImage('logo')">מחק</button>
-                                        </div>
-                                        <div class="img-preview-box" id="logo-settings-preview"></div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>תמונת רקע (מפת ישראל)</label>
-                                        <input type="file" id="settings-bg-file" accept="image/*" style="display:none;" onchange="handleImageUpload(event, 'bg')">
-                                        <div class="file-uploader-box">
-                                            <button type="button" class="btn btn-secondary btn-small" onclick="document.getElementById('settings-bg-file').click()">בחר רקע...</button>
-                                            <button type="button" class="btn btn-danger btn-small" onclick="clearUploadedImage('bg')">מחק</button>
-                                        </div>
-                                        <div class="img-preview-box" id="bg-settings-preview"></div>
-                                    </div>
-                                </div>
-
-                                <!-- Logo Placement Settings -->
-                                <div class="logo-styling-section" style="border-top:1px solid var(--border-color); padding-top:16px; margin-top:16px;">
-                                    <h4>הגדרות מיקום וגודל הלוגו</h4>
-                                    <div class="form-grid-2" style="margin-top:10px;">
-                                        <div class="form-group">
-                                            <label for="set-logo-align">יישור לוגו בכותרת</label>
-                                            <select id="set-logo-align" onchange="updateLogoStyles()">
-                                                <option value="right">ימין</option>
-                                                <option value="center" selected>מרכז</option>
-                                                <option value="left">שמאל</option>
-                                            </select>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="set-logo-width">רוחב הלוגו: <span id="val-logo-width">75px</span></label>
-                                            <input type="range" id="set-logo-width" min="40" max="300" value="75" oninput="updateLogoStyles()">
-                                        </div>
-                                    </div>
-                                    <div class="form-grid-2">
-                                        <div class="form-group">
-                                            <label for="set-logo-margin-top">מרווח עליון (פיקסלים): <span id="val-logo-margin-top">0px</span></label>
-                                            <input type="range" id="set-logo-margin-top" min="0" max="100" value="0" oninput="updateLogoStyles()">
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="set-logo-margin-bottom">מרווח תחתון (פיקסלים): <span id="val-logo-margin-bottom">10px</span></label>
-                                            <input type="range" id="set-logo-margin-bottom" min="0" max="100" value="10" oninput="updateLogoStyles()">
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Pricing settings -->
-                                <div class="pricing-settings-section" style="border-top:1px solid var(--border-color); padding-top:16px; margin-top:16px;">
-                                    <h4>הגדרות תצוגת מחיר</h4>
-                                    <div class="form-group" style="margin-top:10px;">
-                                        <label class="toggle-container" style="display:flex; flex-direction:row; align-items:center; gap:10px; cursor:pointer;">
-                                            <input type="checkbox" id="set-show-itemized-prices" onchange="updatePriceDisplayMode()" style="width:20px; height:20px;">
-                                            <span class="toggle-label" style="font-weight:600;">הצג תמחור מפורט לפי סעיפים במסמך ה-PDF (טבלת מחירון)</span>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <!-- Phrasing/Draft Library Database -->
-                                <div class="phrasing-section" style="border-top:1px solid var(--border-color); padding-top:16px; margin-top:16px; margin-bottom:16px;">
-                                    <h4>מאגר ניסוחים לתיאורי עבודה (לסוכן הניסוח)</h4>
-                                    <p class="card-subtitle" style="margin-bottom:8px;">הדבק כאן את מאגר הניסוחים שלך. סוכן ה-AI ישתמש בו כמודל לניסוח הצעות מחיר חדשות.</p>
-                                    <div class="form-group">
-                                        <textarea id="set-phrasing-db" rows="8" placeholder="הדבק את מאגר הניסוחים כאן..."></textarea>
-                                    </div>
-                                </div>
-                                
                                 <div class="form-group">
                                     <label for="set-biz-terms">תנאי תשלום והערות ברירת מחדל</label>
                                     <textarea id="set-biz-terms" rows="4">תנאי תשלום:
@@ -711,63 +684,78 @@
 • כל שינוי בתוכניות לאחר שלב האישור הראשוני עשוי לגרור תוספת תשלום.
 • ליווי מול חברת החשמל אינו כולל את אגרות הבדיקה של חברת החשמל.</textarea>
                                 </div>
-                                <button type="button" class="btn btn-success" onclick="saveBusinessSettings()">שמור הגדרות עסק</button>
-                             </form>
-                        </div>
-                    </div>
-                    
-                    <!-- Column 2 Addon: Profile settings & Logout -->
-                    <div class="section-card" style="margin-top: 20px;">
-                        <div class="card-header">
-                            <h3><i class="fa-solid fa-user-gear"></i> פרופיל משתמש פעיל</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="user-profile-card">
-                                <div class="user-profile-header">
-                                    <i class="fa-solid fa-circle-user" style="font-size: 1.8rem;"></i>
-                                    <span id="profile-username-display">טוען...</span>
-                                </div>
-                                <div class="user-profile-field" style="margin-top: 10px;">
-                                    <span>שם משתמש:</span>
-                                    <span id="profile-field-username">-</span>
-                                </div>
-                                <div class="user-profile-field">
-                                    <span>תחום עיסוק נוכחי:</span>
-                                    <span id="profile-field-profession">-</span>
-                                </div>
-                                <div class="form-group" style="margin-top: 14px;">
-                                    <label for="settings-profession-input">עדכן תחום עיסוק</label>
-                                    <div style="display: flex; gap: 8px;">
-                                        <input type="text" id="settings-profession-input" placeholder="למשל: גנן, מהנדס בניין, שף" style="flex-grow: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; padding: 8px 12px; border-radius: 8px; font-family: inherit; width: 100%;">
-                                        <button type="button" class="btn btn-accent" onclick="updateUserProfileProfession()" style="padding: 8px 16px; font-size: 0.9rem; white-space: nowrap;">עדכן</button>
-                                    </div>
-                                </div>
-                                <button type="button" class="btn btn-danger btn-full" onclick="handleUserLogout()" style="margin-top: 15px;">
-                                    <i class="fa-solid fa-power-off"></i> התנתק ונעילת מערכת
-                                </button>
-                            </div>
+                                <button type="button" class="btn btn-success" onclick="saveBusinessSettings()">שמור פרטי עסק</button>
+                            </form>
                         </div>
                     </div>
 
-                    <!-- Column 2 Addon 2: Security settings -->
-                    <div class="section-card" id="settings-security-card" style="margin-top: 20px;">
-                        <div class="card-header">
-                            <h3><i class="fa-solid fa-user-shield"></i> עדכון פרטי אבטחה</h3>
+                    <div style="display:flex;flex-direction:column;gap:20px;">
+                        <!-- Logo & BG -->
+                        <div class="section-card">
+                            <div class="card-header"><h3><i class="fa-solid fa-image"></i> עיצוב הצעת מחיר</h3></div>
+                            <div class="card-body">
+                                <div class="form-grid-2">
+                                    <div class="form-group">
+                                        <label>לוגו החברה</label>
+                                        <input type="file" id="settings-logo-file" accept="image/*" style="display:none;" onchange="handleImageUpload(event, 'logo')">
+                                        <div class="file-uploader-box">
+                                            <button type="button" class="btn btn-secondary btn-small" onclick="document.getElementById('settings-logo-file').click()">בחר לוגו...</button>
+                                            <button type="button" class="btn btn-danger btn-small" onclick="clearUploadedImage('logo')">מחק</button>
+                                        </div>
+                                        <div class="img-preview-box" id="logo-settings-preview"></div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>תמונת רקע</label>
+                                        <input type="file" id="settings-bg-file" accept="image/*" style="display:none;" onchange="handleImageUpload(event, 'bg')">
+                                        <div class="file-uploader-box">
+                                            <button type="button" class="btn btn-secondary btn-small" onclick="document.getElementById('settings-bg-file').click()">בחר רקע...</button>
+                                            <button type="button" class="btn btn-danger btn-small" onclick="clearUploadedImage('bg')">מחק</button>
+                                        </div>
+                                        <div class="img-preview-box" id="bg-settings-preview"></div>
+                                    </div>
+                                </div>
+                                <div class="logo-styling-section" style="border-top:1px solid var(--border-color);padding-top:14px;margin-top:14px;">
+                                    <div class="form-grid-2">
+                                        <div class="form-group">
+                                            <label for="set-logo-align">יישור לוגו</label>
+                                            <select id="set-logo-align" onchange="updateLogoStyles()">
+                                                <option value="right">ימין</option>
+                                                <option value="center" selected>מרכז</option>
+                                                <option value="left">שמאל</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="set-logo-width">רוחב: <span id="val-logo-width">75px</span></label>
+                                            <input type="range" id="set-logo-width" min="40" max="300" value="75" oninput="updateLogoStyles()">
+                                        </div>
+                                    </div>
+                                    <div class="form-grid-2">
+                                        <div class="form-group">
+                                            <label for="set-logo-margin-top">מרווח עליון: <span id="val-logo-margin-top">0px</span></label>
+                                            <input type="range" id="set-logo-margin-top" min="0" max="100" value="0" oninput="updateLogoStyles()">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="set-logo-margin-bottom">מרווח תחתון: <span id="val-logo-margin-bottom">10px</span></label>
+                                            <input type="range" id="set-logo-margin-bottom" min="0" max="100" value="10" oninput="updateLogoStyles()">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group" style="margin-top:14px;">
+                                    <label class="toggle-container" style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                                        <input type="checkbox" id="set-show-itemized-prices" onchange="updatePriceDisplayMode()" style="width:18px;height:18px;">
+                                        <span style="font-weight:600;">הצג תמחור מפורט לפי סעיפים ב-PDF</span>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
-                        <div class="card-body">
-                            <form id="form-update-credentials" onsubmit="handleUpdateCredentials(event)" style="display: flex; flex-direction: column; gap: 14px;">
-                                <div class="form-group" style="margin-bottom: 0;">
-                                    <label for="settings-change-username">שם משתמש חדש</label>
-                                    <input type="text" id="settings-change-username" required placeholder="הזן שם משתמש חדש">
-                                </div>
-                                <div class="form-group" style="margin-bottom: 0;">
-                                    <label for="settings-change-password">סיסמה חדשה</label>
-                                    <input type="password" id="settings-change-password" required placeholder="הזן סיסמה חדשה">
-                                </div>
-                                <button type="submit" class="btn btn-accent btn-full" style="margin-top: 5px;">
-                                    <i class="fa-solid fa-save"></i> עדכן שם משתמש וסיסמה
-                                </button>
-                            </form>
+                        <!-- Phrasing DB -->
+                        <div class="section-card">
+                            <div class="card-header"><h3><i class="fa-solid fa-book-open-reader"></i> מאגר ניסוחים</h3></div>
+                            <div class="card-body">
+                                <p class="card-subtitle" style="margin-bottom:8px;">סוכן ה-AI ישתמש בניסוחים האלה כמודל לכתיבת הצעות מחיר.</p>
+                                <textarea id="set-phrasing-db" rows="10" placeholder="הדבק את מאגר הניסוחים כאן..."></textarea>
+                                <button type="button" class="btn btn-success" style="margin-top:10px;" onclick="saveBusinessSettings()">שמור</button>
+                            </div>
                         </div>
                     </div>
                 </div>

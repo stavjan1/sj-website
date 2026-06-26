@@ -285,6 +285,11 @@
         const APP_URL = '/sale/';
         const GOOGLE_CLIENT_ID = '4351198135-epoitoujhpofnasac18p4oonclbojj3k.apps.googleusercontent.com';
 
+        // If already logged in → skip login page entirely
+        if (localStorage.getItem('sj_logged_in_user')) {
+            window.location.replace(APP_URL);
+        }
+
         /* ---- Password toggle ---- */
         const pwEl = document.getElementById('auth-password');
         document.getElementById('toggle-pw').addEventListener('click', () => {
@@ -298,19 +303,17 @@
             const email = document.getElementById('auth-email').value.trim();
             const pass  = document.getElementById('auth-password').value;
             if (!email || !pass) return;
-            // Signal to the app that this user is authenticated so lock-screen is skipped
-            sessionStorage.setItem('sj_logged_in_user', email);
+            localStorage.setItem('sj_logged_in_user', email);
             window.location.href = APP_URL;
         });
 
         /* ---- Google Identity Services callback ---- */
         function handleGoogleCredential(response) {
             const payload = JSON.parse(atob(response.credential.split('.')[1]));
-            // Signal to the app — same key it checks in DOMContentLoaded
-            sessionStorage.setItem('sj_logged_in_user', payload.email);
-            sessionStorage.setItem('gsi_email', payload.email);
-            sessionStorage.setItem('gsi_name',  payload.name);
-            sessionStorage.setItem('gsi_picture', payload.picture);
+            localStorage.setItem('sj_logged_in_user', payload.email);
+            localStorage.setItem('gsi_email', payload.email);
+            localStorage.setItem('gsi_name',  payload.name);
+            localStorage.setItem('gsi_picture', payload.picture);
             window.location.href = APP_URL;
         }
 
