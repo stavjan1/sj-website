@@ -25,7 +25,7 @@
     --color-danger: #f05252;
     --color-danger-hover: #d83838;
 
-    --sidebar-width: 248px;
+    --sidebar-width: 260px;
     --transition-speed: 0.2s;
     --border-radius: 14px;
     
@@ -92,43 +92,42 @@ body {
 .sidebar-logo {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 32px;
-    padding: 0 8px;
+    gap: 11px;
+    margin-bottom: 16px;
+    padding: 0 6px;
 }
 
 .logo-icon {
-    width: 42px;
-    height: 42px;
-    background: linear-gradient(135deg, var(--color-accent), var(--color-success));
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    background: linear-gradient(135deg, #2b74db 0%, #f0c040 100%);
     border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: 'Outfit', sans-serif;
-    font-weight: 700;
-    font-size: 1.25rem;
     color: white;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    box-shadow: 0 4px 14px rgba(43,116,219,0.35);
 }
 
 .logo-text {
     display: flex;
     flex-direction: column;
+    min-width: 0;
 }
 
 .brand-name {
     font-weight: 700;
-    font-size: 1.05rem;
-    letter-spacing: 0.5px;
-    background: linear-gradient(to left, #ffffff, #9ca3af);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    color: #e8edf8;
+    letter-spacing: 0.3px;
 }
 
 .brand-sub {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     color: var(--text-muted);
+    white-space: nowrap;
 }
 
 .nav-menu {
@@ -181,26 +180,25 @@ body {
 .sidebar-home-link {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    margin-bottom: 12px;
+    gap: 9px;
+    padding: 9px 14px;
+    margin-bottom: 18px;
     border-radius: 9px;
-    border: 1px solid rgba(77,142,240,0.25);
-    background: rgba(77,142,240,0.06);
-    color: var(--color-accent);
-    font-size: 0.88rem;
+    border: 1px solid rgba(240,192,64,0.3);
+    background: rgba(240,192,64,0.07);
+    color: #f0c040;
+    font-size: 0.85rem;
     font-weight: 600;
     text-decoration: none;
     transition: all var(--transition-speed) ease;
 }
 .sidebar-home-link:hover {
-    background: rgba(77,142,240,0.14);
-    border-color: rgba(77,142,240,0.5);
-    color: #8ab8ff;
+    background: rgba(240,192,64,0.15);
+    border-color: rgba(240,192,64,0.55);
+    color: #ffe066;
 }
 .sidebar-home-link i {
-    font-size: 0.9rem;
-    opacity: 0.8;
+    font-size: 0.85rem;
 }
 
 .sidebar-footer {
@@ -227,7 +225,7 @@ body {
 /* Content Panels */
 .content-panel {
     display: none;
-    padding: 28px 32px;
+    padding: 32px 40px;
     min-height: 100%;
     animation: fadeIn 0.25s ease-in-out;
 }

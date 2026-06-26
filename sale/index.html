@@ -31,14 +31,25 @@
         
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
+            <!-- Logo -->
             <div class="sidebar-logo">
-                <div class="logo-icon">SJ</div>
+                <div class="logo-icon">
+                    <svg viewBox="0 0 100 100" width="22" height="22" fill="currentColor">
+                        <path d="M40 82 L62 46 L46 46 L58 14 L33 52 L50 52 Z"/>
+                    </svg>
+                </div>
                 <div class="logo-text">
                     <span class="brand-name">SJ הנדסת חשמל</span>
                     <span class="brand-sub">מערכת הצעות מחיר</span>
                 </div>
             </div>
-            
+
+            <!-- Back to main site — at the top so it's never missed -->
+            <a href="../index.html" class="sidebar-home-link">
+                <i class="fa-solid fa-arrow-right"></i>
+                <span>חזרה לאתר הראשי</span>
+            </a>
+
             <nav class="nav-menu">
                 <button class="nav-btn active" id="tab-projects" onclick="switchTab('projects')">
                     <i class="fa-solid fa-folder-open"></i>
@@ -61,14 +72,9 @@
                     <span>הגדרות מערכת</span>
                 </button>
             </nav>
-            
-            <a href="../index.html" class="sidebar-home-link">
-                <i class="fa-solid fa-house"></i>
-                <span>חזרה לאתר הראשי</span>
-            </a>
 
             <div class="sidebar-footer">
-                <span class="version">גרסה 4.0 (Projects & AI Agents)</span>
+                <span class="version">v4.0</span>
             </div>
         </aside>
         
