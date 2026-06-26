@@ -98,26 +98,6 @@
                     <p class="section-subtitle">נהל את שלב התמחור והצעת המחיר לכל לקוח תחת פרויקט ייעודי.</p>
                 </div>
                 
-                <!-- Search + filter bar -->
-                <div class="project-search-row">
-                    <div class="project-search-input-wrap">
-                        <i class="fa-solid fa-magnifying-glass"></i>
-                        <input type="text" id="project-search-q" placeholder="חפש לפי שם פרויקט..." oninput="filterProjectsList()">
-                    </div>
-                    <select id="project-sort" onchange="filterProjectsList()" class="project-filter-select">
-                        <option value="newest">חדש → ישן</option>
-                        <option value="oldest">ישן → חדש</option>
-                        <option value="name-asc">שם א→ת</option>
-                        <option value="name-desc">שם ת→א</option>
-                    </select>
-                    <select id="project-status-filter" onchange="filterProjectsList()" class="project-filter-select">
-                        <option value="all">כל הסטטוסים</option>
-                        <option value="טיוטה">טיוטה</option>
-                        <option value="נשלח">נשלח</option>
-                        <option value="הושלם">הושלם</option>
-                    </select>
-                </div>
-
                 <div class="split-view">
                     <!-- Right side: Create Project -->
                     <div class="control-side">
@@ -138,9 +118,30 @@
                     </div>
 
                     <!-- Left side: Projects List -->
-                    <div class="preview-side" style="background-color: var(--bg-card); padding: 20px;">
-                        <h3 style="margin-bottom:14px;"><i class="fa-solid fa-list-check text-accent"></i> פרויקטים קיימים</h3>
-                        <div id="projects-list-container" class="projects-list">
+                    <div class="preview-side" style="background-color: var(--bg-card); padding: 20px; display:flex; flex-direction:column; gap:0;">
+                        <h3 style="margin-bottom:12px;"><i class="fa-solid fa-list-check text-accent"></i> פרויקטים קיימים</h3>
+
+                        <!-- Search + filter — only above the list -->
+                        <div class="project-search-row" style="margin-bottom:12px;">
+                            <div class="project-search-input-wrap">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="project-search-q" placeholder="חפש שם..." oninput="filterProjectsList()">
+                            </div>
+                            <select id="project-sort" onchange="filterProjectsList()" class="project-filter-select">
+                                <option value="newest">חדש → ישן</option>
+                                <option value="oldest">ישן → חדש</option>
+                                <option value="name-asc">שם א→ת</option>
+                                <option value="name-desc">שם ת→א</option>
+                            </select>
+                            <select id="project-status-filter" onchange="filterProjectsList()" class="project-filter-select">
+                                <option value="all">כל הסטטוסים</option>
+                                <option value="טיוטה">טיוטה</option>
+                                <option value="נשלח">נשלח</option>
+                                <option value="הושלם">הושלם</option>
+                            </select>
+                        </div>
+
+                        <div id="projects-list-container" class="projects-list" style="flex:1; overflow-y:auto;">
                             <!-- Dynamically loaded by script -->
                         </div>
                     </div>

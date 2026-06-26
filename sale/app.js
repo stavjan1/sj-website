@@ -1896,7 +1896,7 @@ function connectGoogleDrive() {
             },
         });
         
-        googleTokenClient.requestAccessToken({ prompt: 'consent' });
+        googleTokenClient.requestAccessToken({ prompt: '' });
     } catch (e) {
         console.error(e);
         showToast('׳©׳’׳™׳׳” ׳‘׳׳×׳—׳•׳ Google OAuth: ׳•׳“׳ ׳©׳”-Client ID ׳×׳§׳™׳', 'error');
@@ -2239,6 +2239,17 @@ async function syncDatabaseFromDrive(silent = false) {
                         projectsList = cloudData.projects;
                         localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList));
                     }
+                    if (cloudData.users && cloudData.users.length > 0) {
+                        const currentUsers = JSON.parse(localStorage.getItem('sj_app_users') || '[]');
+                        // Merge: keep local entries for emails not in cloud, use cloud entries otherwise
+                        const merged = [...cloudData.users];
+                        currentUsers.forEach(cu => {
+                            if (!merged.find(m => m.username.toLowerCase() === cu.username.toLowerCase())) {
+                                merged.push(cu);
+                            }
+                        });
+                        localStorage.setItem('sj_app_users', JSON.stringify(merged));
+                    }
                     
                     localStorage.setItem(getStorageKey('sj_db_last_updated'), cloudTimestamp.toString());
                     
@@ -2317,10 +2328,12 @@ async function syncDatabaseToDrive(silent = true) {
         const timestamp = Date.now();
         localStorage.setItem(getStorageKey('sj_db_last_updated'), timestamp.toString());
         
+        const usersRaw = localStorage.getItem('sj_app_users');
         const payload = {
             settings: appState.settings,
             history: appState.history,
             projects: projectsList,
+            users: usersRaw ? JSON.parse(usersRaw) : [],
             lastUpdated: timestamp
         };
         
@@ -3012,12 +3025,8 @@ function handleUpdateCredentials(event) {
         localStorage.setItem('sj_app_users', JSON.stringify(users));
     }
     
-    // 3. Set new logged in user in the correct storage
-    if (localStorage.getItem('sj_logged_in_user')) {
-        localStorage.setItem('sj_logged_in_user', newUsername);
-    } else {
-        sessionStorage.setItem('sj_logged_in_user', newUsername);
-    }
+    // 3. Always persist logged in user in localStorage
+    localStorage.setItem('sj_logged_in_user', newUsername);
     
     // Clear credentials settings input fields
     newUsernameInput.value = '';
@@ -3238,7 +3247,7 @@ function handleGoogleLogin() {
                 }
             }
         });
-        googleTokenClient.requestAccessToken({ prompt: 'consent' });
+        googleTokenClient.requestAccessToken({ prompt: '' });
     } catch (e) {
         console.error('Google token initialization failed:', e);
         showToast('׳©׳’׳™׳׳” ׳‘׳׳×׳—׳•׳ ׳”׳”׳×׳—׳‘׳¨׳•׳× ׳©׳ ׳’׳•׳’׳. ׳•׳“׳ ׳©׳”-Client ID ׳×׳§׳™׳', 'error');
@@ -3283,19 +3292,11 @@ function saveGoogleUserProfession(event) {
 }
 
 function completeGoogleLogin(email, profession, token, rememberMe) {
-    if (rememberMe) {
-        localStorage.setItem('sj_logged_in_user', email);
-    } else {
-        sessionStorage.setItem('sj_logged_in_user', email);
-    }
-    
+    // Always use localStorage — no cookie notice needed for functional storage
+    localStorage.setItem('sj_logged_in_user', email);
+
     googleAccessToken = token;
-    
-    if (rememberMe) {
-        localStorage.setItem(getStorageKey('sj_drive_access_token'), token);
-    } else {
-        sessionStorage.setItem(getStorageKey('sj_drive_access_token'), token);
-    }
+    localStorage.setItem(getStorageKey('sj_drive_access_token'), token);
     
     const settingsKey = getStorageKey('sj_quote_settings');
     let settings = null;
