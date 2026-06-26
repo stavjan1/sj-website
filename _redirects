@@ -1,13 +1,11 @@
-# Netlify Redirects
+# Cloudflare Pages Redirects
 
-# Clean URLs
-/login        /login.html        200
-/calculator   /calculator.html   200
-/articles     /articles.html     200
+# Clean URLs (serve .html at path without extension)
+/login        /login.html           200
+/calculator   /calculator.html      200
 
-# Client area (the app itself enforces login client-side via auth-guard.js)
-/sale         /sale/index.html   200
-/app          /sale/index.html   301
+# Staff app
+/sale         /sale/index.html      200
+/app          /sale/index.html      301
 
-# Root
-/             /index.html        200
+# www → apex (CF Pages handles this automatically via custom domain settings)

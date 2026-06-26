@@ -8,3 +8,6 @@ Thumbs.db
 
 # Build output (none for this static site, kept for safety)
 node_modules/
+
+# Internal planning doc — not for deploy
+UPGRADE_PLAN.md
