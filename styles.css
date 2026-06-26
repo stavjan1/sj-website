@@ -326,17 +326,18 @@ img {
     background-color: var(--color-dark-bg);
 }
 
-/* Hero background sunset pylon image */
+/* Hero background – Alpine mountains with power lines */
 .hero-bg-image {
     background-image:
-        linear-gradient(rgba(9, 13, 30, 0.55), rgba(9, 9, 11, 0.80)),
-        url('assets/mountain_powerlines.png');
+        linear-gradient(rgba(9, 13, 30, 0.50), rgba(9, 9, 11, 0.75)),
+        url('assets/hero-bg.jpg');
     background-size: cover;
-    background-position: center;
+    background-position: center 40%;
     position: absolute;
     inset: 0;
     z-index: 0;
 }
+
 
 /* Technical CAD grid overlay */
 .hero-grid-overlay {
