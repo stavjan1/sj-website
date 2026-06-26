@@ -572,12 +572,14 @@ img {
     line-height: 1.7;
 }
 
-/* Section title override for light services bg */
+/* Section title override for light services bg — must beat the gradient text-fill */
 .services-section .section-title {
+    background: none;
+    -webkit-text-fill-color: #0c1a38;
     color: #0c1a38;
 }
 .services-section .section-desc {
-    color: #3a4a6b;
+    color: #34507e;
 }
 
 /* Stats Section */
