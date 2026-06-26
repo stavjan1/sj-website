@@ -3,13 +3,21 @@
   <url>
     <loc>https://www.sj-eng.co.il/</loc>
     <priority>1.0</priority>
+    <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://www.sj-eng.co.il/articles.html</loc>
-    <priority>0.7</priority>
+    <loc>https://www.sj-eng.co.il/certificates.html</loc>
+    <priority>0.8</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.sj-eng.co.il/projects.html</loc>
+    <priority>0.8</priority>
+    <changefreq>monthly</changefreq>
   </url>
   <url>
     <loc>https://www.sj-eng.co.il/calculator.html</loc>
     <priority>0.5</priority>
+    <changefreq>monthly</changefreq>
   </url>
 </urlset>

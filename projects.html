@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>פרויקטים | SJ הנדסת חשמל</title>
+    <meta name="description" content="פרויקטי תכנון חשמל של SJ הנדסת חשמל — מגורים, מסחר, תעשייה, תשתיות. שרטוט AutoCAD, לוחות חשמל, מערכות מתח גבוה.">
+    <meta property="og:title" content="פרויקטים | SJ הנדסת חשמל">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.sj-eng.co.il/projects.html">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=Rubik:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='none' stroke='%232b74db' stroke-width='6'/%3E%3Cpath d='M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z' fill='%23ffaa00'/%3E%3C/svg%3E">
+    <link rel="canonical" href="https://www.sj-eng.co.il/projects.html">
+    <style>
+        /* ─── Projects page overrides ─── */
+        .projects-hero {
+            min-height: 380px;
+            display: flex;
+            align-items: flex-end;
+            position: relative;
+            background-image:
+                linear-gradient(to bottom, rgba(8, 15, 40, 0.55) 0%, rgba(8, 15, 40, 0.82) 100%),
+                url('assets/projects_bg.webp');
+            background-size: cover;
+            background-position: center top;
+            padding: 130px 24px 60px;
+        }
+        .projects-hero-content {
+            position: relative;
+            z-index: 2;
+            max-width: 1100px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        .projects-hero h1 {
+            font-size: clamp(2rem, 5vw, 3.4rem);
+            font-weight: 900;
+            color: #fff;
+            margin-bottom: 12px;
+            line-height: 1.2;
+        }
+        .projects-hero p {
+            font-size: 1.1rem;
+            color: rgba(255,255,255,0.78);
+            max-width: 600px;
+            margin-bottom: 0;
+        }
+
+        /* ─── Filter bar ─── */
+        .projects-filter-bar {
+            background: #fff;
+            border-bottom: 1px solid #e5eaf5;
+            padding: 0 24px;
+            position: sticky;
+            top: 70px;
+            z-index: 100;
+        }
+        .projects-filter-inner {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            gap: 4px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            padding: 12px 0;
+        }
+        .projects-filter-inner::-webkit-scrollbar { display: none; }
+        .filter-btn {
+            flex-shrink: 0;
+            padding: 7px 18px;
+            border-radius: 50px;
+            border: 1px solid #d1daf2;
+            background: transparent;
+            color: #4a5a7a;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: inherit;
+        }
+        .filter-btn:hover { border-color: #2b74db; color: #2b74db; }
+        .filter-btn.active {
+            background: #2b74db;
+            border-color: #2b74db;
+            color: #fff;
+        }
+
+        /* ─── Grid section ─── */
+        .projects-grid-section {
+            background: #f4f7fc;
+            padding: 56px 24px 80px;
+        }
+        .projects-grid-container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 28px;
+        }
+
+        /* Project card */
+        .project-card {
+            background: #fff;
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 2px 18px rgba(12, 26, 56, 0.07);
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .project-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 36px rgba(12, 26, 56, 0.14);
+        }
+        .project-img-wrapper {
+            width: 100%;
+            aspect-ratio: 16/10;
+            background: linear-gradient(135deg, #0c1a38, #1a3070);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .project-img-wrapper img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .project-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            color: rgba(255,255,255,0.35);
+            font-size: 0.8rem;
+            text-align: center;
+            padding: 16px;
+        }
+        .project-placeholder svg { opacity: 0.3; }
+        .project-category-tag {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(6px);
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.18);
+        }
+        .project-card-body {
+            padding: 22px 22px 18px;
+        }
+        .project-card-title {
+            font-size: 1rem;
+            font-weight: 800;
+            color: #0c1a38;
+            margin-bottom: 6px;
+            line-height: 1.35;
+        }
+        .project-card-desc {
+            font-size: 0.85rem;
+            color: #5a6a8a;
+            line-height: 1.6;
+            margin-bottom: 14px;
+        }
+        .project-card-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .meta-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.75rem;
+            color: #6a7a9a;
+            background: #f0f4fc;
+            border-radius: 6px;
+            padding: 3px 9px;
+        }
+
+        /* CTA section */
+        .projects-cta-section {
+            background: linear-gradient(135deg, #0c1a38, #1a3070);
+            padding: 70px 24px;
+            text-align: center;
+            color: #fff;
+        }
+        .projects-cta-section h2 {
+            font-size: clamp(1.5rem, 3vw, 2.2rem);
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+        .projects-cta-section p {
+            color: rgba(255,255,255,0.72);
+            margin-bottom: 32px;
+            font-size: 1.05rem;
+        }
+        .cta-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            justify-content: center;
+        }
+
+        @media (max-width: 600px) {
+            .projects-grid { grid-template-columns: 1fr; }
+            .cta-actions { flex-direction: column; align-items: center; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="main-header scrolled" id="main-header">
+        <div class="header-container">
+            <a href="index.html" class="logo-area" id="nav-logo-link">
+                <svg class="logo-svg" viewBox="0 0 100 100" width="40" height="40">
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 2" class="logo-circle"/>
+                    <path d="M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z" fill="currentColor" class="logo-bolt"/>
+                </svg>
+                <div class="logo-text">
+                    <span class="logo-brand">SJ</span>
+                    <span class="logo-subbrand">הנדסת חשמל</span>
+                </div>
+            </a>
+            <nav class="desktop-nav" role="navigation" aria-label="תפריט ראשי">
+                <a href="index.html#services" class="nav-link">שירותים</a>
+                <a href="certificates.html" class="nav-link">הסמכות</a>
+                <a href="projects.html" class="nav-link" aria-current="page">פרויקטים</a>
+                <a href="index.html#knowledge-hub" class="nav-link">מדריכים</a>
+                <a href="index.html#testimonials" class="nav-link">המלצות</a>
+                <a href="login.html" class="nav-link nav-link-staff">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M13 2L4.5 13h6l-1.5 8L18.5 10h-6z"/></svg>
+                    כניסת עובדים
+                </a>
+                <a href="index.html#contact" class="btn-primary">שיחת ייעוץ</a>
+            </nav>
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="פתח תפריט">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Mobile Drawer -->
+    <div class="mobile-drawer" id="mobile-drawer">
+        <nav class="mobile-nav">
+            <a href="index.html#services" class="mobile-nav-link">שירותים</a>
+            <a href="certificates.html" class="mobile-nav-link">הסמכות</a>
+            <a href="projects.html" class="mobile-nav-link">פרויקטים</a>
+            <a href="index.html#knowledge-hub" class="mobile-nav-link">מדריכים</a>
+            <a href="index.html#testimonials" class="mobile-nav-link">המלצות</a>
+            <a href="login.html" class="mobile-nav-link" style="color:#f0c040;">⚡ כניסת עובדים</a>
+            <a href="index.html#contact" class="btn-primary">צור קשר</a>
+        </nav>
+    </div>
+
+    <main>
+        <!-- Hero -->
+        <section class="projects-hero">
+            <div class="projects-hero-content">
+                <h1>פרויקטים שביצענו</h1>
+                <p>תכנון חשמל ברמה הנדסית — ממגורים ועד תשתיות תעשייתיות מורכבות</p>
+            </div>
+        </section>
+
+        <!-- Filter Bar -->
+        <div class="projects-filter-bar">
+            <div class="projects-filter-inner">
+                <button class="filter-btn active" data-filter="all">הכל</button>
+                <button class="filter-btn" data-filter="residential">מגורים</button>
+                <button class="filter-btn" data-filter="commercial">מסחרי</button>
+                <button class="filter-btn" data-filter="industrial">תעשייתי</button>
+                <button class="filter-btn" data-filter="infra">תשתיות</button>
+                <button class="filter-btn" data-filter="hv">מתח גבוה</button>
+            </div>
+        </div>
+
+        <!-- Projects Grid -->
+        <section class="projects-grid-section">
+            <div class="projects-grid-container">
+                <div class="projects-grid" id="projects-grid">
+
+                    <!-- Project 1 -->
+                    <article class="project-card" data-category="residential">
+                        <div class="project-img-wrapper">
+                            <div class="project-placeholder">
+                                <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 21V9h8v12M12 9V3"/>
+                                </svg>
+                                <span>תמונת פרויקט<br>תועלה בקרוב</span>
+                            </div>
+                            <div class="project-category-tag">מגורים</div>
+                        </div>
+                        <div class="project-card-body">
+                            <h3 class="project-card-title">בניין מגורים רב-קומות — בת ים</h3>
+                            <p class="project-card-desc">תכנון מערכת חשמל מלאה לבניין 12 קומות: לוחות, תאורה, כוח, גיבויים וממשק מול חברת החשמל.</p>
+                            <div class="project-card-meta">
+                                <span class="meta-chip">
+                                    <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2a5 5 0 1 0 0 10A5 5 0 0 0 8 2z"/><path d="M8 7v3l2 1"/></svg>
+                                    2024
+                                </span>
+                                <span class="meta-chip">AutoCAD</span>
+                                <span class="meta-chip">לוח ראשי 800A</span>
+                            </div>
+                        </div>
+                    </article>
+
+                    <!-- Project 2 -->
+                    <article class="project-card" data-category="commercial">
+                        <div class="project-img-wrapper">
+                            <div class="project-placeholder">
+                                <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 9h20M8 3v6M16 3v6"/>
+                                </svg>
+                                <span>תמונת פרויקט<br>תועלה בקרוב</span>
+                            </div>
+                            <div class="project-category-tag">מסחרי</div>
+                        </div>
+                        <div class="project-card-body">
+                            <h3 class="project-card-title">קניון ואזור מסחרי — תל אביב</h3>
+                            <p class="project-card-desc">תכנון תאורה לפי תקן IS 12464, מערכות כוח לחנויות, תיאום מול רשויות כיבוי אש ומהנדס בטיחות.</p>
+                            <div class="project-card-meta">
+                                <span class="meta-chip">2024</span>
+                                <span class="meta-chip">תאורה IS 12464</span>
+                                <span class="meta-chip">כ-3,200 מ"ר</span>
+                            </div>
+                        </div>
+                    </article>
+
+                    <!-- Project 3 -->
+                    <article class="project-card" data-category="industrial">
+                        <div class="project-img-wrapper">
+                            <div class="project-placeholder">
+                                <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M2 20V8l8-6 8 6v12H2z"/><path d="M9 20v-8h6v8"/>
+                                </svg>
+                                <span>תמונת פרויקט<br>תועלה בקרוב</span>
+                            </div>
+                            <div class="project-category-tag">תעשייתי</div>
+                        </div>
+                        <div class="project-card-body">
+                            <h3 class="project-card-title">מפעל ייצור — אזור תעשייה</h3>
+                            <p class="project-card-desc">תכנון מערכת חשמל לתעשייה כבדה: לוחות תלת-פאזיים, מנועים, כבלים, הארקות ומערכת UPS.</p>
+                            <div class="project-card-meta">
+                                <span class="meta-chip">2023</span>
+                                <span class="meta-chip">3×4000A</span>
+                                <span class="meta-chip">UPS 200kVA</span>
+                            </div>
+                        </div>
+                    </article>
+
+                    <!-- Project 4 -->
+                    <article class="project-card" data-category="hv">
+                        <div class="project-img-wrapper">
+                            <div class="project-placeholder">
+                                <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M13 2L4.5 13h6l-1.5 8L18.5 10h-6z"/>
+                                </svg>
+                                <span>תמונת פרויקט<br>תועלה בקרוב</span>
+                            </div>
+                            <div class="project-category-tag">מתח גבוה</div>
+                        </div>
+                        <div class="project-card-body">
+                            <h3 class="project-card-title">תחנת מתח גבוה — תשתית עירונית</h3>
+                            <p class="project-card-desc">תכנון והסמכה לתחנת מתח גבוה עירונית: טרנספורמציה, בסיסטם הגנות, תיאום עם חברת החשמל.</p>
+                            <div class="project-card-meta">
+                                <span class="meta-chip">2024</span>
+                                <span class="meta-chip">22kV</span>
+                                <span class="meta-chip">הסמכה חברת חשמל</span>
+                            </div>
+                        </div>
+                    </article>
+
+                    <!-- Project 5 -->
+                    <article class="project-card" data-category="residential">
+                        <div class="project-img-wrapper">
+                            <div class="project-placeholder">
+                                <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                                </svg>
+                                <span>תמונת פרויקט<br>תועלה בקרוב</span>
+                            </div>
+                            <div class="project-category-tag">מגורים</div>
+                        </div>
+                        <div class="project-card-body">
+                            <h3 class="project-card-title">וילה פרטית — הרצליה פיתוח</h3>
+                            <p class="project-card-desc">תכנון חשמל לבית פרטי יוקרתי: תאורה חכמה, בקרת KNX, מערכת סולארית ועגינת רכב חשמלי.</p>
+                            <div class="project-card-meta">
+                                <span class="meta-chip">2025</span>
+                                <span class="meta-chip">KNX</span>
+                                <span class="meta-chip">Solar + EV</span>
+                            </div>
+                        </div>
+                    </article>
+
+                    <!-- Project 6 -->
+                    <article class="project-card" data-category="infra">
+                        <div class="project-img-wrapper">
+                            <div class="project-placeholder">
+                                <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                                </svg>
+                                <span>תמונת פרויקט<br>תועלה בקרוב</span>
+                            </div>
+                            <div class="project-category-tag">תשתיות</div>
+                        </div>
+                        <div class="project-card-body">
+                            <h3 class="project-card-title">תשתית חשמל לשכונה חדשה</h3>
+                            <p class="project-card-desc">תכנון תשתית חשמל לשכונת מגורים חדשה: רשת חלוקה תת-קרקעית, תאורת רחובות ועמדות EV ציבוריות.</p>
+                            <div class="project-card-meta">
+                                <span class="meta-chip">2025</span>
+                                <span class="meta-chip">תכנון עירוני</span>
+                                <span class="meta-chip">EV ציבורי</span>
+                            </div>
+                        </div>
+                    </article>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA -->
+        <section class="projects-cta-section">
+            <h2>יש לך פרויקט שדורש תכנון חשמל?</h2>
+            <p>מגורים, מסחר, תעשייה או תשתיות — נשמח לשמוע ולהציע פתרון</p>
+            <div class="cta-actions">
+                <a href="index.html#contact" class="btn-primary">שלח פרטי פרויקט</a>
+                <a href="https://wa.me/972535302887?text=%D7%94%D7%99%D7%99%20SJ%20%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%A9%D7%9E%D7%95%D7%A2%20%D7%A2%D7%9C%20%D7%A4%D7%A8%D7%95%D7%99%D7%A7%D7%98" target="_blank" rel="noopener noreferrer" class="btn-staff">
+                    <svg viewBox="0 0 32 32" width="18" height="18" fill="currentColor" aria-hidden="true">
+                        <path d="M16 1C7.716 1 1 7.716 1 16c0 2.68 0.686 5.197 1.89 7.39L1 31l7.82-2.05A14.936 14.936 0 0 0 16 31c8.284 0 15-6.716 15-15S24.284 1 16 1zm6.847 18.166c-0.375-0.188-2.222-1.097-2.565-1.222-0.344-0.125-0.594-0.188-0.844 0.188-0.25 0.375-0.97 1.222-1.188 1.472-0.219 0.25-0.438 0.281-0.813 0.094-0.375-0.188-1.582-0.584-3.013-1.859-1.113-0.993-1.865-2.219-2.083-2.594-0.219-0.375-0.023-0.578 0.164-0.765 0.169-0.169 0.375-0.438 0.563-0.656 0.188-0.219 0.25-0.375 0.375-0.625 0.125-0.25 0.063-0.469-0.031-0.656-0.094-0.188-0.844-2.031-1.156-2.781-0.305-0.731-0.614-0.63-0.844-0.642-0.219-0.011-0.469-0.014-0.719-0.014s-0.656 0.094-1 0.469-1.313 1.281-1.313 3.125 1.344 3.625 1.531 3.875c0.188 0.25 2.644 4.038 6.407 5.663 0.895 0.386 1.594 0.617 2.138 0.789 0.898 0.285 1.716 0.245 2.362 0.149 0.72-0.108 2.219-0.908 2.531-1.785 0.313-0.875 0.313-1.625 0.219-1.782-0.094-0.156-0.344-0.25-0.719-0.438z"/>
+                    </svg>
+                    WhatsApp ישיר
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="main-footer" role="contentinfo">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <div class="brand-title">SJ הנדסת חשמל</div>
+                <div class="brand-tagline">תכנון, ייעוץ ושרטוט מערכות חשמל</div>
+            </div>
+            <div class="footer-links">
+                <a href="index.html#services">שירותים</a>
+                <a href="certificates.html">תעודות</a>
+                <a href="projects.html">פרויקטים</a>
+                <a href="index.html#testimonials">המלצות</a>
+                <a href="index.html#contact">צור קשר</a>
+            </div>
+            <div class="footer-copy">
+                <p>&copy; 2026 SJ הנדסת חשמל. כל הזכויות שמורות.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Sticky Buttons -->
+    <div class="sticky-contact-widget">
+        <a href="https://wa.me/972535302887?text=%D7%94%D7%99%D7%99%20SJ" target="_blank" rel="noopener noreferrer" class="widget-btn whatsapp-btn" aria-label="פתיחת שיחה בוואטסאפ">
+            <svg viewBox="0 0 32 32" width="28" height="28" fill="currentColor">
+                <path d="M16 1C7.716 1 1 7.716 1 16c0 2.68 0.686 5.197 1.89 7.39L1 31l7.82-2.05A14.936 14.936 0 0 0 16 31c8.284 0 15-6.716 15-15S24.284 1 16 1zm6.847 18.166c-0.375-0.188-2.222-1.097-2.565-1.222-0.344-0.125-0.594-0.188-0.844 0.188-0.25 0.375-0.97 1.222-1.188 1.472-0.219 0.25-0.438 0.281-0.813 0.094-0.375-0.188-1.582-0.584-3.013-1.859-1.113-0.993-1.865-2.219-2.083-2.594-0.219-0.375-0.023-0.578 0.164-0.765 0.169-0.169 0.375-0.438 0.563-0.656 0.188-0.219 0.25-0.375 0.375-0.625 0.125-0.25 0.063-0.469-0.031-0.656-0.094-0.188-0.844-2.031-1.156-2.781-0.305-0.731-0.614-0.63-0.844-0.642-0.219-0.011-0.469-0.014-0.719-0.014s-0.656 0.094-1 0.469-1.313 1.281-1.313 3.125 1.344 3.625 1.531 3.875c0.188 0.25 2.644 4.038 6.407 5.663 0.895 0.386 1.594 0.617 2.138 0.789 0.898 0.285 1.716 0.245 2.362 0.149 0.72-0.108 2.219-0.908 2.531-1.785 0.313-0.875 0.313-1.625 0.219-1.782-0.094-0.156-0.344-0.25-0.719-0.438z"/>
+            </svg>
+            <span class="widget-tooltip">WhatsApp</span>
+        </a>
+        <a href="tel:053-530-2887" class="widget-btn phone-btn" aria-label="התקשר עכשיו">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+            <span class="widget-tooltip">חיוג מהיר</span>
+        </a>
+    </div>
+
+    <script>
+        // Mobile menu
+        const toggle = document.getElementById('mobile-menu-toggle');
+        const drawer = document.getElementById('mobile-drawer');
+        toggle.addEventListener('click', () => {
+            drawer.classList.toggle('open');
+            toggle.classList.toggle('open');
+        });
+        document.addEventListener('click', e => {
+            if (drawer.classList.contains('open') && !drawer.contains(e.target) && !toggle.contains(e.target)) {
+                drawer.classList.remove('open'); toggle.classList.remove('open');
+            }
+        });
+
+        // Header scroll
+        const header = document.getElementById('main-header');
+        window.addEventListener('scroll', () => {
+            header.classList.toggle('scrolled', window.scrollY > 50);
+        });
+
+        // Filter
+        const filterBtns = document.querySelectorAll('.filter-btn');
+        const cards = document.querySelectorAll('.project-card');
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                filterBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const filter = btn.dataset.filter;
+                cards.forEach(card => {
+                    const show = filter === 'all' || card.dataset.category === filter;
+                    card.style.display = show ? '' : 'none';
+                });
+            });
+        });
+
+        // Scroll reveal
+        const observer = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, { threshold: 0.08 });
+        cards.forEach((card, i) => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(24px)';
+            card.style.transition = `opacity 0.5s ease ${i * 80}ms, transform 0.5s ease ${i * 80}ms`;
+            observer.observe(card);
+        });
+    </script>
+</body>
+</html>
