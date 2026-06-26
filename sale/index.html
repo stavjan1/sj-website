@@ -71,6 +71,10 @@
                     <i class="fa-solid fa-sliders"></i>
                     <span>הגדרות מערכת</span>
                 </button>
+                <button class="nav-btn nav-btn-admin" id="tab-admin" onclick="switchTab('admin')" style="display:none;">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>Admin</span>
+                </button>
             </nav>
 
             <div class="sidebar-footer">
@@ -768,9 +772,90 @@
                     </div>
                 </div>
             </section>
-            
+
+            <!-- Admin Panel — visible only to stavjan19989@gmail.com -->
+            <section id="panel-admin" class="content-panel">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-shield-halved" style="color:#f0c040;"></i> ניהול מערכת — <span style="color:#f0c040;">Admin</span></h2>
+                    <p class="section-subtitle">פאנל ניהול למנהל המערכת בלבד. הגדרות כאן משפיעות על כל המשתמשים.</p>
+                </div>
+
+                <div class="settings-grid">
+                    <!-- Gemini API Key (shared) -->
+                    <div style="display:flex;flex-direction:column;gap:20px;">
+                        <div class="section-card" style="border-color:rgba(240,192,64,0.25);">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-key" style="color:#f0c040;"></i> מפתח Gemini API (גלובלי לכל המשתמשים)</h3>
+                            </div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+                                <p class="input-help">מפתח זה ישמש את <strong>כל המשתמשים</strong> באתר. לא נשמר ב-GitHub. מופק מ-<a href="https://aistudio.google.com/apikey" target="_blank" class="text-link">Google AI Studio</a>.</p>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <input type="password" id="admin-gemini-key" placeholder="AIza... או AQ....">
+                                </div>
+                                <button class="btn btn-accent" onclick="adminSaveGeminiKey()">
+                                    <i class="fa-solid fa-save"></i> שמור מפתח לכל המשתמשים
+                                </button>
+                                <p class="input-help" id="admin-key-status" style="color:var(--color-success);display:none;">
+                                    <i class="fa-solid fa-circle-check"></i> מפתח שמור ופעיל
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Server Drive Folder -->
+                        <div class="section-card" style="border-color:rgba(240,192,64,0.25);">
+                            <div class="card-header">
+                                <h3><i class="fa-brands fa-google-drive" style="color:#f0c040;"></i> תיקיית Drive מרכזית (שרת)</h3>
+                            </div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+                                <p class="input-help">
+                                    צור תיקייה <code>SKILLS/SJ-SALE-WEBSITE</code> ב-Drive שלך, שתף אותה עם
+                                    <strong>"Anyone with link can EDIT"</strong>, הדבק כאן את ה-Folder ID.
+                                    כל משתמש יקבל תת-תיקייה בשמו שם אוטומטית.
+                                </p>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <input type="text" id="admin-server-folder-id" placeholder="1ABCdef_FolderID_fromDriveURL">
+                                    <p class="input-help" style="margin-top:4px;">ה-ID נמצא ב-URL של התיקייה: drive.google.com/drive/folders/<strong>ID_כאן</strong></p>
+                                </div>
+                                <button class="btn btn-accent" onclick="adminSaveServerFolder()">
+                                    <i class="fa-solid fa-server"></i> הגדר כתיקיית שרת
+                                </button>
+                                <p class="input-help" id="admin-folder-status" style="color:var(--color-success);display:none;"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Status + users -->
+                    <div style="display:flex;flex-direction:column;gap:20px;">
+                        <div class="section-card" style="border-color:rgba(240,192,64,0.25);">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-users" style="color:#f0c040;"></i> משתמשי המערכת</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="admin-users-list" style="display:flex;flex-direction:column;gap:8px;">
+                                    <!-- populated by JS -->
+                                </div>
+                                <button class="btn btn-secondary" style="margin-top:14px;width:100%;" onclick="adminRefreshUserList()">
+                                    <i class="fa-solid fa-rotate"></i> רענן רשימת משתמשים
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="section-card" style="border-color:rgba(240,192,64,0.25);">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-circle-info" style="color:#f0c040;"></i> מצב מערכת</h3>
+                            </div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:8px;font-size:0.88rem;">
+                                <div>מפתח API: <span id="admin-status-key" style="color:var(--color-success);">—</span></div>
+                                <div>תיקיית שרת: <span id="admin-status-folder" style="color:var(--color-success);">—</span></div>
+                                <div>Drive: <span id="admin-status-drive">—</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
         </main>
-        
+
     </div>
 
     <!-- Collapsible Stern Pricing Sidebar / Drawer -->
@@ -792,81 +877,41 @@
         </div>
     </div>
 
-    <!-- Sleek Lock Screen Container (Login / Register) -->
+    <!-- Lock Screen -->
     <div id="lock-screen" class="lock-screen-container" style="display: none;">
         <div class="lock-card">
             <div class="lock-logo">
-                <i class="fa-solid fa-file-invoice-dollar lock-icon"></i>
-                <h2>מערכת הצעות מחיר | SJ</h2>
-                <p>כניסה מאובטחת וסנכרון ענן אישי</p>
+                <div style="width:56px;height:56px;background:linear-gradient(135deg,#2b74db,#f0c040);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+                    <i class="fa-solid fa-bolt" style="font-size:1.6rem;color:#fff;"></i>
+                </div>
+                <h2 style="font-size:1.3rem;font-weight:700;margin-bottom:4px;">SJ הנדסת חשמל</h2>
+                <p style="color:var(--text-muted);font-size:0.88rem;">מערכת הצעות מחיר — כניסת עובדים</p>
             </div>
 
-            <!-- Google Authentication (Easiest & Recommended) -->
-            <div class="google-auth-box" style="margin-bottom: 20px; padding: 20px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px;">
-                <button type="button" class="btn btn-full" onclick="handleGoogleLogin()" style="background: #fff; color: #1f2937; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: transform 0.2s; cursor: pointer; width: 100%;">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google Logo" style="width: 18px; height: 18px;">
-                    <span>התחבר באמצעות Google</span>
-                </button>
-                
-                <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 15px;">
-                    <input type="checkbox" id="lock-remember-me" checked style="width: 16px; height: 16px; cursor: pointer;">
-                    <label for="lock-remember-me" style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; user-select: none;">זכור אותי במכשיר זה</label>
-                </div>
+            <!-- Primary: Google Login -->
+            <button type="button" class="btn-google-login" onclick="handleGoogleLogin()">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="G" style="width:20px;height:20px;">
+                <span>כניסה עם חשבון Google</span>
+            </button>
 
-                <!-- Expandable Client ID settings -->
-                <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;">
-                    <button type="button" onclick="toggleGoogleConfig()" style="background: none; border: none; color: var(--color-accent); font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; margin: 0 auto;">
-                        <i class="fa-solid fa-cog"></i> <span>הגדרות חיבור Google API</span>
-                    </button>
-                    <div id="google-config-section" style="display: none; margin-top: 10px; text-align: right;">
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label for="lock-google-client-id" style="font-size: 0.75rem; color: var(--text-muted);">Google Client ID</label>
-                            <input type="text" id="lock-google-client-id" placeholder="הזן מזהה לקוח של גוגל" style="font-size: 0.8rem; padding: 8px 12px; margin-top: 4px; width: 100%; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: #fff;">
-                        </div>
-                    </div>
-                </div>
+            <!-- Secondary: manual login (collapsed) -->
+            <div class="lock-manual-toggle" onclick="toggleManualLogin()">
+                <i class="fa-solid fa-chevron-down" id="manual-toggle-icon" style="font-size:0.75rem;transition:transform 0.2s;"></i>
+                כניסה עם שם משתמש וסיסמה
+            </div>
+            <div id="manual-login-section" style="display:none; margin-top:12px;">
+                <form id="form-login-user" onsubmit="handleUserLogin(event)" style="display:flex;flex-direction:column;gap:10px;">
+                    <input type="text" id="login-username" required placeholder="שם משתמש" style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:10px 14px;font-family:inherit;font-size:0.9rem;">
+                    <input type="password" id="login-password" required placeholder="סיסמה" style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:10px 14px;font-family:inherit;font-size:0.9rem;">
+                    <button type="submit" class="btn btn-accent btn-full">כניסה</button>
+                </form>
             </div>
 
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px; color: var(--text-muted); font-size: 0.8rem;">
-                <div style="flex-grow: 1; height: 1px; background: rgba(255,255,255,0.08);"></div>
-                <span>או כניסה מקומית</span>
-                <div style="flex-grow: 1; height: 1px; background: rgba(255,255,255,0.08);"></div>
-            </div>
-            
-            <!-- Toggle Tabs -->
-            <div class="lock-tabs">
-                <button class="lock-tab-btn active" id="tab-login" onclick="toggleLockForm('login')">התחברות</button>
-                <button class="lock-tab-btn" id="tab-register" onclick="toggleLockForm('register')">הרשמה</button>
-            </div>
-            
-            <!-- Login Form -->
-            <form id="form-login-user" onsubmit="handleUserLogin(event)" class="lock-form active">
-                <div class="form-group">
-                    <label for="login-username">שם משתמש</label>
-                    <input type="text" id="login-username" required placeholder="הזן שם משתמש">
-                </div>
-                <div class="form-group">
-                    <label for="login-password">סיסמה</label>
-                    <input type="password" id="login-password" required placeholder="הזן סיסמה">
-                </div>
-                <button type="submit" class="btn btn-accent btn-full" style="margin-top: 10px;">התחבר למערכת</button>
-            </form>
-            
-            <!-- Register Form -->
-            <form id="form-register-user" onsubmit="handleUserRegister(event)" class="lock-form">
-                <div class="form-group">
-                    <label for="reg-username">שם משתמש חדש</label>
-                    <input type="text" id="reg-username" required placeholder="למשל: סתיו">
-                </div>
-                <div class="form-group">
-                    <label for="reg-password">סיסמה</label>
-                    <input type="password" id="reg-password" required placeholder="צור סיסמה">
-                </div>
-                <div class="form-group">
-                    <label for="reg-profession">תחום עיסוק / התמחות</label>
-                    <input type="text" id="reg-profession" required placeholder="למשל: חשמלאי מוסמך, גנן, שף">
-                </div>
-                <button type="submit" class="btn btn-accent btn-full" style="margin-top: 10px;">צור משתמש והתחבר</button>
+            <!-- Hidden fields kept for JS compatibility -->
+            <input type="hidden" id="lock-remember-me" value="true">
+            <input type="hidden" id="lock-google-client-id">
+            <form id="form-register-user" style="display:none;">
+                <input type="hidden" id="reg-username"><input type="hidden" id="reg-password"><input type="hidden" id="reg-profession">
             </form>
         </div>
     </div>

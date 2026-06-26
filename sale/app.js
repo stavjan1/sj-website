@@ -4,6 +4,87 @@
 // ==========================================================================
 
 // ==========================================================================
+// Admin configuration
+// ==========================================================================
+const ADMIN_EMAIL = 'stavjan19989@gmail.com';
+
+function isAdmin() {
+    return (getActiveUser() || '').toLowerCase().trim() === ADMIN_EMAIL.toLowerCase();
+}
+
+function showAdminTabIfNeeded() {
+    const adminTab = document.getElementById('tab-admin');
+    if (adminTab) adminTab.style.display = isAdmin() ? 'flex' : 'none';
+}
+
+function adminSaveGeminiKey() {
+    const key = (document.getElementById('admin-gemini-key')?.value || '').trim();
+    if (!key) { showToast('הזן מפתח תחילה', 'error'); return; }
+    saveGlobalGeminiKey(key);
+    appState.settings.geminiApiKey = key;
+    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
+    const status = document.getElementById('admin-key-status');
+    if (status) status.style.display = 'block';
+    showToast('מפתח API נשמר לכל המשתמשים');
+    adminRefreshStatus();
+}
+
+function adminSaveServerFolder() {
+    const id = (document.getElementById('admin-server-folder-id')?.value || '').trim();
+    if (!id) { showToast('הזן Folder ID תחילה', 'error'); return; }
+    localStorage.setItem('sj_server_folder_id', id);
+    // Clear cached folder IDs so next sync uses the new server folder
+    localStorage.removeItem(getStorageKey('sj_sync_folder_id'));
+    localStorage.removeItem(getStorageKey('sj_folder_quotes_id'));
+    const status = document.getElementById('admin-folder-status');
+    if (status) { status.style.display = 'block'; status.textContent = `תיקיית שרת הוגדרה: ${id}`; }
+    showToast('תיקיית שרת Drive הוגדרה בהצלחה');
+    adminRefreshStatus();
+}
+
+function adminRefreshStatus() {
+    const keyEl = document.getElementById('admin-status-key');
+    const folderEl = document.getElementById('admin-status-folder');
+    const driveEl = document.getElementById('admin-status-drive');
+    const hasKey = !!getGeminiApiKey();
+    const serverFolder = localStorage.getItem('sj_server_folder_id');
+    if (keyEl) { keyEl.textContent = hasKey ? 'מוגדר ✓' : 'לא מוגדר'; keyEl.style.color = hasKey ? 'var(--color-success)' : 'var(--color-danger)'; }
+    if (folderEl) { folderEl.textContent = serverFolder ? serverFolder.slice(0,20)+'…' : 'לא מוגדר'; folderEl.style.color = serverFolder ? 'var(--color-success)' : '#f0c040'; }
+    if (driveEl) { driveEl.textContent = googleAccessToken ? 'מחובר ✓' : 'מנותק'; driveEl.style.color = googleAccessToken ? 'var(--color-success)' : 'var(--color-danger)'; }
+
+    // Pre-fill existing values
+    const keyInput = document.getElementById('admin-gemini-key');
+    if (keyInput && !keyInput.value) keyInput.value = getGeminiApiKey() || '';
+    const folderInput = document.getElementById('admin-server-folder-id');
+    if (folderInput && !folderInput.value) folderInput.value = serverFolder || '';
+}
+
+function adminRefreshUserList() {
+    const container = document.getElementById('admin-users-list');
+    if (!container) return;
+    const users = JSON.parse(localStorage.getItem('sj_app_users') || '[]');
+    if (users.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">אין משתמשים רשומים.</p>';
+        return;
+    }
+    container.innerHTML = users.map(u => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg-input);border-radius:8px;font-size:0.85rem;">
+            <span>${u.username}</span>
+            <span style="color:var(--text-muted);">${u.profession || '—'}</span>
+        </div>
+    `).join('');
+}
+
+function toggleManualLogin() {
+    const sec = document.getElementById('manual-login-section');
+    const icon = document.getElementById('manual-toggle-icon');
+    if (!sec) return;
+    const open = sec.style.display !== 'none';
+    sec.style.display = open ? 'none' : 'block';
+    if (icon) icon.style.transform = open ? '' : 'rotate(180deg)';
+}
+
+// ==========================================================================
 // Gemini model selection + daily quota
 // ==========================================================================
 let selectedGeminiModel = 'gemini-2.0-flash';
@@ -177,15 +258,14 @@ function initUserSession() {
     loadSternPricing();
     loadUploadedImages();
     checkGoogleSession();
-    
-    // Set default date to today
+
     document.getElementById('form-quote-date').value = getTodayDateString();
-    
-    // Switch to projects tab initially
     switchTab('projects');
-    
-    // Update user profile display in Settings
     updateUserProfileUI();
+    showAdminTabIfNeeded();
+    if (isAdmin()) {
+        setTimeout(() => { adminRefreshStatus(); adminRefreshUserList(); }, 300);
+    }
 }
 
 // Helper: Get today's date in YYYY-MM-DD
@@ -1956,6 +2036,11 @@ async function findOrCreateFolder(name, parentId) {
     return null;
 }
 
+function _userFolderName() {
+    const u = getActiveUser() || 'user';
+    return u.replace(/[^a-zA-Z0-9֐-׿._-]/g, '_').slice(0, 60);
+}
+
 async function resolveSjDriveFolders() {
     if (!googleAccessToken) return null;
     
@@ -1997,49 +2082,46 @@ async function resolveSjDriveFolders() {
     }
     
     try {
-        let sjId = 'root';
-        let qId = appState.settings.googleFolderId;
-        
-        if (!qId || qId === 'auto_sj' || qId === '1FHfFPd5S9EtphEcGxKqw9oAZstKyQbjv') {
-            sjId = await findOrCreateFolder('SJ ׳”׳ ׳“׳¡׳× ׳—׳©׳׳', 'root');
-            if (!sjId) throw new Error("׳©׳’׳™׳׳” ׳‘׳™׳¦׳™׳¨׳× ׳×׳™׳§׳™׳™׳× 'SJ ׳”׳ ׳“׳¡׳× ׳—׳©׳׳'");
-            qId = await findOrCreateFolder('׳”׳¦׳¢׳•׳× ׳׳—׳™׳¨', sjId);
-            if (!qId) throw new Error("׳©׳’׳™׳׳” ׳‘׳™׳¦׳™׳¨׳× ׳×׳™׳§׳™׳™׳× '׳”׳¦׳¢׳•׳× ׳׳—׳™׳¨'");
+        const serverFolderId = localStorage.getItem('sj_server_folder_id');
+        const username = _userFolderName();
+        let qId;
+
+        if (serverFolderId) {
+            qId = await findOrCreateFolder(username, serverFolderId);
+            if (!qId) throw new Error('שגיאה ביצירת תת-תיקיית משתמש בשרת');
         } else {
-            sjId = 'custom';
+            const skillsId = await findOrCreateFolder('SKILLS', 'root');
+            if (!skillsId) throw new Error('שגיאה ביצירת תיקיית SKILLS');
+            const saleId = await findOrCreateFolder('SJ-SALE-WEBSITE', skillsId);
+            if (!saleId) throw new Error('שגיאה ביצירת תיקיית SJ-SALE-WEBSITE');
+            qId = await findOrCreateFolder(username, saleId);
+            if (!qId) throw new Error('שגיאה ביצירת תת-תיקיית משתמש');
         }
-        
+
         const dId = await findOrCreateFolder('.sysdata', qId);
-        if (!dId) throw new Error("׳©׳’׳™׳׳” ׳‘׳™׳¦׳™׳¨׳× ׳×׳™׳§׳™׳™׳× '.sysdata'");
-        
-        localStorage.setItem(getStorageKey('sj_folder_electrical_id'), sjId);
+        if (!dId) throw new Error('שגיאה ביצירת תיקיית .sysdata');
+
         localStorage.setItem(getStorageKey('sj_folder_quotes_id'), qId);
         localStorage.setItem(getStorageKey('sj_folder_data_id'), dId);
         localStorage.setItem(getStorageKey('sj_sync_folder_id'), dId);
-        
+
         appState.settings.googleFolderId = qId;
         localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
-        
-        const folderInput = document.getElementById('settings-drive-folder-id');
-        if (folderInput) folderInput.value = qId;
-        
+
         const pathStatus = document.getElementById('drive-folder-path-status');
         if (pathStatus) {
-            pathStatus.innerHTML = `
-                <i class="fa-solid fa-circle-check" style="color: var(--color-success)"></i> ׳×׳™׳§׳™׳•׳× ׳₪׳¢׳™׳׳•׳× ׳‘׳“׳¨׳™׳™׳‘:<br>
-                <i class="fa-solid fa-file-pdf" style="margin-right: 15px;"></i> ׳׳–׳”׳” ׳×׳™׳§׳™׳™׳× PDF: <strong>${qId}</strong><br>
-                <i class="fa-solid fa-database" style="margin-right: 15px;"></i> ׳׳–׳”׳” ׳×׳™׳§׳™׳™׳× ׳“׳׳˜׳: <strong>${dId}</strong>
-            `;
-            pathStatus.style.color = 'var(--color-success)';
+            const path = serverFolderId
+                ? 'שרת/' + username + '/'
+                : 'SKILLS/SJ-SALE-WEBSITE/' + username + '/';
+            pathStatus.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--color-success)"></i> Drive: <strong>' + path + '</strong>';
         }
-        
-        return { sjElectrical: sjId, quotes: qId, data: dId };
+
+        return { quotes: qId, data: dId };
     } catch (e) {
-        console.error('Failed to resolve SJ Drive Folders:', e);
+        console.error('Failed to resolve Drive folders:', e);
         throw e;
     }
 }
-
 async function getOrCreateSyncFolder() {
     const folders = await resolveSjDriveFolders();
     return folders ? folders.data : null;
@@ -3221,7 +3303,7 @@ function handleGoogleLogin() {
                         try { users = JSON.parse(usersStr); } catch(e) {}
                     }
                     
-                    const rememberMe = document.getElementById('lock-remember-me').checked;
+                    const rememberMe = true; // always localStorage
                     const existingUser = users.find(u => u.username.toLowerCase() === email.toLowerCase());
                     
                     if (existingUser) {
