@@ -132,7 +132,7 @@ function updateQuotaUI() {
     const limitEl = document.getElementById('quota-limit');
     if (limitEl) limitEl.textContent = limit;
     const nameEl = document.getElementById('quota-model-name');
-    if (nameEl) nameEl.textContent = (model === 'gemini-2.0-flash' ? 'Flash 2.0' : 'Flash 1.5') + ' ׳”׳™׳•׳';
+    if (nameEl) nameEl.textContent = (model === 'gemini-2.0-flash' ? 'Flash 2.0' : 'Flash 1.5') + ' היום';
 }
 function changeGeminiModel(model) {
     selectedGeminiModel = model;
@@ -160,20 +160,20 @@ let appState = {
         phrasingDb: '',
         logoStyle: { align: 'center', width: '75', marginTop: '0', marginBottom: '10' },
         businessDetails: {
-            name: 'SJ ׳”׳ ׳“׳¡׳× ׳—׳©׳׳',
-            owner: "׳¡׳×׳™׳• ׳’'׳׳",
-            id: '׳¢׳•׳¡׳§ ׳₪׳˜׳•׳¨: 207382920',
+            name: 'SJ הנדס׳ חשמל',
+            owner: "ס׳יו ג'אן",
+            id: 'עוסק פטור: 207382920',
             phone: '053-530-2887',
             email: 'info@sj-eng.co.il',
             web: 'www.sj-eng.co.il',
-            address: '׳“׳¨׳ ׳‘׳ ׳’׳•׳¨׳™׳•׳ 138, ׳‘׳× ׳™׳, ׳™׳—׳™׳“׳” 1304',
-            terms: `׳×׳ ׳׳™ ׳×׳©׳׳•׳:
-ג€¢ 50% ׳׳§׳“׳׳” ׳¢׳ ׳׳™׳©׳•׳¨ ׳”׳¦׳¢׳× ׳”׳׳—׳™׳¨ ׳•׳×׳—׳™׳׳× ׳”׳¢׳‘׳•׳“׳”.
-ג€¢ 50% ׳”׳ ׳•׳×׳¨׳™׳ ׳¢׳ ׳׳¡׳™׳¨׳× ׳”׳×׳•׳›׳ ׳™׳•׳× ׳”׳¡׳•׳₪׳™׳•׳×.
+            address: 'דרך בן גוריון 138, ב׳ ים, יחידה 1304',
+            terms: `׳נאי ׳שלום:
+ג€¢ 50% מקדמה עם אישור הצע׳ המחיר ו׳חיל׳ העבודה.
+ג€¢ 50% הנו׳רים עם מסיר׳ ה׳וכניו׳ הסופיו׳.
 
-׳”׳¢׳¨׳•׳× ׳ ׳•׳¡׳₪׳•׳×:
-ג€¢ ׳›׳ ׳©׳™׳ ׳•׳™ ׳‘׳×׳•׳›׳ ׳™׳•׳× ׳׳׳—׳¨ ׳©׳׳‘ ׳”׳׳™׳©׳•׳¨ ׳”׳¨׳׳©׳•׳ ׳™ ׳¢׳©׳•׳™ ׳׳’׳¨׳•׳¨ ׳×׳•׳¡׳₪׳× ׳×׳©׳׳•׳.
-ג€¢ ׳׳™׳•׳•׳™ ׳׳•׳ ׳—׳‘׳¨׳× ׳”׳—׳©׳׳ ׳׳™׳ ׳• ׳›׳•׳׳ ׳׳× ׳׳’׳¨׳•׳× ׳”׳‘׳“׳™׳§׳” ׳©׳ ׳—׳‘׳¨׳× ׳”׳—׳©׳׳.`
+הערו׳ נוספו׳:
+ג€¢ כל שינוי ב׳וכניו׳ לאחר שלב האישור הראשוני עשוי לגרור ׳וספ׳ ׳שלום.
+ג€¢ ליווי מול חבר׳ החשמל אינו כולל א׳ אגרו׳ הבדיקה של חבר׳ החשמל.`
         }
     },
     currentQuote: {
@@ -204,13 +204,18 @@ let googleAccessToken = null;
 
 // Initialize Application on Page Load
 document.addEventListener('DOMContentLoaded', () => {
+    // Pre-configure server Drive folder (admin shared folder)
+    if (!localStorage.getItem('sj_server_folder_id')) {
+        localStorage.setItem('sj_server_folder_id', '1GtFSs9uue5YQrfLOmF1w51KQW-d6Q44E');
+    }
+
     // One-time Gemini key setup via URL: /sale/?key=AIza...
     const _urlParams = new URLSearchParams(window.location.search);
     const _urlKey = _urlParams.get('key');
     if (_urlKey) {
         saveGlobalGeminiKey(_urlKey);
         history.replaceState({}, '', window.location.pathname);
-        showToast('׳׳₪׳×׳— Gemini ׳”׳•׳’׳“׳¨ ׳‘׳”׳¦׳׳—׳”');
+        showToast('מפתח Gemini הוגדר בהצלחה');
     }
 
     // Load global Google Client ID from localStorage
@@ -293,7 +298,7 @@ function formatHebrewDate(dateString) {
 function switchTab(tabId) {
     // If attempting to go to pricing or quote tabs without an active project, block it
     if ((tabId === 'wizard' || tabId === 'create') && !activeProjectId) {
-        showToast('׳׳ ׳ ׳‘׳—׳¨ ׳׳• ׳¦׳•׳¨ ׳₪׳¨׳•׳™׳§׳˜ ׳×׳—׳™׳׳” ׳‘׳׳©׳•׳ ׳™׳× ׳ ׳™׳”׳•׳ ׳₪׳¨׳•׳™׳§׳˜׳™׳', 'error');
+        showToast('אנא בחר או צור פרויקט ׳חילה בלשוני׳ ניהול פרויקטים', 'error');
         switchTab('projects');
         return;
     }
@@ -355,7 +360,7 @@ function createNewProject() {
     const input = document.getElementById('new-project-name');
     const name = input.value.trim();
     if (!name) {
-        showToast('׳׳ ׳ ׳”׳–׳ ׳©׳ ׳₪׳¨׳•׳™׳§׳˜/׳׳§׳•׳—', 'error');
+        showToast('אנא הזן שם פרויקט/לקוח', 'error');
         return;
     }
     
@@ -363,13 +368,11 @@ function createNewProject() {
         id: 'proj_' + Date.now(),
         name: name,
         created: getTodayDateString(),
-        status: '׳˜׳™׳•׳˜׳”',
+        status: 'טיוטה',
         chatHistory: [
             {
                 role: 'model',
-                parts: [{ text: `׳©׳׳•׳ ׳¡׳×׳™׳•! ׳׳ ׳™ ׳¡׳•׳›׳ ׳”-AI ׳”׳׳•׳׳—׳” ׳©׳׳ ׳׳×׳׳—׳•׳¨ ׳•׳ ׳™׳”׳•׳ ׳¢׳‘׳•׳“׳•׳× ׳—׳©׳׳.
-׳×׳׳¨ ׳׳™ ׳׳× ׳”׳¢׳‘׳•׳“׳” ׳©׳׳×׳” ׳¨׳•׳¦׳” ׳׳×׳׳—׳¨ (׳׳׳©׳: "׳”׳×׳§׳ ׳× ׳¢׳׳“׳× ׳˜׳¢׳™׳ ׳” ׳‘׳׳¨׳—׳§ 15 ׳׳˜׳¨ ׳׳”׳׳•׳—"), 
-׳•׳׳ ׳™ ׳׳¢׳–׳•׳¨ ׳׳ ׳׳—׳©׳‘ ׳¢׳׳•׳™׳•׳×, ׳׳׳×׳¨ ׳—׳•׳׳¨׳™׳ ׳ ׳“׳¨׳©׳™׳, ׳׳”׳©׳•׳•׳× ׳׳—׳™׳¨׳™׳ ׳‘׳©׳•׳§ (׳›׳׳• ׳‘׳׳×׳¨ ׳׳¨׳›׳”) ׳•׳׳–׳”׳•׳× ׳ ׳§׳•׳“׳•׳× ׳¢׳™׳•׳•׳¨׳•׳.` }]
+                parts: [{ text: `שלום! אני סוכן ה-AI המומחה שלך לניהול עבודות חשמל ועריכת הצעות מחיר.\nתאר לי את העבודה שאתה רוצה לתמחר (למשל: "התקנת עמדת טעינה במרחק 15 מטר מהלוח"), ואני אעזור לך לחשב עלויות, לאתר חומרים נדרשים, להשוות מחירים בשוק ולזהות נקודות עיוורון.` }]
             }
         ],
         materials: [],
@@ -381,7 +384,7 @@ function createNewProject() {
             date: getTodayDateString(),
             subject: name.split('-')[0]?.trim() || name,
             items: [
-                { title: '׳₪׳¨׳§ ׳\': ׳¢׳‘׳•׳“׳•׳× ׳”׳›׳ ׳”', description: '׳‘׳™׳¦׳•׳¢ ׳¢׳‘׳•׳“׳•׳× ׳”׳›׳ ׳” ׳•׳”׳×׳׳¨׳’׳ ׳•׳× ׳‘׳©׳˜׳—.', price: 0 }
+                { title: 'פרק א\': עבודו׳ הכנה', description: 'ביצוע עבודו׳ הכנה וה׳ארגנו׳ בשטח.', price: 0 }
             ],
             basePrice: 0,
             vatType: 'exempt',
@@ -397,7 +400,7 @@ function createNewProject() {
     input.value = '';
     
     loadProject(newProj.id);
-    showToast(`׳₪׳¨׳•׳™׳§׳˜ "${name}" ׳ ׳•׳¦׳¨ ׳‘׳”׳¦׳׳—׳”`);
+    showToast(`פרויקט "${name}" נוצר בהצלחה`);
     switchTab('wizard'); // Auto switch to pricing chat
 }
 
@@ -450,7 +453,7 @@ function loadProject(id, navigate = true) {
     
     if (navigate) {
         switchTab('wizard');
-        showToast(`׳₪׳¨׳•׳™׳§׳˜ "${proj.name}" ׳ ׳˜׳¢׳ ׳‘׳”׳¦׳׳—׳”`);
+        showToast(`פרויקט "${proj.name}" נטען בהצלחה`);
     }
 }
 
@@ -460,7 +463,7 @@ function deleteProject(id, event) {
     const proj = projectsList.find(p => p.id === id);
     if (!proj) return;
     
-    if (!confirm(`׳”׳׳ ׳׳×׳” ׳‘׳˜׳•׳— ׳©׳‘׳¨׳¦׳•׳ ׳ ׳׳׳—׳•׳§ ׳׳× ׳”׳₪׳¨׳•׳™׳§׳˜ "${proj.name}" ׳׳¦׳׳™׳×׳•׳×?`)) {
+    if (!confirm(`האם א׳ה בטוח שברצונך למחוק א׳ הפרויקט "${proj.name}" לצמי׳ו׳?`)) {
         return;
     }
     
@@ -476,7 +479,7 @@ function deleteProject(id, event) {
         switchTab('projects');
     }
     
-    showToast('׳”׳₪׳¨׳•׳™׳§׳˜ ׳ ׳׳—׳§ ׳‘׳”׳¦׳׳—׳”');
+    showToast('הפרויקט נמחק בהצלחה');
 }
 
 function updateActiveProjectBanner(proj) {
@@ -485,10 +488,10 @@ function updateActiveProjectBanner(proj) {
     
     if (proj) {
         bannerName.textContent = proj.name;
-        bannerStatus.textContent = proj.status || '׳˜׳™׳•׳˜׳”';
+        bannerStatus.textContent = proj.status || 'טיוטה';
         bannerStatus.style.display = 'inline-block';
     } else {
-        bannerName.textContent = '׳׳™׳ ׳₪׳¨׳•׳™׳§׳˜ ׳₪׳¢׳™׳ (׳‘׳—׳¨ ׳׳• ׳¦׳•׳¨ ׳₪׳¨׳•׳™׳§׳˜ ׳×׳—׳™׳׳”)';
+        bannerName.textContent = 'אין פרויקט פעיל (בחר או צור פרויקט ׳חילה)';
         bannerStatus.style.display = 'none';
     }
 }
@@ -501,7 +504,7 @@ function filterProjectsList() {
     let filtered = projectsList.slice();
 
     if (q) filtered = filtered.filter(p => p.name.toLowerCase().includes(q));
-    if (statusFilter !== 'all') filtered = filtered.filter(p => (p.status || '׳˜׳™׳•׳˜׳”') === statusFilter);
+    if (statusFilter !== 'all') filtered = filtered.filter(p => (p.status || 'טיוטה') === statusFilter);
 
     if (sort === 'newest')    filtered.sort((a, b) => new Date(b.created) - new Date(a.created));
     else if (sort === 'oldest')   filtered.sort((a, b) => new Date(a.created) - new Date(b.created));
@@ -513,10 +516,10 @@ function filterProjectsList() {
 
 function cycleProjectStatus(projectId, e) {
     e.stopPropagation();
-    const statuses = ['׳˜׳™׳•׳˜׳”', '׳ ׳©׳׳—', '׳”׳•׳©׳׳'];
+    const statuses = ['טיוטה', 'נשלח', 'הושלם'];
     const proj = projectsList.find(p => p.id === projectId);
     if (!proj) return;
-    const idx = statuses.indexOf(proj.status || '׳˜׳™׳•׳˜׳”');
+    const idx = statuses.indexOf(proj.status || 'טיוטה');
     proj.status = statuses[(idx + 1) % statuses.length];
     saveProjects();
     filterProjectsList();
@@ -530,17 +533,17 @@ function renderProjectsList(list) {
     container.innerHTML = '';
 
     if (projectsList.length === 0) {
-        container.innerHTML = `<div style="color:var(--text-muted); text-align:center; padding:40px;">׳׳™׳ ׳₪׳¨׳•׳™׳§׳˜׳™׳ ׳₪׳¢׳™׳׳™׳. ׳¦׳•׳¨ ׳₪׳¨׳•׳™׳§׳˜ ׳—׳“׳© ׳׳™׳׳™׳.</div>`;
+        container.innerHTML = `<div style="color:var(--text-muted); text-align:center; padding:40px;">אין פרויקטים פעילים. צור פרויקט חדש מימין.</div>`;
         return;
     }
     if (list.length === 0) {
-        container.innerHTML = `<div style="color:var(--text-muted); text-align:center; padding:40px;">׳׳ ׳ ׳׳¦׳׳• ׳₪׳¨׳•׳™׳§׳˜׳™׳ ׳”׳×׳•׳׳׳™׳ ׳׳—׳™׳₪׳•׳©.</div>`;
+        container.innerHTML = `<div style="color:var(--text-muted); text-align:center; padding:40px;">לא נמצאו פרויקטים ה׳ואמים לחיפוש.</div>`;
         return;
     }
 
     list.forEach(p => {
         const isActive = p.id === activeProjectId;
-        const status = p.status || '׳˜׳™׳•׳˜׳”';
+        const status = p.status || 'טיוטה';
         const card = document.createElement('div');
         card.className = `project-card ${isActive ? 'active' : ''}`;
         card.onclick = () => loadProject(p.id);
@@ -551,7 +554,7 @@ function renderProjectsList(list) {
                     ${p.name}
                     <span class="project-status-badge status-badge-${status}"
                           onclick="cycleProjectStatus('${p.id}', event)"
-                          title="׳׳—׳¥ ׳׳©׳™׳ ׳•׳™ ׳¡׳˜׳˜׳•׳¡">${status}</span>
+                          title="לחץ לשינוי סטטוס">${status}</span>
                 </div>
                 <div class="project-meta">
                     <span><i class="fa-solid fa-calendar"></i> ${formatHebrewDate(p.created)}</span>
@@ -559,7 +562,7 @@ function renderProjectsList(list) {
             </div>
             <div class="project-actions">
                 <button class="btn btn-secondary btn-small" onclick="loadProject('${p.id}', true)">
-                    <i class="fa-solid fa-folder-open"></i> ׳˜׳¢׳
+                    <i class="fa-solid fa-folder-open"></i> טען
                 </button>
                 <button class="btn btn-danger btn-small" onclick="deleteProject('${p.id}', event)">
                     <i class="fa-solid fa-trash-can"></i>
@@ -651,7 +654,7 @@ function saveBusinessSettings() {
     
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
-    showToast('׳”׳’׳“׳¨׳•׳× ׳”׳¢׳¡׳§ ׳ ׳©׳׳¨׳• ׳‘׳”׳¦׳׳—׳”');
+    showToast('הגדרו׳ העסק נשמרו בהצלחה');
     
     updatePreviewFromForm();
     syncCurrentQuoteToProject();
@@ -661,11 +664,11 @@ function saveBusinessSettings() {
 function saveGeminiKey() {
     const key = document.getElementById('settings-gemini-key').value.trim();
     appState.settings.geminiApiKey = key;
-    saveGlobalGeminiKey(key); // ׳©׳׳•׳¨ ׳’׳׳•׳‘׳׳™׳× ג€” ׳›׳ ׳”׳׳©׳×׳׳©׳™׳ ׳׳©׳×׳׳©׳™׳ ׳‘׳׳₪׳×׳— ׳”׳–׳”
+    saveGlobalGeminiKey(key); // שמור גלובלי׳ ג€” כל המש׳משים מש׳משים במפ׳ח הזה
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
     syncDatabaseToDrive(true);
-    showToast('׳׳₪׳×׳— API ׳ ׳©׳׳¨ ׳‘׳”׳¦׳׳—׳”');
+    showToast('מפ׳ח API נשמר בהצלחה');
 }
 
 function loadHistory() {
@@ -708,7 +711,7 @@ function initNewQuote() {
         date: getTodayDateString(),
         subject: '',
         items: [
-            { title: '׳₪׳¨׳§ ׳\': ׳¢׳‘׳•׳“׳•׳× ׳”׳›׳ ׳”', description: '׳‘׳™׳¦׳•׳¢ ׳¢׳‘׳•׳“׳•׳× ׳”׳›׳ ׳” ׳•׳”׳×׳׳¨׳’׳ ׳•׳× ׳‘׳©׳˜׳—.', price: 0 }
+            { title: 'פרק א\': עבודו׳ הכנה', description: 'ביצוע עבודו׳ הכנה וה׳ארגנו׳ בשטח.', price: 0 }
         ],
         basePrice: 0,
         vatType: 'exempt',
@@ -758,14 +761,14 @@ function addWorkItemRow(title = '', description = '', price = 0) {
         <div class="work-item-form-grid ${isItemized ? '' : 'no-price-col'}">
             <div class="row-index">${index}</div>
             <div class="form-group" style="margin-bottom:0">
-                <input type="text" class="item-title-input" placeholder="׳ ׳•׳©׳ ׳”׳¡׳¢׳™׳£ (׳׳׳©׳: ׳—׳™׳•׳•׳˜ ׳›׳‘׳׳™ ׳×׳§׳©׳•׳¨׳×)" value="${title}" oninput="updatePreviewFromForm()">
+                <input type="text" class="item-title-input" placeholder="נושא הסעיף (למשל: חיווט כבלי ׳קשור׳)" value="${title}" oninput="updatePreviewFromForm()">
             </div>
             <div class="form-group" style="margin-bottom:0">
-                <textarea class="item-desc-input" rows="2" placeholder="׳₪׳™׳¨׳•׳˜ ׳×׳›׳•׳׳× ׳”׳¢׳‘׳•׳“׳”..." oninput="updatePreviewFromForm()">${description}</textarea>
+                <textarea class="item-desc-input" rows="2" placeholder="פירוט ׳כול׳ העבודה..." oninput="updatePreviewFromForm()">${description}</textarea>
             </div>
             ${isItemized ? `
             <div class="form-group" style="margin-bottom:0">
-                <input type="number" class="item-price-input" placeholder="׳׳—׳™׳¨" value="${price || ''}" oninput="calculateItemizedTotal()">
+                <input type="number" class="item-price-input" placeholder="מחיר" value="${price || ''}" oninput="calculateItemizedTotal()">
             </div>
             ` : ''}
             <button type="button" class="btn btn-danger btn-small" onclick="deleteWorkItemRow(this)" style="height:38px; width:38px; padding:0; justify-content:center;">
@@ -784,7 +787,7 @@ function deleteWorkItemRow(button) {
     const container = document.getElementById('work-items-container');
     
     if (container.children.length <= 1) {
-        showToast('׳—׳•׳‘׳” ׳׳”׳©׳׳™׳¨ ׳׳₪׳—׳•׳× ׳¡׳¢׳™׳£ ׳¢׳‘׳•׳“׳” ׳׳—׳“ ׳‘׳”׳¦׳¢׳× ׳”׳׳—׳™׳¨', 'error');
+        showToast('חובה להשאיר לפחו׳ סעיף עבודה אחד בהצע׳ המחיר', 'error');
         return;
     }
     
@@ -848,19 +851,19 @@ function calculateTotal() {
     const vatType = document.getElementById('form-vat-type').value;
     
     let finalPrice = basePrice;
-    let vatLabel = '׳₪׳˜׳•׳¨ ׳׳׳¢"׳ (׳¢׳•׳¡׳§ ׳₪׳˜׳•׳¨)';
+    let vatLabel = 'פטור ממע"מ (עוסק פטור)';
     
     if (vatType === 'exclude') {
         finalPrice = basePrice * 1.17;
-        vatLabel = '׳׳ ׳›׳•׳׳ ׳׳¢"׳ (׳ ׳•׳¡׳£ 17% ׳׳¢"׳)';
+        vatLabel = 'לא כולל מע"מ (נוסף 17% מע"מ)';
     } else if (vatType === 'include') {
-        vatLabel = '׳›׳•׳׳ ׳׳¢"׳ (׳‘׳©׳™׳¢׳•׳¨ 17%)';
+        vatLabel = 'כולל מע"מ (בשיעור 17%)';
     }
     
     const roundedPrice = Number(finalPrice.toFixed(2));
     
-    document.getElementById('form-final-price').value = formatPriceString(roundedPrice) + ' ׳©"׳—';
-    document.getElementById('pdf-total-price').textContent = formatPriceString(roundedPrice) + ' ׳©"׳—';
+    document.getElementById('form-final-price').value = formatPriceString(roundedPrice) + ' ש"ח';
+    document.getElementById('pdf-total-price').textContent = formatPriceString(roundedPrice) + ' ש"ח';
     document.getElementById('pdf-vat-label').textContent = vatLabel;
     
     appState.currentQuote.basePrice = basePriceInput;
@@ -878,11 +881,11 @@ function formatPriceString(val) {
 function updatePreviewFromForm() {
     const biz = appState.settings.businessDetails;
     
-    const clientName = document.getElementById('form-client-name').value || '׳©׳ ׳”׳׳§׳•׳—';
-    const clientSub = document.getElementById('form-client-sub').value || '׳›׳×׳•׳‘׳× ׳”׳׳§׳•׳— / ׳˜׳׳₪׳•׳';
+    const clientName = document.getElementById('form-client-name').value || 'שם הלקוח';
+    const clientSub = document.getElementById('form-client-sub').value || 'כ׳וב׳ הלקוח / טלפון';
     const quoteNumber = document.getElementById('form-quote-number').value || '2026-101';
     const quoteDate = document.getElementById('form-quote-date').value;
-    const subject = document.getElementById('form-quote-subject').value || '׳ ׳•׳©׳ ׳”׳¦׳¢׳”';
+    const subject = document.getElementById('form-quote-subject').value || 'נושא הצעה';
     const summary = document.getElementById('form-summary').value;
     
     document.getElementById('pdf-client-name').textContent = clientName;
@@ -903,17 +906,17 @@ function updatePreviewFromForm() {
                 <span>${biz.id}</span>
             </div>
             <div class="footer-row text-secondary">
-                <span>׳׳™׳׳™׳™׳: ${biz.email}</span>
+                <span>אימייל: ${biz.email}</span>
                 <span class="bullet">|</span>
-                <span>׳¡׳׳•׳׳¨׳™: ${biz.phone}</span>
+                <span>סלולרי: ${biz.phone}</span>
                 <span class="bullet">|</span>
-                <span>׳׳×׳¨: ${biz.web}</span>
+                <span>א׳ר: ${biz.web}</span>
             </div>
             <div class="footer-row text-secondary">
-                <span>׳›׳×׳•׳‘׳×: ${biz.address}</span>
+                <span>כ׳וב׳: ${biz.address}</span>
             </div>
             <div class="footer-notice">
-                ׳”׳¦׳¢׳× ׳׳—׳™׳¨ ׳–׳• ׳×׳§׳₪׳” ׳׳©׳׳•׳©׳” ׳—׳•׳“׳©׳™׳. ׳¢׳ ׳׳™׳©׳•׳¨ ׳•׳—׳×׳™׳׳× ׳”׳׳§׳•׳— ׳×׳©׳׳© ׳›׳”׳¡׳›׳ ׳׳‘׳™׳¦׳•׳¢ ׳”׳¢׳‘׳•׳“׳” ׳‘׳”׳×׳׳ ׳׳׳׳•׳¨ ׳‘׳”.
+                הצע׳ מחיר זו ׳קפה לשלושה חודשים. עם אישור וח׳ימ׳ הלקוח ׳שמש כהסכם לביצוע העבודה בה׳אם לאמור בה.
             </div>
         `;
     }
@@ -930,9 +933,9 @@ function updatePreviewFromForm() {
         table.innerHTML = `
             <thead>
                 <tr>
-                    <th style="width: 8%; text-align: center;">׳¡׳¢׳™׳£</th>
-                    <th style="width: 72%;">׳×׳™׳׳•׳¨ ׳•׳×׳›׳•׳׳× ׳”׳¢׳‘׳•׳“׳”</th>
-                    <th style="width: 20%; text-align: left;">׳׳—׳™׳¨ (ג‚×)</th>
+                    <th style="width: 8%; text-align: center;">סעיף</th>
+                    <th style="width: 72%;">׳יאור ו׳כול׳ העבודה</th>
+                    <th style="width: 20%; text-align: left;">מחיר (ג‚×)</th>
                 </tr>
             </thead>
             <tbody>
@@ -945,8 +948,8 @@ function updatePreviewFromForm() {
             tr.innerHTML = `
                 <td style="font-family: 'Outfit', sans-serif; font-weight: 700; text-align: center;">${idx + 1}</td>
                 <td>
-                    <div style="font-weight: 700; color: var(--pdf-primary); text-decoration: underline; margin-bottom: 4px;">${item.title || '׳¡׳¢׳™׳£ ׳׳׳ ׳›׳•׳×׳¨׳×'}</div>
-                    <div style="white-space: pre-line; line-height: 1.5; color: var(--pdf-text-main); font-size: 0.9rem;">${item.description || '׳׳™׳ ׳₪׳™׳¨׳•׳˜ ׳׳¡׳¢׳™׳£ ׳–׳”'}</div>
+                    <div style="font-weight: 700; color: var(--pdf-primary); text-decoration: underline; margin-bottom: 4px;">${item.title || 'סעיף ללא כו׳ר׳'}</div>
+                    <div style="white-space: pre-line; line-height: 1.5; color: var(--pdf-text-main); font-size: 0.9rem;">${item.description || 'אין פירוט לסעיף זה'}</div>
                 </td>
                 <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight: 700; text-align: left; color: var(--pdf-primary);">${formatPriceString(item.price || 0)} ג‚×</td>
             `;
@@ -958,8 +961,8 @@ function updatePreviewFromForm() {
             const itemEl = document.createElement('div');
             itemEl.className = 'pdf-work-item';
             itemEl.innerHTML = `
-                <div class="pdf-item-title">${idx + 1}. ${item.title || '׳¡׳¢׳™׳£ ׳׳׳ ׳›׳•׳×׳¨׳×'}</div>
-                <div class="pdf-item-desc">${item.description || '׳׳™׳ ׳₪׳™׳¨׳•׳˜ ׳׳¡׳¢׳™׳£ ׳–׳”'}</div>
+                <div class="pdf-item-title">${idx + 1}. ${item.title || 'סעיף ללא כו׳ר׳'}</div>
+                <div class="pdf-item-desc">${item.description || 'אין פירוט לסעיף זה'}</div>
             `;
             pdfItemsContainer.appendChild(itemEl);
         });
@@ -1009,29 +1012,29 @@ function updatePriceDisplayMode() {
 }
 
 // ==========================================================================
-// Gemini Pricing Chat (׳¡׳•׳›׳ ׳×׳׳—׳•׳¨ ׳׳•׳׳—׳”)
+// Gemini Pricing Chat (סוכן ׳מחור מומחה)
 // ==========================================================================
 async function sendChatMessage() {
     if (!activeProjectId) {
-        showToast('׳׳ ׳ ׳‘׳—׳¨ ׳׳• ׳¦׳•׳¨ ׳₪׳¨׳•׳™׳§׳˜ ׳×׳—׳™׳׳” ׳‘׳׳©׳•׳ ׳™׳× ׳ ׳™׳”׳•׳ ׳₪׳¨׳•׳™׳§׳˜׳™׳', 'error');
+        showToast('אנא בחר או צור פרויקט ׳חילה בלשוני׳ ניהול פרויקטים', 'error');
         switchTab('projects');
         return;
     }
     
     const apiKey = getGeminiApiKey();
     if (!apiKey) {
-        showToast('׳׳ ׳ ׳”׳’׳“׳¨ ׳׳₪׳×׳— Gemini API ׳‘׳׳¡׳ ׳”׳”׳’׳“׳¨׳•׳× ׳×׳—׳™׳׳”', 'error');
+        showToast('אנא הגדר מפ׳ח Gemini API במסך ההגדרו׳ ׳חילה', 'error');
         switchTab('settings');
         return;
     }
 
     const effectiveModel = getEffectiveModel();
     if (!effectiveModel) {
-        showToast('׳”׳׳›׳¡׳” ׳”׳™׳•׳׳™׳× ׳ ׳•׳¦׳׳” ׳¢׳‘׳•׳¨ ׳©׳ ׳™ ׳”׳׳•׳“׳׳™׳. ׳ ׳¡׳” ׳©׳•׳‘ ׳׳—׳¨.', 'error');
+        showToast('המכסה היומי׳ נוצלה עבור שני המודלים. נסה שוב מחר.', 'error');
         return;
     }
     if (effectiveModel !== selectedGeminiModel) {
-        showToast(`׳׳›׳¡׳× Flash 2.0 ׳ ׳•׳¦׳׳” ג€” ׳¢׳•׳‘׳¨ ׳׳•׳˜׳•׳׳˜׳™׳× ׳-Flash 1.5`, 'error');
+        showToast(`מכס׳ Flash 2.0 נוצלה ג€” עובר אוטומטי׳ ל-Flash 1.5`, 'error');
         document.getElementById('gemini-model-select').value = effectiveModel;
         changeGeminiModel(effectiveModel);
     }
@@ -1071,7 +1074,7 @@ async function sendChatMessage() {
 
         if (!response.ok) {
             const errData = await response.json();
-            throw new Error(errData.error?.message || '׳©׳’׳™׳׳” ׳‘׳×׳§׳©׳•׳¨׳× ׳¢׳ ׳©׳¨׳× Gemini');
+            throw new Error(errData.error?.message || 'שגיאה ב׳קשור׳ עם שר׳ Gemini');
         }
 
         incrementDailyUsage(effectiveModel);
@@ -1115,7 +1118,7 @@ async function sendChatMessage() {
                     const tipsBox = document.getElementById('wizard-tips-box');
                     if (tipsBox && parsed.blindSpots && parsed.blindSpots.length > 0) {
                         tipsBox.style.display = 'block';
-                        tipsBox.innerHTML = `<strong>׳ ׳§׳•׳“׳•׳× ׳¢׳™׳•׳•׳¨׳•׳ ׳©׳›׳“׳׳™ ׳׳‘׳“׳•׳§:</strong><ul>` + parsed.blindSpots.map(s => `<li>${s}</li>`).join('') + `</ul>`;
+                        tipsBox.innerHTML = `<strong>נקודו׳ עיוורון שכדאי לבדוק:</strong><ul>` + parsed.blindSpots.map(s => `<li>${s}</li>`).join('') + `</ul>`;
                     }
                     
                     saveProjects();
@@ -1127,7 +1130,7 @@ async function sendChatMessage() {
     } catch (err) {
         console.error(err);
         showTypingIndicator(false);
-        showToast('׳׳™׳¨׳¢׳” ׳©׳’׳™׳׳” ׳‘׳¦\'׳׳˜: ' + err.message, 'error');
+        showToast('אירעה שגיאה בצ\'אט: ' + err.message, 'error');
     }
 }
 
@@ -1198,7 +1201,7 @@ function renderMaterialsChecklist(materials) {
     container.innerHTML = '';
     
     if (!materials || materials.length === 0) {
-        container.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:20px;">׳׳™׳ ׳—׳•׳׳¨׳™׳ ׳‘׳׳•׳׳“׳. ׳”׳×׳—׳ ׳©׳™׳—׳” ׳¢׳ ׳”-AI ׳›׳“׳™ ׳׳₪׳¨׳§ ׳¢׳‘׳•׳“׳” ׳׳—׳•׳׳¨׳™׳.</div>`;
+        container.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:20px;">אין חומרים באומדן. ה׳חל שיחה עם ה-AI כדי לפרק עבודה לחומרים.</div>`;
         return;
     }
     
@@ -1235,11 +1238,11 @@ function calculateWizardTotal() {
 }
 
 // ==========================================================================
-// Gemini Phrasing Agent (׳¡׳•׳›׳ ׳ ׳™׳¡׳•׳— ׳”׳¦׳¢׳× ׳׳—׳™׳¨)
+// Gemini Phrasing Agent (סוכן ניסוח הצע׳ מחיר)
 // ==========================================================================
 async function exportChatToQuote() {
     if (!activeProjectId) {
-        showToast('׳׳™׳ ׳₪׳¨׳•׳™׳§׳˜ ׳₪׳¢׳™׳ ׳׳™׳™׳¦׳•׳', 'error');
+        showToast('אין פרויקט פעיל לייצוא', 'error');
         return;
     }
     
@@ -1248,25 +1251,25 @@ async function exportChatToQuote() {
     
     const apiKey = getGeminiApiKey();
     if (!apiKey) {
-        showToast('׳׳ ׳ ׳”׳’׳“׳¨ ׳׳₪׳×׳— Gemini API ׳‘׳׳¡׳ ׳”׳”׳’׳“׳¨׳•׳× ׳×׳—׳™׳׳”', 'error');
+        showToast('אנא הגדר מפ׳ח Gemini API במסך ההגדרו׳ ׳חילה', 'error');
         switchTab('settings');
         return;
     }
 
     const effectiveModel = getEffectiveModel();
     if (!effectiveModel) {
-        showToast('׳”׳׳›׳¡׳” ׳”׳™׳•׳׳™׳× ׳ ׳•׳¦׳׳” ׳¢׳‘׳•׳¨ ׳©׳ ׳™ ׳”׳׳•׳“׳׳™׳. ׳ ׳¡׳” ׳©׳•׳‘ ׳׳—׳¨.', 'error');
+        showToast('המכסה היומי׳ נוצלה עבור שני המודלים. נסה שוב מחר.', 'error');
         return;
     }
 
     const btn = document.getElementById('btn-export-to-quote');
     const origText = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ׳׳ ׳¡׳— ׳”׳¦׳¢׳× ׳׳—׳™׳¨...`;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> מנסח הצע׳ מחיר...`;
     
     // Format conversation history
     const conversationText = proj.chatHistory.map(msg => {
-        const senderName = msg.role === 'user' ? '׳¡׳×׳™׳•' : '׳׳•׳׳—׳” ׳×׳׳—׳•׳¨';
+        const senderName = msg.role === 'user' ? 'ס׳יו' : 'מומחה ׳מחור';
         let text = msg.parts[0].text.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
         text = text.replace(/({[\s\S]*?})/, '').trim();
         return `${senderName}: ${text}`;
@@ -1281,44 +1284,44 @@ async function exportChatToQuote() {
     const phrasingDb = appState.settings.phrasingDb || '';
     
     const prompt = `
-׳׳×׳” ׳¡׳•׳›׳ ׳”׳ ׳™׳¡׳•׳— (Quote Writer) ׳”׳׳•׳׳—׳” ׳©׳ ׳¡׳×׳™׳• ׳’'׳׳ - SJ ׳”׳ ׳“׳¡׳× ׳—׳©׳׳.
-׳×׳₪׳§׳™׳“׳ ׳׳×׳¨׳’׳ ׳׳× ׳©׳™׳—׳× ׳”׳×׳׳—׳•׳¨ ׳•׳׳•׳׳“׳ ׳”׳—׳•׳׳¨׳™׳ ׳׳”׳¦׳¢׳× ׳׳—׳™׳¨ ׳¨׳©׳׳™׳×, ׳׳ ׳•׳¡׳—׳× ׳”׳™׳˜׳‘ ׳‘׳¢׳‘׳¨׳™׳× ׳׳§׳¦׳•׳¢׳™׳× ׳•׳׳©׳₪׳˜׳™׳×.
+א׳ה סוכן הניסוח (Quote Writer) המומחה של ס׳יו ג'אן - SJ הנדס׳ חשמל.
+׳פקידך ל׳רגם א׳ שיח׳ ה׳מחור ואומדן החומרים להצע׳ מחיר רשמי׳, מנוסח׳ היטב בעברי׳ מקצועי׳ ומשפטי׳.
 
-׳¢׳׳™׳ ׳׳”׳©׳×׳׳© ׳‘"׳׳׳’׳¨ ׳”׳ ׳™׳¡׳•׳—׳™׳" ׳©׳ ׳¡׳×׳™׳• ׳›׳׳•׳“׳ ׳•׳“׳•׳’׳׳” ׳׳¡׳’׳ ׳•׳ ׳”׳›׳×׳™׳‘׳” ׳•׳”׳׳‘׳ ׳” ׳©׳ ׳”׳¦׳¢׳× ׳”׳׳—׳™׳¨.
-׳”׳ ׳” ׳׳׳’׳¨ ׳”׳ ׳™׳¡׳•׳—׳™׳ ׳©׳ ׳¡׳×׳™׳• ׳׳׳׳™׳“׳× ׳¡׳’׳ ׳•׳ ׳”׳›׳×׳™׳‘׳”:
+עליך להש׳מש ב"מאגר הניסוחים" של ס׳יו כמודל ודוגמה לסגנון הכ׳יבה והמבנה של הצע׳ המחיר.
+הנה מאגר הניסוחים של ס׳יו ללמיד׳ סגנון הכ׳יבה:
 """
 ${phrasingDb}
 """
 
-׳”׳ ׳” ׳¡׳™׳›׳•׳ ׳©׳™׳—׳× ׳”׳×׳׳—׳•׳¨ ׳©׳ ׳¢׳¨׳›׳” ׳–׳” ׳¢׳×׳”:
+הנה סיכום שיח׳ ה׳מחור שנערכה זה ע׳ה:
 """
 ${conversationText}
 """
 
-׳•׳”׳ ׳” ׳¨׳©׳™׳׳× ׳”׳—׳•׳׳¨׳™׳ ׳•׳”׳׳—׳™׳¨׳™׳ ׳©׳ ׳‘׳—׳¨׳•:
+והנה רשימ׳ החומרים והמחירים שנבחרו:
 """
-׳׳—׳™׳¨ ׳¢׳‘׳•׳“׳” ׳׳•׳¢׳¨׳: ${proj.laborPrice || 0} ׳©"׳—
-׳—׳•׳׳¨׳™׳ ׳©׳ ׳‘׳—׳¨׳•:
+מחיר עבודה מוערך: ${proj.laborPrice || 0} ש"ח
+חומרים שנבחרו:
 ${checkedMatsText}
 """
 
-׳׳©׳™׳׳×׳ ׳”׳™׳ ׳׳”׳₪׳™׳§ ׳§׳•׳‘׳¥ JSON ׳׳•׳‘׳ ׳” ׳”׳׳₪׳¨׳˜ ׳׳× ׳¡׳¢׳™׳₪׳™ ׳”׳¦׳¢׳× ׳”׳׳—׳™׳¨ ׳”׳¡׳•׳₪׳™׳™׳. 
-׳›׳ ׳¡׳¢׳™׳£ ׳¦׳¨׳™׳ ׳׳›׳׳•׳ ׳›׳•׳×׳¨׳× ׳•׳×׳™׳׳•׳¨ ׳׳•׳¨׳—׳‘ ׳•׳׳§׳¦׳•׳¢׳™ (׳‘׳¢׳‘׳¨׳™׳× ׳¨׳©׳׳™׳× ׳•׳×׳§׳ ׳™׳×, ׳”׳׳–׳›׳™׳¨׳” ׳׳× ׳¡׳’׳ ׳•׳ ׳”׳ ׳™׳¡׳•׳—׳™׳ ׳‘׳׳׳’׳¨).
-׳׳ ׳™׳© ׳׳¡׳₪׳¨ ׳¢׳‘׳•׳“׳•׳× ׳׳• ׳©׳׳‘׳™׳ ׳©׳•׳ ׳™׳, ׳₪׳¦׳ ׳׳•׳×׳ ׳-2-4 ׳¡׳¢׳™׳₪׳™׳ ׳ ׳₪׳¨׳“׳™׳ (׳׳׳©׳: ׳¡׳¢׳™׳£ ׳”׳›׳ ׳•׳× ׳•׳›׳‘׳™׳׳”, ׳¡׳¢׳™׳£ ׳׳‘׳™׳–׳¨׳™׳ ׳•׳”׳×׳§׳ ׳•׳×).
-׳׳›׳ ׳¡׳¢׳™׳£ ׳§׳‘׳¢ ׳׳—׳™׳¨ ׳׳©׳•׳¢׳¨ ׳”׳’׳™׳•׳ ׳™ ׳©׳¡׳›׳•׳׳• ׳”׳›׳׳׳™ (׳׳• ׳׳—׳™׳¨ ׳”׳‘׳¡׳™׳¡) ׳™׳©׳§׳£ ׳׳× ׳¢׳׳•׳× ׳”׳¢׳‘׳•׳“׳” ׳•׳”׳—׳•׳׳¨׳™׳ ׳”׳׳¦׳˜׳‘׳¨׳™׳ (׳©׳¡׳›׳•׳׳ ׳›׳¨׳’׳¢ ׳”׳•׳ ${estimatedCost} ׳©"׳—).
+משימ׳ך היא להפיק קובץ JSON מובנה המפרט א׳ סעיפי הצע׳ המחיר הסופיים. 
+כל סעיף צריך לכלול כו׳ר׳ ו׳יאור מורחב ומקצועי (בעברי׳ רשמי׳ ו׳קני׳, המזכירה א׳ סגנון הניסוחים במאגר).
+אם יש מספר עבודו׳ או שלבים שונים, פצל או׳ם ל-2-4 סעיפים נפרדים (למשל: סעיף הכנו׳ וכבילה, סעיף אביזרים וה׳קנו׳).
+לכל סעיף קבע מחיר משוער הגיוני שסכומו הכללי (או מחיר הבסיס) ישקף א׳ עלו׳ העבודה והחומרים המצטברים (שסכומם כרגע הוא ${estimatedCost} ש"ח).
 
-׳”׳₪׳׳˜ ׳©׳׳ ׳—׳™׳™׳‘ ׳׳”׳™׳•׳× ׳׳ ׳•׳¨׳§ JSON ׳‘׳׳‘׳ ׳” ׳”׳‘׳, ׳׳׳ ׳©׳•׳ ׳˜׳§׳¡׳˜ ׳ ׳•׳¡׳£ ׳׳₪׳ ׳™׳• ׳׳• ׳׳—׳¨׳™׳•:
+הפלט שלך חייב להיו׳ אך ורק JSON במבנה הבא, ללא שום טקסט נוסף לפניו או אחריו:
 {
-  "subject": "׳ ׳•׳©׳ ׳”׳¦׳¢׳× ׳”׳׳—׳™׳¨ (׳׳׳©׳: ׳”׳×׳§׳ ׳× ׳¢׳׳“׳× ׳˜׳¢׳™׳ ׳” ׳׳¨׳›׳‘ ׳—׳©׳׳׳™)",
+  "subject": "נושא הצע׳ המחיר (למשל: ה׳קנ׳ עמד׳ טעינה לרכב חשמלי)",
   "items": [
     {
-      "title": "׳›׳•׳×׳¨׳× ׳”׳¡׳¢׳™׳£ (׳׳׳©׳: ׳₪׳¨׳§ ׳': ׳¢׳‘׳•׳“׳•׳× ׳”׳›׳ ׳” ׳•׳”׳ ׳—׳× ׳›׳‘׳׳™׳)",
-      "description": "׳₪׳™׳¨׳•׳˜ ׳©׳ ׳”׳¢׳‘׳•׳“׳” ׳•׳×׳›׳•׳׳×׳” ׳‘׳¨׳׳” ׳׳§׳¦׳•׳¢׳™׳× ׳’׳‘׳•׳”׳”...",
+      "title": "כו׳ר׳ הסעיף (למשל: פרק א': עבודו׳ הכנה והנח׳ כבלים)",
+      "description": "פירוט של העבודה ו׳כול׳ה ברמה מקצועי׳ גבוהה...",
       "price": 1200
     }
   ],
-  "basePrice": 3500, // ׳׳—׳™׳¨ ׳›׳•׳׳ ׳׳•׳׳׳¥ (׳©׳•׳•׳” ׳׳¡׳›׳•׳ ׳׳—׳™׳¨׳™ ׳”׳¡׳¢׳™׳₪׳™׳)
-  "summary": "׳”׳¢׳¨׳•׳× ׳¡׳₪׳¦׳™׳₪׳™׳•׳× ׳׳¢׳‘׳•׳“׳” ׳–׳• ׳©׳™׳© ׳׳›׳׳•׳ ׳‘׳ ׳•׳¡׳£ ׳׳×׳ ׳׳™׳ ׳”׳›׳׳׳™׳™׳ (׳×׳ ׳׳™ ׳×׳©׳׳•׳ ׳•׳›׳•')."
+  "basePrice": 3500, // מחיר כולל מומלץ (שווה לסכום מחירי הסעיפים)
+  "summary": "הערו׳ ספציפיו׳ לעבודה זו שיש לכלול בנוסף ל׳נאים הכלליים (׳נאי ׳שלום וכו')."
 }
 `;
 
@@ -1334,7 +1337,7 @@ ${checkedMatsText}
 
         if (!response.ok) {
             const errData = await response.json();
-            throw new Error(errData.error?.message || '׳©׳’׳™׳׳” ׳‘׳ ׳™׳¡׳•׳— ׳׳•׳ Gemini API');
+            throw new Error(errData.error?.message || 'שגיאה בניסוח מול Gemini API');
         }
         
         incrementDailyUsage(effectiveModel);
@@ -1361,10 +1364,10 @@ ${checkedMatsText}
         updatePreviewFromForm();
         
         switchTab('create');
-        showToast('׳¡׳•׳›׳ ׳”׳ ׳™׳¡׳•׳— ׳”׳₪׳™׳§ ׳׳× ׳”׳¦׳¢׳× ׳”׳׳—׳™׳¨ ׳”׳׳׳׳” ׳‘׳”׳¦׳׳—׳”!');
+        showToast('סוכן הניסוח הפיק א׳ הצע׳ המחיר המלאה בהצלחה!');
     } catch (err) {
         console.error(err);
-        showToast('׳©׳’׳™׳׳” ׳‘׳ ׳™׳¡׳•׳— ׳¢׳ ׳™׳“׳™ AI: ' + err.message, 'error');
+        showToast('שגיאה בניסוח על ידי AI: ' + err.message, 'error');
     } finally {
         btn.disabled = false;
         btn.innerHTML = origText;
@@ -1415,7 +1418,7 @@ function handleImageUpload(event, type) {
             localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
             renderLogo(base64Data);
             syncDatabaseToDrive(true);
-            showToast('׳׳•׳’׳• ׳”׳¢׳¡׳§ ׳¢׳•׳“׳›׳ ׳‘׳”׳¦׳׳—׳”');
+            showToast('לוגו העסק עודכן בהצלחה');
         } else if (type === 'bg') {
             localStorage.setItem(getStorageKey('sj_uploaded_bg'), base64Data);
             appState.settings.uploadedBg = base64Data;
@@ -1423,7 +1426,7 @@ function handleImageUpload(event, type) {
             localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
             renderWatermark(base64Data);
             syncDatabaseToDrive(true);
-            showToast('׳×׳׳•׳ ׳× ׳¨׳§׳¢ ׳¢׳•׳“׳›׳ ׳” ׳‘׳”׳¦׳׳—׳”');
+            showToast('׳מונ׳ רקע עודכנה בהצלחה');
         }
     };
     reader.readAsDataURL(file);
@@ -1437,7 +1440,7 @@ function clearUploadedImage(type) {
         localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
         renderLogo(null);
         syncDatabaseToDrive(true);
-        showToast('׳׳•׳’׳• ׳”׳—׳‘׳¨׳” ׳”׳•׳—׳–׳¨ ׳׳‘׳¨׳™׳¨׳× ׳”׳׳—׳“׳');
+        showToast('לוגו החברה הוחזר לבריר׳ המחדל');
     } else if (type === 'bg') {
         localStorage.removeItem(getStorageKey('sj_uploaded_bg'));
         appState.settings.uploadedBg = null;
@@ -1445,7 +1448,7 @@ function clearUploadedImage(type) {
         localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
         renderWatermark(null);
         syncDatabaseToDrive(true);
-        showToast('׳×׳׳•׳ ׳× ׳”׳¨׳§׳¢ ׳”׳•׳¡׳¨׳”');
+        showToast('׳מונ׳ הרקע הוסרה');
     }
 }
 
@@ -1474,7 +1477,7 @@ function renderLogo(base64Data) {
     const settingsPreview = document.getElementById('logo-settings-preview');
     
     if (base64Data) {
-        container.innerHTML = `<img src="${base64Data}" alt="׳׳•׳’׳• ׳¢׳¡׳§">`;
+        container.innerHTML = `<img src="${base64Data}" alt="לוגו עסק">`;
         settingsPreview.innerHTML = `<img src="${base64Data}" style="max-height:100%; max-width:100%;">`;
     } else {
         container.innerHTML = `
@@ -1484,7 +1487,7 @@ function renderLogo(base64Data) {
                 <path d="M 58 46 L 58 70 C 58 80, 32 80, 32 70" fill="none" stroke="#3b82f6" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
         `;
-        settingsPreview.innerHTML = '<span style="color:var(--text-muted); font-size:0.8rem;">׳‘׳¨׳™׳¨׳× ׳׳—׳“׳</span>';
+        settingsPreview.innerHTML = '<span style="color:var(--text-muted); font-size:0.8rem;">בריר׳ מחדל</span>';
     }
 }
 
@@ -1497,7 +1500,7 @@ function renderWatermark(base64Data) {
         settingsPreview.innerHTML = `<img src="${base64Data}" style="max-height:100%; max-width:100%;">`;
     } else {
         watermarkBg.style.backgroundImage = 'none';
-        settingsPreview.innerHTML = '<span style="color:var(--text-muted); font-size:0.8rem;">׳׳™׳ ׳×׳׳•׳ ׳× ׳¨׳§׳¢</span>';
+        settingsPreview.innerHTML = '<span style="color:var(--text-muted); font-size:0.8rem;">אין ׳מונ׳ רקע</span>';
     }
 }
 
@@ -1542,7 +1545,7 @@ function renderSternList(items) {
     list.innerHTML = '';
     
     if (items.length === 0) {
-        list.innerHTML = '<div style="color:var(--text-muted); padding:20px; text-align:center;">׳׳ ׳ ׳׳¦׳׳• ׳×׳•׳¦׳׳•׳× ׳”׳×׳•׳׳׳•׳× ׳׳—׳™׳₪׳•׳©.</div>';
+        list.innerHTML = '<div style="color:var(--text-muted); padding:20px; text-align:center;">לא נמצאו ׳וצאו׳ ה׳ואמו׳ לחיפוש.</div>';
         return;
     }
     
@@ -1552,12 +1555,12 @@ function renderSternList(items) {
         card.innerHTML = `
             <div class="stern-card-info">
                 <div class="stern-card-desc">${item.description}</div>
-                <div class="stern-card-unit">${item.unit ? '׳₪׳™׳¨׳•׳˜/׳™׳—׳™׳“׳”: ' + item.unit : ''}</div>
+                <div class="stern-card-unit">${item.unit ? 'פירוט/יחידה: ' + item.unit : ''}</div>
             </div>
             <div class="stern-card-action">
                 <div class="stern-card-price">${formatPriceString(item.price)} ג‚×</div>
                 <button class="btn btn-accent btn-small" onclick="addSternItemToQuote(${index})">
-                    <i class="fa-solid fa-plus"></i> ׳”׳•׳¡׳£
+                    <i class="fa-solid fa-plus"></i> הוסף
                 </button>
             </div>
         `;
@@ -1605,15 +1608,15 @@ function addSternItemToQuote(dbIndex) {
     }
     
     updatePreviewFromForm();
-    showToast(`׳ ׳•׳¡׳£ ׳¡׳¢׳™׳£: "${item.description.substring(0, 30)}..." ׳‘׳׳—׳™׳¨ ${item.price} ׳©"׳—`);
+    showToast(`נוסף סעיף: "${item.description.substring(0, 30)}..." במחיר ${item.price} ש"ח`);
 }
 
 // ==========================================================================
 // PDF Generation & Download
 // ==========================================================================
 function downloadPDF() {
-    const clientName = document.getElementById('form-client-name').value.trim() || '׳׳§׳•׳—';
-    const subject = document.getElementById('form-quote-subject').value.trim() || '׳”׳¦׳¢׳× ׳׳—׳™׳¨';
+    const clientName = document.getElementById('form-client-name').value.trim() || 'לקוח';
+    const subject = document.getElementById('form-quote-subject').value.trim() || 'הצע׳ מחיר';
     const quoteNumber = document.getElementById('form-quote-number').value.trim() || '000';
     
     appState.currentQuote.clientName = clientName;
@@ -1627,7 +1630,7 @@ function downloadPDF() {
     updatePreviewFromForm();
     
     const element = document.getElementById('quote-pdf-sheet');
-    const filename = `׳”׳¦׳¢׳× ׳׳—׳™׳¨_${quoteNumber}_${clientName.replace(/\s+/g, '_')}.pdf`;
+    const filename = `הצע׳ מחיר_${quoteNumber}_${clientName.replace(/\s+/g, '_')}.pdf`;
     
     const options = {
         margin: 10,
@@ -1646,16 +1649,16 @@ function downloadPDF() {
         }
     };
     
-    showToast('׳׳›׳™׳ ׳§׳•׳‘׳¥ PDF ׳׳”׳•׳¨׳“׳”...');
+    showToast('מכין קובץ PDF להורדה...');
     
     return html2pdf().set(options).from(element).save()
         .then(() => {
-            showToast('׳§׳•׳‘׳¥ PDF ׳”׳•׳¨׳“ ׳‘׳”׳¦׳׳—׳”');
+            showToast('קובץ PDF הורד בהצלחה');
             saveToHistory(false);
         })
         .catch(err => {
             console.error('PDF error:', err);
-            showToast('׳©׳’׳™׳׳” ׳‘׳™׳¦׳™׳¨׳× ׳§׳•׳‘׳¥ ׳”-PDF', 'error');
+            showToast('שגיאה ביציר׳ קובץ ה-PDF', 'error');
         });
 }
 
@@ -1665,16 +1668,16 @@ function shareWhatsApp() {
     const finalPrice = document.getElementById('form-final-price').value;
     const vatType = document.getElementById('form-vat-type').value;
     
-    let vatLabel = '׳₪׳˜׳•׳¨ ׳׳׳¢"׳';
-    if (vatType === 'exclude') vatLabel = '׳׳ ׳›׳•׳׳ ׳׳¢"׳';
-    if (vatType === 'include') vatLabel = '׳›׳•׳׳ ׳׳¢"׳';
+    let vatLabel = 'פטור ממע"מ';
+    if (vatType === 'exclude') vatLabel = 'לא כולל מע"מ';
+    if (vatType === 'include') vatLabel = 'כולל מע"מ';
     
     if (!clientName || !subject) {
-        showToast('׳׳ ׳ ׳׳׳ ׳©׳ ׳׳§׳•׳— ׳•׳ ׳•׳©׳ ׳›׳“׳™ ׳׳”׳₪׳™׳§ ׳”׳•׳“׳¢׳”', 'error');
+        showToast('אנא מלא שם לקוח ונושא כדי להפיק הודעה', 'error');
         return;
     }
     
-    const msg = `׳©׳׳•׳ ${clientName},\n\n׳”׳₪׳§׳×׳™ ׳¢׳‘׳•׳¨׳ ׳”׳¦׳¢׳× ׳׳—׳™׳¨ ׳׳₪׳•׳¨׳˜׳× ׳‘׳ ׳•׳©׳: *${subject}*.\n׳¡׳”"׳› ׳׳×׳©׳׳•׳: *${finalPrice}* (${vatLabel}).\n\n׳©׳׳—׳×׳™ ׳׳ ׳׳× ׳§׳•׳‘׳¥ ׳”-PDF ׳”׳׳₪׳•׳¨׳˜ ׳‘׳׳™׳™׳. ׳׳©׳׳— ׳׳¢׳‘׳•׳¨ ׳¢׳׳™׳• ׳™׳—׳“ ׳׳™׳×׳.\n\n׳‘׳‘׳¨׳›׳”,\n*׳¡׳×׳™׳• ׳’'׳׳ - SJ ׳”׳ ׳“׳¡׳× ׳—׳©׳׳*`;
+    const msg = `שלום ${clientName},\n\nהפק׳י עבורך הצע׳ מחיר מפורט׳ בנושא: *${subject}*.\nסה"כ ל׳שלום: *${finalPrice}* (${vatLabel}).\n\nשלח׳י לך א׳ קובץ ה-PDF המפורט במייל. אשמח לעבור עליו יחד אי׳ך.\n\nבברכה,\n*ס׳יו ג'אן - SJ הנדס׳ חשמל*`;
     const encodedMsg = encodeURIComponent(msg);
     
     window.open(`https://api.whatsapp.com/send?text=${encodedMsg}`, '_blank');
@@ -1692,7 +1695,7 @@ function saveToHistory(showToastFlag = true) {
     q.summary = document.getElementById('form-summary').value;
     
     if (!q.clientName || !q.subject) {
-        if (showToastFlag) showToast('׳—׳•׳‘׳” ׳׳”׳–׳™׳ ׳©׳ ׳׳§׳•׳— ׳•׳ ׳•׳©׳ ׳׳₪׳ ׳™ ׳”׳©׳׳™׳¨׳”', 'error');
+        if (showToastFlag) showToast('חובה להזין שם לקוח ונושא לפני השמירה', 'error');
         return;
     }
     
@@ -1700,12 +1703,12 @@ function saveToHistory(showToastFlag = true) {
         const idx = appState.history.findIndex(item => item.id === q.id);
         if (idx !== -1) {
             appState.history[idx] = JSON.parse(JSON.stringify(q));
-            if (showToastFlag) showToast('׳”׳¦׳¢׳× ׳”׳׳—׳™׳¨ ׳¢׳•׳“׳›׳ ׳” ׳‘׳”׳™׳¡׳˜׳•׳¨׳™׳”');
+            if (showToastFlag) showToast('הצע׳ המחיר עודכנה בהיסטוריה');
         }
     } else {
         q.id = 'hist_' + Date.now().toString();
         appState.history.unshift(JSON.parse(JSON.stringify(q)));
-        if (showToastFlag) showToast('׳”׳¦׳¢׳× ׳”׳׳—׳™׳¨ ׳ ׳©׳׳¨׳” ׳‘׳”׳™׳¡׳˜׳•׳¨׳™׳”');
+        if (showToastFlag) showToast('הצע׳ המחיר נשמרה בהיסטוריה');
     }
     
     saveHistory();
@@ -1722,20 +1725,20 @@ function loadQuoteFromHistory(id) {
     updatePreviewFromForm();
     
     switchTab('create');
-    showToast(`׳”׳¦׳¢׳× ׳׳—׳™׳¨ ׳׳¡' ${quote.quoteNumber} ׳ ׳˜׳¢׳ ׳” ׳׳¢׳¨׳™׳›׳”`);
+    showToast(`הצע׳ מחיר מס' ${quote.quoteNumber} נטענה לעריכה`);
 }
 
 function deleteQuoteFromHistory(id, event) {
     if (event) event.stopPropagation();
     
-    if (!confirm('׳”׳׳ ׳׳×׳” ׳‘׳˜׳•׳— ׳©׳‘׳¨׳¦׳•׳ ׳ ׳׳׳—׳•׳§ ׳”׳¦׳¢׳× ׳׳—׳™׳¨ ׳–׳• ׳׳¦׳׳™׳×׳•׳×?')) {
+    if (!confirm('האם א׳ה בטוח שברצונך למחוק הצע׳ מחיר זו לצמי׳ו׳?')) {
         return;
     }
     
     appState.history = appState.history.filter(item => item.id !== id);
     saveHistory();
     renderHistoryList();
-    showToast('׳”׳¦׳¢׳× ׳”׳׳—׳™׳¨ ׳ ׳׳—׳§׳” ׳‘׳”׳¦׳׳—׳”');
+    showToast('הצע׳ המחיר נמחקה בהצלחה');
 }
 
 function renderHistoryList() {
@@ -1756,23 +1759,23 @@ function renderHistoryList() {
         row.style.cursor = 'pointer';
         row.onclick = () => loadQuoteFromHistory(q.id);
         
-        let vatText = '׳₪׳˜׳•׳¨';
-        if (q.vatType === 'exclude') vatText = '+ ׳׳¢"׳';
-        if (q.vatType === 'include') vatText = '׳›׳•׳׳ ׳׳¢"׳';
+        let vatText = 'פטור';
+        if (q.vatType === 'exclude') vatText = '+ מע"מ';
+        if (q.vatType === 'include') vatText = 'כולל מע"מ';
         
         row.innerHTML = `
             <td style="font-family: 'Outfit', sans-serif; font-weight:700;">${q.quoteNumber}</td>
             <td style="font-family: 'Outfit', sans-serif;">${formatHebrewDate(q.date)}</td>
             <td style="font-weight:600; color: var(--color-accent);">${q.clientName}</td>
             <td>${q.subject}</td>
-            <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight:600;">${formatPriceString(q.finalPrice)} ׳©"׳— <span style="font-size:0.75rem; color:var(--text-muted);">${vatText}</span></td>
-            <td><span class="badge active">׳©׳׳•׳¨</span></td>
+            <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight:600;">${formatPriceString(q.finalPrice)} ש"ח <span style="font-size:0.75rem; color:var(--text-muted);">${vatText}</span></td>
+            <td><span class="badge active">שמור</span></td>
             <td class="actions-cell">
                 <button class="btn btn-secondary btn-small" onclick="loadQuoteFromHistory('${q.id}')">
-                    <i class="fa-solid fa-pen"></i> ׳¢׳¨׳•׳
+                    <i class="fa-solid fa-pen"></i> ערוך
                 </button>
                 <button class="btn btn-danger btn-small" onclick="deleteQuoteFromHistory('${q.id}', event)">
-                    <i class="fa-solid fa-trash-can"></i> ׳׳—׳§
+                    <i class="fa-solid fa-trash-can"></i> מחק
                 </button>
             </td>
         `;
@@ -1803,7 +1806,7 @@ function filterHistory() {
     if (visibleCount === 0) {
         if (emptyState) {
             emptyState.style.display = 'flex';
-            emptyState.querySelector('p').textContent = '׳׳ ׳ ׳׳¦׳׳• ׳”׳¦׳¢׳•׳× ׳׳—׳™׳¨ ׳”׳×׳•׳׳׳•׳× ׳׳—׳™׳₪׳•׳©.';
+            emptyState.querySelector('p').textContent = 'לא נמצאו הצעו׳ מחיר ה׳ואמו׳ לחיפוש.';
         }
     } else {
         if (emptyState) emptyState.style.display = 'none';
@@ -1819,12 +1822,12 @@ function exportHistoryData() {
     
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href",     dataStr);
-    downloadAnchor.setAttribute("download", `׳’׳™׳‘׳•׳™_׳”׳¦׳¢׳•׳×_׳׳—׳™׳¨_SJ_${getTodayDateString()}.json`);
+    downloadAnchor.setAttribute("download", `גיבוי_הצעו׳_מחיר_SJ_${getTodayDateString()}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
     
-    showToast('׳ ׳×׳•׳ ׳™ ׳”׳׳¢׳¨׳›׳× ׳™׳•׳¦׳׳• ׳׳§׳•׳‘׳¥ ׳’׳™׳‘׳•׳™ ׳‘׳”׳¦׳׳—׳”');
+    showToast('נ׳וני המערכ׳ יוצאו לקובץ גיבוי בהצלחה');
 }
 
 function importHistoryClick() {
@@ -1840,7 +1843,7 @@ function importHistoryData(event) {
         try {
             const imported = JSON.parse(e.target.result);
             if (imported.history && Array.isArray(imported.history)) {
-                if (confirm(`׳ ׳׳¦׳׳• ${imported.history.length} ׳”׳¦׳¢׳•׳× ׳׳—׳™׳¨ ׳‘׳§׳•׳‘׳¥. ׳”׳׳ ׳‘׳¨׳¦׳•׳ ׳ ׳׳™׳™׳‘׳?`)) {
+                if (confirm(`נמצאו ${imported.history.length} הצעו׳ מחיר בקובץ. האם ברצונך לייבא?`)) {
                     appState.history = imported.history;
                     if (imported.settings) {
                         appState.settings = imported.settings;
@@ -1853,13 +1856,13 @@ function importHistoryData(event) {
                     }
                     saveHistory();
                     renderHistoryList();
-                    showToast('׳”׳ ׳×׳•׳ ׳™׳ ׳™׳•׳‘׳׳• ׳‘׳”׳¦׳׳—׳”');
+                    showToast('הנ׳ונים יובאו בהצלחה');
                 }
             } else {
-                showToast('׳§׳•׳‘׳¥ ׳’׳™׳‘׳•׳™ ׳׳ ׳×׳§׳™׳', 'error');
+                showToast('קובץ גיבוי לא ׳קין', 'error');
             }
         } catch (err) {
-            showToast('׳©׳’׳™׳׳” ׳‘׳₪׳¢׳ ׳•׳— ׳§׳•׳‘׳¥ ׳”׳’׳™׳‘׳•׳™', 'error');
+            showToast('שגיאה בפענוח קובץ הגיבוי', 'error');
         }
     };
     reader.readAsText(file);
@@ -1893,14 +1896,14 @@ function updateDriveStatus(connected) {
     
     if (connected) {
         statusLabel.className = 'status-connected';
-        statusLabel.innerHTML = '<i class="fa-solid fa-circle-dot"></i> ׳׳—׳•׳‘׳¨ ׳-Google Drive';
-        btn.textContent = '׳”׳—׳׳£ ׳—׳©׳‘׳•׳ / ׳”׳×׳—׳‘׳¨ ׳׳—׳“׳©';
+        statusLabel.innerHTML = '<i class="fa-solid fa-circle-dot"></i> מחובר ל-Google Drive';
+        btn.textContent = 'החלף חשבון / ה׳חבר מחדש';
         if (syncSection) syncSection.style.display = 'flex';
         loadDriveFoldersList();
     } else {
         statusLabel.className = 'status-disconnected';
-        statusLabel.innerHTML = '<i class="fa-solid fa-circle-dot"></i> ׳׳ ׳•׳×׳§';
-        btn.textContent = '׳’׳‘׳” ׳׳× ׳¢׳‘׳•׳“׳×׳ ׳¢"׳™ ׳™׳¦׳™׳¨׳× ׳×׳™׳§׳™׳™׳× ׳”׳¦׳¢׳•׳× ׳׳—׳™׳¨ ׳‘-DRIVE ׳©׳ ׳’׳•׳’׳';
+        statusLabel.innerHTML = '<i class="fa-solid fa-circle-dot"></i> מנו׳ק';
+        btn.textContent = 'גבה א׳ עבוד׳ך ע"י יציר׳ ׳יקיי׳ הצעו׳ מחיר ב-DRIVE של גוגל';
         if (syncSection) syncSection.style.display = 'none';
         const container = document.getElementById('drive-folder-select-container');
         if (container) container.innerHTML = '';
@@ -1920,8 +1923,8 @@ function clearDriveSession() {
     const pathStatus = document.getElementById('drive-folder-path-status');
     if (pathStatus) {
         pathStatus.innerHTML = `
-            <i class="fa-solid fa-file-pdf"></i> ׳§׳•׳‘׳¦׳™ PDF ׳™׳™׳©׳׳¨׳• ׳‘׳×׳™׳§׳™׳™׳” ׳”׳ ׳‘׳—׳¨׳×<br>
-            <i class="fa-solid fa-database"></i> ׳’׳™׳‘׳•׳™ ׳•׳¡׳ ׳›׳¨׳•׳ ׳ ׳×׳•׳ ׳™׳: <strong>׳×׳™׳§׳™׳™׳× ׳׳¢׳¨׳›׳× ׳׳•׳¡׳×׳¨׳× (.sysdata)</strong>
+            <i class="fa-solid fa-file-pdf"></i> קובצי PDF יישמרו ב׳יקייה הנבחר׳<br>
+            <i class="fa-solid fa-database"></i> גיבוי וסנכרון נ׳ונים: <strong>׳יקיי׳ מערכ׳ מוס׳ר׳ (.sysdata)</strong>
         `;
         pathStatus.style.color = '';
     }
@@ -1934,7 +1937,7 @@ function clearDriveSession() {
 function connectGoogleDrive() {
     const clientId = document.getElementById('settings-drive-client-id').value.trim();
     if (!clientId) {
-        showToast('׳׳ ׳ ׳”׳–׳ Google Client ID ׳‘׳”׳’׳“׳¨׳•׳× ׳×׳—׳™׳׳”', 'error');
+        showToast('אנא הזן Google Client ID בהגדרו׳ ׳חילה', 'error');
         return;
     }
     
@@ -1950,7 +1953,7 @@ function connectGoogleDrive() {
             scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly',
             callback: async (response) => {
                 if (response.error !== undefined) {
-                    showToast('׳©׳’׳™׳׳” ׳‘׳—׳™׳‘׳•׳¨ ׳׳’׳•׳’׳ ׳“׳¨׳™׳™׳‘: ' + response.error, 'error');
+                    showToast('שגיאה בחיבור לגוגל דרייב: ' + response.error, 'error');
                     return;
                 }
                 googleAccessToken = response.access_token;
@@ -1963,15 +1966,15 @@ function connectGoogleDrive() {
                 localStorage.removeItem(getStorageKey('sj_sync_folder_id'));
                 
                 updateDriveStatus(true);
-                showToast('׳”׳×׳—׳‘׳¨׳× ׳-Google Drive ׳‘׳”׳¦׳׳—׳”!');
+                showToast('ה׳חבר׳ ל-Google Drive בהצלחה!');
                 
                 try {
-                    showToast('׳׳–׳”׳” ׳•׳׳¡׳ ׳›׳¨׳ ׳׳× ׳×׳™׳§׳™׳™׳× ׳”׳¢׳ ׳ ׳©׳ SJ ׳”׳ ׳“׳¡׳× ׳—׳©׳׳...');
+                    showToast('מזהה ומסנכרן א׳ ׳יקיי׳ הענן של SJ הנדס׳ חשמל...');
                     await resolveSjDriveFolders();
                     autoDetectQuoteNumber(false);
                     syncDatabaseFromDrive(false); // Cloud sync
                 } catch (folderErr) {
-                    showToast('׳©׳’׳™׳׳” ׳‘׳™׳¦׳™׳¨׳× ׳ ׳×׳™׳‘ ׳”׳×׳™׳§׳™׳•׳× ׳‘׳“׳¨׳™׳™׳‘: ' + folderErr.message, 'error');
+                    showToast('שגיאה ביציר׳ נ׳יב ה׳יקיו׳ בדרייב: ' + folderErr.message, 'error');
                 }
             },
         });
@@ -1979,7 +1982,7 @@ function connectGoogleDrive() {
         googleTokenClient.requestAccessToken({ prompt: '' });
     } catch (e) {
         console.error(e);
-        showToast('׳©׳’׳™׳׳” ׳‘׳׳×׳—׳•׳ Google OAuth: ׳•׳“׳ ׳©׳”-Client ID ׳×׳§׳™׳', 'error');
+        showToast('שגיאה בא׳חול Google OAuth: ודא שה-Client ID ׳קין', 'error');
     }
 }
 
@@ -2004,7 +2007,7 @@ async function findOrCreateFolder(name, parentId) {
     const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&access_token=${googleAccessToken}`);
     if (!res.ok) {
         const errText = await res.text();
-        throw new Error(`׳—׳™׳₪׳•׳© ׳×׳™׳§׳™׳™׳” '${name}' ׳ ׳›׳©׳: ${errText}`);
+        throw new Error(`חיפוש ׳יקייה '${name}' נכשל: ${errText}`);
     }
     const data = await res.json();
     if (data.files && data.files.length > 0) {
@@ -2037,7 +2040,7 @@ async function findOrCreateFolder(name, parentId) {
 }
 
 function _userFolderName() {
-    const u = getActiveUser() || 'user';
+    const u = (getActiveUser() || 'user').split('@')[0];
     return u.replace(/[^a-zA-Z0-9֐-׿._-]/g, '_').slice(0, 60);
 }
 
@@ -2062,9 +2065,9 @@ async function resolveSjDriveFolders() {
                 const pathStatus = document.getElementById('drive-folder-path-status');
                 if (pathStatus) {
                     pathStatus.innerHTML = `
-                        <i class="fa-solid fa-circle-check" style="color: var(--color-success)"></i> ׳×׳™׳§׳™׳•׳× ׳₪׳¢׳™׳׳•׳× ׳‘׳“׳¨׳™׳™׳‘:<br>
-                        <i class="fa-solid fa-file-pdf" style="margin-right: 15px;"></i> ׳׳–׳”׳” ׳×׳™׳§׳™׳™׳× PDF: <strong>${quotesId}</strong><br>
-                        <i class="fa-solid fa-database" style="margin-right: 15px;"></i> ׳׳–׳”׳” ׳×׳™׳§׳™׳™׳× ׳“׳׳˜׳: <strong>${dataId}</strong>
+                        <i class="fa-solid fa-circle-check" style="color: var(--color-success)"></i> ׳יקיו׳ פעילו׳ בדרייב:<br>
+                        <i class="fa-solid fa-file-pdf" style="margin-right: 15px;"></i> מזהה ׳יקיי׳ PDF: <strong>${quotesId}</strong><br>
+                        <i class="fa-solid fa-database" style="margin-right: 15px;"></i> מזהה ׳יקיי׳ דאטא: <strong>${dataId}</strong>
                     `;
                     pathStatus.style.color = 'var(--color-success)';
                 }
@@ -2178,13 +2181,13 @@ async function scanForLegacyData(folderId) {
 
 // Manual trigger: scan current sync folder for old JSON and import
 async function manualLegacyScan() {
-    if (!googleAccessToken) { showToast('׳™׳© ׳׳”׳×׳—׳‘׳¨ ׳׳’׳•׳’׳ ׳×׳—׳™׳׳”', 'error'); return; }
-    showToast('׳¡׳•׳¨׳§ ׳×׳™׳§׳™׳™׳× Drive ׳׳ ׳×׳•׳ ׳™׳ ׳™׳©׳ ׳™׳...');
+    if (!googleAccessToken) { showToast('יש לה׳חבר לגוגל ׳חילה', 'error'); return; }
+    showToast('סורק ׳יקיי׳ Drive לנ׳ונים ישנים...');
     try {
         const syncFolderId = await getOrCreateSyncFolder();
-        if (!syncFolderId) { showToast('׳׳ ׳ ׳׳¦׳׳” ׳×׳™׳§׳™׳™׳× Drive', 'error'); return; }
+        if (!syncFolderId) { showToast('לא נמצאה ׳יקיי׳ Drive', 'error'); return; }
         const recovered = await scanForLegacyData(syncFolderId);
-        if (!recovered) { showToast('׳׳ ׳ ׳׳¦׳׳• ׳ ׳×׳•׳ ׳™׳ ׳™׳©׳ ׳™׳ ׳‘׳×׳™׳§׳™׳™׳”', 'error'); return; }
+        if (!recovered) { showToast('לא נמצאו נ׳ונים ישנים ב׳יקייה', 'error'); return; }
         if (recovered.settings) {
             appState.settings = Object.assign({}, appState.settings, recovered.settings);
             localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
@@ -2201,20 +2204,20 @@ async function manualLegacyScan() {
         filterProjectsList();
         renderHistoryList();
         await syncDatabaseToDrive(true);
-        showToast('׳ ׳×׳•׳ ׳™׳ ׳™׳©׳ ׳™׳ ׳™׳•׳‘׳׳• ׳‘׳”׳¦׳׳—׳”!');
+        showToast('נ׳ונים ישנים יובאו בהצלחה!');
     } catch (e) {
-        showToast('׳©׳’׳™׳׳” ׳‘׳¡׳¨׳™׳§׳”: ' + e.message, 'error');
+        showToast('שגיאה בסריקה: ' + e.message, 'error');
     }
 }
 
 // Google Drive Picker ג€” lets user browse and pick any folder
 function openDrivePicker() {
     if (!googleAccessToken) {
-        showToast('׳™׳© ׳׳—׳‘׳¨ Google Drive ׳×׳—׳™׳׳” ג€” ׳׳—׳¥ "׳—׳‘׳¨ Drive" ׳‘׳”׳’׳“׳¨׳•׳×', 'error');
+        showToast('יש לחבר Google Drive ׳חילה ג€” לחץ "חבר Drive" בהגדרו׳', 'error');
         return;
     }
     if (typeof gapi === 'undefined' || typeof google === 'undefined') {
-        showToast('׳׳׳×׳™׳ ׳׳˜׳¢׳™׳ ׳× Google API... ׳ ׳¡׳” ׳©׳•׳‘ ׳‘׳¢׳•׳“ ׳©׳ ׳™׳™׳”', 'error');
+        showToast('ממ׳ין לטעינ׳ Google API... נסה שוב בעוד שנייה', 'error');
         return;
     }
     try {
@@ -2225,30 +2228,30 @@ function openDrivePicker() {
                     .setSelectFolderEnabled(true)
                     .setMimeTypes('application/vnd.google-apps.folder');
                 const picker = new google.picker.PickerBuilder()
-                    .setTitle('׳‘׳—׳¨ ׳×׳™׳§׳™׳™׳” ׳׳©׳׳™׳¨׳× ׳”׳¦׳¢׳•׳× ׳׳—׳™׳¨')
+                    .setTitle('בחר ׳יקייה לשמיר׳ הצעו׳ מחיר')
                     .addView(folderView)
                     .setOAuthToken(googleAccessToken)
                     .setCallback(async (pickerData) => {
                         if (pickerData.action === google.picker.Action.PICKED) {
                             const folder = pickerData.docs[0];
-                            showToast(`׳×׳™׳§׳™׳™׳” ׳ ׳‘׳—׳¨׳”: ${folder.name}`);
+                            showToast(`׳יקייה נבחרה: ${folder.name}`);
                             await handleDriveFolderChange(folder.id);
                         }
                     })
                     .build();
                 picker.setVisible(true);
             } catch (innerErr) {
-                showToast('׳©׳’׳™׳׳” ׳‘׳₪׳×׳™׳—׳× ׳‘׳•׳—׳¨ ׳”׳×׳™׳§׳™׳•׳× ג€” ׳™׳© ׳׳—׳‘׳¨ ׳׳—׳“׳© ׳-Drive', 'error');
+                showToast('שגיאה בפ׳יח׳ בוחר ה׳יקיו׳ ג€” יש לחבר מחדש ל-Drive', 'error');
             }
         });
     } catch (e) {
-        showToast('׳©׳’׳™׳׳” ׳‘׳˜׳¢׳™׳ ׳× Google Picker ג€” ׳™׳© ׳׳—׳‘׳¨ ׳׳—׳“׳© ׳-Drive', 'error');
+        showToast('שגיאה בטעינ׳ Google Picker ג€” יש לחבר מחדש ל-Drive', 'error');
     }
 }
 
 async function smartSyncFromDrive() {
     if (!googleAccessToken) {
-        showToast('׳™׳© ׳׳—׳‘׳¨ Google Drive ׳×׳—׳™׳׳”', 'error');
+        showToast('יש לחבר Google Drive ׳חילה', 'error');
         return;
     }
     setSyncLoading(true);
@@ -2257,12 +2260,12 @@ async function smartSyncFromDrive() {
         await manualSyncFromCloud();
         // Step 2: if still no projects, try backup recovery
         if (projectsList.length === 0) {
-            showToast('׳׳ ׳ ׳׳¦׳ ׳§׳•׳‘׳¥ ׳¡׳ ׳›׳¨׳•׳ ג€” ׳׳—׳₪׳© ׳’׳™׳‘׳•׳™׳™׳...', 'error');
+            showToast('לא נמצא קובץ סנכרון ג€” מחפש גיבויים...', 'error');
             await recoverDriveBackup();
         }
         // Step 3: if still nothing, scan for legacy data
         if (projectsList.length === 0) {
-            showToast('׳׳—׳₪׳© ׳ ׳×׳•׳ ׳™׳ ׳™׳©׳ ׳™׳ ׳‘׳×׳™׳§׳™׳™׳”...', 'error');
+            showToast('מחפש נ׳ונים ישנים ב׳יקייה...', 'error');
             await manualLegacyScan();
         }
     } finally {
@@ -2345,12 +2348,12 @@ async function syncDatabaseFromDrive(silent = false) {
                     }
                     
                     if (!silent) {
-                        showToast('׳ ׳×׳•׳ ׳™ ׳”׳׳₪׳׳™׳§׳¦׳™׳” ׳¡׳•׳ ׳›׳¨׳ ׳• ׳׳”׳¢׳ ׳ ׳‘׳”׳¦׳׳—׳”!');
+                        showToast('נ׳וני האפליקציה סונכרנו מהענן בהצלחה!');
                     }
                 } else if (localTimestamp > cloudTimestamp) {
                     await syncDatabaseToDrive(true);
                 } else {
-                    if (!silent) showToast('׳”׳ ׳×׳•׳ ׳™׳ ׳‘׳¢׳ ׳ ׳›׳‘׳¨ ׳׳¢׳•׳“׳›׳ ׳™׳');
+                    if (!silent) showToast('הנ׳ונים בענן כבר מעודכנים');
                 }
             }
         } else {
@@ -2372,13 +2375,13 @@ async function syncDatabaseFromDrive(silent = false) {
                 loadSettings();
                 filterProjectsList();
                 renderHistoryList();
-                if (!silent) showToast('׳©׳•׳—׳–׳¨׳• ׳ ׳×׳•׳ ׳™׳ ׳™׳©׳ ׳™׳ ׳׳”׳“׳¨׳™׳™׳‘!');
+                if (!silent) showToast('שוחזרו נ׳ונים ישנים מהדרייב!');
             }
             await syncDatabaseToDrive(true);
         }
     } catch (e) {
         console.error('Error syncing from cloud:', e);
-        if (!silent) showToast('׳©׳’׳™׳׳” ׳‘׳¡׳ ׳›׳¨׳•׳ ׳׳”׳¢׳ ׳: ' + e.message, 'error');
+        if (!silent) showToast('שגיאה בסנכרון מהענן: ' + e.message, 'error');
     } finally {
         setSyncLoading(false);
     }
@@ -2451,35 +2454,35 @@ async function syncDatabaseToDrive(silent = true) {
         if (!uploadRes.ok) throw new Error('Upload request failed');
         
         if (!silent) {
-            showToast('׳ ׳×׳•׳ ׳™ ׳”׳׳₪׳׳™׳§׳¦׳™׳” ׳ ׳©׳׳¨׳• ׳•׳¡׳•׳ ׳›׳¨׳ ׳• ׳׳¢׳ ׳ ׳‘׳”׳¦׳׳—׳”!');
+            showToast('נ׳וני האפליקציה נשמרו וסונכרנו לענן בהצלחה!');
         }
     } catch (e) {
         console.error('Error syncing to cloud:', e);
-        if (!silent) showToast('׳©׳’׳™׳׳” ׳‘׳©׳׳™׳¨׳” ׳׳¢׳ ׳: ' + e.message, 'error');
+        if (!silent) showToast('שגיאה בשמירה לענן: ' + e.message, 'error');
     } finally {
         setSyncLoading(false);
     }
 }
 
 function manualSyncFromCloud() {
-    showToast('׳׳‘׳¦׳¢ ׳¡׳ ׳›׳¨׳•׳ ׳¢׳ ׳ ׳™׳“׳ ׳™...');
+    showToast('מבצע סנכרון ענן ידני...');
     syncDatabaseFromDrive(false);
 }
 
 async function autoDetectQuoteNumber(showAlerts = false) {
     if (!googleAccessToken) {
-        if (showAlerts) showToast('׳’׳•׳’׳ ׳“׳¨׳™׳™׳‘ ׳׳™׳ ׳• ׳׳—׳•׳‘׳¨. ׳׳ ׳ ׳”׳×׳—׳‘׳¨ ׳“׳¨׳ ׳”׳’׳“׳¨׳•׳× ׳׳¢׳¨׳›׳×', 'error');
+        if (showAlerts) showToast('גוגל דרייב אינו מחובר. אנא ה׳חבר דרך הגדרו׳ מערכ׳', 'error');
         return;
     }
     
     if (showAlerts) {
-        showToast('׳¡׳•׳¨׳§ ׳§׳‘׳¦׳™׳ ׳‘׳“׳¨׳™׳™׳‘ ׳׳§׳‘׳™׳¢׳× ׳׳¡׳₪׳¨ ׳”׳¦׳¢׳”...');
+        showToast('סורק קבצים בדרייב לקביע׳ מספר הצעה...');
     }
     
     try {
         const folders = await resolveSjDriveFolders();
         if (!folders || !folders.quotes) {
-            if (showAlerts) showToast('׳©׳’׳™׳׳” ׳‘׳’׳™׳©׳” ׳׳×׳™׳§׳™׳™׳× ׳”׳¦׳¢׳•׳× ׳׳—׳™׳¨ ׳‘׳“׳¨׳™׳™׳‘', 'error');
+            if (showAlerts) showToast('שגיאה בגישה ל׳יקיי׳ הצעו׳ מחיר בדרייב', 'error');
             return;
         }
         const folderId = folders.quotes;
@@ -2490,7 +2493,7 @@ async function autoDetectQuoteNumber(showAlerts = false) {
         if (!res.ok) {
             if (res.status === 401) {
                 clearDriveSession();
-                if (showAlerts) showToast('׳₪׳’ ׳×׳•׳§׳£ ׳”׳—׳™׳‘׳•׳¨ ׳׳’׳•׳’׳ ׳“׳¨׳™׳™׳‘. ׳׳ ׳ ׳”׳×׳—׳‘׳¨ ׳׳—׳“׳© ׳‘׳”׳’׳“׳¨׳•׳×', 'error');
+                if (showAlerts) showToast('פג ׳וקף החיבור לגוגל דרייב. אנא ה׳חבר מחדש בהגדרו׳', 'error');
                 return;
             }
             throw new Error('Drive API error');
@@ -2521,16 +2524,16 @@ async function autoDetectQuoteNumber(showAlerts = false) {
         appState.currentQuote.quoteNumber = finalQuoteStr;
         updatePreviewFromForm();
         
-        showToast(`׳–׳•׳”׳” ׳׳¡׳₪׳¨ ׳”׳¦׳¢׳” ׳”׳‘׳ ׳׳×׳•׳ ׳”׳“׳¨׳™׳™׳‘: ${finalQuoteStr}`);
+        showToast(`זוהה מספר הצעה הבא מ׳וך הדרייב: ${finalQuoteStr}`);
     } catch (e) {
         console.error(e);
-        if (showAlerts) showToast('׳©׳’׳™׳׳” ׳‘׳¡׳¨׳™׳§׳× ׳”׳“׳¨׳™׳™׳‘', 'error');
+        if (showAlerts) showToast('שגיאה בסריק׳ הדרייב', 'error');
     }
 }
 
 function uploadPDFToDrive() {
-    const clientName = document.getElementById('form-client-name').value.trim() || '׳׳§׳•׳—';
-    const subject = document.getElementById('form-quote-subject').value.trim() || '׳”׳¦׳¢׳× ׳׳—׳™׳¨';
+    const clientName = document.getElementById('form-client-name').value.trim() || 'לקוח';
+    const subject = document.getElementById('form-quote-subject').value.trim() || 'הצע׳ מחיר';
     const quoteNumber = document.getElementById('form-quote-number').value.trim() || '000';
     
     appState.currentQuote.clientName = clientName;
@@ -2544,13 +2547,13 @@ function uploadPDFToDrive() {
     updatePreviewFromForm();
     
     if (!googleAccessToken) {
-        showToast('׳׳ ׳ ׳—׳‘׳¨ ׳׳× Google Drive ׳“׳¨׳ ׳”׳’׳“׳¨׳•׳× ׳׳¢׳¨׳›׳× ׳×׳—׳™׳׳”', 'error');
+        showToast('אנא חבר א׳ Google Drive דרך הגדרו׳ מערכ׳ ׳חילה', 'error');
         switchTab('settings');
         return;
     }
     
     const element = document.getElementById('quote-pdf-sheet');
-    const filename = `׳”׳¦׳¢׳× ׳׳—׳™׳¨_${quoteNumber}_${clientName.replace(/\s+/g, '_')}.pdf`;
+    const filename = `הצע׳ מחיר_${quoteNumber}_${clientName.replace(/\s+/g, '_')}.pdf`;
     
     const options = {
         margin: 10,
@@ -2572,16 +2575,16 @@ function uploadPDFToDrive() {
     const btn = document.getElementById('btn-save-drive');
     const originalText = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ׳©׳׳™׳¨׳” ׳‘׳“׳¨׳™׳™׳‘...`;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> שמירה בדרייב...`;
     
-    showToast('׳׳₪׳™׳§ PDF ׳•׳׳¢׳׳” ׳-Google Drive...');
+    showToast('מפיק PDF ומעלה ל-Google Drive...');
     
     html2pdf().set(options).from(element).toPdf().output('blob')
         .then(async (blob) => {
             try {
                 const folders = await resolveSjDriveFolders();
                 if (!folders || !folders.quotes) {
-                    throw new Error('׳׳ ׳ ׳™׳×׳ ׳׳׳¦׳•׳ ׳׳• ׳׳™׳¦׳•׳¨ ׳׳× ׳×׳™׳§׳™׳™׳× ׳”׳™׳¢׳“ ׳‘׳“׳¨׳™׳™׳‘');
+                    throw new Error('לא ני׳ן למצוא או ליצור א׳ ׳יקיי׳ היעד בדרייב');
                 }
                 const folderId = folders.quotes;
                 
@@ -2625,7 +2628,7 @@ function uploadPDFToDrive() {
                 const method = existingFileId ? 'PATCH' : 'POST';
                 
                 if (existingFileId) {
-                    showToast('׳ ׳׳¦׳ ׳§׳•׳‘׳¥ ׳§׳™׳™׳ ׳‘׳“׳¨׳™׳™׳‘. ׳׳¢׳“׳›׳ ׳’׳¨׳¡׳”...');
+                    showToast('נמצא קובץ קיים בדרייב. מעדכן גרסה...');
                 }
                 
                 const res = await fetch(uploadUrl, {
@@ -2639,20 +2642,20 @@ function uploadPDFToDrive() {
                 if (!res.ok) {
                     if (res.status === 401) {
                         clearDriveSession();
-                        throw new Error('׳₪׳’ ׳×׳•׳§׳£ ׳”׳—׳™׳‘׳•׳¨ ׳׳’׳•׳’׳ ׳“׳¨׳™׳™׳‘. ׳׳ ׳ ׳”׳×׳—׳‘׳¨ ׳׳—׳“׳© ׳‘׳”׳’׳“׳¨׳•׳×');
+                        throw new Error('פג ׳וקף החיבור לגוגל דרייב. אנא ה׳חבר מחדש בהגדרו׳');
                     }
                     throw new Error('Drive API Upload failed');
                 }
                 
                 if (existingFileId) {
-                    showToast('׳”׳§׳•׳‘׳¥ ׳¢׳•׳“׳›׳ ׳‘׳“׳¨׳™׳™׳‘ ׳‘׳”׳¦׳׳—׳”!');
+                    showToast('הקובץ עודכן בדרייב בהצלחה!');
                 } else {
-                    showToast('׳”׳§׳•׳‘׳¥ ׳ ׳©׳׳¨ ׳‘׳“׳¨׳™׳™׳‘ ׳‘׳”׳¦׳׳—׳”!');
+                    showToast('הקובץ נשמר בדרייב בהצלחה!');
                 }
                 saveToHistory(false);
             } catch (err) {
                 console.error(err);
-                showToast('׳©׳’׳™׳׳” ׳‘׳©׳׳™׳¨׳” ׳׳“׳¨׳™׳™׳‘: ' + err.message, 'error');
+                showToast('שגיאה בשמירה לדרייב: ' + err.message, 'error');
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = originalText;
@@ -2660,7 +2663,7 @@ function uploadPDFToDrive() {
         })
         .catch(err => {
             console.error('PDF error:', err);
-            showToast('׳©׳’׳™׳׳” ׳‘׳”׳₪׳§׳× ׳§׳•׳‘׳¥ ׳”-PDF', 'error');
+            showToast('שגיאה בהפק׳ קובץ ה-PDF', 'error');
             btn.disabled = false;
             btn.innerHTML = originalText;
         });
@@ -2705,88 +2708,88 @@ function getProfessionSystemInstruction() {
     
     switch (profession) {
         case 'charger_installer':
-            specificContent = `׳׳×׳” ׳׳•׳׳—׳” ׳×׳׳—׳•׳¨, ׳—׳™׳©׳•׳‘ ׳—׳•׳׳¨׳™׳ ׳•׳ ׳™׳”׳•׳ ׳¢׳‘׳•׳“׳•׳× ׳©׳ ׳”׳×׳§׳ ׳× ׳¢׳׳“׳•׳× ׳˜׳¢׳™׳ ׳” ׳׳¨׳›׳‘׳™׳ ׳—׳©׳׳׳™׳™׳ ׳‘׳™׳©׳¨׳׳ (׳¢׳‘׳•׳¨ ׳¡׳×׳™׳• ׳’'׳׳ - SJ ׳”׳ ׳“׳¡׳× ׳—׳©׳׳).
-׳×׳₪׳§׳™׳“׳ ׳׳ ׳”׳ ׳©׳™׳—׳” ׳׳§׳¦׳•׳¢׳™׳×, ׳׳׳•׳§׳“׳× ׳•׳׳¡׳™׳™׳¢׳× ׳›׳“׳™ ׳׳¢׳–׳•׳¨ ׳׳¡׳×׳™׳• ׳׳×׳׳—׳¨ ׳”׳×׳§׳ ׳× ׳¢׳׳“׳× ׳˜׳¢׳™׳ ׳” ׳׳¨׳›׳‘ ׳—׳©׳׳׳™.
+            specificContent = `א׳ה מומחה ׳מחור, חישוב חומרים וניהול עבודו׳ של ה׳קנ׳ עמדו׳ טעינה לרכבים חשמליים בישראל (עבור ס׳יו ג'אן - SJ הנדס׳ חשמל).
+׳פקידך לנהל שיחה מקצועי׳, ממוקד׳ ומסייע׳ כדי לעזור לס׳יו ל׳מחר ה׳קנ׳ עמד׳ טעינה לרכב חשמלי.
 
-׳‘׳›׳ ׳”׳•׳“׳¢׳” ׳©׳׳:
-1. ׳ ׳×׳— ׳׳× ׳¢׳‘׳•׳“׳× ׳”׳×׳§׳ ׳× ׳¢׳׳“׳× ׳”׳˜׳¢׳™׳ ׳” ׳©׳¡׳×׳™׳• ׳׳×׳׳¨.
-2. ׳–׳”׳” ׳ ׳§׳•׳“׳•׳× ׳¢׳™׳•׳•׳¨׳•׳ (Blind spots) ׳•׳“׳¨׳™׳©׳•׳× ׳§׳¨׳™׳˜׳™׳•׳× - ׳“׳‘׳¨׳™׳ ׳©׳¦׳¨׳™׳ ׳׳§׳—׳× ׳‘׳—׳©׳‘׳•׳ (׳׳׳©׳: ׳¡׳•׳’ ׳”׳׳•׳— - ׳—׳“-׳₪׳׳–׳™ ׳׳• ׳×׳׳×-׳₪׳׳–׳™, ׳”׳׳¨׳§׳” ׳©׳ ׳”׳‘׳ ׳™׳™׳, ׳׳’׳ ׳–׳׳™׳’׳” 6mA DC ׳׳•׳‘׳ ׳” ׳׳• ׳׳₪׳¡׳§ ׳׳’׳ Type B ׳™׳™׳¢׳•׳“׳™ ׳‘׳׳•׳—, ׳׳•׳׳™׳›׳™ ׳›׳‘׳ ׳׳×׳׳™׳׳™׳ 5x6 ׳׳• 5x10, ׳׳•׳₪׳ ׳§׳™׳‘׳•׳¢ ׳”׳׳•׳‘׳™׳ - ׳¦׳™׳ ׳•׳¨ ׳׳¨׳™׳›׳£, ׳×׳¢׳׳” ׳¡׳’׳•׳¨׳” ׳׳• ׳—׳¦׳™׳‘׳”, ׳׳¨׳—׳§ ׳‘׳₪׳•׳¢׳ ׳׳”׳׳•׳—, ׳¢׳‘׳•׳“׳” ׳‘׳’׳•׳‘׳”, ׳”׳₪׳¨׳¢׳•׳× ׳‘׳©׳˜׳—, ׳”׳’׳“׳׳× ׳—׳™׳‘׳•׳¨ ׳•׳×׳™׳׳•׳ ׳׳•׳ ׳—׳‘׳¨׳× ׳”׳—׳©׳׳, ׳©׳׳׳•׳× ׳׳§׳™׳‘׳•׳¢ ׳”׳׳•׳‘׳™׳ ׳•׳›׳“׳•׳׳”).
-3. ׳”׳¦׳¢ ׳¨׳©׳™׳׳× ׳—׳•׳׳¨׳™׳ ׳ ׳׳•׳•׳™׳ ׳•׳׳‘׳™׳–׳¨׳™׳ ׳©׳¡׳×׳™׳• ׳¦׳¨׳™׳ ׳׳§׳ ׳•׳× ׳›׳“׳™ ׳׳”׳©׳׳™׳ ׳׳× ׳¢׳‘׳•׳“׳× ׳”׳”׳×׳§׳ ׳” ׳§׳•׳׳₪׳׳˜ ׳₪׳¨׳₪׳§׳˜ (׳›׳’׳•׳ ׳“׳™׳‘׳׳™׳, ׳‘׳¨׳’׳™׳, ׳›׳‘׳ XLPE, ׳×׳¢׳׳•׳× PVC, ׳§׳•׳₪׳¡׳׳•׳× ׳—׳™׳‘׳•׳¨, ׳¢׳׳“׳× ׳˜׳¢׳™׳ ׳”, ׳¦׳™׳ ׳•׳¨׳•׳× ׳”׳’׳ ׳”, ׳׳”׳“׳§׳™׳, ׳—׳¦׳™׳‘׳•׳× ׳•׳›׳•').
-4. ׳‘׳¦׳¢ "׳‘׳“׳™׳§׳× ׳׳—׳™׳¨׳™׳ ׳‘׳׳™׳ ׳˜׳¨׳ ׳˜" - ׳¡׳₪׳§ ׳”׳¢׳¨׳›׳× ׳׳—׳™׳¨ ׳¨׳›׳© ׳׳©׳•׳¢׳¨׳× ׳׳—׳•׳׳¨׳™׳ (׳›׳׳™׳׳• ׳—׳™׳₪׳©׳× ׳‘׳׳×׳¨׳™׳ ׳›׳׳• ׳׳¨׳›׳”) ׳•׳₪׳¨׳˜ ׳׳× ׳׳—׳™׳¨׳™ ׳”׳—׳•׳׳¨׳™׳ ׳‘׳©׳§׳׳™׳.
-5. ׳¡׳₪׳§ ׳׳•׳׳“׳ ׳¢׳׳•׳× ׳¢׳‘׳•׳“׳” (׳¢׳‘׳•׳“׳” ׳‘׳׳‘׳“, ׳׳׳ ׳—׳•׳׳¨׳™׳) ׳׳©׳•׳¢׳¨׳× ׳‘׳©׳§׳׳™׳ ׳—׳“׳©׳™׳ (׳ ׳™׳×׳ ׳׳”׳¡׳×׳׳ ׳¢׳ ׳׳—׳™׳¨׳•׳ ׳™׳ ׳׳§׳•׳‘׳׳™׳ ׳›׳׳• ׳׳—׳™׳¨׳•׳ ׳©׳˜׳¨׳).`;
+בכל הודעה שלך:
+1. נ׳ח א׳ עבוד׳ ה׳קנ׳ עמד׳ הטעינה שס׳יו מ׳אר.
+2. זהה נקודו׳ עיוורון (Blind spots) ודרישו׳ קריטיו׳ - דברים שצריך לקח׳ בחשבון (למשל: סוג הלוח - חד-פאזי או ׳ל׳-פאזי, הארקה של הבניין, מגן זליגה 6mA DC מובנה או מפסק מגן Type B ייעודי בלוח, מוליכי כבל מ׳אימים 5x6 או 5x10, אופן קיבוע המוביל - צינור מריכף, ׳עלה סגורה או חציבה, מרחק בפועל מהלוח, עבודה בגובה, הפרעו׳ בשטח, הגדל׳ חיבור ו׳יאום מול חבר׳ החשמל, שאלו׳ לקיבוע המוביל וכדומה).
+3. הצע רשימ׳ חומרים נלווים ואביזרים שס׳יו צריך לקנו׳ כדי להשלים א׳ עבוד׳ הה׳קנה קומפלט פרפקט (כגון דיבלים, ברגים, כבל XLPE, ׳עלו׳ PVC, קופסאו׳ חיבור, עמד׳ טעינה, צינורו׳ הגנה, מהדקים, חציבו׳ וכו').
+4. בצע "בדיק׳ מחירים באינטרנט" - ספק הערכ׳ מחיר רכש משוער׳ לחומרים (כאילו חיפש׳ בא׳רים כמו ארכה) ופרט א׳ מחירי החומרים בשקלים.
+5. ספק אומדן עלו׳ עבודה (עבודה בלבד, ללא חומרים) משוער׳ בשקלים חדשים (ני׳ן להס׳מך על מחירונים מקובלים כמו מחירון שטרן).`;
             break;
             
         case 'solar_installer':
-            specificContent = `׳׳×׳” ׳׳•׳׳—׳” ׳×׳׳—׳•׳¨, ׳—׳™׳©׳•׳‘ ׳—׳•׳׳¨׳™׳ ׳•׳ ׳™׳”׳•׳ ׳¢׳‘׳•׳“׳•׳× ׳©׳ ׳”׳×׳§׳ ׳× ׳׳¢׳¨׳›׳•׳× ׳¡׳•׳׳׳¨׳™׳•׳× (PV) ׳‘׳™׳©׳¨׳׳ (׳¢׳‘׳•׳¨ ׳¡׳×׳™׳• ׳’'׳׳ - SJ ׳”׳ ׳“׳¡׳× ׳—׳©׳׳).
-׳×׳₪׳§׳™׳“׳ ׳׳ ׳”׳ ׳©׳™׳—׳” ׳׳§׳¦׳•׳¢׳™׳×, ׳׳׳•׳§׳“׳× ׳•׳׳¡׳™׳™׳¢׳× ׳›׳“׳™ ׳׳¢׳–׳•׳¨ ׳׳¡׳×׳™׳• ׳׳×׳׳—׳¨ ׳”׳×׳§׳ ׳× ׳׳¢׳¨׳›׳× ׳¡׳•׳׳׳¨׳™׳× ׳׳™׳™׳¦׳•׳¨ ׳—׳©׳׳.
+            specificContent = `א׳ה מומחה ׳מחור, חישוב חומרים וניהול עבודו׳ של ה׳קנ׳ מערכו׳ סולאריו׳ (PV) בישראל (עבור ס׳יו ג'אן - SJ הנדס׳ חשמל).
+׳פקידך לנהל שיחה מקצועי׳, ממוקד׳ ומסייע׳ כדי לעזור לס׳יו ל׳מחר ה׳קנ׳ מערכ׳ סולארי׳ לייצור חשמל.
 
-׳‘׳›׳ ׳”׳•׳“׳¢׳” ׳©׳׳:
-1. ׳ ׳×׳— ׳׳× ׳¢׳‘׳•׳“׳× ׳”׳”׳×׳§׳ ׳” ׳”׳¡׳•׳׳׳¨׳™׳× ׳©׳¡׳×׳™׳• ׳׳×׳׳¨.
-2. ׳–׳”׳” ׳ ׳§׳•׳“׳•׳× ׳¢׳™׳•׳•׳¨׳•׳ (Blind spots) ׳•׳“׳¨׳™׳©׳•׳× ׳§׳¨׳™׳˜׳™׳•׳× - ׳“׳‘׳¨׳™׳ ׳©׳¦׳¨׳™׳ ׳׳§׳—׳× ׳‘׳—׳©׳‘׳•׳ (׳׳׳©׳: ׳¡׳•׳’ ׳”׳’׳’ - ׳‘׳˜׳•׳, ׳¨׳¢׳₪׳™׳ ׳׳• ׳׳™׳¡׳›׳•׳¨׳™׳×, ׳”׳¦׳׳׳•׳× ׳׳₪׳©׳¨׳™׳•׳×, ׳›׳‘׳™׳׳× DC ׳™׳™׳¢׳•׳“׳™׳× ׳¢׳׳™׳“׳” ׳‘׳§׳¨׳ ׳™ UV, ׳¡׳•׳’ ׳”׳׳׳™׳¨ - Inverter, ׳¢׳’׳™׳ ׳” ׳•׳§׳•׳ ׳¡׳˜׳¨׳•׳§׳¦׳™׳” ׳׳×׳׳™׳׳” ׳׳¢׳•׳׳¡׳™ ׳¨׳•׳—, ׳”׳׳¨׳§׳•׳× ׳©׳׳“׳× ׳”׳₪׳ ׳׳™׳, ׳”׳›׳ ׳•׳× ׳׳—׳™׳‘׳•׳¨ ׳׳׳•׳— ׳”׳¨׳׳©׳™, ׳׳•׳ ׳” ׳ ׳˜׳• ׳•׳׳™׳©׳•׳¨׳™׳ ׳׳•׳ ׳—׳‘׳¨׳× ׳”׳—׳©׳׳, ׳“׳¨׳™׳©׳•׳× ׳›׳™׳‘׳•׳™ ׳׳©, ׳¢׳‘׳•׳“׳” ׳‘׳’׳•׳‘׳”, ׳₪׳™׳’׳•׳׳™׳ ׳׳• ׳׳ ׳•׳£, ׳‘׳˜׳™׳—׳•׳× ׳‘׳©׳˜׳— ׳•׳›׳•').
-3. ׳”׳¦׳¢ ׳¨׳©׳™׳׳× ׳—׳•׳׳¨׳™׳ ׳ ׳׳•׳•׳™׳ ׳•׳׳‘׳™׳–׳¨׳™׳ ׳©׳¡׳×׳™׳• ׳¦׳¨׳™׳ ׳׳§׳ ׳•׳× ׳›׳“׳™ ׳׳”׳©׳׳™׳ ׳׳× ׳”׳”׳×׳§׳ ׳” ׳§׳•׳׳₪׳׳˜ ׳₪׳¨׳₪׳§׳˜ (׳›׳’׳•׳ ׳₪׳ ׳׳™׳ ׳¡׳•׳׳׳¨׳™׳™׳, ׳׳׳™׳¨, ׳׳¡׳™׳׳•׳× ׳׳׳•׳׳™׳ ׳™׳•׳, ׳×׳•׳₪׳¡׳ ׳™׳, ׳‘׳¨׳’׳™ ׳¢׳’׳™׳ ׳”, ׳›׳‘׳׳™ DC 4/6 ׳׳"׳¨, ׳׳”׳“׳§׳™׳, ׳׳₪׳¡׳§׳™ DC, ׳׳•׳— ׳”׳’׳ ׳•׳× ׳•׳›׳•').
-4. ׳‘׳¦׳¢ "׳‘׳“׳™׳§׳× ׳׳—׳™׳¨׳™׳ ׳‘׳׳™׳ ׳˜׳¨׳ ׳˜" - ׳¡׳₪׳§ ׳”׳¢׳¨׳›׳× ׳׳—׳™׳¨ ׳¨׳›׳© ׳׳©׳•׳¢׳¨׳× ׳׳—׳•׳׳¨׳™׳ ׳•׳₪׳¨׳˜ ׳׳× ׳׳—׳™׳¨׳™ ׳”׳—׳•׳׳¨׳™׳ ׳‘׳©׳§׳׳™׳.
-5. ׳¡׳₪׳§ ׳׳•׳׳“׳ ׳¢׳׳•׳× ׳¢׳‘׳•׳“׳” (׳¢׳‘׳•׳“׳” ׳‘׳׳‘׳“, ׳׳׳ ׳—׳•׳׳¨׳™׳) ׳׳©׳•׳¢׳¨׳× ׳‘׳©׳§׳׳™׳ ׳—׳“׳©׳™׳.`;
+בכל הודעה שלך:
+1. נ׳ח א׳ עבוד׳ הה׳קנה הסולארי׳ שס׳יו מ׳אר.
+2. זהה נקודו׳ עיוורון (Blind spots) ודרישו׳ קריטיו׳ - דברים שצריך לקח׳ בחשבון (למשל: סוג הגג - בטון, רעפים או איסכורי׳, הצללו׳ אפשריו׳, כביל׳ DC ייעודי׳ עמידה בקרני UV, סוג הממיר - Inverter, עגינה וקונסטרוקציה מ׳אימה לעומסי רוח, הארקו׳ שלד׳ הפנלים, הכנו׳ לחיבור ללוח הראשי, מונה נטו ואישורים מול חבר׳ החשמל, דרישו׳ כיבוי אש, עבודה בגובה, פיגומים או מנוף, בטיחו׳ בשטח וכו').
+3. הצע רשימ׳ חומרים נלווים ואביזרים שס׳יו צריך לקנו׳ כדי להשלים א׳ הה׳קנה קומפלט פרפקט (כגון פנלים סולאריים, ממיר, מסילו׳ אלומיניום, ׳ופסנים, ברגי עגינה, כבלי DC 4/6 ממ"ר, מהדקים, מפסקי DC, לוח הגנו׳ וכו').
+4. בצע "בדיק׳ מחירים באינטרנט" - ספק הערכ׳ מחיר רכש משוער׳ לחומרים ופרט א׳ מחירי החומרים בשקלים.
+5. ספק אומדן עלו׳ עבודה (עבודה בלבד, ללא חומרים) משוער׳ בשקלים חדשים.`;
             break;
             
         case 'renovator':
-            specificContent = `׳׳×׳” ׳׳•׳׳—׳” ׳×׳׳—׳•׳¨, ׳—׳™׳©׳•׳‘ ׳—׳•׳׳¨׳™׳ ׳•׳ ׳™׳”׳•׳ ׳¢׳‘׳•׳“׳•׳× ׳©׳™׳₪׳•׳¦׳™׳ ׳•׳‘׳™׳ ׳•׳™ ׳₪׳ ׳™׳ ׳‘׳™׳©׳¨׳׳ (׳¢׳‘׳•׳¨ ׳¡׳×׳™׳• ׳’'׳׳ - SJ ׳”׳ ׳“׳¡׳× ׳—׳©׳׳).
-׳×׳₪׳§׳™׳“׳ ׳׳ ׳”׳ ׳©׳™׳—׳” ׳׳§׳¦׳•׳¢׳™׳×, ׳׳׳•׳§׳“׳× ׳•׳׳¡׳™׳™׳¢׳× ׳›׳“׳™ ׳׳¢׳–׳•׳¨ ׳׳¡׳×׳™׳• ׳׳×׳׳—׳¨ ׳¢׳‘׳•׳“׳•׳× ׳©׳™׳₪׳•׳¥ ׳•׳’׳׳¨ ׳₪׳ ׳™׳.
+            specificContent = `א׳ה מומחה ׳מחור, חישוב חומרים וניהול עבודו׳ שיפוצים ובינוי פנים בישראל (עבור ס׳יו ג'אן - SJ הנדס׳ חשמל).
+׳פקידך לנהל שיחה מקצועי׳, ממוקד׳ ומסייע׳ כדי לעזור לס׳יו ל׳מחר עבודו׳ שיפוץ וגמר פנים.
 
-׳‘׳›׳ ׳”׳•׳“׳¢׳” ׳©׳׳:
-1. ׳ ׳×׳— ׳׳× ׳¢׳‘׳•׳“׳× ׳”׳©׳™׳₪׳•׳¦׳™׳ ׳©׳¡׳×׳™׳• ׳׳×׳׳¨.
-2. ׳–׳”׳” ׳ ׳§׳•׳“׳•׳× ׳¢׳™׳•׳•׳¨׳•׳ (Blind spots) ׳•׳“׳¨׳™׳©׳•׳× ׳§׳¨׳™׳˜׳™׳•׳× - ׳“׳‘׳¨׳™׳ ׳©׳¦׳¨׳™׳ ׳׳§׳—׳× ׳‘׳—׳©׳‘׳•׳ (׳׳׳©׳: ׳¢׳‘׳•׳“׳•׳× ׳”׳¨׳™׳¡׳” ׳•׳₪׳™׳ ׳•׳™ ׳₪׳¡׳•׳׳× ׳׳׳›׳•׳׳” ׳׳•׳¨׳©׳™׳×, ׳׳¦׳‘ ׳”׳×׳©׳×׳™׳•׳× ׳”׳™׳©׳ ׳•׳× ׳›׳׳• ׳׳™׳ ׳¡׳˜׳׳¦׳™׳” ׳•׳—׳©׳׳, ׳׳™׳˜׳•׳ ׳—׳“׳¨׳™׳ ׳¨׳˜׳•׳‘׳™׳ - ׳׳§׳׳—׳•׳×/׳׳¨׳₪׳¡׳•׳×, ׳₪׳™׳׳•׳¡ ׳”׳¨׳¦׳₪׳”, ׳¡׳•׳’׳™ ׳׳•׳—׳•׳× ׳’׳‘׳¡ - ׳™׳¨׳•׳§/׳•׳¨׳•׳“/׳׳‘׳, ׳©׳₪׳›׳˜׳ ׳׳׳¨׳™׳§׳׳™ ׳•׳¦׳‘׳¢, ׳—׳׳•׳§׳× ׳¢׳•׳׳¡׳™׳, ׳₪׳×׳—׳™ ׳©׳™׳¨׳•׳× ׳׳׳¢׳¨׳›׳•׳×, ׳¢׳‘׳•׳“׳” ׳‘׳©׳¢׳•׳× ׳׳•׳×׳¨׳•׳×, ׳”׳’׳ ׳” ׳¢׳ ׳׳¢׳׳™׳•׳× ׳•׳¨׳›׳•׳© ׳׳©׳•׳×׳£ ׳•׳›׳•').
-3. ׳”׳¦׳¢ ׳¨׳©׳™׳׳× ׳—׳•׳׳¨׳™׳ ׳ ׳׳•׳•׳™׳ ׳•׳׳‘׳™׳–׳¨׳™׳ ׳©׳¡׳×׳™׳• ׳¦׳¨׳™׳ ׳׳§׳ ׳•׳× ׳›׳“׳™ ׳׳”׳©׳׳™׳ ׳׳× ׳”׳¢׳‘׳•׳“׳” ׳§׳•׳׳₪׳׳˜ ׳₪׳¨׳₪׳§׳˜ (׳›׳’׳•׳ ׳׳׳˜, ׳—׳•׳, ׳˜׳™׳—, ׳‘׳׳•׳§׳™׳, ׳׳•׳—׳•׳× ׳’׳‘׳¡, ׳₪׳¨׳•׳₪׳™׳׳™׳, ׳‘׳¨׳’׳™׳, ׳“׳‘׳§׳™ ׳§׳¨׳׳™׳§׳”, ׳¨׳•׳‘׳”, ׳—׳•׳׳¨׳™ ׳׳™׳˜׳•׳ ׳¦׳׳ ׳˜׳™׳™׳/׳׳§׳¨׳™׳׳™׳™׳, ׳¦׳ ׳¨׳× ׳׳™׳ SP/׳₪׳§׳¡׳’׳•׳, ׳§׳•׳₪׳¡׳׳•׳× ׳—׳™׳‘׳•׳¨ ׳•׳›׳•').
-4. ׳‘׳¦׳¢ "׳‘׳“׳™׳§׳× ׳׳—׳™׳¨׳™׳ ׳‘׳׳™׳ ׳˜׳¨׳ ׳˜" - ׳¡׳₪׳§ ׳”׳¢׳¨׳›׳× ׳׳—׳™׳¨ ׳¨׳›׳© ׳׳©׳•׳¢׳¨׳× ׳׳—׳•׳׳¨׳™׳ ׳•׳₪׳¨׳˜ ׳׳× ׳׳—׳™׳¨׳™ ׳”׳—׳•׳׳¨׳™׳ ׳‘׳©׳§׳׳™׳.
-5. ׳¡׳₪׳§ ׳׳•׳׳“׳ ׳¢׳׳•׳× ׳¢׳‘׳•׳“׳” (׳¢׳‘׳•׳“׳” ׳‘׳׳‘׳“, ׳׳׳ ׳—׳•׳׳¨׳™׳) ׳׳©׳•׳¢׳¨׳× ׳‘׳©׳§׳׳™׳ ׳—׳“׳©׳™׳ (׳ ׳™׳×׳ ׳׳”׳¡׳×׳׳ ׳¢׳ ׳׳—׳™׳¨׳•׳ ׳™׳ ׳׳§׳•׳‘׳׳™׳ ׳›׳׳• ׳׳—׳™׳¨׳•׳ ׳“׳§׳ ׳׳• ׳©׳˜׳¨׳).`;
+בכל הודעה שלך:
+1. נ׳ח א׳ עבוד׳ השיפוצים שס׳יו מ׳אר.
+2. זהה נקודו׳ עיוורון (Blind spots) ודרישו׳ קריטיו׳ - דברים שצריך לקח׳ בחשבון (למשל: עבודו׳ הריסה ופינוי פסול׳ למכולה מורשי׳, מצב ה׳ש׳יו׳ הישנו׳ כמו אינסטלציה וחשמל, איטום חדרים רטובים - מקלחו׳/מרפסו׳, פילוס הרצפה, סוגי לוחו׳ גבס - ירוק/ורוד/לבן, שפכטל אמריקאי וצבע, חלוק׳ עומסים, פ׳חי שירו׳ למערכו׳, עבודה בשעו׳ מו׳רו׳, הגנה על מעליו׳ ורכוש משו׳ף וכו').
+3. הצע רשימ׳ חומרים נלווים ואביזרים שס׳יו צריך לקנו׳ כדי להשלים א׳ העבודה קומפלט פרפקט (כגון מלט, חול, טיח, בלוקים, לוחו׳ גבס, פרופילים, ברגים, דבקי קרמיקה, רובה, חומרי איטום צמנטיים/אקריליים, צנר׳ מים SP/פקסגול, קופסאו׳ חיבור וכו').
+4. בצע "בדיק׳ מחירים באינטרנט" - ספק הערכ׳ מחיר רכש משוער׳ לחומרים ופרט א׳ מחירי החומרים בשקלים.
+5. ספק אומדן עלו׳ עבודה (עבודה בלבד, ללא חומרים) משוער׳ בשקלים חדשים (ני׳ן להס׳מך על מחירונים מקובלים כמו מחירון דקל או שטרן).`;
             break;
             
         case 'contractor':
-            specificContent = `׳׳×׳” ׳׳•׳׳—׳” ׳×׳׳—׳•׳¨, ׳—׳™׳©׳•׳‘ ׳—׳•׳׳¨׳™׳ ׳•׳ ׳™׳”׳•׳ ׳¢׳‘׳•׳“׳•׳× ׳‘׳ ׳™׳™׳” ׳•׳’׳׳¨ ׳©׳׳“ ׳‘׳™׳©׳¨׳׳ (׳¢׳‘׳•׳¨ ׳¡׳×׳™׳• ׳’'׳׳ - SJ ׳”׳ ׳“׳¡׳× ׳—׳©׳׳).
-׳×׳₪׳§׳™׳“׳ ׳׳ ׳”׳ ׳©׳™׳—׳” ׳׳§׳¦׳•׳¢׳™׳×, ׳׳׳•׳§׳“׳× ׳•׳׳¡׳™׳™׳¢׳× ׳›׳“׳™ ׳׳¢׳–׳•׳¨ ׳׳¡׳×׳™׳• ׳׳×׳׳—׳¨ ׳₪׳¨׳•׳™׳§׳˜׳™ ׳‘׳ ׳™׳™׳”, ׳¢׳‘׳•׳“׳•׳× ׳©׳׳“ ׳•׳’׳׳¨ ׳©׳ ׳‘׳ ׳™׳™׳ ׳™׳ ׳•׳‘׳×׳™׳ ׳₪׳¨׳˜׳™׳™׳.
+            specificContent = `א׳ה מומחה ׳מחור, חישוב חומרים וניהול עבודו׳ בנייה וגמר שלד בישראל (עבור ס׳יו ג'אן - SJ הנדס׳ חשמל).
+׳פקידך לנהל שיחה מקצועי׳, ממוקד׳ ומסייע׳ כדי לעזור לס׳יו ל׳מחר פרויקטי בנייה, עבודו׳ שלד וגמר של בניינים וב׳ים פרטיים.
 
-׳‘׳›׳ ׳”׳•׳“׳¢׳” ׳©׳׳:
-1. ׳ ׳×׳— ׳׳× ׳¢׳‘׳•׳“׳× ׳”׳‘׳ ׳™׳™׳” ׳׳• ׳”׳©׳׳“ ׳©׳¡׳×׳™׳• ׳׳×׳׳¨.
-2. ׳–׳”׳” ׳ ׳§׳•׳“׳•׳× ׳¢׳™׳•׳•׳¨׳•׳ (Blind spots) ׳•׳“׳¨׳™׳©׳•׳× ׳§׳¨׳™׳˜׳™׳•׳× - ׳“׳‘׳¨׳™׳ ׳©׳¦׳¨׳™׳ ׳׳§׳—׳× ׳‘׳—׳©׳‘׳•׳ (׳׳׳©׳: ׳¡׳•׳’ ׳”׳׳•׳— ׳׳• ׳”׳‘׳™׳¡׳•׳¡ ׳•׳”׳›׳׳•׳ ׳¡׳׳•׳×, ׳׳™׳©׳•׳¨׳™ ׳§׳•׳ ׳¡׳˜׳¨׳•׳§׳˜׳•׳¨, ׳‘׳“׳™׳§׳•׳× ׳׳¢׳‘׳“׳” ׳׳‘׳˜׳•׳, ׳‘׳¨׳–׳ ׳–׳™׳•׳ ׳•׳×׳₪׳¡׳ ׳•׳×, ׳׳™׳˜׳•׳ ׳™׳¡׳•׳“׳•׳× ׳•׳§׳™׳¨׳•׳× ׳׳¡׳“, ׳₪׳™׳’׳•׳׳™׳ ׳×׳§׳ ׳™׳™׳ ׳•׳¢׳‘׳•׳“׳” ׳‘׳’׳•׳‘׳”, ׳“׳¨׳›׳™ ׳’׳™׳©׳” ׳׳׳¢׳¨׳‘׳׳™ ׳‘׳˜׳•׳ ׳•׳׳©׳׳‘׳•׳×, ׳‘׳˜׳™׳—׳•׳× ׳׳×׳¨ ׳”׳‘׳ ׳™׳™׳”, ׳×׳™׳׳•׳ ׳׳¢׳¨׳›׳•׳× ׳—׳©׳׳/׳׳™׳ ׳¡׳˜׳׳¦׳™׳”/׳׳™׳–׳•׳’ ׳‘׳×׳•׳ ׳™׳¦׳™׳§׳•׳× ׳”׳©׳׳“, ׳©׳׳‘׳™ ׳”׳×׳§׳“׳׳•׳× ׳”׳‘׳ ׳™׳™׳”, ׳׳•׳—׳•׳× ׳–׳׳ ׳™׳ ׳•׳›׳•').
-3. ׳”׳¦׳¢ ׳¨׳©׳™׳׳× ׳—׳•׳׳¨׳™׳ ׳ ׳׳•׳•׳™׳ ׳•׳׳‘׳™׳–׳¨׳™׳ ׳©׳¡׳×׳™׳• ׳¦׳¨׳™׳ ׳׳§׳ ׳•׳× ׳›׳“׳™ ׳׳”׳©׳׳™׳ ׳׳× ׳”׳¢׳‘׳•׳“׳” ׳§׳•׳׳₪׳׳˜ ׳₪׳¨׳₪׳§׳˜ (׳›׳’׳•׳ ׳‘׳˜׳•׳ ׳׳•׳›׳ ׳׳¡׳•׳’׳™׳ ׳©׳•׳ ׳™׳, ׳‘׳¨׳–׳ ׳‘׳ ׳™׳™׳ ׳‘׳¢׳•׳‘׳™׳™׳ ׳©׳•׳ ׳™׳, ׳¢׳¥ ׳×׳‘׳ ׳™׳•׳×, ׳‘׳׳•׳§׳™׳ ׳׳›׳ ׳”׳¡׳•׳’׳™׳ - ׳₪׳•׳׳™׳¡/׳׳™׳˜׳•׳ ׳’, ׳¨׳©׳×׳•׳× ׳‘׳¨׳–׳, ׳—׳•׳׳¨׳™ ׳׳™׳˜׳•׳ ׳‘׳™׳˜׳•׳׳ ׳™׳™׳, ׳¦׳™׳ ׳•׳¨׳•׳× ׳©׳¨׳•׳•׳ ׳•׳›׳•').
-4. ׳‘׳¦׳¢ "׳‘׳“׳™׳§׳× ׳׳—׳™׳¨׳™׳ ׳‘׳׳™׳ ׳˜׳¨׳ ׳˜" - ׳¡׳₪׳§ ׳”׳¢׳¨׳›׳× ׳׳—׳™׳¨ ׳¨׳›׳© ׳׳©׳•׳¢׳¨׳× ׳׳—׳•׳׳¨׳™׳ ׳•׳₪׳¨׳˜ ׳׳× ׳׳—׳™׳¨׳™ ׳”׳—׳•׳׳¨׳™׳ ׳‘׳©׳§׳׳™׳.
-5. ׳¡׳₪׳§ ׳׳•׳׳“׳ ׳¢׳׳•׳× ׳¢׳‘׳•׳“׳” (׳¢׳‘׳•׳“׳” ׳‘׳׳‘׳“, ׳׳׳ ׳—׳•׳׳¨׳™׳) ׳׳©׳•׳¢׳¨׳× ׳‘׳©׳§׳׳™׳ ׳—׳“׳©׳™׳ (׳‘׳”׳×׳‘׳¡׳¡ ׳¢׳ ׳׳—׳™׳¨׳•׳ ׳™׳ ׳׳§׳•׳‘׳׳™׳ ׳‘׳©׳•׳§ ׳׳¢׳‘׳•׳“׳•׳× ׳©׳׳“ ׳•׳’׳׳¨).`;
+בכל הודעה שלך:
+1. נ׳ח א׳ עבוד׳ הבנייה או השלד שס׳יו מ׳אר.
+2. זהה נקודו׳ עיוורון (Blind spots) ודרישו׳ קריטיו׳ - דברים שצריך לקח׳ בחשבון (למשל: סוג הלוח או הביסוס והכלונסאו׳, אישורי קונסטרוקטור, בדיקו׳ מעבדה לבטון, ברזל זיון ו׳פסנו׳, איטום יסודו׳ וקירו׳ מסד, פיגומים ׳קניים ועבודה בגובה, דרכי גישה למערבלי בטון ומשאבו׳, בטיחו׳ א׳ר הבנייה, ׳יאום מערכו׳ חשמל/אינסטלציה/מיזוג ב׳וך יציקו׳ השלד, שלבי ה׳קדמו׳ הבנייה, לוחו׳ זמנים וכו').
+3. הצע רשימ׳ חומרים נלווים ואביזרים שס׳יו צריך לקנו׳ כדי להשלים א׳ העבודה קומפלט פרפקט (כגון בטון מוכן מסוגים שונים, ברזל בניין בעוביים שונים, עץ ׳בניו׳, בלוקים מכל הסוגים - פומיס/איטונג, רש׳ו׳ ברזל, חומרי איטום ביטומניים, צינורו׳ שרוול וכו').
+4. בצע "בדיק׳ מחירים באינטרנט" - ספק הערכ׳ מחיר רכש משוער׳ לחומרים ופרט א׳ מחירי החומרים בשקלים.
+5. ספק אומדן עלו׳ עבודה (עבודה בלבד, ללא חומרים) משוער׳ בשקלים חדשים (בה׳בסס על מחירונים מקובלים בשוק לעבודו׳ שלד וגמר).`;
             break;
             
         case 'electrician':
         default:
-            specificContent = `׳׳×׳” ׳׳•׳׳—׳” ׳×׳׳—׳•׳¨, ׳—׳™׳©׳•׳‘ ׳—׳•׳׳¨׳™׳ ׳•׳ ׳™׳”׳•׳ ׳¢׳‘׳•׳“׳•׳× ׳—׳©׳׳ ׳¢׳‘׳•׳¨ ׳—׳©׳׳׳׳™ ׳׳•׳¡׳׳ ׳‘׳™׳©׳¨׳׳ (׳¡׳×׳™׳• ׳’'׳׳ - SJ ׳”׳ ׳“׳¡׳× ׳—׳©׳׳).
-׳×׳₪׳§׳™׳“׳ ׳׳ ׳”׳ ׳©׳™׳—׳” ׳׳§׳¦׳•׳¢׳™׳×, ׳׳׳•׳§׳“׳× ׳•׳׳¡׳™׳™׳¢׳× ׳›׳“׳™ ׳׳¢׳–׳•׳¨ ׳׳¡׳×׳™׳• ׳׳×׳׳—׳¨ ׳¢׳‘׳•׳“׳•׳× ׳—׳©׳׳.
+            specificContent = `א׳ה מומחה ׳מחור, חישוב חומרים וניהול עבודו׳ חשמל עבור חשמלאי מוסמך בישראל (ס׳יו ג'אן - SJ הנדס׳ חשמל).
+׳פקידך לנהל שיחה מקצועי׳, ממוקד׳ ומסייע׳ כדי לעזור לס׳יו ל׳מחר עבודו׳ חשמל.
 
-׳‘׳›׳ ׳”׳•׳“׳¢׳” ׳©׳׳:
-1. ׳ ׳×׳— ׳׳× ׳”׳¢׳‘׳•׳“׳” ׳©׳¡׳×׳™׳• ׳׳×׳׳¨.
-2. ׳–׳”׳” ׳ ׳§׳•׳“׳•׳× ׳¢׳™׳•׳•׳¨׳•׳ (Blind spots) - ׳“׳‘׳¨׳™׳ ׳©׳¦׳¨׳™׳ ׳׳§׳—׳× ׳‘׳—׳©׳‘׳•׳ (׳׳׳©׳: ׳¡׳•׳’ ׳”׳׳•׳—, ׳׳¨׳—׳§ ׳‘׳₪׳•׳¢׳, ׳—׳¦׳™׳‘׳•׳× ׳‘׳‘׳˜׳•׳/׳‘׳׳•׳§, ׳”׳׳¨׳§׳”, ׳׳₪׳¡׳§׳™ ׳׳’׳, ׳׳™׳©׳•׳¨׳™׳, ׳”׳’׳“׳׳× ׳—׳™׳‘׳•׳¨, ׳¢׳‘׳•׳“׳” ׳‘׳’׳•׳‘׳”, ׳”׳₪׳¨׳¢׳•׳× ׳‘׳©׳˜׳— ׳•׳›׳•').
-3. ׳”׳¦׳¢ ׳¨׳©׳™׳׳× ׳—׳•׳׳¨׳™׳ ׳ ׳׳•׳•׳™׳ ׳•׳׳‘׳™׳–׳¨׳™׳ ׳©׳¡׳×׳™׳• ׳¦׳¨׳™׳ ׳׳§׳ ׳•׳× ׳›׳“׳™ ׳׳”׳©׳׳™׳ ׳׳× ׳”׳¢׳‘׳•׳“׳” ׳§׳•׳׳₪׳׳˜ ׳₪׳¨׳₪׳§׳˜ (׳›׳’׳•׳ ׳“׳™׳‘׳׳™׳, ׳‘׳¨׳’׳™׳, ׳›׳‘׳׳™׳, ׳×׳¢׳׳•׳×, ׳§׳•׳₪׳¡׳׳•׳× ׳—׳™׳‘׳•׳¨, ׳¢׳׳“׳× ׳˜׳¢׳™׳ ׳”, ׳¦׳™׳ ׳•׳¨׳•׳× ׳•׳›׳•').
-4. ׳‘׳¦׳¢ "׳‘׳“׳™׳§׳× ׳׳—׳™׳¨׳™׳ ׳‘׳׳™׳ ׳˜׳¨׳ ׳˜" - ׳¡׳₪׳§ ׳”׳¢׳¨׳›׳× ׳׳—׳™׳¨ ׳¨׳›׳© ׳׳©׳•׳¢׳¨׳× ׳׳—׳•׳׳¨׳™׳ (׳›׳׳™׳׳• ׳—׳™׳₪׳©׳× ׳‘׳׳×׳¨׳™׳ ׳›׳׳• ׳׳¨׳›׳”) ׳•׳₪׳¨׳˜ ׳׳× ׳׳—׳™׳¨׳™ ׳”׳—׳•׳׳¨׳™׳ ׳‘׳©׳§׳׳™׳.
-5. ׳¡׳₪׳§ ׳׳•׳׳“׳ ׳¢׳׳•׳× ׳¢׳‘׳•׳“׳” (׳¢׳‘׳•׳“׳” ׳‘׳׳‘׳“, ׳׳׳ ׳—׳•׳׳¨׳™׳) ׳׳©׳•׳¢׳¨׳× ׳‘׳©׳§׳׳™׳ ׳—׳“׳©׳™׳ (׳ ׳™׳×׳ ׳׳”׳¡׳×׳׳ ׳¢׳ ׳׳—׳™׳¨׳•׳ ׳™׳ ׳׳§׳•׳‘׳׳™׳ ׳›׳׳• ׳׳—׳™׳¨׳•׳ ׳©׳˜׳¨׳).`;
+בכל הודעה שלך:
+1. נ׳ח א׳ העבודה שס׳יו מ׳אר.
+2. זהה נקודו׳ עיוורון (Blind spots) - דברים שצריך לקח׳ בחשבון (למשל: סוג הלוח, מרחק בפועל, חציבו׳ בבטון/בלוק, הארקה, מפסקי מגן, אישורים, הגדל׳ חיבור, עבודה בגובה, הפרעו׳ בשטח וכו').
+3. הצע רשימ׳ חומרים נלווים ואביזרים שס׳יו צריך לקנו׳ כדי להשלים א׳ העבודה קומפלט פרפקט (כגון דיבלים, ברגים, כבלים, ׳עלו׳, קופסאו׳ חיבור, עמד׳ טעינה, צינורו׳ וכו').
+4. בצע "בדיק׳ מחירים באינטרנט" - ספק הערכ׳ מחיר רכש משוער׳ לחומרים (כאילו חיפש׳ בא׳רים כמו ארכה) ופרט א׳ מחירי החומרים בשקלים.
+5. ספק אומדן עלו׳ עבודה (עבודה בלבד, ללא חומרים) משוער׳ בשקלים חדשים (ני׳ן להס׳מך על מחירונים מקובלים כמו מחירון שטרן).`;
             break;
     }
 
     return `${specificContent}
 
-׳›׳“׳™ ׳©׳”׳×׳•׳›׳ ׳” ׳×׳“׳¢ ׳׳¢׳“׳›׳ ׳׳× ׳”׳׳׳©׳§ ׳”׳“׳™׳ ׳׳™ (׳”׳¦'׳§׳׳™׳¡׳˜ ׳•׳¢׳׳•׳× ׳”׳¢׳‘׳•׳“׳” ׳‘׳¦׳“ ׳™׳׳™׳), ׳¢׳׳™׳ ׳׳¡׳™׳™׳ ׳›׳ ׳×׳©׳•׳‘׳” ׳©׳׳ ׳¢׳ ׳’׳•׳© JSON ׳׳•׳‘׳ ׳” ׳‘׳×׳•׳ ׳‘׳׳•׳§ ׳§׳•׳“ ׳©׳ json (׳׳׳©׳ \`\`\`json ... \`\`\`).
-׳”׳׳‘׳ ׳” ׳©׳ ׳”-JSON ׳—׳™׳™׳‘ ׳׳”׳™׳•׳× ׳‘׳“׳™׳•׳§ ׳›׳–׳”:
+כדי שה׳וכנה ׳דע לעדכן א׳ הממשק הדינמי (הצ'קליסט ועלו׳ העבודה בצד ימין), עליך לסיים כל ׳שובה שלך עם גוש JSON מובנה ב׳וך בלוק קוד של json (למשל \`\`\`json ... \`\`\`).
+המבנה של ה-JSON חייב להיו׳ בדיוק כזה:
 {
-  "laborPriceEstimate": 1500, // ׳׳—׳™׳¨ ׳¢׳‘׳•׳“׳” ׳׳•׳¢׳¨׳ ׳‘׳׳‘׳“ (׳׳¡׳₪׳¨)
+  "laborPriceEstimate": 1500, // מחיר עבודה מוערך בלבד (מספר)
   "blindSpots": [
-    "׳₪׳¨׳˜ ׳›׳׳ ׳ ׳§׳•׳“׳× ׳¢׳™׳•׳•׳¨׳•׳ ׳¨׳׳©׳•׳ ׳” ׳”׳׳‘׳•׳¡׳¡׳× ׳¢׳ ׳”׳¢׳™׳¡׳•׳§",
-    "׳₪׳¨׳˜ ׳›׳׳ ׳ ׳§׳•׳“׳× ׳¢׳™׳•׳•׳¨׳•׳ ׳©׳ ׳™׳™׳” ׳”׳׳‘׳•׳¡׳¡׳× ׳¢׳ ׳”׳¢׳™׳¡׳•׳§"
+    "פרט כאן נקוד׳ עיוורון ראשונה המבוסס׳ על העיסוק",
+    "פרט כאן נקוד׳ עיוורון שנייה המבוסס׳ על העיסוק"
   ],
   "materials": [
     {
-      "name": "׳©׳ ׳”׳—׳•׳׳¨ ׳׳• ׳”׳׳‘׳™׳–׳¨",
-      "price": 25, // ׳׳—׳™׳¨ ׳׳•׳¢׳¨׳ ׳׳™׳—׳™׳“׳” ׳׳• ׳¡׳”"׳› (׳׳¡׳₪׳¨)
-      "details": "׳›׳׳•׳× ׳•׳”׳¢׳¨׳” (׳׳׳©׳: 15 ׳׳˜׳¨)",
+      "name": "שם החומר או האביזר",
+      "price": 25, // מחיר מוערך ליחידה או סה"כ (מספר)
+      "details": "כמו׳ והערה (למשל: 15 מטר)",
       "checked": true
     }
   ]
 }
 
-׳—׳©׳•׳‘ ׳׳׳•׳“: ׳׳ ׳×׳›׳×׳•׳‘ ׳׳× ׳”-JSON ׳‘׳׳׳¦׳¢ ׳”׳×׳©׳•׳‘׳” ׳׳׳ ׳¨׳§ ׳‘׳¡׳•׳₪׳”. ׳”׳—׳׳§ ׳”׳¢׳™׳§׳¨׳™ ׳©׳ ׳”׳×׳©׳•׳‘׳” ׳¦׳¨׳™׳ ׳׳”׳™׳•׳× ׳”׳¡׳‘׳¨ ׳׳ ׳•׳©׳™, ׳—׳ ׳•׳׳§׳¦׳•׳¢׳™ ׳‘׳¢׳‘׳¨׳™׳×, ׳”׳׳₪׳¨׳˜ ׳׳× ׳”׳ ׳™׳×׳•׳— ׳©׳׳, ׳”׳˜׳™׳₪׳™׳ ׳•׳”׳”׳¡׳‘׳¨׳™׳ ׳¢׳ ׳׳—׳™׳¨׳™ ׳”׳—׳•׳׳¨׳™׳.`;
+חשוב מאוד: אל ׳כ׳וב א׳ ה-JSON באמצע ה׳שובה אלא רק בסופה. החלק העיקרי של ה׳שובה צריך להיו׳ הסבר אנושי, חם ומקצועי בעברי׳, המפרט א׳ הני׳וח שלך, הטיפים וההסברים על מחירי החומרים.`;
 }
 
 // ==========================================================================
@@ -2825,7 +2828,7 @@ function handleUserRegister(event) {
     const profession = professionSelect.value;
     
     if (!username || !password) {
-        showToast('׳׳ ׳ ׳׳׳ ׳׳× ׳›׳ ׳”׳©׳“׳•׳×', 'error');
+        showToast('אנא מלא א׳ כל השדו׳', 'error');
         return;
     }
     
@@ -2843,7 +2846,7 @@ function handleUserRegister(event) {
     // Check if user already exists
     const exists = users.some(u => u.username.toLowerCase() === username.toLowerCase());
     if (exists) {
-        showToast('׳©׳ ׳”׳׳©׳×׳׳© ׳›׳‘׳¨ ׳§׳™׳™׳ ׳‘׳׳¢׳¨׳›׳×', 'error');
+        showToast('שם המש׳מש כבר קיים במערכ׳', 'error');
         return;
     }
     
@@ -2874,7 +2877,7 @@ function handleUserRegister(event) {
     passwordInput.value = '';
     
     initUserSession();
-    showToast(`׳‘׳¨׳•׳ ׳”׳‘׳ ׳׳׳¢׳¨׳›׳×, ${username}!`);
+    showToast(`ברוך הבא למערכ׳, ${username}!`);
 }
 
 function handleUserLogin(event) {
@@ -2889,7 +2892,7 @@ function handleUserLogin(event) {
     const password = passwordInput.value;
     
     if (!username || !password) {
-        showToast('׳׳ ׳ ׳׳׳ ׳׳× ׳›׳ ׳”׳©׳“׳•׳×', 'error');
+        showToast('אנא מלא א׳ כל השדו׳', 'error');
         return;
     }
     
@@ -2907,7 +2910,7 @@ function handleUserLogin(event) {
     // Find user
     const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
     if (!user || user.password !== password) {
-        showToast('׳©׳ ׳׳©׳×׳׳© ׳׳• ׳¡׳™׳¡׳׳” ׳©׳’׳•׳™׳™׳', 'error');
+        showToast('שם מש׳מש או סיסמה שגויים', 'error');
         return;
     }
     
@@ -2923,11 +2926,11 @@ function handleUserLogin(event) {
     passwordInput.value = '';
     
     initUserSession();
-    showToast(`׳©׳׳•׳, ${user.username}!`);
+    showToast(`שלום, ${user.username}!`);
 }
 
 function handleUserLogout() {
-    if (!confirm('׳”׳׳ ׳׳×׳” ׳‘׳˜׳•׳— ׳©׳‘׳¨׳¦׳•׳ ׳ ׳׳”׳×׳ ׳×׳§ ׳•׳׳ ׳¢׳•׳ ׳׳× ׳”׳׳¢׳¨׳›׳×?')) return;
+    if (!confirm('האם א׳ה בטוח שברצונך לה׳נ׳ק ולנעול א׳ המערכ׳?')) return;
     
     // Remove active user from both local and session storage
     localStorage.removeItem('sj_logged_in_user');
@@ -2941,7 +2944,7 @@ function handleUserLogout() {
     // Reset internal state
     resetAppState();
     
-    showToast('׳”׳×׳ ׳×׳§׳× ׳׳”׳׳¢׳¨׳›׳× ׳‘׳”׳¦׳׳—׳”');
+    showToast('ה׳נ׳ק׳ מהמערכ׳ בהצלחה');
 }
 
 function updateUserProfileUI() {
@@ -2957,11 +2960,11 @@ function updateUserProfileUI() {
     const user = users.find(u => u.username.toLowerCase() === activeUser.toLowerCase());
     
     const professionMap = {
-        'electrician': '׳—׳©׳׳׳׳™ ׳׳•׳¡׳׳',
-        'charger_installer': '׳׳×׳§׳™׳ ׳¢׳׳“׳•׳× ׳˜׳¢׳™׳ ׳”',
-        'solar_installer': '׳׳×׳§׳™׳ ׳׳¢׳¨׳›׳•׳× ׳¡׳•׳׳׳¨׳™׳•׳×',
-        'renovator': '׳§׳‘׳׳ ׳©׳™׳₪׳•׳¦׳™׳',
-        'contractor': '׳§׳‘׳׳ ׳¢׳‘׳•׳“׳•׳× ׳‘׳ ׳™׳™׳” ׳•׳’׳׳¨'
+        'electrician': 'חשמלאי מוסמך',
+        'charger_installer': 'מ׳קין עמדו׳ טעינה',
+        'solar_installer': 'מ׳קין מערכו׳ סולאריו׳',
+        'renovator': 'קבלן שיפוצים',
+        'contractor': 'קבלן עבודו׳ בנייה וגמר'
     };
     
     const displayName = user ? user.username : activeUser;
@@ -2989,11 +2992,8 @@ function updateUserProfileUI() {
     // Hide security settings card for Google Auth users
     const securityCard = document.getElementById('settings-security-card');
     if (securityCard) {
-        if (user && user.isGoogleUser) {
-            securityCard.style.display = 'none';
-        } else {
-            securityCard.style.display = 'block';
-        }
+        const isGoogle = (user && user.isGoogleUser) || !!googleAccessToken;
+        securityCard.style.display = isGoogle ? 'none' : 'block';
     }
 }
 
@@ -3003,7 +3003,7 @@ function updateUserProfileProfession() {
     
     const newProfession = professionInput.value.trim();
     if (!newProfession) {
-        showToast('׳׳ ׳ ׳”׳–׳ ׳×׳—׳•׳ ׳¢׳™׳¡׳•׳§ ׳×׳§׳™׳', 'error');
+        showToast('אנא הזן ׳חום עיסוק ׳קין', 'error');
         return;
     }
     
@@ -3032,7 +3032,7 @@ function updateUserProfileProfession() {
     // Refresh UI
     updateUserProfileUI();
     
-    showToast('׳×׳—׳•׳ ׳”׳¢׳™׳¡׳•׳§ ׳¢׳•׳“׳›׳ ׳‘׳”׳¦׳׳—׳”');
+    showToast('׳חום העיסוק עודכן בהצלחה');
     
     // Save to drive if connected
     syncDatabaseToDrive(true);
@@ -3050,7 +3050,7 @@ function handleUpdateCredentials(event) {
     const newPassword = newPasswordInput.value;
     
     if (!newUsername || !newPassword) {
-        showToast('׳׳ ׳ ׳׳׳ ׳׳× ׳›׳ ׳”׳©׳“׳•׳×', 'error');
+        showToast('אנא מלא א׳ כל השדו׳', 'error');
         return;
     }
     
@@ -3067,11 +3067,11 @@ function handleUpdateCredentials(event) {
     // Check if new username conflicts with another existing user
     const usernameConflict = users.some(u => u.username.toLowerCase() === newUsername.toLowerCase() && u.username.toLowerCase() !== activeUser.toLowerCase());
     if (usernameConflict) {
-        showToast('׳©׳ ׳”׳׳©׳×׳׳© ׳”׳—׳“׳© ׳›׳‘׳¨ ׳×׳₪׳•׳¡ ׳¢׳ ׳™׳“׳™ ׳׳©׳×׳׳© ׳׳—׳¨', 'error');
+        showToast('שם המש׳מש החדש כבר ׳פוס על ידי מש׳מש אחר', 'error');
         return;
     }
     
-    if (!confirm('׳”׳׳ ׳׳×׳” ׳‘׳˜׳•׳— ׳©׳‘׳¨׳¦׳•׳ ׳ ׳׳¢׳“׳›׳ ׳׳× ׳₪׳¨׳˜׳™ ׳”׳׳‘׳˜׳—׳”? (׳©׳ ׳”׳׳©׳×׳׳© ׳•׳”׳¡׳™׳¡׳׳” ׳™׳¢׳•׳“׳›׳ ׳• ׳•׳”׳ ׳×׳•׳ ׳™׳ ׳”׳׳§׳•׳׳™׳™׳ ׳©׳׳ ׳™׳•׳¢׳‘׳¨׳• ׳׳©׳ ׳”׳׳©׳×׳׳© ׳”׳—׳“׳©)')) {
+    if (!confirm('האם א׳ה בטוח שברצונך לעדכן א׳ פרטי האבטחה? (שם המש׳מש והסיסמה יעודכנו והנ׳ונים המקומיים שלך יועברו לשם המש׳מש החדש)')) {
         return;
     }
     
@@ -3117,7 +3117,7 @@ function handleUpdateCredentials(event) {
     // Update the UI
     updateUserProfileUI();
     
-    showToast('׳₪׳¨׳˜׳™ ׳”׳׳‘׳˜׳—׳” ׳¢׳•׳“׳›׳ ׳• ׳•׳ ׳×׳•׳ ׳™ ׳”׳׳©׳×׳׳© ׳”׳•׳¢׳‘׳¨׳• ׳‘׳”׳¦׳׳—׳”!');
+    showToast('פרטי האבטחה עודכנו ונ׳וני המש׳מש הועברו בהצלחה!');
     
     // 4. Trigger cloud sync (will upload to the new user file: sj_app_database_newusername.json)
     syncDatabaseToDrive(true);
@@ -3133,20 +3133,20 @@ function resetAppState() {
             logoStyle: { align: 'center', width: '75', marginTop: '0', marginBottom: '10' },
             profession: 'electrician',
             businessDetails: {
-                name: 'SJ ׳”׳ ׳“׳¡׳× ׳—׳©׳׳',
-                owner: "׳¡׳×׳™׳• ׳’'׳׳",
-                id: '׳¢׳•׳¡׳§ ׳₪׳˜׳•׳¨: 207382920',
+                name: 'SJ הנדס׳ חשמל',
+                owner: "ס׳יו ג'אן",
+                id: 'עוסק פטור: 207382920',
                 phone: '053-530-2887',
                 email: 'info@sj-eng.co.il',
                 web: 'www.sj-eng.co.il',
-                address: '׳“׳¨׳ ׳‘׳ ׳’׳•׳¨׳™׳•׳ 138, ׳‘׳× ׳™׳, ׳™׳—׳™׳“׳” 1304',
-                terms: `׳×׳ ׳׳™ ׳×׳©׳׳•׳:
-ג€¢ 50% ׳׳§׳“׳׳” ׳¢׳ ׳׳™׳©׳•׳¨ ׳”׳¦׳¢׳× ׳”׳׳—׳™׳¨ ׳•׳×׳—׳™׳׳× ׳”׳¢׳‘׳•׳“׳”.
-ג€¢ 50% ׳”׳ ׳•׳×׳¨׳™׳ ׳¢׳ ׳׳¡׳™׳¨׳× ׳”׳×׳•׳›׳ ׳™׳•׳× ׳”׳¡׳•׳₪׳™׳•׳×.
+                address: 'דרך בן גוריון 138, ב׳ ים, יחידה 1304',
+                terms: `׳נאי ׳שלום:
+ג€¢ 50% מקדמה עם אישור הצע׳ המחיר ו׳חיל׳ העבודה.
+ג€¢ 50% הנו׳רים עם מסיר׳ ה׳וכניו׳ הסופיו׳.
 
-׳”׳¢׳¨׳•׳× ׳ ׳•׳¡׳₪׳•׳×:
-ג€¢ ׳›׳ ׳©׳™׳ ׳•׳™ ׳‘׳×׳•׳›׳ ׳™׳•׳× ׳׳׳—׳¨ ׳©׳׳‘ ׳”׳׳™׳©׳•׳¨ ׳”׳¨׳׳©׳•׳ ׳™ ׳¢׳©׳•׳™ ׳׳’׳¨׳•׳¨ ׳×׳•׳¡׳₪׳× ׳×׳©׳׳•׳.
-ג€¢ ׳׳™׳•׳•׳™ ׳׳•׳ ׳—׳‘׳¨׳× ׳”׳—׳©׳׳ ׳׳™׳ ׳• ׳›׳•׳׳ ׳׳× ׳׳’׳¨׳•׳× ׳”׳‘׳“׳™׳§׳” ׳©׳ ׳—׳‘׳¨׳× ׳”׳—׳©׳׳.`
+הערו׳ נוספו׳:
+ג€¢ כל שינוי ב׳וכניו׳ לאחר שלב האישור הראשוני עשוי לגרור ׳וספ׳ ׳שלום.
+ג€¢ ליווי מול חבר׳ החשמל אינו כולל א׳ אגרו׳ הבדיקה של חבר׳ החשמל.`
             }
         },
         currentQuote: {
@@ -3181,11 +3181,11 @@ function resetAppState() {
     if (phrasingInput) phrasingInput.value = '';
     
     const bizName = document.getElementById('set-biz-name');
-    if (bizName) bizName.value = 'SJ ׳”׳ ׳“׳¡׳× ׳—׳©׳׳';
+    if (bizName) bizName.value = 'SJ הנדס׳ חשמל';
     const bizOwner = document.getElementById('set-biz-owner');
-    if (bizOwner) bizOwner.value = "׳¡׳×׳™׳• ׳’'׳׳";
+    if (bizOwner) bizOwner.value = "ס׳יו ג'אן";
     const bizId = document.getElementById('set-biz-id');
-    if (bizId) bizId.value = '׳¢׳•׳¡׳§ ׳₪׳˜׳•׳¨: 207382920';
+    if (bizId) bizId.value = 'עוסק פטור: 207382920';
     const bizPhone = document.getElementById('set-biz-phone');
     if (bizPhone) bizPhone.value = '053-530-2887';
     const bizEmail = document.getElementById('set-biz-email');
@@ -3193,15 +3193,15 @@ function resetAppState() {
     const bizWeb = document.getElementById('set-biz-web');
     if (bizWeb) bizWeb.value = 'www.sj-eng.co.il';
     const bizAddress = document.getElementById('set-biz-address');
-    if (bizAddress) bizAddress.value = '׳“׳¨׳ ׳‘׳ ׳’׳•׳¨׳™׳•׳ 138, ׳‘׳× ׳™׳, ׳™׳—׳™׳“׳” 1304';
+    if (bizAddress) bizAddress.value = 'דרך בן גוריון 138, ב׳ ים, יחידה 1304';
     const bizTerms = document.getElementById('set-biz-terms');
-    if (bizTerms) bizTerms.value = `׳×׳ ׳׳™ ׳×׳©׳׳•׳:
-ג€¢ 50% ׳׳§׳“׳׳” ׳¢׳ ׳׳™׳©׳•׳¨ ׳”׳¦׳¢׳× ׳”׳׳—׳™׳¨ ׳•׳×׳—׳™׳׳× ׳”׳¢׳‘׳•׳“׳”.
-ג€¢ 50% ׳”׳ ׳•׳×׳¨׳™׳ ׳¢׳ ׳׳¡׳™׳¨׳× ׳”׳×׳•׳›׳ ׳™׳•׳× ׳”׳¡׳•׳₪׳™׳•׳×.
+    if (bizTerms) bizTerms.value = `׳נאי ׳שלום:
+ג€¢ 50% מקדמה עם אישור הצע׳ המחיר ו׳חיל׳ העבודה.
+ג€¢ 50% הנו׳רים עם מסיר׳ ה׳וכניו׳ הסופיו׳.
 
-׳”׳¢׳¨׳•׳× ׳ ׳•׳¡׳₪׳•׳×:
-ג€¢ ׳›׳ ׳©׳™׳ ׳•׳™ ׳‘׳×׳•׳›׳ ׳™׳•׳× ׳׳׳—׳¨ ׳©׳׳‘ ׳”׳׳™׳©׳•׳¨ ׳”׳¨׳׳©׳•׳ ׳™ ׳¢׳©׳•׳™ ׳׳’׳¨׳•׳¨ ׳×׳•׳¡׳₪׳× ׳×׳©׳׳•׳.
-ג€¢ ׳׳™׳•׳•׳™ ׳׳•׳ ׳—׳‘׳¨׳× ׳”׳—׳©׳׳ ׳׳™׳ ׳• ׳›׳•׳׳ ׳׳× ׳׳’׳¨׳•׳× ׳”׳‘׳“׳™׳§׳” ׳©׳ ׳—׳‘׳¨׳× ׳”׳—׳©׳׳.`;
+הערו׳ נוספו׳:
+ג€¢ כל שינוי ב׳וכניו׳ לאחר שלב האישור הראשוני עשוי לגרור ׳וספ׳ ׳שלום.
+ג€¢ ליווי מול חבר׳ החשמל אינו כולל א׳ אגרו׳ הבדיקה של חבר׳ החשמל.`;
 
     const logoAlign = document.getElementById('set-logo-align');
     if (logoAlign) logoAlign.value = 'center';
@@ -3259,7 +3259,7 @@ function handleGoogleLogin() {
     }
     
     if (!clientId) {
-        showToast('׳׳ ׳ ׳”׳–׳ Google Client ID ׳‘׳”׳’׳“׳¨׳•׳× ׳”׳—׳™׳‘׳•׳¨ ׳×׳—׳™׳׳”', 'error');
+        showToast('אנא הזן Google Client ID בהגדרו׳ החיבור ׳חילה', 'error');
         const configSection = document.getElementById('google-config-section');
         if (configSection) configSection.style.display = 'block';
         return;
@@ -3275,7 +3275,7 @@ function handleGoogleLogin() {
             scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
             callback: async (response) => {
                 if (response.error !== undefined) {
-                    showToast('׳©׳’׳™׳׳” ׳‘׳”׳×׳—׳‘׳¨׳•׳× ׳׳’׳•׳’׳: ' + response.error, 'error');
+                    showToast('שגיאה בה׳חברו׳ לגוגל: ' + response.error, 'error');
                     return;
                 }
                 const token = response.access_token;
@@ -3291,7 +3291,7 @@ function handleGoogleLogin() {
                     const email = userInfo.email;
                     
                     if (!email) {
-                        showToast('׳©׳’׳™׳׳” ׳‘׳§׳‘׳׳× ׳›׳×׳•׳‘׳× ׳”׳׳™׳׳™׳™׳ ׳׳—׳©׳‘׳•׳ ׳’׳•׳’׳', 'error');
+                        showToast('שגיאה בקבל׳ כ׳וב׳ האימייל מחשבון גוגל', 'error');
                         return;
                     }
                     
@@ -3325,14 +3325,14 @@ function handleGoogleLogin() {
                     }
                 } catch (userErr) {
                     console.error('Error fetching Google User info:', userErr);
-                    showToast('׳©׳’׳™׳׳” ׳‘׳§׳‘׳׳× ׳₪׳¨׳˜׳™ ׳”׳׳©׳×׳׳© ׳׳’׳•׳’׳: ' + userErr.message, 'error');
+                    showToast('שגיאה בקבל׳ פרטי המש׳מש מגוגל: ' + userErr.message, 'error');
                 }
             }
         });
         googleTokenClient.requestAccessToken({ prompt: '' });
     } catch (e) {
         console.error('Google token initialization failed:', e);
-        showToast('׳©׳’׳™׳׳” ׳‘׳׳×׳—׳•׳ ׳”׳”׳×׳—׳‘׳¨׳•׳× ׳©׳ ׳’׳•׳’׳. ׳•׳“׳ ׳©׳”-Client ID ׳×׳§׳™׳', 'error');
+        showToast('שגיאה בא׳חול הה׳חברו׳ של גוגל. ודא שה-Client ID ׳קין', 'error');
     }
 }
 
@@ -3343,7 +3343,7 @@ function saveGoogleUserProfession(event) {
     
     const profession = modalInput.value.trim();
     if (!profession) {
-        showToast('׳׳ ׳ ׳”׳–׳ ׳×׳—׳•׳ ׳¢׳™׳¡׳•׳§', 'error');
+        showToast('אנא הזן ׳חום עיסוק', 'error');
         return;
     }
     
@@ -3406,7 +3406,7 @@ function completeGoogleLogin(email, profession, token, rememberMe) {
     document.querySelector('.app-container').style.display = 'flex';
     
     initUserSession();
-    showToast(`׳‘׳¨׳•׳ ׳”׳‘׳ ׳׳׳¢׳¨׳›׳×, ${email}!`);
+    showToast(`ברוך הבא למערכ׳, ${email}!`);
 }
 
 async function loadDriveFoldersList() {
@@ -3421,15 +3421,15 @@ async function loadDriveFoldersList() {
         if (!container) return;
         
         if (folders.length === 0) {
-            container.innerHTML = `<span style="color:var(--text-muted); font-size:0.85rem;">׳׳ ׳ ׳׳¦׳׳• ׳×׳™׳§׳™׳•׳× ׳ ׳•׳¡׳₪׳•׳× ׳‘׳“׳¨׳™׳™׳‘. ׳ ׳™׳¦׳•׳¨ ׳׳× ׳×׳™׳§׳™׳™׳× '׳”׳¦׳¢׳•׳× ׳׳—׳™׳¨' ׳›׳‘׳¨׳™׳¨׳× ׳׳—׳“׳.</span>`;
+            container.innerHTML = `<span style="color:var(--text-muted); font-size:0.85rem;">לא נמצאו ׳יקיו׳ נוספו׳ בדרייב. ניצור א׳ ׳יקיי׳ 'הצעו׳ מחיר' כבריר׳ מחדל.</span>`;
             return;
         }
         
         let options = folders.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
-        options = `<option value="auto_sj">SJ ׳”׳ ׳“׳¡׳× ׳—׳©׳׳ > ׳”׳¦׳¢׳•׳× ׳׳—׳™׳¨ (׳‘׳¨׳™׳¨׳× ׳׳—׳“׳)</option>` + options;
+        options = `<option value="auto_sj">SJ הנדס׳ חשמל > הצעו׳ מחיר (בריר׳ מחדל)</option>` + options;
         
         container.innerHTML = `
-            <label style="font-size: 0.85rem; color: var(--text-secondary); display: block; margin-top: 10px;">׳‘׳—׳¨ ׳×׳™׳§׳™׳™׳× ׳™׳¢׳“ ׳‘-Drive ׳׳’׳™׳‘׳•׳™:</label>
+            <label style="font-size: 0.85rem; color: var(--text-secondary); display: block; margin-top: 10px;">בחר ׳יקיי׳ יעד ב-Drive לגיבוי:</label>
             <select id="settings-drive-folder-select" onchange="handleDriveFolderChange(this.value)" style="width:100%; margin-top: 5px; padding: 8px 12px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; font-family: inherit;">
                 ${options}
             </select>
@@ -3463,19 +3463,19 @@ async function handleDriveFolderChange(folderId) {
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
     
     try {
-        showToast('׳׳¢׳“׳›׳ ׳׳™׳§׳•׳ ׳×׳™׳§׳™׳™׳” ׳‘׳“׳¨׳™׳™׳‘...');
+        showToast('מעדכן מיקום ׳יקייה בדרייב...');
         await resolveSjDriveFolders();
         autoDetectQuoteNumber(false);
         await syncDatabaseToDrive(false);
-        showToast('׳׳™׳§׳•׳ ׳”׳×׳™׳§׳™׳™׳” ׳¢׳•׳“׳›׳ ׳•׳¡׳•׳ ׳›׳¨׳ ׳‘׳”׳¦׳׳—׳”');
+        showToast('מיקום ה׳יקייה עודכן וסונכרן בהצלחה');
     } catch (e) {
-        showToast('׳©׳’׳™׳׳” ׳‘׳¢׳“׳›׳•׳ ׳׳™׳§׳•׳ ׳”׳×׳™׳§׳™׳™׳”: ' + e.message, 'error');
+        showToast('שגיאה בעדכון מיקום ה׳יקייה: ' + e.message, 'error');
     }
 }
 
 async function recoverDriveBackup() {
     if (!googleAccessToken) {
-        showToast('׳’׳•׳’׳ ׳“׳¨׳™׳™׳‘ ׳׳™׳ ׳• ׳׳—׳•׳‘׳¨. ׳׳ ׳ ׳”׳×׳—׳‘׳¨ ׳×׳—׳™׳׳”.', 'error');
+        showToast('גוגל דרייב אינו מחובר. אנא ה׳חבר ׳חילה.', 'error');
         return;
     }
     
@@ -3483,7 +3483,7 @@ async function recoverDriveBackup() {
     if (!btn) return;
     const originalText = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ׳׳—׳₪׳© ׳’׳™׳‘׳•׳™׳™׳...`;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> מחפש גיבויים...`;
     
     try {
         const dbFilename = getCloudDatabaseFilename();
@@ -3496,7 +3496,7 @@ async function recoverDriveBackup() {
         const files = data.files || [];
         
         if (files.length === 0) {
-            showToast('׳׳ ׳ ׳׳¦׳׳• ׳§׳•׳‘׳¦׳™ ׳’׳™׳‘׳•׳™ ׳‘׳“׳¨׳™׳™׳‘ ׳©׳׳ ׳¢׳‘׳•׳¨ ׳׳©׳×׳׳© ׳–׳”.', 'error');
+            showToast('לא נמצאו קובצי גיבוי בדרייב שלך עבור מש׳מש זה.', 'error');
             return;
         }
         
@@ -3506,7 +3506,7 @@ async function recoverDriveBackup() {
         // Retrieve the newest file
         const targetFile = files[0];
         
-        showToast('׳ ׳׳¦׳ ׳’׳™׳‘׳•׳™! ׳׳©׳—׳–׳¨ ׳ ׳×׳•׳ ׳™׳ ׳׳”׳¢׳ ׳...');
+        showToast('נמצא גיבוי! משחזר נ׳ונים מהענן...');
         
         // Download content
         const downloadRes = await fetch(`https://www.googleapis.com/drive/v3/files/${targetFile.id}?alt=media`, {
@@ -3563,10 +3563,10 @@ async function recoverDriveBackup() {
             loadProject(activeProjectId, false);
         }
         
-        showToast('׳”׳ ׳×׳•׳ ׳™׳ ׳©׳•׳—׳–׳¨׳• ׳‘׳”׳¦׳׳—׳” ׳׳”׳’׳™׳‘׳•׳™ ׳‘׳¢׳ ׳!');
+        showToast('הנ׳ונים שוחזרו בהצלחה מהגיבוי בענן!');
     } catch (e) {
         console.error(e);
-        showToast('׳©׳’׳™׳׳” ׳‘׳©׳—׳–׳•׳¨ ׳”׳’׳™׳‘׳•׳™: ' + e.message, 'error');
+        showToast('שגיאה בשחזור הגיבוי: ' + e.message, 'error');
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;
