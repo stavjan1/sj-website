@@ -139,12 +139,11 @@ function changeGeminiModel(model) {
     updateQuotaUI();
 }
 
-// Global (shared) Gemini API key ג€” admin sets once, everyone benefits
 function getGeminiApiKey() {
-    // Prefer user-specific key, then global fallback
-    return appState.settings.geminiApiKey
+    const key = appState.settings.geminiApiKey
         || localStorage.getItem('sj_gemini_key_global')
         || '';
+    return (key && key.length > 15 && key !== 'null' && key !== 'undefined') ? key : '';
 }
 function saveGlobalGeminiKey(key) {
     localStorage.setItem('sj_gemini_key_global', key);
@@ -160,20 +159,20 @@ let appState = {
         phrasingDb: '',
         logoStyle: { align: 'center', width: '75', marginTop: '0', marginBottom: '10' },
         businessDetails: {
-            name: 'SJ הנדס׳ חשמל',
-            owner: "ס׳יו ג'אן",
+            name: 'SJ הנדסת חשמל',
+            owner: "סתיו ג'אן",
             id: 'עוסק פטור: 207382920',
             phone: '053-530-2887',
             email: 'info@sj-eng.co.il',
             web: 'www.sj-eng.co.il',
-            address: 'דרך בן גוריון 138, ב׳ ים, יחידה 1304',
-            terms: `׳נאי ׳שלום:
-ג€¢ 50% מקדמה עם אישור הצע׳ המחיר ו׳חיל׳ העבודה.
-ג€¢ 50% הנו׳רים עם מסיר׳ ה׳וכניו׳ הסופיו׳.
+            address: 'דרך בן גוריון 138, בת ים, יחידה 1304',
+            terms: `תנאי תשלום:
+ג€¢ 50% מקדמה עם אישור הצעת המחיר ותחילת העבודה.
+ג€¢ 50% הנותרים עם מסירת התוכניות הסופיות.
 
-הערו׳ נוספו׳:
-ג€¢ כל שינוי ב׳וכניו׳ לאחר שלב האישור הראשוני עשוי לגרור ׳וספ׳ ׳שלום.
-ג€¢ ליווי מול חבר׳ החשמל אינו כולל א׳ אגרו׳ הבדיקה של חבר׳ החשמל.`
+הערות נוספות:
+ג€¢ כל שינוי בתוכניות לאחר שלב האישור הראשוני עשוי לגרור תוספת תשלום.
+ג€¢ ליווי מול חברת החשמל אינו כולל את אגרות הבדיקה של חברת החשמל.`
         }
     },
     currentQuote: {
@@ -195,6 +194,7 @@ let appState = {
 
 // Projects state
 let projectsList = [];
+let trashedProjectsList = [];
 let activeProjectId = null;
 
 // Global variables for Stern Pricing and Google OAuth
@@ -328,14 +328,12 @@ function switchTab(tabId) {
 function loadProjects() {
     const saved = localStorage.getItem(getStorageKey('sj_projects'));
     if (saved) {
-        try {
-            projectsList = JSON.parse(saved);
-        } catch (e) {
-            console.error('Error loading projects', e);
-        }
-    } else {
-        projectsList = [];
-    }
+        try { projectsList = JSON.parse(saved); } catch (e) { projectsList = []; }
+    } else { projectsList = []; }
+    const savedTrash = localStorage.getItem(getStorageKey('sj_trash_projects'));
+    if (savedTrash) {
+        try { trashedProjectsList = JSON.parse(savedTrash); } catch (e) { trashedProjectsList = []; }
+    } else { trashedProjectsList = []; }
     filterProjectsList();
     
     // Auto load last active or first project
@@ -352,6 +350,7 @@ function loadProjects() {
 
 function saveProjects() {
     localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList));
+    localStorage.setItem(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
     syncDatabaseToDrive(true);
 }
@@ -384,7 +383,7 @@ function createNewProject() {
             date: getTodayDateString(),
             subject: name.split('-')[0]?.trim() || name,
             items: [
-                { title: 'פרק א\': עבודו׳ הכנה', description: 'ביצוע עבודו׳ הכנה וה׳ארגנו׳ בשטח.', price: 0 }
+                { title: 'פרק א\': עבודות הכנה', description: 'ביצוע עבודות הכנה והתארגנות בשטח.', price: 0 }
             ],
             basePrice: 0,
             vatType: 'exempt',
@@ -410,7 +409,12 @@ function loadProject(id, navigate = true) {
     
     activeProjectId = id;
     localStorage.setItem(getStorageKey('sj_active_project_id'), id);
-    
+
+    // Reset model to default each time a project is loaded
+    changeGeminiModel('gemini-2.0-flash');
+    const modelSel = document.getElementById('gemini-model-select');
+    if (modelSel) modelSel.value = 'gemini-2.0-flash';
+
     updateActiveProjectBanner(proj);
     filterProjectsList();
     
@@ -459,18 +463,15 @@ function loadProject(id, navigate = true) {
 
 function deleteProject(id, event) {
     if (event) event.stopPropagation();
-    
     const proj = projectsList.find(p => p.id === id);
     if (!proj) return;
-    
-    if (!confirm(`האם א׳ה בטוח שברצונך למחוק א׳ הפרויקט "${proj.name}" לצמי׳ו׳?`)) {
-        return;
-    }
-    
+    if (!confirm(`העברת "${proj.name}" לסל המחזור — ניתן לשחזר מהגדרות Drive.`)) return;
+
     projectsList = projectsList.filter(p => p.id !== id);
+    trashedProjectsList.push({ ...proj, _deletedAt: new Date().toISOString() });
     saveProjects();
     filterProjectsList();
-    
+
     if (activeProjectId === id) {
         activeProjectId = null;
         localStorage.removeItem(getStorageKey('sj_active_project_id'));
@@ -478,8 +479,7 @@ function deleteProject(id, event) {
         initNewQuote();
         switchTab('projects');
     }
-    
-    showToast('הפרויקט נמחק בהצלחה');
+    showToast('הפרויקט הועבר לסל המחזור');
 }
 
 function updateActiveProjectBanner(proj) {
@@ -491,7 +491,7 @@ function updateActiveProjectBanner(proj) {
         bannerStatus.textContent = proj.status || 'טיוטה';
         bannerStatus.style.display = 'inline-block';
     } else {
-        bannerName.textContent = 'אין פרויקט פעיל (בחר או צור פרויקט ׳חילה)';
+        bannerName.textContent = 'אין פרויקט פעיל (בחר או צור פרויקט תחילה)';
         bannerStatus.style.display = 'none';
     }
 }
@@ -537,7 +537,7 @@ function renderProjectsList(list) {
         return;
     }
     if (list.length === 0) {
-        container.innerHTML = `<div style="color:var(--text-muted); text-align:center; padding:40px;">לא נמצאו פרויקטים ה׳ואמים לחיפוש.</div>`;
+        container.innerHTML = `<div style="color:var(--text-muted); text-align:center; padding:40px;">לא נמצאו פרויקטים התואמים לחיפוש.</div>`;
         return;
     }
 
@@ -654,7 +654,7 @@ function saveBusinessSettings() {
     
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
-    showToast('הגדרו׳ העסק נשמרו בהצלחה');
+    showToast('הגדרות העסק נשמרו בהצלחה');
     
     updatePreviewFromForm();
     syncCurrentQuoteToProject();
@@ -664,11 +664,11 @@ function saveBusinessSettings() {
 function saveGeminiKey() {
     const key = document.getElementById('settings-gemini-key').value.trim();
     appState.settings.geminiApiKey = key;
-    saveGlobalGeminiKey(key); // שמור גלובלי׳ ג€” כל המש׳משים מש׳משים במפ׳ח הזה
+    saveGlobalGeminiKey(key); // שמור גלובלית ג€” כל המשתמשים משתמשים במפתח הזה
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
     syncDatabaseToDrive(true);
-    showToast('מפ׳ח API נשמר בהצלחה');
+    showToast('מפתח API נשמר בהצלחה');
 }
 
 function loadHistory() {
@@ -711,7 +711,7 @@ function initNewQuote() {
         date: getTodayDateString(),
         subject: '',
         items: [
-            { title: 'פרק א\': עבודו׳ הכנה', description: 'ביצוע עבודו׳ הכנה וה׳ארגנו׳ בשטח.', price: 0 }
+            { title: 'פרק א\': עבודות הכנה', description: 'ביצוע עבודות הכנה והתארגנות בשטח.', price: 0 }
         ],
         basePrice: 0,
         vatType: 'exempt',
@@ -761,10 +761,10 @@ function addWorkItemRow(title = '', description = '', price = 0) {
         <div class="work-item-form-grid ${isItemized ? '' : 'no-price-col'}">
             <div class="row-index">${index}</div>
             <div class="form-group" style="margin-bottom:0">
-                <input type="text" class="item-title-input" placeholder="נושא הסעיף (למשל: חיווט כבלי ׳קשור׳)" value="${title}" oninput="updatePreviewFromForm()">
+                <input type="text" class="item-title-input" placeholder="נושא הסעיף (למשל: חיווט כבלי תקשורת)" value="${title}" oninput="updatePreviewFromForm()">
             </div>
             <div class="form-group" style="margin-bottom:0">
-                <textarea class="item-desc-input" rows="2" placeholder="פירוט ׳כול׳ העבודה..." oninput="updatePreviewFromForm()">${description}</textarea>
+                <textarea class="item-desc-input" rows="2" placeholder="פירוט תכולת העבודה..." oninput="updatePreviewFromForm()">${description}</textarea>
             </div>
             ${isItemized ? `
             <div class="form-group" style="margin-bottom:0">
@@ -787,7 +787,7 @@ function deleteWorkItemRow(button) {
     const container = document.getElementById('work-items-container');
     
     if (container.children.length <= 1) {
-        showToast('חובה להשאיר לפחו׳ סעיף עבודה אחד בהצע׳ המחיר', 'error');
+        showToast('חובה להשאיר לפחות סעיף עבודה אחד בהצעת המחיר', 'error');
         return;
     }
     
@@ -882,7 +882,7 @@ function updatePreviewFromForm() {
     const biz = appState.settings.businessDetails;
     
     const clientName = document.getElementById('form-client-name').value || 'שם הלקוח';
-    const clientSub = document.getElementById('form-client-sub').value || 'כ׳וב׳ הלקוח / טלפון';
+    const clientSub = document.getElementById('form-client-sub').value || 'כתובת הלקוח / טלפון';
     const quoteNumber = document.getElementById('form-quote-number').value || '2026-101';
     const quoteDate = document.getElementById('form-quote-date').value;
     const subject = document.getElementById('form-quote-subject').value || 'נושא הצעה';
@@ -910,13 +910,13 @@ function updatePreviewFromForm() {
                 <span class="bullet">|</span>
                 <span>סלולרי: ${biz.phone}</span>
                 <span class="bullet">|</span>
-                <span>א׳ר: ${biz.web}</span>
+                <span>אתר: ${biz.web}</span>
             </div>
             <div class="footer-row text-secondary">
-                <span>כ׳וב׳: ${biz.address}</span>
+                <span>כתובת: ${biz.address}</span>
             </div>
             <div class="footer-notice">
-                הצע׳ מחיר זו ׳קפה לשלושה חודשים. עם אישור וח׳ימ׳ הלקוח ׳שמש כהסכם לביצוע העבודה בה׳אם לאמור בה.
+                הצעת מחיר זו תקפה לשלושה חודשים. עם אישור וחתימת הלקוח תשמש כהסכם לביצוע העבודה בהתאם לאמור בה.
             </div>
         `;
     }
@@ -934,7 +934,7 @@ function updatePreviewFromForm() {
             <thead>
                 <tr>
                     <th style="width: 8%; text-align: center;">סעיף</th>
-                    <th style="width: 72%;">׳יאור ו׳כול׳ העבודה</th>
+                    <th style="width: 72%;">תיאור ותכולת העבודה</th>
                     <th style="width: 20%; text-align: left;">מחיר (ג‚×)</th>
                 </tr>
             </thead>
@@ -948,7 +948,7 @@ function updatePreviewFromForm() {
             tr.innerHTML = `
                 <td style="font-family: 'Outfit', sans-serif; font-weight: 700; text-align: center;">${idx + 1}</td>
                 <td>
-                    <div style="font-weight: 700; color: var(--pdf-primary); text-decoration: underline; margin-bottom: 4px;">${item.title || 'סעיף ללא כו׳ר׳'}</div>
+                    <div style="font-weight: 700; color: var(--pdf-primary); text-decoration: underline; margin-bottom: 4px;">${item.title || 'סעיף ללא כותרת'}</div>
                     <div style="white-space: pre-line; line-height: 1.5; color: var(--pdf-text-main); font-size: 0.9rem;">${item.description || 'אין פירוט לסעיף זה'}</div>
                 </td>
                 <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight: 700; text-align: left; color: var(--pdf-primary);">${formatPriceString(item.price || 0)} ג‚×</td>
@@ -961,7 +961,7 @@ function updatePreviewFromForm() {
             const itemEl = document.createElement('div');
             itemEl.className = 'pdf-work-item';
             itemEl.innerHTML = `
-                <div class="pdf-item-title">${idx + 1}. ${item.title || 'סעיף ללא כו׳ר׳'}</div>
+                <div class="pdf-item-title">${idx + 1}. ${item.title || 'סעיף ללא כותרת'}</div>
                 <div class="pdf-item-desc">${item.description || 'אין פירוט לסעיף זה'}</div>
             `;
             pdfItemsContainer.appendChild(itemEl);
@@ -1012,7 +1012,7 @@ function updatePriceDisplayMode() {
 }
 
 // ==========================================================================
-// Gemini Pricing Chat (סוכן ׳מחור מומחה)
+// Gemini Pricing Chat (סוכן תמחור מומחה)
 // ==========================================================================
 async function sendChatMessage() {
     if (!activeProjectId) {
@@ -1023,18 +1023,18 @@ async function sendChatMessage() {
     
     const apiKey = getGeminiApiKey();
     if (!apiKey) {
-        showToast('אנא הגדר מפ׳ח Gemini API במסך ההגדרו׳ ׳חילה', 'error');
+        showToast('אנא הגדר מפתח Gemini API במסך ההגדרות תחילה', 'error');
         switchTab('settings');
         return;
     }
 
     const effectiveModel = getEffectiveModel();
     if (!effectiveModel) {
-        showToast('המכסה היומי׳ נוצלה עבור שני המודלים. נסה שוב מחר.', 'error');
+        showToast('המכסה היומית נוצלה עבור שני המודלים. נסה שוב מחר.', 'error');
         return;
     }
     if (effectiveModel !== selectedGeminiModel) {
-        showToast(`מכס׳ Flash 2.0 נוצלה ג€” עובר אוטומטי׳ ל-Flash 1.5`, 'error');
+        showToast(`מכסת Flash 2.0 נוצלה ג€” עובר אוטומטית ל-Flash 1.5`, 'error');
         document.getElementById('gemini-model-select').value = effectiveModel;
         changeGeminiModel(effectiveModel);
     }
@@ -1074,7 +1074,7 @@ async function sendChatMessage() {
 
         if (!response.ok) {
             const errData = await response.json();
-            throw new Error(errData.error?.message || 'שגיאה ב׳קשור׳ עם שר׳ Gemini');
+            throw new Error(errData.error?.message || 'שגיאה בתקשורת עם שרת Gemini');
         }
 
         incrementDailyUsage(effectiveModel);
@@ -1118,7 +1118,7 @@ async function sendChatMessage() {
                     const tipsBox = document.getElementById('wizard-tips-box');
                     if (tipsBox && parsed.blindSpots && parsed.blindSpots.length > 0) {
                         tipsBox.style.display = 'block';
-                        tipsBox.innerHTML = `<strong>נקודו׳ עיוורון שכדאי לבדוק:</strong><ul>` + parsed.blindSpots.map(s => `<li>${s}</li>`).join('') + `</ul>`;
+                        tipsBox.innerHTML = `<strong>נקודות עיוורון שכדאי לבדוק:</strong><ul>` + parsed.blindSpots.map(s => `<li>${s}</li>`).join('') + `</ul>`;
                     }
                     
                     saveProjects();
@@ -1201,7 +1201,7 @@ function renderMaterialsChecklist(materials) {
     container.innerHTML = '';
     
     if (!materials || materials.length === 0) {
-        container.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:20px;">אין חומרים באומדן. ה׳חל שיחה עם ה-AI כדי לפרק עבודה לחומרים.</div>`;
+        container.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:20px;">אין חומרים באומדן. התחל שיחה עם ה-AI כדי לפרק עבודה לחומרים.</div>`;
         return;
     }
     
@@ -1238,7 +1238,7 @@ function calculateWizardTotal() {
 }
 
 // ==========================================================================
-// Gemini Phrasing Agent (סוכן ניסוח הצע׳ מחיר)
+// Gemini Phrasing Agent (סוכן ניסוח הצעת מחיר)
 // ==========================================================================
 async function exportChatToQuote() {
     if (!activeProjectId) {
@@ -1251,25 +1251,25 @@ async function exportChatToQuote() {
     
     const apiKey = getGeminiApiKey();
     if (!apiKey) {
-        showToast('אנא הגדר מפ׳ח Gemini API במסך ההגדרו׳ ׳חילה', 'error');
+        showToast('אנא הגדר מפתח Gemini API במסך ההגדרות תחילה', 'error');
         switchTab('settings');
         return;
     }
 
     const effectiveModel = getEffectiveModel();
     if (!effectiveModel) {
-        showToast('המכסה היומי׳ נוצלה עבור שני המודלים. נסה שוב מחר.', 'error');
+        showToast('המכסה היומית נוצלה עבור שני המודלים. נסה שוב מחר.', 'error');
         return;
     }
 
     const btn = document.getElementById('btn-export-to-quote');
     const origText = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> מנסח הצע׳ מחיר...`;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> מנסח הצעת מחיר...`;
     
     // Format conversation history
     const conversationText = proj.chatHistory.map(msg => {
-        const senderName = msg.role === 'user' ? 'ס׳יו' : 'מומחה ׳מחור';
+        const senderName = msg.role === 'user' ? 'סתיו' : 'מומחה תמחור';
         let text = msg.parts[0].text.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
         text = text.replace(/({[\s\S]*?})/, '').trim();
         return `${senderName}: ${text}`;
@@ -1284,44 +1284,44 @@ async function exportChatToQuote() {
     const phrasingDb = appState.settings.phrasingDb || '';
     
     const prompt = `
-א׳ה סוכן הניסוח (Quote Writer) המומחה של ס׳יו ג'אן - SJ הנדס׳ חשמל.
-׳פקידך ל׳רגם א׳ שיח׳ ה׳מחור ואומדן החומרים להצע׳ מחיר רשמי׳, מנוסח׳ היטב בעברי׳ מקצועי׳ ומשפטי׳.
+אתה סוכן הניסוח (Quote Writer) המומחה של סתיו ג'אן - SJ הנדסת חשמל.
+תפקידך לתרגם את שיחת התמחור ואומדן החומרים להצעת מחיר רשמית, מנוסחת היטב בעברית מקצועית ומשפטית.
 
-עליך להש׳מש ב"מאגר הניסוחים" של ס׳יו כמודל ודוגמה לסגנון הכ׳יבה והמבנה של הצע׳ המחיר.
-הנה מאגר הניסוחים של ס׳יו ללמיד׳ סגנון הכ׳יבה:
+עליך להשתמש ב"מאגר הניסוחים" של סתיו כמודל ודוגמה לסגנון הכתיבה והמבנה של הצעת המחיר.
+הנה מאגר הניסוחים של סתיו ללמידת סגנון הכתיבה:
 """
 ${phrasingDb}
 """
 
-הנה סיכום שיח׳ ה׳מחור שנערכה זה ע׳ה:
+הנה סיכום שיחת התמחור שנערכה זה עתה:
 """
 ${conversationText}
 """
 
-והנה רשימ׳ החומרים והמחירים שנבחרו:
+והנה רשימת החומרים והמחירים שנבחרו:
 """
 מחיר עבודה מוערך: ${proj.laborPrice || 0} ש"ח
 חומרים שנבחרו:
 ${checkedMatsText}
 """
 
-משימ׳ך היא להפיק קובץ JSON מובנה המפרט א׳ סעיפי הצע׳ המחיר הסופיים. 
-כל סעיף צריך לכלול כו׳ר׳ ו׳יאור מורחב ומקצועי (בעברי׳ רשמי׳ ו׳קני׳, המזכירה א׳ סגנון הניסוחים במאגר).
-אם יש מספר עבודו׳ או שלבים שונים, פצל או׳ם ל-2-4 סעיפים נפרדים (למשל: סעיף הכנו׳ וכבילה, סעיף אביזרים וה׳קנו׳).
-לכל סעיף קבע מחיר משוער הגיוני שסכומו הכללי (או מחיר הבסיס) ישקף א׳ עלו׳ העבודה והחומרים המצטברים (שסכומם כרגע הוא ${estimatedCost} ש"ח).
+משימתך היא להפיק קובץ JSON מובנה המפרט את סעיפי הצעת המחיר הסופיים. 
+כל סעיף צריך לכלול כותרת ותיאור מורחב ומקצועי (בעברית רשמית ותקנית, המזכירה את סגנון הניסוחים במאגר).
+אם יש מספר עבודות או שלבים שונים, פצל אותם ל-2-4 סעיפים נפרדים (למשל: סעיף הכנות וכבילה, סעיף אביזרים והתקנות).
+לכל סעיף קבע מחיר משוער הגיוני שסכומו הכללי (או מחיר הבסיס) ישקף את עלות העבודה והחומרים המצטברים (שסכומם כרגע הוא ${estimatedCost} ש"ח).
 
-הפלט שלך חייב להיו׳ אך ורק JSON במבנה הבא, ללא שום טקסט נוסף לפניו או אחריו:
+הפלט שלך חייב להיות אך ורק JSON במבנה הבא, ללא שום טקסט נוסף לפניו או אחריו:
 {
-  "subject": "נושא הצע׳ המחיר (למשל: ה׳קנ׳ עמד׳ טעינה לרכב חשמלי)",
+  "subject": "נושא הצעת המחיר (למשל: התקנת עמדת טעינה לרכב חשמלי)",
   "items": [
     {
-      "title": "כו׳ר׳ הסעיף (למשל: פרק א': עבודו׳ הכנה והנח׳ כבלים)",
-      "description": "פירוט של העבודה ו׳כול׳ה ברמה מקצועי׳ גבוהה...",
+      "title": "כותרת הסעיף (למשל: פרק א': עבודות הכנה והנחת כבלים)",
+      "description": "פירוט של העבודה ותכולתה ברמה מקצועית גבוהה...",
       "price": 1200
     }
   ],
   "basePrice": 3500, // מחיר כולל מומלץ (שווה לסכום מחירי הסעיפים)
-  "summary": "הערו׳ ספציפיו׳ לעבודה זו שיש לכלול בנוסף ל׳נאים הכלליים (׳נאי ׳שלום וכו')."
+  "summary": "הערות ספציפיות לעבודה זו שיש לכלול בנוסף לתנאים הכלליים (תנאי תשלום וכו')."
 }
 `;
 
@@ -1364,7 +1364,7 @@ ${checkedMatsText}
         updatePreviewFromForm();
         
         switchTab('create');
-        showToast('סוכן הניסוח הפיק א׳ הצע׳ המחיר המלאה בהצלחה!');
+        showToast('סוכן הניסוח הפיק את הצעת המחיר המלאה בהצלחה!');
     } catch (err) {
         console.error(err);
         showToast('שגיאה בניסוח על ידי AI: ' + err.message, 'error');
@@ -1426,7 +1426,7 @@ function handleImageUpload(event, type) {
             localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
             renderWatermark(base64Data);
             syncDatabaseToDrive(true);
-            showToast('׳מונ׳ רקע עודכנה בהצלחה');
+            showToast('תמונת רקע עודכנה בהצלחה');
         }
     };
     reader.readAsDataURL(file);
@@ -1440,7 +1440,7 @@ function clearUploadedImage(type) {
         localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
         renderLogo(null);
         syncDatabaseToDrive(true);
-        showToast('לוגו החברה הוחזר לבריר׳ המחדל');
+        showToast('לוגו החברה הוחזר לברירת המחדל');
     } else if (type === 'bg') {
         localStorage.removeItem(getStorageKey('sj_uploaded_bg'));
         appState.settings.uploadedBg = null;
@@ -1448,7 +1448,7 @@ function clearUploadedImage(type) {
         localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
         renderWatermark(null);
         syncDatabaseToDrive(true);
-        showToast('׳מונ׳ הרקע הוסרה');
+        showToast('תמונת הרקע הוסרה');
     }
 }
 
@@ -1487,7 +1487,7 @@ function renderLogo(base64Data) {
                 <path d="M 58 46 L 58 70 C 58 80, 32 80, 32 70" fill="none" stroke="#3b82f6" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
         `;
-        settingsPreview.innerHTML = '<span style="color:var(--text-muted); font-size:0.8rem;">בריר׳ מחדל</span>';
+        settingsPreview.innerHTML = '<span style="color:var(--text-muted); font-size:0.8rem;">ברירת מחדל</span>';
     }
 }
 
@@ -1500,7 +1500,7 @@ function renderWatermark(base64Data) {
         settingsPreview.innerHTML = `<img src="${base64Data}" style="max-height:100%; max-width:100%;">`;
     } else {
         watermarkBg.style.backgroundImage = 'none';
-        settingsPreview.innerHTML = '<span style="color:var(--text-muted); font-size:0.8rem;">אין ׳מונ׳ רקע</span>';
+        settingsPreview.innerHTML = '<span style="color:var(--text-muted); font-size:0.8rem;">אין תמונת רקע</span>';
     }
 }
 
@@ -1545,7 +1545,7 @@ function renderSternList(items) {
     list.innerHTML = '';
     
     if (items.length === 0) {
-        list.innerHTML = '<div style="color:var(--text-muted); padding:20px; text-align:center;">לא נמצאו ׳וצאו׳ ה׳ואמו׳ לחיפוש.</div>';
+        list.innerHTML = '<div style="color:var(--text-muted); padding:20px; text-align:center;">לא נמצאו תוצאות התואמות לחיפוש.</div>';
         return;
     }
     
@@ -1616,7 +1616,7 @@ function addSternItemToQuote(dbIndex) {
 // ==========================================================================
 function downloadPDF() {
     const clientName = document.getElementById('form-client-name').value.trim() || 'לקוח';
-    const subject = document.getElementById('form-quote-subject').value.trim() || 'הצע׳ מחיר';
+    const subject = document.getElementById('form-quote-subject').value.trim() || 'הצעת מחיר';
     const quoteNumber = document.getElementById('form-quote-number').value.trim() || '000';
     
     appState.currentQuote.clientName = clientName;
@@ -1630,7 +1630,7 @@ function downloadPDF() {
     updatePreviewFromForm();
     
     const element = document.getElementById('quote-pdf-sheet');
-    const filename = `הצע׳ מחיר_${quoteNumber}_${clientName.replace(/\s+/g, '_')}.pdf`;
+    const filename = `הצעת מחיר_${quoteNumber}_${clientName.replace(/\s+/g, '_')}.pdf`;
     
     const options = {
         margin: 10,
@@ -1658,7 +1658,7 @@ function downloadPDF() {
         })
         .catch(err => {
             console.error('PDF error:', err);
-            showToast('שגיאה ביציר׳ קובץ ה-PDF', 'error');
+            showToast('שגיאה ביצירת קובץ ה-PDF', 'error');
         });
 }
 
@@ -1677,7 +1677,7 @@ function shareWhatsApp() {
         return;
     }
     
-    const msg = `שלום ${clientName},\n\nהפק׳י עבורך הצע׳ מחיר מפורט׳ בנושא: *${subject}*.\nסה"כ ל׳שלום: *${finalPrice}* (${vatLabel}).\n\nשלח׳י לך א׳ קובץ ה-PDF המפורט במייל. אשמח לעבור עליו יחד אי׳ך.\n\nבברכה,\n*ס׳יו ג'אן - SJ הנדס׳ חשמל*`;
+    const msg = `שלום ${clientName},\n\nהפקתי עבורך הצעת מחיר מפורטת בנושא: *${subject}*.\nסה"כ לתשלום: *${finalPrice}* (${vatLabel}).\n\nשלחתי לך את קובץ ה-PDF המפורט במייל. אשמח לעבור עליו יחד איתך.\n\nבברכה,\n*סתיו ג'אן - SJ הנדסת חשמל*`;
     const encodedMsg = encodeURIComponent(msg);
     
     window.open(`https://api.whatsapp.com/send?text=${encodedMsg}`, '_blank');
@@ -1703,12 +1703,12 @@ function saveToHistory(showToastFlag = true) {
         const idx = appState.history.findIndex(item => item.id === q.id);
         if (idx !== -1) {
             appState.history[idx] = JSON.parse(JSON.stringify(q));
-            if (showToastFlag) showToast('הצע׳ המחיר עודכנה בהיסטוריה');
+            if (showToastFlag) showToast('הצעת המחיר עודכנה בהיסטוריה');
         }
     } else {
         q.id = 'hist_' + Date.now().toString();
         appState.history.unshift(JSON.parse(JSON.stringify(q)));
-        if (showToastFlag) showToast('הצע׳ המחיר נשמרה בהיסטוריה');
+        if (showToastFlag) showToast('הצעת המחיר נשמרה בהיסטוריה');
     }
     
     saveHistory();
@@ -1725,20 +1725,20 @@ function loadQuoteFromHistory(id) {
     updatePreviewFromForm();
     
     switchTab('create');
-    showToast(`הצע׳ מחיר מס' ${quote.quoteNumber} נטענה לעריכה`);
+    showToast(`הצעת מחיר מס' ${quote.quoteNumber} נטענה לעריכה`);
 }
 
 function deleteQuoteFromHistory(id, event) {
     if (event) event.stopPropagation();
     
-    if (!confirm('האם א׳ה בטוח שברצונך למחוק הצע׳ מחיר זו לצמי׳ו׳?')) {
+    if (!confirm('האם אתה בטוח שברצונך למחוק הצעת מחיר זו לצמיתות?')) {
         return;
     }
     
     appState.history = appState.history.filter(item => item.id !== id);
     saveHistory();
     renderHistoryList();
-    showToast('הצע׳ המחיר נמחקה בהצלחה');
+    showToast('הצעת המחיר נמחקה בהצלחה');
 }
 
 function renderHistoryList() {
@@ -1806,7 +1806,7 @@ function filterHistory() {
     if (visibleCount === 0) {
         if (emptyState) {
             emptyState.style.display = 'flex';
-            emptyState.querySelector('p').textContent = 'לא נמצאו הצעו׳ מחיר ה׳ואמו׳ לחיפוש.';
+            emptyState.querySelector('p').textContent = 'לא נמצאו הצעות מחיר התואמות לחיפוש.';
         }
     } else {
         if (emptyState) emptyState.style.display = 'none';
@@ -1822,12 +1822,12 @@ function exportHistoryData() {
     
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href",     dataStr);
-    downloadAnchor.setAttribute("download", `גיבוי_הצעו׳_מחיר_SJ_${getTodayDateString()}.json`);
+    downloadAnchor.setAttribute("download", `גיבוי_הצעות_מחיר_SJ_${getTodayDateString()}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
     
-    showToast('נ׳וני המערכ׳ יוצאו לקובץ גיבוי בהצלחה');
+    showToast('נתוני המערכת יוצאו לקובץ גיבוי בהצלחה');
 }
 
 function importHistoryClick() {
@@ -1843,7 +1843,7 @@ function importHistoryData(event) {
         try {
             const imported = JSON.parse(e.target.result);
             if (imported.history && Array.isArray(imported.history)) {
-                if (confirm(`נמצאו ${imported.history.length} הצעו׳ מחיר בקובץ. האם ברצונך לייבא?`)) {
+                if (confirm(`נמצאו ${imported.history.length} הצעות מחיר בקובץ. האם ברצונך לייבא?`)) {
                     appState.history = imported.history;
                     if (imported.settings) {
                         appState.settings = imported.settings;
@@ -1856,10 +1856,10 @@ function importHistoryData(event) {
                     }
                     saveHistory();
                     renderHistoryList();
-                    showToast('הנ׳ונים יובאו בהצלחה');
+                    showToast('הנתונים יובאו בהצלחה');
                 }
             } else {
-                showToast('קובץ גיבוי לא ׳קין', 'error');
+                showToast('קובץ גיבוי לא תקין', 'error');
             }
         } catch (err) {
             showToast('שגיאה בפענוח קובץ הגיבוי', 'error');
@@ -1897,13 +1897,13 @@ function updateDriveStatus(connected) {
     if (connected) {
         statusLabel.className = 'status-connected';
         statusLabel.innerHTML = '<i class="fa-solid fa-circle-dot"></i> מחובר ל-Google Drive';
-        btn.textContent = 'החלף חשבון / ה׳חבר מחדש';
+        btn.textContent = 'החלף חשבון / התחבר מחדש';
         if (syncSection) syncSection.style.display = 'flex';
         loadDriveFoldersList();
     } else {
         statusLabel.className = 'status-disconnected';
-        statusLabel.innerHTML = '<i class="fa-solid fa-circle-dot"></i> מנו׳ק';
-        btn.textContent = 'גבה א׳ עבוד׳ך ע"י יציר׳ ׳יקיי׳ הצעו׳ מחיר ב-DRIVE של גוגל';
+        statusLabel.innerHTML = '<i class="fa-solid fa-circle-dot"></i> מנותק';
+        btn.textContent = 'גבה את עבודתך ע"י יצירת תיקיית הצעות מחיר ב-DRIVE של גוגל';
         if (syncSection) syncSection.style.display = 'none';
         const container = document.getElementById('drive-folder-select-container');
         if (container) container.innerHTML = '';
@@ -1923,8 +1923,8 @@ function clearDriveSession() {
     const pathStatus = document.getElementById('drive-folder-path-status');
     if (pathStatus) {
         pathStatus.innerHTML = `
-            <i class="fa-solid fa-file-pdf"></i> קובצי PDF יישמרו ב׳יקייה הנבחר׳<br>
-            <i class="fa-solid fa-database"></i> גיבוי וסנכרון נ׳ונים: <strong>׳יקיי׳ מערכ׳ מוס׳ר׳ (.sysdata)</strong>
+            <i class="fa-solid fa-file-pdf"></i> קובצי PDF יישמרו בתיקייה הנבחרת<br>
+            <i class="fa-solid fa-database"></i> גיבוי וסנכרון נתונים: <strong>תיקיית מערכת מוסתרת (.sysdata)</strong>
         `;
         pathStatus.style.color = '';
     }
@@ -1937,7 +1937,7 @@ function clearDriveSession() {
 function connectGoogleDrive() {
     const clientId = document.getElementById('settings-drive-client-id').value.trim();
     if (!clientId) {
-        showToast('אנא הזן Google Client ID בהגדרו׳ ׳חילה', 'error');
+        showToast('אנא הזן Google Client ID בהגדרות תחילה', 'error');
         return;
     }
     
@@ -1966,15 +1966,15 @@ function connectGoogleDrive() {
                 localStorage.removeItem(getStorageKey('sj_sync_folder_id'));
                 
                 updateDriveStatus(true);
-                showToast('ה׳חבר׳ ל-Google Drive בהצלחה!');
+                showToast('התחברת ל-Google Drive בהצלחה!');
                 
                 try {
-                    showToast('מזהה ומסנכרן א׳ ׳יקיי׳ הענן של SJ הנדס׳ חשמל...');
+                    showToast('מזהה ומסנכרן את תיקיית הענן של SJ הנדסת חשמל...');
                     await resolveSjDriveFolders();
                     autoDetectQuoteNumber(false);
                     syncDatabaseFromDrive(false); // Cloud sync
                 } catch (folderErr) {
-                    showToast('שגיאה ביציר׳ נ׳יב ה׳יקיו׳ בדרייב: ' + folderErr.message, 'error');
+                    showToast('שגיאה ביצירת נתיב התיקיות בדרייב: ' + folderErr.message, 'error');
                 }
             },
         });
@@ -1982,7 +1982,7 @@ function connectGoogleDrive() {
         googleTokenClient.requestAccessToken({ prompt: '' });
     } catch (e) {
         console.error(e);
-        showToast('שגיאה בא׳חול Google OAuth: ודא שה-Client ID ׳קין', 'error');
+        showToast('שגיאה באתחול Google OAuth: ודא שה-Client ID תקין', 'error');
     }
 }
 
@@ -2007,7 +2007,7 @@ async function findOrCreateFolder(name, parentId) {
     const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&access_token=${googleAccessToken}`);
     if (!res.ok) {
         const errText = await res.text();
-        throw new Error(`חיפוש ׳יקייה '${name}' נכשל: ${errText}`);
+        throw new Error(`חיפוש תיקייה '${name}' נכשל: ${errText}`);
     }
     const data = await res.json();
     if (data.files && data.files.length > 0) {
@@ -2065,9 +2065,9 @@ async function resolveSjDriveFolders() {
                 const pathStatus = document.getElementById('drive-folder-path-status');
                 if (pathStatus) {
                     pathStatus.innerHTML = `
-                        <i class="fa-solid fa-circle-check" style="color: var(--color-success)"></i> ׳יקיו׳ פעילו׳ בדרייב:<br>
-                        <i class="fa-solid fa-file-pdf" style="margin-right: 15px;"></i> מזהה ׳יקיי׳ PDF: <strong>${quotesId}</strong><br>
-                        <i class="fa-solid fa-database" style="margin-right: 15px;"></i> מזהה ׳יקיי׳ דאטא: <strong>${dataId}</strong>
+                        <i class="fa-solid fa-circle-check" style="color: var(--color-success)"></i> תיקיות פעילות בדרייב:<br>
+                        <i class="fa-solid fa-file-pdf" style="margin-right: 15px;"></i> מזהה תיקיית PDF: <strong>${quotesId}</strong><br>
+                        <i class="fa-solid fa-database" style="margin-right: 15px;"></i> מזהה תיקיית דאטא: <strong>${dataId}</strong>
                     `;
                     pathStatus.style.color = 'var(--color-success)';
                 }
@@ -2181,13 +2181,13 @@ async function scanForLegacyData(folderId) {
 
 // Manual trigger: scan current sync folder for old JSON and import
 async function manualLegacyScan() {
-    if (!googleAccessToken) { showToast('יש לה׳חבר לגוגל ׳חילה', 'error'); return; }
-    showToast('סורק ׳יקיי׳ Drive לנ׳ונים ישנים...');
+    if (!googleAccessToken) { showToast('יש להתחבר לגוגל תחילה', 'error'); return; }
+    showToast('סורק תיקיית Drive לנתונים ישנים...');
     try {
         const syncFolderId = await getOrCreateSyncFolder();
-        if (!syncFolderId) { showToast('לא נמצאה ׳יקיי׳ Drive', 'error'); return; }
+        if (!syncFolderId) { showToast('לא נמצאה תיקיית Drive', 'error'); return; }
         const recovered = await scanForLegacyData(syncFolderId);
-        if (!recovered) { showToast('לא נמצאו נ׳ונים ישנים ב׳יקייה', 'error'); return; }
+        if (!recovered) { showToast('לא נמצאו נתונים ישנים בתיקייה', 'error'); return; }
         if (recovered.settings) {
             appState.settings = Object.assign({}, appState.settings, recovered.settings);
             localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
@@ -2204,7 +2204,7 @@ async function manualLegacyScan() {
         filterProjectsList();
         renderHistoryList();
         await syncDatabaseToDrive(true);
-        showToast('נ׳ונים ישנים יובאו בהצלחה!');
+        showToast('נתונים ישנים יובאו בהצלחה!');
     } catch (e) {
         showToast('שגיאה בסריקה: ' + e.message, 'error');
     }
@@ -2213,11 +2213,11 @@ async function manualLegacyScan() {
 // Google Drive Picker ג€” lets user browse and pick any folder
 function openDrivePicker() {
     if (!googleAccessToken) {
-        showToast('יש לחבר Google Drive ׳חילה ג€” לחץ "חבר Drive" בהגדרו׳', 'error');
+        showToast('יש לחבר Google Drive תחילה ג€” לחץ "חבר Drive" בהגדרות', 'error');
         return;
     }
     if (typeof gapi === 'undefined' || typeof google === 'undefined') {
-        showToast('ממ׳ין לטעינ׳ Google API... נסה שוב בעוד שנייה', 'error');
+        showToast('ממתין לטעינת Google API... נסה שוב בעוד שנייה', 'error');
         return;
     }
     try {
@@ -2228,30 +2228,30 @@ function openDrivePicker() {
                     .setSelectFolderEnabled(true)
                     .setMimeTypes('application/vnd.google-apps.folder');
                 const picker = new google.picker.PickerBuilder()
-                    .setTitle('בחר ׳יקייה לשמיר׳ הצעו׳ מחיר')
+                    .setTitle('בחר תיקייה לשמירת הצעות מחיר')
                     .addView(folderView)
                     .setOAuthToken(googleAccessToken)
                     .setCallback(async (pickerData) => {
                         if (pickerData.action === google.picker.Action.PICKED) {
                             const folder = pickerData.docs[0];
-                            showToast(`׳יקייה נבחרה: ${folder.name}`);
+                            showToast(`תיקייה נבחרה: ${folder.name}`);
                             await handleDriveFolderChange(folder.id);
                         }
                     })
                     .build();
                 picker.setVisible(true);
             } catch (innerErr) {
-                showToast('שגיאה בפ׳יח׳ בוחר ה׳יקיו׳ ג€” יש לחבר מחדש ל-Drive', 'error');
+                showToast('שגיאה בפתיחת בוחר התיקיות ג€” יש לחבר מחדש ל-Drive', 'error');
             }
         });
     } catch (e) {
-        showToast('שגיאה בטעינ׳ Google Picker ג€” יש לחבר מחדש ל-Drive', 'error');
+        showToast('שגיאה בטעינת Google Picker ג€” יש לחבר מחדש ל-Drive', 'error');
     }
 }
 
 async function smartSyncFromDrive() {
     if (!googleAccessToken) {
-        showToast('יש לחבר Google Drive ׳חילה', 'error');
+        showToast('יש לחבר Google Drive תחילה', 'error');
         return;
     }
     setSyncLoading(true);
@@ -2265,7 +2265,7 @@ async function smartSyncFromDrive() {
         }
         // Step 3: if still nothing, scan for legacy data
         if (projectsList.length === 0) {
-            showToast('מחפש נ׳ונים ישנים ב׳יקייה...', 'error');
+            showToast('מחפש נתונים ישנים בתיקייה...', 'error');
             await manualLegacyScan();
         }
     } finally {
@@ -2324,6 +2324,10 @@ async function syncDatabaseFromDrive(silent = false) {
                         projectsList = cloudData.projects;
                         localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList));
                     }
+                    if (cloudData.trash) {
+                        trashedProjectsList = cloudData.trash;
+                        localStorage.setItem(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList));
+                    }
                     if (cloudData.users && cloudData.users.length > 0) {
                         const currentUsers = JSON.parse(localStorage.getItem('sj_app_users') || '[]');
                         // Merge: keep local entries for emails not in cloud, use cloud entries otherwise
@@ -2348,12 +2352,12 @@ async function syncDatabaseFromDrive(silent = false) {
                     }
                     
                     if (!silent) {
-                        showToast('נ׳וני האפליקציה סונכרנו מהענן בהצלחה!');
+                        showToast('נתוני האפליקציה סונכרנו מהענן בהצלחה!');
                     }
                 } else if (localTimestamp > cloudTimestamp) {
                     await syncDatabaseToDrive(true);
                 } else {
-                    if (!silent) showToast('הנ׳ונים בענן כבר מעודכנים');
+                    if (!silent) showToast('הנתונים בענן כבר מעודכנים');
                 }
             }
         } else {
@@ -2375,7 +2379,7 @@ async function syncDatabaseFromDrive(silent = false) {
                 loadSettings();
                 filterProjectsList();
                 renderHistoryList();
-                if (!silent) showToast('שוחזרו נ׳ונים ישנים מהדרייב!');
+                if (!silent) showToast('שוחזרו נתונים ישנים מהדרייב!');
             }
             await syncDatabaseToDrive(true);
         }
@@ -2418,6 +2422,7 @@ async function syncDatabaseToDrive(silent = true) {
             settings: appState.settings,
             history: appState.history,
             projects: projectsList,
+            trash: trashedProjectsList,
             users: usersRaw ? JSON.parse(usersRaw) : [],
             lastUpdated: timestamp
         };
@@ -2454,7 +2459,7 @@ async function syncDatabaseToDrive(silent = true) {
         if (!uploadRes.ok) throw new Error('Upload request failed');
         
         if (!silent) {
-            showToast('נ׳וני האפליקציה נשמרו וסונכרנו לענן בהצלחה!');
+            showToast('נתוני האפליקציה נשמרו וסונכרנו לענן בהצלחה!');
         }
     } catch (e) {
         console.error('Error syncing to cloud:', e);
@@ -2471,18 +2476,18 @@ function manualSyncFromCloud() {
 
 async function autoDetectQuoteNumber(showAlerts = false) {
     if (!googleAccessToken) {
-        if (showAlerts) showToast('גוגל דרייב אינו מחובר. אנא ה׳חבר דרך הגדרו׳ מערכ׳', 'error');
+        if (showAlerts) showToast('גוגל דרייב אינו מחובר. אנא התחבר דרך הגדרות מערכת', 'error');
         return;
     }
     
     if (showAlerts) {
-        showToast('סורק קבצים בדרייב לקביע׳ מספר הצעה...');
+        showToast('סורק קבצים בדרייב לקביעת מספר הצעה...');
     }
     
     try {
         const folders = await resolveSjDriveFolders();
         if (!folders || !folders.quotes) {
-            if (showAlerts) showToast('שגיאה בגישה ל׳יקיי׳ הצעו׳ מחיר בדרייב', 'error');
+            if (showAlerts) showToast('שגיאה בגישה לתיקיית הצעות מחיר בדרייב', 'error');
             return;
         }
         const folderId = folders.quotes;
@@ -2493,7 +2498,7 @@ async function autoDetectQuoteNumber(showAlerts = false) {
         if (!res.ok) {
             if (res.status === 401) {
                 clearDriveSession();
-                if (showAlerts) showToast('פג ׳וקף החיבור לגוגל דרייב. אנא ה׳חבר מחדש בהגדרו׳', 'error');
+                if (showAlerts) showToast('פג תוקף החיבור לגוגל דרייב. אנא התחבר מחדש בהגדרות', 'error');
                 return;
             }
             throw new Error('Drive API error');
@@ -2524,16 +2529,16 @@ async function autoDetectQuoteNumber(showAlerts = false) {
         appState.currentQuote.quoteNumber = finalQuoteStr;
         updatePreviewFromForm();
         
-        showToast(`זוהה מספר הצעה הבא מ׳וך הדרייב: ${finalQuoteStr}`);
+        showToast(`זוהה מספר הצעה הבא מתוך הדרייב: ${finalQuoteStr}`);
     } catch (e) {
         console.error(e);
-        if (showAlerts) showToast('שגיאה בסריק׳ הדרייב', 'error');
+        if (showAlerts) showToast('שגיאה בסריקת הדרייב', 'error');
     }
 }
 
 function uploadPDFToDrive() {
     const clientName = document.getElementById('form-client-name').value.trim() || 'לקוח';
-    const subject = document.getElementById('form-quote-subject').value.trim() || 'הצע׳ מחיר';
+    const subject = document.getElementById('form-quote-subject').value.trim() || 'הצעת מחיר';
     const quoteNumber = document.getElementById('form-quote-number').value.trim() || '000';
     
     appState.currentQuote.clientName = clientName;
@@ -2547,13 +2552,13 @@ function uploadPDFToDrive() {
     updatePreviewFromForm();
     
     if (!googleAccessToken) {
-        showToast('אנא חבר א׳ Google Drive דרך הגדרו׳ מערכ׳ ׳חילה', 'error');
+        showToast('אנא חבר את Google Drive דרך הגדרות מערכת תחילה', 'error');
         switchTab('settings');
         return;
     }
     
     const element = document.getElementById('quote-pdf-sheet');
-    const filename = `הצע׳ מחיר_${quoteNumber}_${clientName.replace(/\s+/g, '_')}.pdf`;
+    const filename = `הצעת מחיר_${quoteNumber}_${clientName.replace(/\s+/g, '_')}.pdf`;
     
     const options = {
         margin: 10,
@@ -2584,7 +2589,7 @@ function uploadPDFToDrive() {
             try {
                 const folders = await resolveSjDriveFolders();
                 if (!folders || !folders.quotes) {
-                    throw new Error('לא ני׳ן למצוא או ליצור א׳ ׳יקיי׳ היעד בדרייב');
+                    throw new Error('לא ניתן למצוא או ליצור את תיקיית היעד בדרייב');
                 }
                 const folderId = folders.quotes;
                 
@@ -2642,7 +2647,7 @@ function uploadPDFToDrive() {
                 if (!res.ok) {
                     if (res.status === 401) {
                         clearDriveSession();
-                        throw new Error('פג ׳וקף החיבור לגוגל דרייב. אנא ה׳חבר מחדש בהגדרו׳');
+                        throw new Error('פג תוקף החיבור לגוגל דרייב. אנא התחבר מחדש בהגדרות');
                     }
                     throw new Error('Drive API Upload failed');
                 }
@@ -2663,7 +2668,7 @@ function uploadPDFToDrive() {
         })
         .catch(err => {
             console.error('PDF error:', err);
-            showToast('שגיאה בהפק׳ קובץ ה-PDF', 'error');
+            showToast('שגיאה בהפקת קובץ ה-PDF', 'error');
             btn.disabled = false;
             btn.innerHTML = originalText;
         });
@@ -2708,88 +2713,88 @@ function getProfessionSystemInstruction() {
     
     switch (profession) {
         case 'charger_installer':
-            specificContent = `א׳ה מומחה ׳מחור, חישוב חומרים וניהול עבודו׳ של ה׳קנ׳ עמדו׳ טעינה לרכבים חשמליים בישראל (עבור ס׳יו ג'אן - SJ הנדס׳ חשמל).
-׳פקידך לנהל שיחה מקצועי׳, ממוקד׳ ומסייע׳ כדי לעזור לס׳יו ל׳מחר ה׳קנ׳ עמד׳ טעינה לרכב חשמלי.
+            specificContent = `אתה מומחה תמחור, חישוב חומרים וניהול עבודות של התקנת עמדות טעינה לרכבים חשמליים בישראל (עבור סתיו ג'אן - SJ הנדסת חשמל).
+תפקידך לנהל שיחה מקצועית, ממוקדת ומסייעת כדי לעזור לסתיו לתמחר התקנת עמדת טעינה לרכב חשמלי.
 
 בכל הודעה שלך:
-1. נ׳ח א׳ עבוד׳ ה׳קנ׳ עמד׳ הטעינה שס׳יו מ׳אר.
-2. זהה נקודו׳ עיוורון (Blind spots) ודרישו׳ קריטיו׳ - דברים שצריך לקח׳ בחשבון (למשל: סוג הלוח - חד-פאזי או ׳ל׳-פאזי, הארקה של הבניין, מגן זליגה 6mA DC מובנה או מפסק מגן Type B ייעודי בלוח, מוליכי כבל מ׳אימים 5x6 או 5x10, אופן קיבוע המוביל - צינור מריכף, ׳עלה סגורה או חציבה, מרחק בפועל מהלוח, עבודה בגובה, הפרעו׳ בשטח, הגדל׳ חיבור ו׳יאום מול חבר׳ החשמל, שאלו׳ לקיבוע המוביל וכדומה).
-3. הצע רשימ׳ חומרים נלווים ואביזרים שס׳יו צריך לקנו׳ כדי להשלים א׳ עבוד׳ הה׳קנה קומפלט פרפקט (כגון דיבלים, ברגים, כבל XLPE, ׳עלו׳ PVC, קופסאו׳ חיבור, עמד׳ טעינה, צינורו׳ הגנה, מהדקים, חציבו׳ וכו').
-4. בצע "בדיק׳ מחירים באינטרנט" - ספק הערכ׳ מחיר רכש משוער׳ לחומרים (כאילו חיפש׳ בא׳רים כמו ארכה) ופרט א׳ מחירי החומרים בשקלים.
-5. ספק אומדן עלו׳ עבודה (עבודה בלבד, ללא חומרים) משוער׳ בשקלים חדשים (ני׳ן להס׳מך על מחירונים מקובלים כמו מחירון שטרן).`;
+1. נתח את עבודת התקנת עמדת הטעינה שסתיו מתאר.
+2. זהה נקודות עיוורון (Blind spots) ודרישות קריטיות - דברים שצריך לקחת בחשבון (למשל: סוג הלוח - חד-פאזי או תלת-פאזי, הארקה של הבניין, מגן זליגה 6mA DC מובנה או מפסק מגן Type B ייעודי בלוח, מוליכי כבל מתאימים 5x6 או 5x10, אופן קיבוע המוביל - צינור מריכף, תעלה סגורה או חציבה, מרחק בפועל מהלוח, עבודה בגובה, הפרעות בשטח, הגדלת חיבור ותיאום מול חברת החשמל, שאלות לקיבוע המוביל וכדומה).
+3. הצע רשימת חומרים נלווים ואביזרים שסתיו צריך לקנות כדי להשלים את עבודת ההתקנה קומפלט פרפקט (כגון דיבלים, ברגים, כבל XLPE, תעלות PVC, קופסאות חיבור, עמדת טעינה, צינורות הגנה, מהדקים, חציבות וכו').
+4. בצע "בדיקת מחירים באינטרנט" - ספק הערכת מחיר רכש משוערת לחומרים (כאילו חיפשת באתרים כמו ארכה) ופרט את מחירי החומרים בשקלים.
+5. ספק אומדן עלות עבודה (עבודה בלבד, ללא חומרים) משוערת בשקלים חדשים (ניתן להסתמך על מחירונים מקובלים כמו מחירון שטרן).`;
             break;
             
         case 'solar_installer':
-            specificContent = `א׳ה מומחה ׳מחור, חישוב חומרים וניהול עבודו׳ של ה׳קנ׳ מערכו׳ סולאריו׳ (PV) בישראל (עבור ס׳יו ג'אן - SJ הנדס׳ חשמל).
-׳פקידך לנהל שיחה מקצועי׳, ממוקד׳ ומסייע׳ כדי לעזור לס׳יו ל׳מחר ה׳קנ׳ מערכ׳ סולארי׳ לייצור חשמל.
+            specificContent = `אתה מומחה תמחור, חישוב חומרים וניהול עבודות של התקנת מערכות סולאריות (PV) בישראל (עבור סתיו ג'אן - SJ הנדסת חשמל).
+תפקידך לנהל שיחה מקצועית, ממוקדת ומסייעת כדי לעזור לסתיו לתמחר התקנת מערכת סולארית לייצור חשמל.
 
 בכל הודעה שלך:
-1. נ׳ח א׳ עבוד׳ הה׳קנה הסולארי׳ שס׳יו מ׳אר.
-2. זהה נקודו׳ עיוורון (Blind spots) ודרישו׳ קריטיו׳ - דברים שצריך לקח׳ בחשבון (למשל: סוג הגג - בטון, רעפים או איסכורי׳, הצללו׳ אפשריו׳, כביל׳ DC ייעודי׳ עמידה בקרני UV, סוג הממיר - Inverter, עגינה וקונסטרוקציה מ׳אימה לעומסי רוח, הארקו׳ שלד׳ הפנלים, הכנו׳ לחיבור ללוח הראשי, מונה נטו ואישורים מול חבר׳ החשמל, דרישו׳ כיבוי אש, עבודה בגובה, פיגומים או מנוף, בטיחו׳ בשטח וכו').
-3. הצע רשימ׳ חומרים נלווים ואביזרים שס׳יו צריך לקנו׳ כדי להשלים א׳ הה׳קנה קומפלט פרפקט (כגון פנלים סולאריים, ממיר, מסילו׳ אלומיניום, ׳ופסנים, ברגי עגינה, כבלי DC 4/6 ממ"ר, מהדקים, מפסקי DC, לוח הגנו׳ וכו').
-4. בצע "בדיק׳ מחירים באינטרנט" - ספק הערכ׳ מחיר רכש משוער׳ לחומרים ופרט א׳ מחירי החומרים בשקלים.
-5. ספק אומדן עלו׳ עבודה (עבודה בלבד, ללא חומרים) משוער׳ בשקלים חדשים.`;
+1. נתח את עבודת ההתקנה הסולארית שסתיו מתאר.
+2. זהה נקודות עיוורון (Blind spots) ודרישות קריטיות - דברים שצריך לקחת בחשבון (למשל: סוג הגג - בטון, רעפים או איסכורית, הצללות אפשריות, כבילת DC ייעודית עמידה בקרני UV, סוג הממיר - Inverter, עגינה וקונסטרוקציה מתאימה לעומסי רוח, הארקות שלדת הפנלים, הכנות לחיבור ללוח הראשי, מונה נטו ואישורים מול חברת החשמל, דרישות כיבוי אש, עבודה בגובה, פיגומים או מנוף, בטיחות בשטח וכו').
+3. הצע רשימת חומרים נלווים ואביזרים שסתיו צריך לקנות כדי להשלים את ההתקנה קומפלט פרפקט (כגון פנלים סולאריים, ממיר, מסילות אלומיניום, תופסנים, ברגי עגינה, כבלי DC 4/6 ממ"ר, מהדקים, מפסקי DC, לוח הגנות וכו').
+4. בצע "בדיקת מחירים באינטרנט" - ספק הערכת מחיר רכש משוערת לחומרים ופרט את מחירי החומרים בשקלים.
+5. ספק אומדן עלות עבודה (עבודה בלבד, ללא חומרים) משוערת בשקלים חדשים.`;
             break;
             
         case 'renovator':
-            specificContent = `א׳ה מומחה ׳מחור, חישוב חומרים וניהול עבודו׳ שיפוצים ובינוי פנים בישראל (עבור ס׳יו ג'אן - SJ הנדס׳ חשמל).
-׳פקידך לנהל שיחה מקצועי׳, ממוקד׳ ומסייע׳ כדי לעזור לס׳יו ל׳מחר עבודו׳ שיפוץ וגמר פנים.
+            specificContent = `אתה מומחה תמחור, חישוב חומרים וניהול עבודות שיפוצים ובינוי פנים בישראל (עבור סתיו ג'אן - SJ הנדסת חשמל).
+תפקידך לנהל שיחה מקצועית, ממוקדת ומסייעת כדי לעזור לסתיו לתמחר עבודות שיפוץ וגמר פנים.
 
 בכל הודעה שלך:
-1. נ׳ח א׳ עבוד׳ השיפוצים שס׳יו מ׳אר.
-2. זהה נקודו׳ עיוורון (Blind spots) ודרישו׳ קריטיו׳ - דברים שצריך לקח׳ בחשבון (למשל: עבודו׳ הריסה ופינוי פסול׳ למכולה מורשי׳, מצב ה׳ש׳יו׳ הישנו׳ כמו אינסטלציה וחשמל, איטום חדרים רטובים - מקלחו׳/מרפסו׳, פילוס הרצפה, סוגי לוחו׳ גבס - ירוק/ורוד/לבן, שפכטל אמריקאי וצבע, חלוק׳ עומסים, פ׳חי שירו׳ למערכו׳, עבודה בשעו׳ מו׳רו׳, הגנה על מעליו׳ ורכוש משו׳ף וכו').
-3. הצע רשימ׳ חומרים נלווים ואביזרים שס׳יו צריך לקנו׳ כדי להשלים א׳ העבודה קומפלט פרפקט (כגון מלט, חול, טיח, בלוקים, לוחו׳ גבס, פרופילים, ברגים, דבקי קרמיקה, רובה, חומרי איטום צמנטיים/אקריליים, צנר׳ מים SP/פקסגול, קופסאו׳ חיבור וכו').
-4. בצע "בדיק׳ מחירים באינטרנט" - ספק הערכ׳ מחיר רכש משוער׳ לחומרים ופרט א׳ מחירי החומרים בשקלים.
-5. ספק אומדן עלו׳ עבודה (עבודה בלבד, ללא חומרים) משוער׳ בשקלים חדשים (ני׳ן להס׳מך על מחירונים מקובלים כמו מחירון דקל או שטרן).`;
+1. נתח את עבודת השיפוצים שסתיו מתאר.
+2. זהה נקודות עיוורון (Blind spots) ודרישות קריטיות - דברים שצריך לקחת בחשבון (למשל: עבודות הריסה ופינוי פסולת למכולה מורשית, מצב התשתיות הישנות כמו אינסטלציה וחשמל, איטום חדרים רטובים - מקלחות/מרפסות, פילוס הרצפה, סוגי לוחות גבס - ירוק/ורוד/לבן, שפכטל אמריקאי וצבע, חלוקת עומסים, פתחי שירות למערכות, עבודה בשעות מותרות, הגנה על מעליות ורכוש משותף וכו').
+3. הצע רשימת חומרים נלווים ואביזרים שסתיו צריך לקנות כדי להשלים את העבודה קומפלט פרפקט (כגון מלט, חול, טיח, בלוקים, לוחות גבס, פרופילים, ברגים, דבקי קרמיקה, רובה, חומרי איטום צמנטיים/אקריליים, צנרת מים SP/פקסגול, קופסאות חיבור וכו').
+4. בצע "בדיקת מחירים באינטרנט" - ספק הערכת מחיר רכש משוערת לחומרים ופרט את מחירי החומרים בשקלים.
+5. ספק אומדן עלות עבודה (עבודה בלבד, ללא חומרים) משוערת בשקלים חדשים (ניתן להסתמך על מחירונים מקובלים כמו מחירון דקל או שטרן).`;
             break;
             
         case 'contractor':
-            specificContent = `א׳ה מומחה ׳מחור, חישוב חומרים וניהול עבודו׳ בנייה וגמר שלד בישראל (עבור ס׳יו ג'אן - SJ הנדס׳ חשמל).
-׳פקידך לנהל שיחה מקצועי׳, ממוקד׳ ומסייע׳ כדי לעזור לס׳יו ל׳מחר פרויקטי בנייה, עבודו׳ שלד וגמר של בניינים וב׳ים פרטיים.
+            specificContent = `אתה מומחה תמחור, חישוב חומרים וניהול עבודות בנייה וגמר שלד בישראל (עבור סתיו ג'אן - SJ הנדסת חשמל).
+תפקידך לנהל שיחה מקצועית, ממוקדת ומסייעת כדי לעזור לסתיו לתמחר פרויקטי בנייה, עבודות שלד וגמר של בניינים ובתים פרטיים.
 
 בכל הודעה שלך:
-1. נ׳ח א׳ עבוד׳ הבנייה או השלד שס׳יו מ׳אר.
-2. זהה נקודו׳ עיוורון (Blind spots) ודרישו׳ קריטיו׳ - דברים שצריך לקח׳ בחשבון (למשל: סוג הלוח או הביסוס והכלונסאו׳, אישורי קונסטרוקטור, בדיקו׳ מעבדה לבטון, ברזל זיון ו׳פסנו׳, איטום יסודו׳ וקירו׳ מסד, פיגומים ׳קניים ועבודה בגובה, דרכי גישה למערבלי בטון ומשאבו׳, בטיחו׳ א׳ר הבנייה, ׳יאום מערכו׳ חשמל/אינסטלציה/מיזוג ב׳וך יציקו׳ השלד, שלבי ה׳קדמו׳ הבנייה, לוחו׳ זמנים וכו').
-3. הצע רשימ׳ חומרים נלווים ואביזרים שס׳יו צריך לקנו׳ כדי להשלים א׳ העבודה קומפלט פרפקט (כגון בטון מוכן מסוגים שונים, ברזל בניין בעוביים שונים, עץ ׳בניו׳, בלוקים מכל הסוגים - פומיס/איטונג, רש׳ו׳ ברזל, חומרי איטום ביטומניים, צינורו׳ שרוול וכו').
-4. בצע "בדיק׳ מחירים באינטרנט" - ספק הערכ׳ מחיר רכש משוער׳ לחומרים ופרט א׳ מחירי החומרים בשקלים.
-5. ספק אומדן עלו׳ עבודה (עבודה בלבד, ללא חומרים) משוער׳ בשקלים חדשים (בה׳בסס על מחירונים מקובלים בשוק לעבודו׳ שלד וגמר).`;
+1. נתח את עבודת הבנייה או השלד שסתיו מתאר.
+2. זהה נקודות עיוורון (Blind spots) ודרישות קריטיות - דברים שצריך לקחת בחשבון (למשל: סוג הלוח או הביסוס והכלונסאות, אישורי קונסטרוקטור, בדיקות מעבדה לבטון, ברזל זיון ותפסנות, איטום יסודות וקירות מסד, פיגומים תקניים ועבודה בגובה, דרכי גישה למערבלי בטון ומשאבות, בטיחות אתר הבנייה, תיאום מערכות חשמל/אינסטלציה/מיזוג בתוך יציקות השלד, שלבי התקדמות הבנייה, לוחות זמנים וכו').
+3. הצע רשימת חומרים נלווים ואביזרים שסתיו צריך לקנות כדי להשלים את העבודה קומפלט פרפקט (כגון בטון מוכן מסוגים שונים, ברזל בניין בעוביים שונים, עץ תבניות, בלוקים מכל הסוגים - פומיס/איטונג, רשתות ברזל, חומרי איטום ביטומניים, צינורות שרוול וכו').
+4. בצע "בדיקת מחירים באינטרנט" - ספק הערכת מחיר רכש משוערת לחומרים ופרט את מחירי החומרים בשקלים.
+5. ספק אומדן עלות עבודה (עבודה בלבד, ללא חומרים) משוערת בשקלים חדשים (בהתבסס על מחירונים מקובלים בשוק לעבודות שלד וגמר).`;
             break;
             
         case 'electrician':
         default:
-            specificContent = `א׳ה מומחה ׳מחור, חישוב חומרים וניהול עבודו׳ חשמל עבור חשמלאי מוסמך בישראל (ס׳יו ג'אן - SJ הנדס׳ חשמל).
-׳פקידך לנהל שיחה מקצועי׳, ממוקד׳ ומסייע׳ כדי לעזור לס׳יו ל׳מחר עבודו׳ חשמל.
+            specificContent = `אתה מומחה תמחור, חישוב חומרים וניהול עבודות חשמל עבור חשמלאי מוסמך בישראל (סתיו ג'אן - SJ הנדסת חשמל).
+תפקידך לנהל שיחה מקצועית, ממוקדת ומסייעת כדי לעזור לסתיו לתמחר עבודות חשמל.
 
 בכל הודעה שלך:
-1. נ׳ח א׳ העבודה שס׳יו מ׳אר.
-2. זהה נקודו׳ עיוורון (Blind spots) - דברים שצריך לקח׳ בחשבון (למשל: סוג הלוח, מרחק בפועל, חציבו׳ בבטון/בלוק, הארקה, מפסקי מגן, אישורים, הגדל׳ חיבור, עבודה בגובה, הפרעו׳ בשטח וכו').
-3. הצע רשימ׳ חומרים נלווים ואביזרים שס׳יו צריך לקנו׳ כדי להשלים א׳ העבודה קומפלט פרפקט (כגון דיבלים, ברגים, כבלים, ׳עלו׳, קופסאו׳ חיבור, עמד׳ טעינה, צינורו׳ וכו').
-4. בצע "בדיק׳ מחירים באינטרנט" - ספק הערכ׳ מחיר רכש משוער׳ לחומרים (כאילו חיפש׳ בא׳רים כמו ארכה) ופרט א׳ מחירי החומרים בשקלים.
-5. ספק אומדן עלו׳ עבודה (עבודה בלבד, ללא חומרים) משוער׳ בשקלים חדשים (ני׳ן להס׳מך על מחירונים מקובלים כמו מחירון שטרן).`;
+1. נתח את העבודה שסתיו מתאר.
+2. זהה נקודות עיוורון (Blind spots) - דברים שצריך לקחת בחשבון (למשל: סוג הלוח, מרחק בפועל, חציבות בבטון/בלוק, הארקה, מפסקי מגן, אישורים, הגדלת חיבור, עבודה בגובה, הפרעות בשטח וכו').
+3. הצע רשימת חומרים נלווים ואביזרים שסתיו צריך לקנות כדי להשלים את העבודה קומפלט פרפקט (כגון דיבלים, ברגים, כבלים, תעלות, קופסאות חיבור, עמדת טעינה, צינורות וכו').
+4. בצע "בדיקת מחירים באינטרנט" - ספק הערכת מחיר רכש משוערת לחומרים (כאילו חיפשת באתרים כמו ארכה) ופרט את מחירי החומרים בשקלים.
+5. ספק אומדן עלות עבודה (עבודה בלבד, ללא חומרים) משוערת בשקלים חדשים (ניתן להסתמך על מחירונים מקובלים כמו מחירון שטרן).`;
             break;
     }
 
     return `${specificContent}
 
-כדי שה׳וכנה ׳דע לעדכן א׳ הממשק הדינמי (הצ'קליסט ועלו׳ העבודה בצד ימין), עליך לסיים כל ׳שובה שלך עם גוש JSON מובנה ב׳וך בלוק קוד של json (למשל \`\`\`json ... \`\`\`).
-המבנה של ה-JSON חייב להיו׳ בדיוק כזה:
+כדי שהתוכנה תדע לעדכן את הממשק הדינמי (הצ'קליסט ועלות העבודה בצד ימין), עליך לסיים כל תשובה שלך עם גוש JSON מובנה בתוך בלוק קוד של json (למשל \`\`\`json ... \`\`\`).
+המבנה של ה-JSON חייב להיות בדיוק כזה:
 {
   "laborPriceEstimate": 1500, // מחיר עבודה מוערך בלבד (מספר)
   "blindSpots": [
-    "פרט כאן נקוד׳ עיוורון ראשונה המבוסס׳ על העיסוק",
-    "פרט כאן נקוד׳ עיוורון שנייה המבוסס׳ על העיסוק"
+    "פרט כאן נקודת עיוורון ראשונה המבוססת על העיסוק",
+    "פרט כאן נקודת עיוורון שנייה המבוססת על העיסוק"
   ],
   "materials": [
     {
       "name": "שם החומר או האביזר",
       "price": 25, // מחיר מוערך ליחידה או סה"כ (מספר)
-      "details": "כמו׳ והערה (למשל: 15 מטר)",
+      "details": "כמות והערה (למשל: 15 מטר)",
       "checked": true
     }
   ]
 }
 
-חשוב מאוד: אל ׳כ׳וב א׳ ה-JSON באמצע ה׳שובה אלא רק בסופה. החלק העיקרי של ה׳שובה צריך להיו׳ הסבר אנושי, חם ומקצועי בעברי׳, המפרט א׳ הני׳וח שלך, הטיפים וההסברים על מחירי החומרים.`;
+חשוב מאוד: אל תכתוב את ה-JSON באמצע התשובה אלא רק בסופה. החלק העיקרי של התשובה צריך להיות הסבר אנושי, חם ומקצועי בעברית, המפרט את הניתוח שלך, הטיפים וההסברים על מחירי החומרים.`;
 }
 
 // ==========================================================================
@@ -2828,7 +2833,7 @@ function handleUserRegister(event) {
     const profession = professionSelect.value;
     
     if (!username || !password) {
-        showToast('אנא מלא א׳ כל השדו׳', 'error');
+        showToast('אנא מלא את כל השדות', 'error');
         return;
     }
     
@@ -2846,7 +2851,7 @@ function handleUserRegister(event) {
     // Check if user already exists
     const exists = users.some(u => u.username.toLowerCase() === username.toLowerCase());
     if (exists) {
-        showToast('שם המש׳מש כבר קיים במערכ׳', 'error');
+        showToast('שם המשתמש כבר קיים במערכת', 'error');
         return;
     }
     
@@ -2877,7 +2882,7 @@ function handleUserRegister(event) {
     passwordInput.value = '';
     
     initUserSession();
-    showToast(`ברוך הבא למערכ׳, ${username}!`);
+    showToast(`ברוך הבא למערכת, ${username}!`);
 }
 
 function handleUserLogin(event) {
@@ -2892,7 +2897,7 @@ function handleUserLogin(event) {
     const password = passwordInput.value;
     
     if (!username || !password) {
-        showToast('אנא מלא א׳ כל השדו׳', 'error');
+        showToast('אנא מלא את כל השדות', 'error');
         return;
     }
     
@@ -2910,7 +2915,7 @@ function handleUserLogin(event) {
     // Find user
     const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
     if (!user || user.password !== password) {
-        showToast('שם מש׳מש או סיסמה שגויים', 'error');
+        showToast('שם משתמש או סיסמה שגויים', 'error');
         return;
     }
     
@@ -2930,7 +2935,7 @@ function handleUserLogin(event) {
 }
 
 function handleUserLogout() {
-    if (!confirm('האם א׳ה בטוח שברצונך לה׳נ׳ק ולנעול א׳ המערכ׳?')) return;
+    if (!confirm('האם אתה בטוח שברצונך להתנתק ולנעול את המערכת?')) return;
     
     // Remove active user from both local and session storage
     localStorage.removeItem('sj_logged_in_user');
@@ -2944,7 +2949,7 @@ function handleUserLogout() {
     // Reset internal state
     resetAppState();
     
-    showToast('ה׳נ׳ק׳ מהמערכ׳ בהצלחה');
+    showToast('התנתקת מהמערכת בהצלחה');
 }
 
 function updateUserProfileUI() {
@@ -2961,10 +2966,10 @@ function updateUserProfileUI() {
     
     const professionMap = {
         'electrician': 'חשמלאי מוסמך',
-        'charger_installer': 'מ׳קין עמדו׳ טעינה',
-        'solar_installer': 'מ׳קין מערכו׳ סולאריו׳',
+        'charger_installer': 'מתקין עמדות טעינה',
+        'solar_installer': 'מתקין מערכות סולאריות',
         'renovator': 'קבלן שיפוצים',
-        'contractor': 'קבלן עבודו׳ בנייה וגמר'
+        'contractor': 'קבלן עבודות בנייה וגמר'
     };
     
     const displayName = user ? user.username : activeUser;
@@ -3001,7 +3006,7 @@ function updateUserProfileProfession() {
     
     const newProfession = professionInput.value.trim();
     if (!newProfession) {
-        showToast('אנא הזן ׳חום עיסוק ׳קין', 'error');
+        showToast('אנא הזן תחום עיסוק תקין', 'error');
         return;
     }
     
@@ -3030,7 +3035,7 @@ function updateUserProfileProfession() {
     // Refresh UI
     updateUserProfileUI();
     
-    showToast('׳חום העיסוק עודכן בהצלחה');
+    showToast('תחום העיסוק עודכן בהצלחה');
     
     // Save to drive if connected
     syncDatabaseToDrive(true);
@@ -3048,7 +3053,7 @@ function handleUpdateCredentials(event) {
     const newPassword = newPasswordInput.value;
     
     if (!newUsername || !newPassword) {
-        showToast('אנא מלא א׳ כל השדו׳', 'error');
+        showToast('אנא מלא את כל השדות', 'error');
         return;
     }
     
@@ -3065,11 +3070,11 @@ function handleUpdateCredentials(event) {
     // Check if new username conflicts with another existing user
     const usernameConflict = users.some(u => u.username.toLowerCase() === newUsername.toLowerCase() && u.username.toLowerCase() !== activeUser.toLowerCase());
     if (usernameConflict) {
-        showToast('שם המש׳מש החדש כבר ׳פוס על ידי מש׳מש אחר', 'error');
+        showToast('שם המשתמש החדש כבר תפוס על ידי משתמש אחר', 'error');
         return;
     }
     
-    if (!confirm('האם א׳ה בטוח שברצונך לעדכן א׳ פרטי האבטחה? (שם המש׳מש והסיסמה יעודכנו והנ׳ונים המקומיים שלך יועברו לשם המש׳מש החדש)')) {
+    if (!confirm('האם אתה בטוח שברצונך לעדכן את פרטי האבטחה? (שם המשתמש והסיסמה יעודכנו והנתונים המקומיים שלך יועברו לשם המשתמש החדש)')) {
         return;
     }
     
@@ -3115,7 +3120,7 @@ function handleUpdateCredentials(event) {
     // Update the UI
     updateUserProfileUI();
     
-    showToast('פרטי האבטחה עודכנו ונ׳וני המש׳מש הועברו בהצלחה!');
+    showToast('פרטי האבטחה עודכנו ונתוני המשתמש הועברו בהצלחה!');
     
     // 4. Trigger cloud sync (will upload to the new user file: sj_app_database_newusername.json)
     syncDatabaseToDrive(true);
@@ -3131,20 +3136,20 @@ function resetAppState() {
             logoStyle: { align: 'center', width: '75', marginTop: '0', marginBottom: '10' },
             profession: 'electrician',
             businessDetails: {
-                name: 'SJ הנדס׳ חשמל',
-                owner: "ס׳יו ג'אן",
+                name: 'SJ הנדסת חשמל',
+                owner: "סתיו ג'אן",
                 id: 'עוסק פטור: 207382920',
                 phone: '053-530-2887',
                 email: 'info@sj-eng.co.il',
                 web: 'www.sj-eng.co.il',
-                address: 'דרך בן גוריון 138, ב׳ ים, יחידה 1304',
-                terms: `׳נאי ׳שלום:
-ג€¢ 50% מקדמה עם אישור הצע׳ המחיר ו׳חיל׳ העבודה.
-ג€¢ 50% הנו׳רים עם מסיר׳ ה׳וכניו׳ הסופיו׳.
+                address: 'דרך בן גוריון 138, בת ים, יחידה 1304',
+                terms: `תנאי תשלום:
+ג€¢ 50% מקדמה עם אישור הצעת המחיר ותחילת העבודה.
+ג€¢ 50% הנותרים עם מסירת התוכניות הסופיות.
 
-הערו׳ נוספו׳:
-ג€¢ כל שינוי ב׳וכניו׳ לאחר שלב האישור הראשוני עשוי לגרור ׳וספ׳ ׳שלום.
-ג€¢ ליווי מול חבר׳ החשמל אינו כולל א׳ אגרו׳ הבדיקה של חבר׳ החשמל.`
+הערות נוספות:
+ג€¢ כל שינוי בתוכניות לאחר שלב האישור הראשוני עשוי לגרור תוספת תשלום.
+ג€¢ ליווי מול חברת החשמל אינו כולל את אגרות הבדיקה של חברת החשמל.`
             }
         },
         currentQuote: {
@@ -3179,9 +3184,9 @@ function resetAppState() {
     if (phrasingInput) phrasingInput.value = '';
     
     const bizName = document.getElementById('set-biz-name');
-    if (bizName) bizName.value = 'SJ הנדס׳ חשמל';
+    if (bizName) bizName.value = 'SJ הנדסת חשמל';
     const bizOwner = document.getElementById('set-biz-owner');
-    if (bizOwner) bizOwner.value = "ס׳יו ג'אן";
+    if (bizOwner) bizOwner.value = "סתיו ג'אן";
     const bizId = document.getElementById('set-biz-id');
     if (bizId) bizId.value = 'עוסק פטור: 207382920';
     const bizPhone = document.getElementById('set-biz-phone');
@@ -3191,15 +3196,15 @@ function resetAppState() {
     const bizWeb = document.getElementById('set-biz-web');
     if (bizWeb) bizWeb.value = 'www.sj-eng.co.il';
     const bizAddress = document.getElementById('set-biz-address');
-    if (bizAddress) bizAddress.value = 'דרך בן גוריון 138, ב׳ ים, יחידה 1304';
+    if (bizAddress) bizAddress.value = 'דרך בן גוריון 138, בת ים, יחידה 1304';
     const bizTerms = document.getElementById('set-biz-terms');
-    if (bizTerms) bizTerms.value = `׳נאי ׳שלום:
-ג€¢ 50% מקדמה עם אישור הצע׳ המחיר ו׳חיל׳ העבודה.
-ג€¢ 50% הנו׳רים עם מסיר׳ ה׳וכניו׳ הסופיו׳.
+    if (bizTerms) bizTerms.value = `תנאי תשלום:
+ג€¢ 50% מקדמה עם אישור הצעת המחיר ותחילת העבודה.
+ג€¢ 50% הנותרים עם מסירת התוכניות הסופיות.
 
-הערו׳ נוספו׳:
-ג€¢ כל שינוי ב׳וכניו׳ לאחר שלב האישור הראשוני עשוי לגרור ׳וספ׳ ׳שלום.
-ג€¢ ליווי מול חבר׳ החשמל אינו כולל א׳ אגרו׳ הבדיקה של חבר׳ החשמל.`;
+הערות נוספות:
+ג€¢ כל שינוי בתוכניות לאחר שלב האישור הראשוני עשוי לגרור תוספת תשלום.
+ג€¢ ליווי מול חברת החשמל אינו כולל את אגרות הבדיקה של חברת החשמל.`;
 
     const logoAlign = document.getElementById('set-logo-align');
     if (logoAlign) logoAlign.value = 'center';
@@ -3257,7 +3262,7 @@ function handleGoogleLogin() {
     }
     
     if (!clientId) {
-        showToast('אנא הזן Google Client ID בהגדרו׳ החיבור ׳חילה', 'error');
+        showToast('אנא הזן Google Client ID בהגדרות החיבור תחילה', 'error');
         const configSection = document.getElementById('google-config-section');
         if (configSection) configSection.style.display = 'block';
         return;
@@ -3273,7 +3278,7 @@ function handleGoogleLogin() {
             scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
             callback: async (response) => {
                 if (response.error !== undefined) {
-                    showToast('שגיאה בה׳חברו׳ לגוגל: ' + response.error, 'error');
+                    showToast('שגיאה בהתחברות לגוגל: ' + response.error, 'error');
                     return;
                 }
                 const token = response.access_token;
@@ -3289,7 +3294,7 @@ function handleGoogleLogin() {
                     const email = userInfo.email;
                     
                     if (!email) {
-                        showToast('שגיאה בקבל׳ כ׳וב׳ האימייל מחשבון גוגל', 'error');
+                        showToast('שגיאה בקבלת כתובת האימייל מחשבון גוגל', 'error');
                         return;
                     }
                     
@@ -3323,14 +3328,14 @@ function handleGoogleLogin() {
                     }
                 } catch (userErr) {
                     console.error('Error fetching Google User info:', userErr);
-                    showToast('שגיאה בקבל׳ פרטי המש׳מש מגוגל: ' + userErr.message, 'error');
+                    showToast('שגיאה בקבלת פרטי המשתמש מגוגל: ' + userErr.message, 'error');
                 }
             }
         });
         googleTokenClient.requestAccessToken({ prompt: '' });
     } catch (e) {
         console.error('Google token initialization failed:', e);
-        showToast('שגיאה בא׳חול הה׳חברו׳ של גוגל. ודא שה-Client ID ׳קין', 'error');
+        showToast('שגיאה באתחול ההתחברות של גוגל. ודא שה-Client ID תקין', 'error');
     }
 }
 
@@ -3341,7 +3346,7 @@ function saveGoogleUserProfession(event) {
     
     const profession = modalInput.value.trim();
     if (!profession) {
-        showToast('אנא הזן ׳חום עיסוק', 'error');
+        showToast('אנא הזן תחום עיסוק', 'error');
         return;
     }
     
@@ -3404,7 +3409,7 @@ function completeGoogleLogin(email, profession, token, rememberMe) {
     document.querySelector('.app-container').style.display = 'flex';
     
     initUserSession();
-    showToast(`ברוך הבא למערכ׳, ${email}!`);
+    showToast(`ברוך הבא למערכת, ${email}!`);
 }
 
 async function loadDriveFoldersList() {
@@ -3419,15 +3424,15 @@ async function loadDriveFoldersList() {
         if (!container) return;
         
         if (folders.length === 0) {
-            container.innerHTML = `<span style="color:var(--text-muted); font-size:0.85rem;">לא נמצאו ׳יקיו׳ נוספו׳ בדרייב. ניצור א׳ ׳יקיי׳ 'הצעו׳ מחיר' כבריר׳ מחדל.</span>`;
+            container.innerHTML = `<span style="color:var(--text-muted); font-size:0.85rem;">לא נמצאו תיקיות נוספות בדרייב. ניצור את תיקיית 'הצעות מחיר' כברירת מחדל.</span>`;
             return;
         }
         
         let options = folders.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
-        options = `<option value="auto_sj">SJ הנדס׳ חשמל > הצעו׳ מחיר (בריר׳ מחדל)</option>` + options;
+        options = `<option value="auto_sj">SJ הנדסת חשמל > הצעות מחיר (ברירת מחדל)</option>` + options;
         
         container.innerHTML = `
-            <label style="font-size: 0.85rem; color: var(--text-secondary); display: block; margin-top: 10px;">בחר ׳יקיי׳ יעד ב-Drive לגיבוי:</label>
+            <label style="font-size: 0.85rem; color: var(--text-secondary); display: block; margin-top: 10px;">בחר תיקיית יעד ב-Drive לגיבוי:</label>
             <select id="settings-drive-folder-select" onchange="handleDriveFolderChange(this.value)" style="width:100%; margin-top: 5px; padding: 8px 12px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; font-family: inherit;">
                 ${options}
             </select>
@@ -3461,19 +3466,19 @@ async function handleDriveFolderChange(folderId) {
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
     
     try {
-        showToast('מעדכן מיקום ׳יקייה בדרייב...');
+        showToast('מעדכן מיקום תיקייה בדרייב...');
         await resolveSjDriveFolders();
         autoDetectQuoteNumber(false);
         await syncDatabaseToDrive(false);
-        showToast('מיקום ה׳יקייה עודכן וסונכרן בהצלחה');
+        showToast('מיקום התיקייה עודכן וסונכרן בהצלחה');
     } catch (e) {
-        showToast('שגיאה בעדכון מיקום ה׳יקייה: ' + e.message, 'error');
+        showToast('שגיאה בעדכון מיקום התיקייה: ' + e.message, 'error');
     }
 }
 
 async function recoverDriveBackup() {
     if (!googleAccessToken) {
-        showToast('גוגל דרייב אינו מחובר. אנא ה׳חבר ׳חילה.', 'error');
+        showToast('גוגל דרייב אינו מחובר. אנא התחבר תחילה.', 'error');
         return;
     }
     
@@ -3494,7 +3499,7 @@ async function recoverDriveBackup() {
         const files = data.files || [];
         
         if (files.length === 0) {
-            showToast('לא נמצאו קובצי גיבוי בדרייב שלך עבור מש׳מש זה.', 'error');
+            showToast('לא נמצאו קובצי גיבוי בדרייב שלך עבור משתמש זה.', 'error');
             return;
         }
         
@@ -3504,7 +3509,7 @@ async function recoverDriveBackup() {
         // Retrieve the newest file
         const targetFile = files[0];
         
-        showToast('נמצא גיבוי! משחזר נ׳ונים מהענן...');
+        showToast('נמצא גיבוי! משחזר נתונים מהענן...');
         
         // Download content
         const downloadRes = await fetch(`https://www.googleapis.com/drive/v3/files/${targetFile.id}?alt=media`, {
@@ -3561,7 +3566,7 @@ async function recoverDriveBackup() {
             loadProject(activeProjectId, false);
         }
         
-        showToast('הנ׳ונים שוחזרו בהצלחה מהגיבוי בענן!');
+        showToast('הנתונים שוחזרו בהצלחה מהגיבוי בענן!');
     } catch (e) {
         console.error(e);
         showToast('שגיאה בשחזור הגיבוי: ' + e.message, 'error');
