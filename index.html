@@ -291,6 +291,14 @@
                     <p class="section-desc">תכנון החשמל שלך מבוצע תחת הסטנדרטים והרישיונות המחמירים ביותר בישראל</p>
                 </div>
                 
+                <!-- Mobile-only accordion toggle -->
+                <button class="certs-accordion-toggle" id="certs-toggle" aria-expanded="false">
+                    <span class="certs-toggle-label">הצג רישיונות והסמכות</span>
+                    <svg class="certs-toggle-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                </button>
+
                 <div class="certificates-grid">
                     <!-- Cert 1 -->
                     <div class="cert-card reveal" style="--delay: 0ms">
@@ -330,6 +338,10 @@
                         <h3 class="cert-card-title">תכנון מתח גבוה ומערכות חירום</h3>
                         <p class="cert-card-desc">הסמכה מיוחדת לתכנון הארקות יסוד מורכבות, מערכות מתח גבוה (שנאים ותחנות משנה), מערכות גילוי אש וספקי כוח לחירום.</p>
                     </div>
+                </div>
+
+                <div class="certs-see-all">
+                    <a href="certificates.html" class="certs-see-all-link">לכל התעודות וההסמכות ←</a>
                 </div>
             </div>
         </section>
@@ -758,17 +770,50 @@
                         </div>
 
                         <!-- Grid of Social / Navigation Buttons -->
-                        <h4 class="social-title">ניווט מהיר למשרד או ערוצים חברתיים:</h4>
+                        <h4 class="social-title">ניווט, ביקורות וערוצים חברתיים:</h4>
                         <div class="social-grid">
-                            <!-- Waze Button -->
-                            <a href="https://waze.com/ul?q=SJ%20הנדסת%20חשמל&navigate=yes" target="_blank" rel="noopener noreferrer" class="social-btn waze" id="btn-waze">
+                            <!-- Google Maps — Business Profile -->
+                            <a href="https://share.google/yfICmL7UsH6HpVJeC" target="_blank" rel="noopener noreferrer" class="social-btn gmaps" id="btn-gmaps">
                                 <svg class="btn-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                                    <path d="M12 2C6.48 2 2 6.48 2 12c0 2.39.84 4.59 2.25 6.32l-.08.08a1 1 0 0 0-.17.3c-.34.93-.94 2.58-1 2.8-.07.25-.01.52.16.71a.76.76 0 0 0 .54.23c.09 0 .19-.01.28-.05l3.24-1.22c.23-.09.48-.09.7-.01C9.28 21.61 10.61 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm3.3 12.3c-.39.39-1.02.39-1.41 0l-1.9-1.9-1.9 1.9c-.39.39-1.02.39-1.41 0-.39-.39-.39-1.02 0-1.41l1.9-1.9-1.9-1.9c-.39-.39-.39-1.02 0-1.41.39-.39 1.02-.39 1.41 0l1.9 1.9 1.9-1.9c.39-.39 1.02-.39 1.41 0 .39.39.39 1.02 0 1.41l-1.9 1.9 1.9 1.9c.39.39.39 1.02 0 1.41z"/>
+                                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
                                 </svg>
                                 Google Maps
                             </a>
 
-                            <!-- Facebook Button -->
+                            <!-- Waze Navigation -->
+                            <a href="https://waze.com/ul?q=%D7%93%D7%A8%D7%9A%20%D7%91%D7%9F%20%D7%92%D7%95%D7%A8%D7%99%D7%95%D7%9F%20138%20%D7%91%D7%AA%20%D7%99%D7%9D&navigate=yes" target="_blank" rel="noopener noreferrer" class="social-btn waze" id="btn-waze">
+                                <svg class="btn-icon" viewBox="0 0 32 32" width="20" height="20" fill="currentColor">
+                                    <path d="M16 1C7.7 1 1 7.7 1 16c0 3.6 1.3 6.9 3.4 9.5l-.1.1c-.2.2-.3.5-.4.7-.5 1.4-1.4 3.8-1.5 4.2-.1.4 0 .8.3 1.1.2.2.5.4.8.4.1 0 .3 0 .4-.1l4.8-1.8c.3-.1.7-.1 1 0C11.2 30.7 13.5 31 16 31c9.4 0 15-6.7 15-15C31 7.7 24.3 1 16 1zm5 18.5c-.6.6-1.5.6-2.1 0L16 16.6l-2.9 2.9c-.6.6-1.5.6-2.1 0-.6-.6-.6-1.5 0-2.1l2.9-2.9-2.9-2.9c-.6-.6-.6-1.5 0-2.1.6-.6 1.5-.6 2.1 0l2.9 2.9 2.9-2.9c.6-.6 1.5-.6 2.1 0 .6.6.6 1.5 0 2.1L18.1 14.5l2.9 2.9c.6.6.6 1.5 0 2.1z"/>
+                                </svg>
+                                Waze
+                            </a>
+
+                            <!-- Google Business Profile -->
+                            <a href="https://share.google/yfICmL7UsH6HpVJeC" target="_blank" rel="noopener noreferrer" class="social-btn gbp" id="btn-gbp">
+                                <svg class="btn-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                    <path d="M21.35 11.1h-9.17v2.73h6.51c-.33 3.81-3.5 5.44-6.5 5.44C8.36 19.27 5 16.25 5 12c0-4.1 3.2-7.27 7.2-7.27 3.09 0 4.9 1.97 4.9 1.97L19 4.72S16.56 2 12.1 2C6.42 2 2.03 6.8 2.03 12c0 5.05 4.13 10 10.22 10 5.35 0 9.25-3.67 9.25-9.09 0-1.15-.15-1.81-.15-1.81z"/>
+                                </svg>
+                                דף העסק
+                            </a>
+
+                            <!-- Leave a Google Review -->
+                            <a href="https://share.google/yfICmL7UsH6HpVJeC" target="_blank" rel="noopener noreferrer" class="social-btn google-review" id="btn-google-review">
+                                <svg class="btn-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                                    <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+                                </svg>
+                                השאר ביקורת
+                            </a>
+
+                            <!-- Email -->
+                            <a href="mailto:info@sj-eng.co.il" class="social-btn email-social" id="btn-email-social">
+                                <svg class="btn-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                    <polyline points="22,6 12,13 2,6"></polyline>
+                                </svg>
+                                שלח מייל
+                            </a>
+
+                            <!-- Facebook -->
                             <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" class="social-btn facebook" id="btn-fb">
                                 <svg class="btn-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                                     <path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c4.56-.93 8-4.96 8-9.75z"/>
@@ -776,7 +821,7 @@
                                 Facebook
                             </a>
 
-                            <!-- Instagram Button -->
+                            <!-- Instagram -->
                             <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" class="social-btn instagram" id="btn-ig">
                                 <svg class="btn-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                                     <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.051.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 1 0 0 12.324 6.162 6.162 0 0 0 0-12.324zM12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm6.406-11.845a1.44 1.44 0 1 0 0 2.881 1.44 1.44 0 0 0 0-2.881z"/>
@@ -784,7 +829,7 @@
                                 Instagram
                             </a>
 
-                            <!-- LinkedIn Button -->
+                            <!-- LinkedIn -->
                             <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" class="social-btn linkedin" id="btn-linkedin">
                                 <svg class="btn-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                                     <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
@@ -826,8 +871,8 @@
     <div class="sticky-contact-widget" id="sticky-contact-widget">
         <!-- WhatsApp Glow Button -->
         <a href="https://wa.me/972535302887?text=%D7%94%D7%99%D7%99%20SJ%2C%20%D7%90%D7%A0%D7%99%20%D7%A6%D7%A8%D7%99%D7%9A%20%D7%A2%D7%96%D7%A8%D7%94%20%D7%91%D7%A4%D7%A8%D7%95%D7%99%D7%A7%D7%98%20%D7%A9%D7%9C%D7%99" target="_blank" rel="noopener noreferrer" class="widget-btn whatsapp-btn" id="widget-whatsapp" aria-label="פתיחת שיחה בוואטסאפ">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.338 5.393 0 11.95 0 15.127 0 18.113 1.237 20.36 3.484c2.247 2.248 3.484 5.234 3.484 8.411 0 6.559-5.333 11.9-11.895 11.9-2.007 0-3.982-.507-5.727-1.477L0 24zm6.59-4.846c1.62.962 3.208 1.47 4.883 1.47 5.289 0 9.591-4.307 9.593-9.598.002-2.562-1.002-4.97-2.812-6.782-1.81-1.81-4.22-2.812-6.79-2.812-5.29 0-9.597 4.306-9.599 9.6.001 1.765.485 3.393 1.471 4.887l-.961 3.513 3.615-.98zm11.23-5.263c-.302-.15-1.787-.88-2.063-.98-.276-.1-.478-.15-.678.15-.2.3-.775.98-.95 1.18-.175.2-.35.22-.653.07-.303-.15-1.28-.47-2.438-1.503-.9-.802-1.508-1.793-1.685-2.093-.177-.3-.018-.46.13-.608.134-.132.302-.347.452-.52.15-.173.2-.298.3-.497.1-.2.05-.37-.025-.52-.075-.15-.678-1.63-.93-2.23-.244-.585-.494-.505-.678-.515-.18-.01-.384-.01-.59-.01-.2 0-.527.075-.802.373-.276.3-.1.05-1.05 1.03-1.05 2.51 0 1.48 1.08 2.91 1.23 3.11.15.2 2.13 3.25 5.16 4.56.72.31 1.28.5 1.72.64.72.23 1.38.2 1.9.12.58-.08 1.79-.73 2.04-1.43.25-.7.25-1.3.17-1.43-.07-.13-.28-.2-.58-.35z"/>
+            <svg viewBox="0 0 32 32" width="28" height="28" fill="currentColor">
+                <path d="M16 1C7.716 1 1 7.716 1 16c0 2.68 0.686 5.197 1.89 7.39L1 31l7.82-2.05A14.936 14.936 0 0 0 16 31c8.284 0 15-6.716 15-15S24.284 1 16 1zm0 27.5a12.44 12.44 0 0 1-6.34-1.73l-0.455-0.27-4.64 1.22 1.24-4.52-0.295-0.47A12.45 12.45 0 0 1 3.5 16C3.5 9.096 9.096 3.5 16 3.5S28.5 9.096 28.5 16 22.904 28.5 16 28.5zm6.847-9.334c-0.375-0.188-2.222-1.097-2.565-1.222-0.344-0.125-0.594-0.188-0.844 0.188-0.25 0.375-0.97 1.222-1.188 1.472-0.219 0.25-0.438 0.281-0.813 0.094-0.375-0.188-1.582-0.584-3.013-1.859-1.113-0.993-1.865-2.219-2.083-2.594-0.219-0.375-0.023-0.578 0.164-0.765 0.169-0.169 0.375-0.438 0.563-0.656 0.188-0.219 0.25-0.375 0.375-0.625 0.125-0.25 0.063-0.469-0.031-0.656-0.094-0.188-0.844-2.031-1.156-2.781-0.305-0.731-0.614-0.63-0.844-0.642-0.219-0.011-0.469-0.014-0.719-0.014s-0.656 0.094-1 0.469-1.313 1.281-1.313 3.125 1.344 3.625 1.531 3.875c0.188 0.25 2.644 4.038 6.407 5.663 0.895 0.386 1.594 0.617 2.138 0.789 0.898 0.285 1.716 0.245 2.362 0.149 0.72-0.108 2.219-0.908 2.531-1.785 0.313-0.875 0.313-1.625 0.219-1.782-0.094-0.156-0.344-0.25-0.719-0.438z"/>
             </svg>
             <span class="widget-tooltip">WhatsApp</span>
         </a>

@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initSmoothScrollMobile();
     initCursorGlow();
     initFaqAccordion();
+    initCertsAccordion();
 });
 
 
@@ -222,20 +223,41 @@ function initContactForm() {
 function initCursorGlow() {
     const glow = document.getElementById('cursor-glow');
     if (!glow) return;
-    
-    // Check if device supports hover (not a mobile touch device)
+
+    const lightSections = ['.services-section'];
+
     if (window.matchMedia('(hover: hover)').matches) {
         document.addEventListener('mousemove', (e) => {
-            // Center the glow on the cursor coordinates
             glow.style.left = `${e.clientX}px`;
             glow.style.top = `${e.clientY}px`;
             glow.style.opacity = '1';
+
+            // Switch to dark multiply glow on light-background sections
+            const el = document.elementFromPoint(e.clientX, e.clientY);
+            const onLight = el && lightSections.some(sel => el.closest(sel));
+            glow.classList.toggle('on-light', !!onLight);
         });
-        
+
         document.addEventListener('mouseleave', () => {
             glow.style.opacity = '0';
         });
     }
+}
+
+/**
+ * 9. Certificates accordion on mobile
+ */
+function initCertsAccordion() {
+    const toggle = document.getElementById('certs-toggle');
+    const grid = document.querySelector('.certificates-grid');
+    if (!toggle || !grid) return;
+
+    toggle.addEventListener('click', () => {
+        const isOpen = grid.classList.toggle('open');
+        toggle.setAttribute('aria-expanded', String(isOpen));
+        const label = toggle.querySelector('.certs-toggle-label');
+        if (label) label.textContent = isOpen ? 'הסתר' : 'הצג רישיונות והסמכות';
+    });
 }
 
 /**
