@@ -98,6 +98,26 @@
                     <p class="section-subtitle">נהל את שלב התמחור והצעת המחיר לכל לקוח תחת פרויקט ייעודי.</p>
                 </div>
                 
+                <!-- Search + filter bar -->
+                <div class="project-search-row">
+                    <div class="project-search-input-wrap">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="project-search-q" placeholder="חפש לפי שם פרויקט..." oninput="filterProjectsList()">
+                    </div>
+                    <select id="project-sort" onchange="filterProjectsList()" class="project-filter-select">
+                        <option value="newest">חדש → ישן</option>
+                        <option value="oldest">ישן → חדש</option>
+                        <option value="name-asc">שם א→ת</option>
+                        <option value="name-desc">שם ת→א</option>
+                    </select>
+                    <select id="project-status-filter" onchange="filterProjectsList()" class="project-filter-select">
+                        <option value="all">כל הסטטוסים</option>
+                        <option value="טיוטה">טיוטה</option>
+                        <option value="נשלח">נשלח</option>
+                        <option value="הושלם">הושלם</option>
+                    </select>
+                </div>
+
                 <div class="split-view">
                     <!-- Right side: Create Project -->
                     <div class="control-side">
@@ -116,7 +136,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Left side: Projects List -->
                     <div class="preview-side" style="background-color: var(--bg-card); padding: 20px;">
                         <h3 style="margin-bottom:14px;"><i class="fa-solid fa-list-check text-accent"></i> פרויקטים קיימים</h3>
@@ -515,26 +535,8 @@
                 </div>
                 
                 <div class="settings-grid">
-                    <!-- Column 1: API & Drive Configuration -->
+                    <!-- Column 1: Drive Configuration -->
                     <div style="display:flex; flex-direction:column; gap:20px;">
-                        <div class="section-card">
-                            <div class="card-header">
-                                <h3><i class="fa-solid fa-key text-accent"></i> מפתח API של Gemini</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="form-group">
-                                    <label for="settings-gemini-key">Gemini API Key</label>
-                                    <input type="password" id="settings-gemini-key" placeholder="הכנס את ה-API Key שלך">
-                                    <p class="input-help">
-                                        מפתח ה-API נשמר בדפדפן שלך בלבד.
-                                        תוכל להפיק מפתח בחינם ב-
-                                        <a href="https://aistudio.google.com/" target="_blank" class="text-link">Google AI Studio <i class="fa-solid fa-arrow-up-right-from-square"></i></a>.
-                                    </p>
-                                </div>
-                                <button class="btn btn-accent" onclick="saveGeminiKey()">שמור מפתח API</button>
-                            </div>
-                        </div>
-                        
                         <div class="section-card">
                             <div class="card-header">
                                 <h3><i class="fa-brands fa-google-drive text-accent"></i> חיבור ל-Google Drive</h3>
@@ -545,43 +547,38 @@
                                     <input type="text" id="settings-drive-client-id" placeholder="הכנס את מזהה לקוח ה-OAuth שלך">
                                     <p class="input-help">נדרש כדי לבצע אימות מול חשבון ה-Google שלך לשמירה ישירה של קבצים.</p>
                                 </div>
-                                <div class="form-group" style="margin-bottom:0">
-                                    <label for="settings-drive-folder-id">תיקיית יעד ב-Drive</label>
-                                    <div style="display:flex; gap:8px; align-items:center;">
-                                        <input type="text" id="settings-drive-folder-id" readonly style="background: rgba(255,255,255,0.05); cursor: not-allowed; flex:1;" placeholder="יזוהה אוטומטית לאחר התחברות">
-                                        <button class="btn btn-secondary" onclick="openDrivePicker()" title="דפדף ובחר תיקייה ב-Drive" style="white-space:nowrap; padding:8px 12px; flex-shrink:0;">
+
+                                <!-- Drive connect row -->
+                                <div class="drive-conn-status">
+                                    <span id="drive-status" class="status-disconnected"><i class="fa-solid fa-circle-dot"></i> מנותק</span>
+                                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                        <button class="btn btn-accent" id="btn-connect-drive" onclick="connectGoogleDrive()">
+                                            <i class="fa-brands fa-google-drive"></i> חבר Drive
+                                        </button>
+                                        <button class="btn btn-secondary" onclick="openDrivePicker()" title="בחר תיקיית יעד" style="white-space:nowrap;">
                                             <i class="fa-solid fa-folder-open"></i> בחר תיקייה
                                         </button>
                                     </div>
-                                    <p class="input-help" id="drive-folder-path-status" style="margin-top: 5px; font-weight: 500; line-height: 1.6;">
-                                        <i class="fa-solid fa-file-pdf"></i> קובצי PDF יישמרו בתיקייה הנבחרת<br>
-                                        <i class="fa-solid fa-database"></i> גיבוי וסנכרון נתונים: <strong>תיקיית מערכת מוסתרת (.sysdata)</strong>
-                                    </p>
                                 </div>
-                                <div class="drive-conn-status">
-                                    <span id="drive-status" class="status-disconnected"><i class="fa-solid fa-circle-dot"></i> מנותק</span>
-                                    <button class="btn btn-accent" id="btn-connect-drive" onclick="connectGoogleDrive()">גבה את עבודתך ע"י יצירת תיקיית הצעות מחיר ב-DRIVE של גוגל</button>
-                                </div>
-                                <div id="drive-folder-select-container" style="margin-top: 10px;"></div>
-                                <p class="input-help text-danger" style="margin-top: 10px; color: var(--color-danger); font-weight: 500; font-size: 0.85rem; line-height: 1.5;">
-                                    <i class="fa-solid fa-triangle-exclamation"></i> 
-                                    שים לב: ללא גיבוי ב-Google Drive, הפרויקטים וההיסטוריה יישמרו מקומית בלבד. במקרה של ניקוי נתוני גלישה או סגירת הדפדפן (אם לא סומן "זכור אותי במכשיר זה"), <strong>כל המידע שלך עלול להימחק לצמיתות!</strong>
+                                <p class="input-help" id="drive-folder-path-status" style="margin-top:0; font-weight:500; line-height:1.6;">
+                                    <i class="fa-solid fa-database"></i> גיבוי וסנכרון: <strong>.sysdata</strong> (מוסתרת)
                                 </p>
-                                <div class="drive-sync-controls" id="drive-sync-section" style="display:none; flex-direction:column; gap:12px; margin-top:8px; border-top:1px solid var(--border-color); padding-top:14px;">
-                                    <div style="display:flex; flex-direction:row; gap:10px; width:100%; align-items:center;">
-                                        <button class="btn btn-secondary" style="flex-grow:1;" id="btn-sync-cloud" onclick="manualSyncFromCloud()">
-                                            <i class="fa-solid fa-cloud-arrow-down"></i> סנכרן כעת מהענן
+
+                                <p class="input-help" style="color:var(--color-danger); font-weight:500; font-size:0.85rem; line-height:1.5;">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                    ללא Drive — הנתונים נשמרים מקומית בלבד ועלולים להימחק.
+                                </p>
+
+                                <!-- Single smart sync button (shown when connected) -->
+                                <div id="drive-sync-section" style="display:none;">
+                                    <div style="display:flex; align-items:center; gap:10px;">
+                                        <button class="btn btn-secondary" style="flex:1;" id="btn-sync-cloud" onclick="smartSyncFromDrive()">
+                                            <i class="fa-solid fa-cloud-arrow-down"></i> סנכרן / שחזר מ-Drive
                                         </button>
-                                        <span id="sync-spinner" style="display:none; align-items:center; justify-content:center; color:var(--color-success)">
+                                        <span id="sync-spinner" style="display:none; color:var(--color-success)">
                                             <i class="fa-solid fa-spinner fa-spin" style="font-size:1.4rem;"></i>
                                         </span>
                                     </div>
-                                    <button class="btn btn-secondary" id="btn-recover-backup" onclick="recoverDriveBackup()" style="font-size: 0.82rem; padding: 10px; width: 100%; text-align: center; font-weight: 600; border: 1px dashed rgba(255,255,255,0.15); background: rgba(255,255,255,0.02);">
-                                        <i class="fa-solid fa-rotate-left"></i> כבר יש לך היסטוריה והיא נמחקה? שלוף גיבוי
-                                    </button>
-                                    <button class="btn btn-secondary" onclick="manualLegacyScan()" style="font-size: 0.82rem; padding: 10px; width: 100%; text-align: center; font-weight: 600; border: 1px dashed rgba(255,200,50,0.3); background: rgba(255,200,50,0.04); color: #f0c040;">
-                                        <i class="fa-solid fa-magnifying-glass-chart"></i> סרוק תיקיית Drive וייבא נתונים ישנים
-                                    </button>
                                 </div>
                             </div>
                         </div>

@@ -262,6 +262,68 @@ body {
     font-size: 0.95rem;
 }
 
+/* Project search + filter row */
+.project-search-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+.project-search-input-wrap {
+    flex: 1;
+    min-width: 180px;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.project-search-input-wrap i {
+    position: absolute;
+    right: 12px;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+.project-search-input-wrap input {
+    width: 100%;
+    padding: 9px 36px 9px 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
+}
+.project-search-input-wrap input:focus {
+    outline: none;
+    border-color: var(--color-accent);
+}
+.project-filter-select {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.88rem;
+    padding: 8px 10px;
+    cursor: pointer;
+}
+
+/* Project status badge */
+.project-status-badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+    transition: opacity 0.2s;
+}
+.project-status-badge:hover { opacity: 0.8; }
+.status-badge-טיוטה { background: rgba(100,120,180,0.18); color: #8aa0d8; border: 1px solid rgba(100,120,180,0.3); }
+.status-badge-נשלח  { background: rgba(240,192,64,0.15);  color: #f0c040; border: 1px solid rgba(240,192,64,0.3); }
+.status-badge-הושלם { background: rgba(52,199,89,0.15);   color: #34c759; border: 1px solid rgba(52,199,89,0.3); }
+
 /* Model selector + quota ring bar */
 .model-quota-bar {
     display: flex;
