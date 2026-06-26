@@ -19,8 +19,9 @@
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     
-    <!-- Google Identity Services client for Google Drive Integration -->
+    <!-- Google Identity Services + Drive Picker API -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
     
     <!-- Custom styling -->
     <link rel="stylesheet" href="styles.css">
@@ -510,8 +511,13 @@
                                     <p class="input-help">נדרש כדי לבצע אימות מול חשבון ה-Google שלך לשמירה ישירה של קבצים.</p>
                                 </div>
                                 <div class="form-group" style="margin-bottom:0">
-                                    <label for="settings-drive-folder-id">מזהה תיקיית הצעות מחיר (מנוהל אוטומטית)</label>
-                                    <input type="text" id="settings-drive-folder-id" readonly style="background: rgba(255,255,255,0.05); cursor: not-allowed;" placeholder="יזוהה אוטומטית לאחר התחברות">
+                                    <label for="settings-drive-folder-id">תיקיית יעד ב-Drive</label>
+                                    <div style="display:flex; gap:8px; align-items:center;">
+                                        <input type="text" id="settings-drive-folder-id" readonly style="background: rgba(255,255,255,0.05); cursor: not-allowed; flex:1;" placeholder="יזוהה אוטומטית לאחר התחברות">
+                                        <button class="btn btn-secondary" onclick="openDrivePicker()" title="דפדף ובחר תיקייה ב-Drive" style="white-space:nowrap; padding:8px 12px; flex-shrink:0;">
+                                            <i class="fa-solid fa-folder-open"></i> בחר תיקייה
+                                        </button>
+                                    </div>
                                     <p class="input-help" id="drive-folder-path-status" style="margin-top: 5px; font-weight: 500; line-height: 1.6;">
                                         <i class="fa-solid fa-file-pdf"></i> קובצי PDF יישמרו בתיקייה הנבחרת<br>
                                         <i class="fa-solid fa-database"></i> גיבוי וסנכרון נתונים: <strong>תיקיית מערכת מוסתרת (.sysdata)</strong>
@@ -536,7 +542,10 @@
                                         </span>
                                     </div>
                                     <button class="btn btn-secondary" id="btn-recover-backup" onclick="recoverDriveBackup()" style="font-size: 0.82rem; padding: 10px; width: 100%; text-align: center; font-weight: 600; border: 1px dashed rgba(255,255,255,0.15); background: rgba(255,255,255,0.02);">
-                                        <i class="fa-solid fa-rotate-left"></i> כבר יש לך היסטוריה והיא נמחקה? כנראה שביצעת שינוי ידני בדרייב. שלוף גיבוי
+                                        <i class="fa-solid fa-rotate-left"></i> כבר יש לך היסטוריה והיא נמחקה? שלוף גיבוי
+                                    </button>
+                                    <button class="btn btn-secondary" onclick="manualLegacyScan()" style="font-size: 0.82rem; padding: 10px; width: 100%; text-align: center; font-weight: 600; border: 1px dashed rgba(255,200,50,0.3); background: rgba(255,200,50,0.04); color: #f0c040;">
+                                        <i class="fa-solid fa-magnifying-glass-chart"></i> סרוק תיקיית Drive וייבא נתונים ישנים
                                     </button>
                                 </div>
                             </div>

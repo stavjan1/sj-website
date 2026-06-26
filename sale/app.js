@@ -1738,7 +1738,7 @@ function connectGoogleDrive() {
     try {
         googleTokenClient = google.accounts.oauth2.initTokenClient({
             client_id: clientId,
-            scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly',
+            scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly',
             callback: async (response) => {
                 if (response.error !== undefined) {
                     showToast('שגיאה בחיבור לגוגל דרייב: ' + response.error, 'error');
@@ -1792,15 +1792,17 @@ function setSyncLoading(loading) {
 async function findOrCreateFolder(name, parentId) {
     const escapedName = name.replace(/'/g, "\\'");
     const query = `name = '${escapedName}' and '${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&access_token=${googleAccessToken}`);
-    if (res.ok) {
-        const data = await res.json();
-        if (data.files && data.files.length > 0) {
-            return data.files[0].id;
-        }
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&access_token=${googleAccessToken}`);
+    if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`חיפוש תיקייה '${name}' נכשל: ${errText}`);
     }
-    
-    // Create folder
+    const data = await res.json();
+    if (data.files && data.files.length > 0) {
+        return data.files[0].id;
+    }
+
+    // Create folder only when search succeeded but returned nothing
     const metadata = {
         name: name,
         mimeType: 'application/vnd.google-apps.folder'
@@ -1914,6 +1916,111 @@ async function getOrCreateSyncFolder() {
     return folders ? folders.data : null;
 }
 
+// Scan a Drive folder for old-format JSON files and extract recognisable data
+async function scanForLegacyData(folderId) {
+    if (!googleAccessToken || !folderId) return null;
+    try {
+        // List all JSON files in the folder AND one level of subfolders
+        const q = `'${folderId}' in parents and trashed = false and (mimeType = 'application/json' or name contains '.json' or name contains '.dat')`;
+        const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,modifiedTime)&orderBy=modifiedTime desc&access_token=${googleAccessToken}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        const files = data.files || [];
+        if (files.length === 0) return null;
+
+        let bestSettings = null, bestHistory = [], bestProjects = [];
+
+        for (const file of files.slice(0, 8)) {
+            try {
+                const dlRes = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
+                    headers: { 'Authorization': `Bearer ${googleAccessToken}` }
+                });
+                if (!dlRes.ok) continue;
+                const parsed = await dlRes.json();
+
+                // Full backup format: { settings, history, projects }
+                if (parsed.settings && typeof parsed.settings === 'object') {
+                    bestSettings = bestSettings || parsed.settings;
+                    if (parsed.history && parsed.history.length > bestHistory.length) bestHistory = parsed.history;
+                    if (parsed.projects && parsed.projects.length > bestProjects.length) bestProjects = parsed.projects;
+                    continue;
+                }
+                // Flat settings blob (old format)
+                const knownKeys = ['profession','geminiApiKey','businessDetails','googleFolderId','phrasingDb','logoStyle'];
+                if (knownKeys.some(k => parsed[k] !== undefined)) {
+                    bestSettings = bestSettings ? Object.assign({}, parsed, bestSettings) : parsed;
+                }
+                // History array
+                if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].id) {
+                    if (parsed.length > bestHistory.length) bestHistory = parsed;
+                }
+            } catch (e) { /* skip unparseable file */ }
+        }
+
+        if (!bestSettings && bestHistory.length === 0) return null;
+        return { settings: bestSettings, history: bestHistory, projects: bestProjects };
+    } catch (e) {
+        console.warn('Legacy scan failed:', e);
+        return null;
+    }
+}
+
+// Manual trigger: scan current sync folder for old JSON and import
+async function manualLegacyScan() {
+    if (!googleAccessToken) { showToast('יש להתחבר לגוגל תחילה', 'error'); return; }
+    showToast('סורק תיקיית Drive לנתונים ישנים...');
+    try {
+        const syncFolderId = await getOrCreateSyncFolder();
+        if (!syncFolderId) { showToast('לא נמצאה תיקיית Drive', 'error'); return; }
+        const recovered = await scanForLegacyData(syncFolderId);
+        if (!recovered) { showToast('לא נמצאו נתונים ישנים בתיקייה', 'error'); return; }
+        if (recovered.settings) {
+            appState.settings = Object.assign({}, appState.settings, recovered.settings);
+            localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
+        }
+        if (recovered.history && recovered.history.length > 0) {
+            appState.history = recovered.history;
+            localStorage.setItem(getStorageKey('sj_quote_history'), JSON.stringify(appState.history));
+        }
+        if (recovered.projects && recovered.projects.length > 0) {
+            projectsList = recovered.projects;
+            localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList));
+        }
+        loadSettings();
+        renderProjectsList();
+        renderHistoryList();
+        await syncDatabaseToDrive(true);
+        showToast('נתונים ישנים יובאו בהצלחה!');
+    } catch (e) {
+        showToast('שגיאה בסריקה: ' + e.message, 'error');
+    }
+}
+
+// Google Drive Picker — lets user browse and pick any folder
+function openDrivePicker() {
+    if (!googleAccessToken) { showToast('יש להתחבר לגוגל תחילה', 'error'); return; }
+    if (typeof gapi === 'undefined') { showToast('ממתין לטעינת Drive API...', 'error'); return; }
+    gapi.load('picker', () => {
+        const folderView = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+            .setIncludeFolders(true)
+            .setSelectFolderEnabled(true)
+            .setMimeTypes('application/vnd.google-apps.folder');
+        const picker = new google.picker.PickerBuilder()
+            .setTitle('בחר תיקייה לשמירת הצעות מחיר')
+            .addView(folderView)
+            .setOAuthToken(googleAccessToken)
+            .setCallback(async (pickerData) => {
+                if (pickerData.action === google.picker.Action.PICKED) {
+                    const folder = pickerData.docs[0];
+                    showToast(`תיקייה נבחרה: ${folder.name}`);
+                    await handleDriveFolderChange(folder.id);
+                }
+            })
+            .build();
+        picker.setVisible(true);
+    });
+}
+
 function getCloudDatabaseFilename() {
     const activeUser = getActiveUser();
     if (!activeUser) return '.sys_config.dat';
@@ -1987,6 +2094,26 @@ async function syncDatabaseFromDrive(silent = false) {
                 }
             }
         } else {
+            // No sync file found — try to recover old JSON files before first write
+            const recovered = await scanForLegacyData(syncFolderId);
+            if (recovered) {
+                if (recovered.settings) {
+                    appState.settings = Object.assign({}, appState.settings, recovered.settings);
+                    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
+                }
+                if (recovered.history && recovered.history.length > 0) {
+                    appState.history = recovered.history;
+                    localStorage.setItem(getStorageKey('sj_quote_history'), JSON.stringify(appState.history));
+                }
+                if (recovered.projects && recovered.projects.length > 0) {
+                    projectsList = recovered.projects;
+                    localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList));
+                }
+                loadSettings();
+                renderProjectsList();
+                renderHistoryList();
+                if (!silent) showToast('שוחזרו נתונים ישנים מהדרייב!');
+            }
             await syncDatabaseToDrive(true);
         }
     } catch (e) {
@@ -2887,7 +3014,7 @@ function handleGoogleLogin() {
     try {
         googleTokenClient = google.accounts.oauth2.initTokenClient({
             client_id: clientId,
-            scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+            scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
             callback: async (response) => {
                 if (response.error !== undefined) {
                     showToast('שגיאה בהתחברות לגוגל: ' + response.error, 'error');
