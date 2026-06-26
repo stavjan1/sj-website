@@ -719,8 +719,10 @@
                     <div class="contact-form-container reveal">
                         <h3 class="form-title">השאירו פרטים ונחזור אליכם בהקדם</h3>
                         <p class="form-sub-title-note">שיחת הייעוץ הראשונית ובדיקת כדאיות מבוצעות 🤝 ללא התחייבות</p>
-                        <form id="contact-form" name="contact" method="POST" data-netlify="true" class="contact-form">
-                            <input type="hidden" name="form-name" value="contact">
+                        <form id="contact-form" name="contact" method="POST" class="contact-form">
+                            <input type="hidden" name="access_key" value="REPLACE_WITH_WEB3FORMS_KEY">
+                            <input type="hidden" name="subject" value="פנייה חדשה מהאתר — SJ הנדסת חשמל">
+                            <input type="hidden" name="from_name" value="אתר SJ הנדסת חשמל">
                             <div class="form-group">
                                 <label for="form-name">שם מלא *</label>
                                 <input type="text" id="form-name" name="name" required placeholder="ישראל ישראלי">

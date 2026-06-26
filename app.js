@@ -183,14 +183,11 @@ function initContactForm() {
         const originalText = submitBtn.textContent;
         submitBtn.textContent = 'שולח...';
         
-        // Encode form data for Netlify Forms
         const formData = new FormData(form);
-        const body = new URLSearchParams(formData).toString();
-        
-        fetch('/', {
+
+        fetch('https://api.web3forms.com/submit', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: body
+            body: formData
         })
         .then(() => {
             submitBtn.disabled = false;
