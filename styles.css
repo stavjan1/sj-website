@@ -489,24 +489,32 @@ img {
 /* Services Section */
 .services-section {
     position: relative;
-    background-color: var(--color-dark-bg);
+    background-image:
+        linear-gradient(rgba(220, 235, 255, 0.78), rgba(210, 228, 252, 0.82)),
+        url('assets/services_bg.webp');
+    background-size: cover;
+    background-position: center 45%;
+    background-attachment: fixed;
 }
 
 .services-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 30px;
+    gap: 28px;
     margin-top: 40px;
 }
 
 .service-card {
-    background-color: var(--color-dark-card);
-    border: 1px solid rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.9);
     border-radius: var(--border-radius-md);
-    padding: 40px 30px;
+    padding: 38px 28px;
     transition: var(--transition-smooth);
     position: relative;
     overflow: hidden;
+    box-shadow: 0 4px 24px rgba(30, 60, 120, 0.10);
 }
 
 .service-card::before {
@@ -523,9 +531,9 @@ img {
 
 .service-card:hover {
     transform: translateY(-8px);
-    background-color: var(--color-dark-card-hover);
-    border-color: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.96);
+    border-color: rgba(43, 116, 219, 0.25);
+    box-shadow: 0 20px 48px rgba(30, 60, 120, 0.18);
 }
 
 .service-card:hover::before {
@@ -536,8 +544,8 @@ img {
     width: 60px;
     height: 60px;
     border-radius: var(--border-radius-sm);
-    background-color: rgba(43, 116, 219, 0.1);
-    color: var(--color-sky-glow);
+    background-color: rgba(43, 116, 219, 0.12);
+    color: var(--color-sky-light);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -555,13 +563,21 @@ img {
     font-size: 1.35rem;
     font-weight: 700;
     margin-bottom: 15px;
-    color: var(--color-text-white);
+    color: #0f1e3d;
 }
 
 .service-card-desc {
     font-size: 0.95rem;
-    color: var(--color-text-gray);
+    color: #3a4a6b;
     line-height: 1.7;
+}
+
+/* Section title override for light services bg */
+.services-section .section-title {
+    color: #0c1a38;
+}
+.services-section .section-desc {
+    color: #3a4a6b;
 }
 
 /* Stats Section */
@@ -625,7 +641,7 @@ img {
 
 .stats-sub-note {
     text-align: center;
-    margin-top: 40px;
+    margin: 40px auto 0;
     font-size: 1.1rem;
     font-weight: 700;
     color: var(--color-accent-amber);
@@ -633,10 +649,10 @@ img {
     border: 1px solid rgba(255, 170, 0, 0.15);
     padding: 10px 30px;
     border-radius: 50px;
-    display: inline-block;
-    left: 50%;
-    position: relative;
-    transform: translateX(-50%);
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 /* Certificates & Accreditations */
@@ -1747,6 +1763,13 @@ img {
 @media (hover: none) {
     .cursor-glow {
         display: none !important;
+    }
+}
+
+/* Services bg: disable parallax fixed on mobile (iOS bug) */
+@media (max-width: 991px) {
+    .services-section {
+        background-attachment: scroll;
     }
 }
 
