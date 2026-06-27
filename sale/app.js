@@ -159,7 +159,6 @@ function changeGeminiModel(model) {
 
 // Weighted "AI engine load": grows with message length and thinking time, so it
 // reflects real compute intensity instead of a crude X/30 request counter.
-const WEIGHTED_DAILY_BUDGET = { 'deepseek-chat': 400, 'deepseek-reasoner': 250 };
 function computeRequestCost(messageChars, latencyMs) {
     const base = 1.2;
     const lengthFactor = Math.min((messageChars || 0) / 350, 4);  // longer prompts cost more
@@ -523,6 +522,25 @@ function saveProjects() {
     syncDatabaseToDrive(true);
 }
 
+// Recoverable safety snapshot of the current local data, taken right before a
+// cloud sync replaces it. Keeps the single most recent snapshot per user so a
+// bad/stale cloud overwrite never causes permanent loss.
+function backupLocalSnapshot(reason) {
+    try {
+        const hasData = (appState.history || []).length || (projectsList || []).length || (trashedProjectsList || []).length;
+        if (!hasData) return; // nothing worth backing up
+        const snap = {
+            reason: reason || '',
+            at: Date.now(),
+            settings: appState.settings,
+            history: appState.history,
+            projects: projectsList,
+            trash: trashedProjectsList
+        };
+        localStorage.setItem(getStorageKey('sj_local_backup'), JSON.stringify(snap));
+    } catch (e) { /* storage full / serialization issue — non-fatal */ }
+}
+
 function createNewProject() {
     const input = document.getElementById('new-project-name');
     const name = input.value.trim();
@@ -830,18 +848,6 @@ function saveBusinessSettings() {
     updatePreviewFromForm();
     syncCurrentQuoteToProject();
     syncDatabaseToDrive(true);
-}
-
-function saveGeminiKey() {
-    const keyEl = document.getElementById('settings-gemini-key');
-    if (!keyEl) return;
-    const key = keyEl.value.trim();
-    appState.settings.geminiApiKey = key;
-    saveGlobalGeminiKey(key); // שמור גלובלית — כל המשתמשים משתמשים במפתח הזה
-    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
-    localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
-    syncDatabaseToDrive(true);
-    showToast('מפתח API נשמר בהצלחה');
 }
 
 function loadHistory() {
@@ -2228,7 +2234,8 @@ function importHistoryData(event) {
         try {
             const imported = JSON.parse(e.target.result);
             if (imported.history && Array.isArray(imported.history)) {
-                if (confirm(`נמצאו ${imported.history.length} הצעות מחיר בקובץ. האם ברצונך לייבא?`)) {
+                if (confirm(`נמצאו ${imported.history.length} הצעות מחיר בקובץ.\n\nשים לב: הייבוא יחליף את כל ההיסטוריה והפרויקטים הנוכחיים בקובץ הגיבוי (לא ימוזג). להמשיך?`)) {
+                    backupLocalSnapshot('before import');
                     appState.history = imported.history;
                     if (imported.settings) {
                         appState.settings = imported.settings;
@@ -2697,6 +2704,9 @@ async function syncDatabaseFromDrive(silent = false) {
                 const cloudTimestamp = cloudData.lastUpdated || 0;
                 
                 if (cloudTimestamp > localTimestamp) {
+                    // Snapshot the local data before the cloud copy replaces it,
+                    // so a stale/unexpected cloud overwrite is always recoverable.
+                    backupLocalSnapshot('before cloud sync');
                     if (cloudData.settings) {
                         appState.settings = cloudData.settings;
                         localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
@@ -2798,7 +2808,19 @@ async function syncDatabaseToDrive(silent = true) {
                 fileId = data.files[0].id;
             }
         }
-        
+
+        // SAFETY: never overwrite an existing cloud backup with a fully-empty
+        // local dataset. This guards against a corrupt/blank local load (or a
+        // fresh login) silently wiping the user's cloud data.
+        const localEmpty = (appState.history || []).length === 0
+            && (projectsList || []).length === 0
+            && (trashedProjectsList || []).length === 0;
+        if (localEmpty && fileId) {
+            console.warn('Sync push skipped: local dataset is empty but a cloud backup exists — not overwriting.');
+            setSyncLoading(false);
+            return;
+        }
+
         const timestamp = Date.now();
         localStorage.setItem(getStorageKey('sj_db_last_updated'), timestamp.toString());
         
@@ -3926,7 +3948,10 @@ async function recoverDriveBackup() {
         
         if (!downloadRes.ok) throw new Error('Failed to download backup file');
         const cloudData = await downloadRes.json();
-        
+
+        // Snapshot current local data first, so even a manual recover is reversible.
+        backupLocalSnapshot('before manual recover');
+
         // Apply to appState
         if (cloudData.settings) {
             appState.settings = cloudData.settings;
