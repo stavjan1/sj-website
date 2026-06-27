@@ -1560,6 +1560,56 @@ textarea#ai-input {
     overflow: hidden;
 }
 
+.chat-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    background-color: var(--bg-card-header);
+    border-bottom: 1px solid var(--border-color);
+}
+.chat-search-wrap {
+    position: relative;
+    flex-grow: 1;
+    display: flex;
+    align-items: center;
+}
+.chat-search-wrap > i {
+    position: absolute;
+    inset-inline-start: 12px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+.chat-search-wrap input {
+    width: 100%;
+    padding: 8px 34px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.chat-search-wrap input:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+.chat-search-clear {
+    position: absolute;
+    inset-inline-end: 8px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+    font-size: 0.85rem;
+}
+.chat-search-clear:hover { color: var(--text-primary); }
+#btn-regenerate { flex-shrink: 0; white-space: nowrap; }
+
 .chat-messages {
     flex-grow: 1;
     overflow-y: auto;
@@ -1567,6 +1617,13 @@ textarea#ai-input {
     display: flex;
     flex-direction: column;
     gap: 12px;
+}
+.chat-bubble.search-hidden { display: none; }
+.chat-bubble mark {
+    background: var(--color-accent);
+    color: #fff;
+    border-radius: 3px;
+    padding: 0 2px;
 }
 
 .chat-bubble {

@@ -1150,17 +1150,6 @@ async function sendChatMessage() {
         switchTab('projects');
         return;
     }
-    
-    const effectiveModel = getEffectiveModel();
-    if (!effectiveModel) {
-        showToast('המכסה היומית נוצלה עבור שני המודלים. נסה שוב מחר.', 'error');
-        return;
-    }
-    if (effectiveModel !== selectedGeminiModel) {
-        showToast(`המכסה של ${MODEL_LABELS[selectedGeminiModel] || selectedGeminiModel} נוצלה — עובר אוטומטית ל-${MODEL_LABELS[effectiveModel] || effectiveModel}`, 'error');
-        document.getElementById('gemini-model-select').value = effectiveModel;
-        changeGeminiModel(effectiveModel);
-    }
 
     const inputArea = document.getElementById('chat-user-input');
     const userText = inputArea.value.trim();
@@ -1179,29 +1168,57 @@ async function sendChatMessage() {
     // Render and scroll to bottom
     renderChatHistory(activeProject.chatHistory);
     inputArea.value = '';
-    
-    // Show typing
-    showTypingIndicator(true);
-    
-    const systemInstructionText = getProfessionSystemInstruction();
 
+    await runPricingAgent(activeProject, userText.length);
+}
+
+// Re-run the pricing agent on the existing history. Shared by sendChatMessage
+// (after a new user turn) and regenerateLastAnswer (after dropping the last reply).
+async function runPricingAgent(activeProject, promptChars) {
+    const effectiveModel = getEffectiveModel();
+    if (!effectiveModel) {
+        showToast('המכסה היומית נוצלה עבור שני המודלים. נסה שוב מחר.', 'error');
+        return;
+    }
+    if (effectiveModel !== selectedGeminiModel) {
+        showToast(`המכסה של ${MODEL_LABELS[selectedGeminiModel] || selectedGeminiModel} נוצלה — עובר אוטומטית ל-${MODEL_LABELS[effectiveModel] || effectiveModel}`, 'error');
+        const sel = document.getElementById('gemini-model-select');
+        if (sel) sel.value = effectiveModel;
+        changeGeminiModel(effectiveModel);
+    }
+
+    showTypingIndicator(true);
+    const systemInstructionText = getProfessionSystemInstruction();
     const _t0 = performance.now();
     setQuotaCharging(true);
     try {
         const response = await callAI(effectiveModel, {
-            messages: historyToMessages(systemInstructionText, activeProject.chatHistory)
+            messages: historyToMessages(systemInstructionText, activeProject.chatHistory),
+            stream: true
         });
 
         if (!response.ok) {
             throw new Error(await readAIError(response));
         }
 
-        incrementDailyUsage(effectiveModel);
-        addWeightedUsage(effectiveModel, userText.length, performance.now() - _t0);
-        setQuotaCharging(false);
+        // Stream tokens live when the proxy returns an SSE stream; otherwise read
+        // the full JSON body (personal-key fallback or any non-streaming reply).
+        let responseText = '';
+        const ctype = response.headers.get('content-type') || '';
+        if (response.body && ctype.includes('event-stream')) {
+            const bubble = beginStreamingBubble();
+            responseText = await consumeSSEStream(response, (full) => {
+                bubble.textContent = visibleChatText(full);
+                scrollChatToBottom();
+            });
+        } else {
+            const data = await response.json();
+            responseText = data.choices[0].message.content;
+        }
 
-        const data = await response.json();
-        const responseText = data.choices[0].message.content;
+        incrementDailyUsage(effectiveModel);
+        addWeightedUsage(effectiveModel, promptChars || responseText.length, performance.now() - _t0);
+        setQuotaCharging(false);
 
         // Save reply to history
         activeProject.chatHistory.push({
@@ -1209,51 +1226,153 @@ async function sendChatMessage() {
             parts: [{ text: responseText }]
         });
         saveProjects();
-        
+
         showTypingIndicator(false);
         renderChatHistory(activeProject.chatHistory);
-        
-        // Parse and sync materials JSON
-        const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) || responseText.match(/({[\s\S]*?})/);
-        if (jsonMatch) {
-            try {
-                const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
-                if (parsed) {
-                    activeProject.laborPrice = parsed.laborPriceEstimate || 0;
-                    document.getElementById('wizard-labor-price').value = activeProject.laborPrice;
-                    
-                    const existingMaterials = activeProject.materials || [];
-                    const newMaterials = (parsed.materials || []).map(newMat => {
-                        const matched = existingMaterials.find(m => m.name === newMat.name);
-                        return {
-                            name: newMat.name,
-                            price: newMat.price || 0,
-                            details: newMat.details || '',
-                            checked: matched ? matched.checked : true
-                        };
-                    });
-                    activeProject.materials = newMaterials;
-                    
-                    renderMaterialsChecklist(newMaterials);
-                    
-                    const tipsBox = document.getElementById('wizard-tips-box');
-                    if (tipsBox && parsed.blindSpots && parsed.blindSpots.length > 0) {
-                        tipsBox.style.display = 'block';
-                        tipsBox.innerHTML = `<strong>נקודות עיוורון שכדאי לבדוק:</strong><ul>` + parsed.blindSpots.map(s => `<li>${s}</li>`).join('') + `</ul>`;
-                    }
-                    
-                    saveProjects();
-                }
-            } catch (e) {
-                console.error("Failed to parse JSON blocks from Gemini response", e);
-            }
-        }
+
+        applyMaterialsFromResponse(activeProject, responseText);
     } catch (err) {
         console.error(err);
         showTypingIndicator(false);
         setQuotaCharging(false);
         showToast('אירעה שגיאה בצ\'אט: ' + err.message, 'error');
     }
+}
+
+// Parse the trailing JSON block of a pricing reply and sync the labor price,
+// materials checklist and blind-spots box.
+function applyMaterialsFromResponse(activeProject, responseText) {
+    const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) || responseText.match(/({[\s\S]*?})/);
+    if (!jsonMatch) return;
+    try {
+        const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+        if (!parsed) return;
+        activeProject.laborPrice = parsed.laborPriceEstimate || 0;
+        const laborEl = document.getElementById('wizard-labor-price');
+        if (laborEl) laborEl.value = activeProject.laborPrice;
+
+        const existingMaterials = activeProject.materials || [];
+        const newMaterials = (parsed.materials || []).map(newMat => {
+            const matched = existingMaterials.find(m => m.name === newMat.name);
+            return {
+                name: newMat.name,
+                price: newMat.price || 0,
+                details: newMat.details || '',
+                checked: matched ? matched.checked : true
+            };
+        });
+        activeProject.materials = newMaterials;
+        renderMaterialsChecklist(newMaterials);
+
+        const tipsBox = document.getElementById('wizard-tips-box');
+        if (tipsBox && parsed.blindSpots && parsed.blindSpots.length > 0) {
+            tipsBox.style.display = 'block';
+            tipsBox.innerHTML = `<strong>נקודות עיוורון שכדאי לבדוק:</strong><ul>` + parsed.blindSpots.map(s => `<li>${s}</li>`).join('') + `</ul>`;
+        }
+        saveProjects();
+    } catch (e) {
+        console.error("Failed to parse JSON block from AI response", e);
+    }
+}
+
+// Drop the most recent AI reply and ask the agent to answer again.
+async function regenerateLastAnswer() {
+    if (!activeProjectId) {
+        showToast('אין שיחה פעילה לניסוח מחדש', 'error');
+        return;
+    }
+    const activeProject = projectsList.find(p => p.id === activeProjectId);
+    if (!activeProject || !activeProject.chatHistory || activeProject.chatHistory.length === 0) {
+        showToast('אין עדיין תשובה לנסח מחדש', 'error');
+        return;
+    }
+    // Remove a trailing model reply (if present) so we re-answer the last user turn.
+    if (activeProject.chatHistory[activeProject.chatHistory.length - 1].role === 'model') {
+        activeProject.chatHistory.pop();
+    }
+    if (!activeProject.chatHistory.some(m => m.role === 'user')) {
+        showToast('אין הודעת משתמש לנסח עליה תשובה', 'error');
+        return;
+    }
+    saveProjects();
+    renderChatHistory(activeProject.chatHistory);
+    await runPricingAgent(activeProject);
+}
+
+// ── Streaming + chat-search helpers ──
+function scrollChatToBottom() {
+    const log = document.getElementById('chat-messages-log');
+    if (log) log.scrollTop = log.scrollHeight;
+}
+
+// Text shown live while streaming — hide the trailing JSON block as it arrives.
+function visibleChatText(text) {
+    if (!text) return '';
+    const fence = text.indexOf('```');
+    return (fence !== -1 ? text.slice(0, fence) : text).trim();
+}
+
+// Replace the typing indicator with an empty model bubble we fill token-by-token.
+function beginStreamingBubble() {
+    const log = document.getElementById('chat-messages-log');
+    showTypingIndicator(false);
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble model';
+    bubble.id = 'chat-streaming-bubble';
+    if (log) { log.appendChild(bubble); log.scrollTop = log.scrollHeight; }
+    return bubble;
+}
+
+// Read an OpenAI-style SSE stream, calling onProgress(fullText) as content grows.
+async function consumeSSEStream(response, onProgress) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let full = '';
+    while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let nl;
+        while ((nl = buffer.indexOf('\n')) !== -1) {
+            const line = buffer.slice(0, nl).trim();
+            buffer = buffer.slice(nl + 1);
+            if (!line.startsWith('data:')) continue;
+            const payload = line.slice(5).trim();
+            if (payload === '[DONE]' || !payload) continue;
+            try {
+                const json = JSON.parse(payload);
+                const delta = json.choices && json.choices[0] && json.choices[0].delta && json.choices[0].delta.content;
+                if (delta) { full += delta; if (onProgress) onProgress(full); }
+            } catch (_) { /* ignore keep-alive / partial lines */ }
+        }
+    }
+    return full;
+}
+
+// ── Chat search ──
+let chatSearchQuery = '';
+function filterChatMessages(query) {
+    chatSearchQuery = (query || '').trim();
+    const clearBtn = document.getElementById('chat-search-clear');
+    if (clearBtn) clearBtn.style.display = chatSearchQuery ? 'block' : 'none';
+    applyChatSearch();
+}
+function clearChatSearch() {
+    const input = document.getElementById('chat-search-input');
+    if (input) input.value = '';
+    filterChatMessages('');
+}
+function applyChatSearch() {
+    const log = document.getElementById('chat-messages-log');
+    if (!log) return;
+    const q = chatSearchQuery.toLowerCase();
+    log.querySelectorAll('.chat-bubble').forEach(bubble => {
+        if (bubble.id === 'chat-typing-bubble') return;
+        const text = bubble.textContent || '';
+        const hit = !q || text.toLowerCase().includes(q);
+        bubble.classList.toggle('search-hidden', !hit);
+    });
 }
 
 function sendSuggestedChatPrompt(text) {
@@ -1307,8 +1426,9 @@ function renderChatHistory(chatHistory) {
         bubble.textContent = text;
         log.appendChild(bubble);
     });
-    
+
     log.scrollTop = log.scrollHeight;
+    applyChatSearch();
 }
 
 function showTypingIndicator(show) {

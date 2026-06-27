@@ -67,11 +67,12 @@ export async function onRequestPost(context) {
   const requested = String(body.model || '').replace(/[^a-zA-Z0-9.\-_]/g, '');
   const model = provider.models.includes(requested) ? requested : provider.defaultModel;
 
+  const stream = body.stream === true;
   const payload = {
     model,
     messages: body.messages,
     temperature: typeof body.temperature === 'number' ? body.temperature : 0.7,
-    stream: false,
+    stream,
   };
   if (typeof body.max_tokens === 'number') payload.max_tokens = body.max_tokens;
   // JSON mode — the reasoner model doesn't support response_format, so skip it there.
@@ -93,7 +94,19 @@ export async function onRequestPost(context) {
     return jsonResponse({ error: { message: 'שגיאת רשת מול שרת ה-AI: ' + e.message } }, 502);
   }
 
-  // Pass the provider's response (and status) straight back to the client.
+  // For a successful streaming request, pipe the SSE body straight through.
+  if (stream && upstream.ok && upstream.body) {
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      },
+    });
+  }
+
+  // Otherwise (non-streaming, or an error) return the body as-is.
   const text = await upstream.text();
   return new Response(text, {
     status: upstream.status,

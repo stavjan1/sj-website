@@ -197,6 +197,16 @@
                     <!-- Right Side: Gemini Chat Box -->
                     <div class="control-side" style="display:flex; flex-direction:column; height:calc(100vh - 160px);">
                         <div class="chat-container">
+                            <div class="chat-toolbar">
+                                <div class="chat-search-wrap">
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                    <input type="text" id="chat-search-input" placeholder="חיפוש בשיחה…" oninput="filterChatMessages(this.value)">
+                                    <button type="button" class="chat-search-clear" id="chat-search-clear" onclick="clearChatSearch()" title="נקה" style="display:none;"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                                <button type="button" class="btn btn-secondary btn-small" id="btn-regenerate" onclick="regenerateLastAnswer()" title="נסח מחדש את התשובה האחרונה">
+                                    <i class="fa-solid fa-rotate"></i> נסה שוב
+                                </button>
+                            </div>
                             <div class="chat-messages" id="chat-messages-log">
                                 <div class="chat-bubble system">
                                     שלום סתיו! אני סוכן ה-AI המומחה שלך לתמחור וניהול עבודות חשמל.
