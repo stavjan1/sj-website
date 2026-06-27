@@ -20,6 +20,10 @@ A licensed electrical-engineering consultancy in Israel: electrical system plann
 - מנוע תלת-פאזי מהמהם? פאזה חסרה: https://www.sj-eng.co.il/articles.html#g6
 - כל הבית חשוך — מה לבדוק לפני שמתקשרים לחשמלאי: https://www.sj-eng.co.il/articles.html#g7
 - הגדלת חיבור חשמל מחברת החשמל — כל השלבים: https://www.sj-eng.co.il/articles.html#g8
+- ריח של חשמל שרוף בבית — מה לעשות מיד: https://www.sj-eng.co.il/articles.html#g9
+- עמדת טעינה לרכב חשמלי בבית — מה לבדוק לפני התקנה: https://www.sj-eng.co.il/articles.html#g10
+- מותר להחליף שקע/מפסק בעצמי? מה החוק אומר: https://www.sj-eng.co.il/articles.html#g11
+- הפחת קופץ כשיורד גשם — הסיבה ומה בודקים: https://www.sj-eng.co.il/articles.html#g12
 - כל המדריכים: https://www.sj-eng.co.il/articles.html
 
 ## שירותים (Services)
