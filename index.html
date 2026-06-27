@@ -35,21 +35,114 @@
     <!-- Preload hero background (improves Largest Contentful Paint) -->
     <link rel="preload" as="image" href="assets/hero_powerlines.webp" type="image/webp">
 
-    <!-- Structured data for local search (Google) -->
+    <!-- Structured data for local search + AI engines (Google / LLMs) -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "ProfessionalService",
-      "name": "SJ הנדסת חשמל",
-      "description": "תכנון, ייעוץ ושרטוט מערכות חשמל בסמכות מהנדס חשמל מורשה.",
-      "telephone": "+972-53-530-2887",
-      "url": "https://www.sj-eng.co.il",
-      "areaServed": "IL",
-      "address": {
-        "@type": "PostalAddress",
-        "addressLocality": "בת ים",
-        "addressCountry": "IL"
-      }
+      "@graph": [
+        {
+          "@type": ["ProfessionalService", "ElectricalContractor", "LocalBusiness"],
+          "@id": "https://www.sj-eng.co.il/#business",
+          "name": "SJ הנדסת חשמל",
+          "alternateName": "SJ Electrical Engineering",
+          "description": "משרד תכנון, ייעוץ ושרטוט מערכות חשמל בסמכות מהנדס חשמל מורשה — שרטוט AutoCAD, תכנון לוחות חשמל, מתח נמוך וגבוה, תיאום מול חברת החשמל והרשויות.",
+          "url": "https://www.sj-eng.co.il/",
+          "telephone": "+972-53-530-2887",
+          "email": "info@sj-eng.co.il",
+          "priceRange": "₪₪",
+          "image": "https://www.sj-eng.co.il/assets/mountain_powerlines.png",
+          "logo": "https://www.sj-eng.co.il/assets/mountain_powerlines.png",
+          "knowsLanguage": ["he", "en"],
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "דרך בן גוריון 138",
+            "addressLocality": "בת ים",
+            "addressRegion": "מחוז תל אביב",
+            "postalCode": "5950000",
+            "addressCountry": "IL"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 32.0171,
+            "longitude": 34.7519
+          },
+          "areaServed": [
+            { "@type": "City", "name": "בת ים" },
+            { "@type": "City", "name": "תל אביב" },
+            { "@type": "City", "name": "חולון" },
+            { "@type": "AdministrativeArea", "name": "מרכז הארץ" }
+          ],
+          "openingHoursSpecification": [
+            {
+              "@type": "OpeningHoursSpecification",
+              "dayOfWeek": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"],
+              "opens": "08:00",
+              "closes": "18:00"
+            },
+            {
+              "@type": "OpeningHoursSpecification",
+              "dayOfWeek": "Friday",
+              "opens": "08:00",
+              "closes": "13:00"
+            }
+          ],
+          "founder": {
+            "@type": "Person",
+            "@id": "https://www.sj-eng.co.il/about.html#founder",
+            "name": "סתיו ג'אן",
+            "jobTitle": "מהנדס חשמל",
+            "worksFor": { "@id": "https://www.sj-eng.co.il/#business" }
+          },
+          "knowsAbout": [
+            "תכנון חשמל",
+            "שרטוט AutoCAD",
+            "לוחות חשמל",
+            "מתח נמוך",
+            "מתח גבוה",
+            "הגדלת חיבור חשמל",
+            "תיאום מול חברת החשמל",
+            "בדיקת מתקני חשמל"
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://www.sj-eng.co.il/#website",
+          "url": "https://www.sj-eng.co.il/",
+          "name": "SJ הנדסת חשמל",
+          "inLanguage": "he",
+          "publisher": { "@id": "https://www.sj-eng.co.il/#business" }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://www.sj-eng.co.il/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "כמה זמן לוקח לאשר תוכנית חשמל מול חברת החשמל?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "עבור פרויקטים סטנדרטיים (עד 3x250A) הבדיקה והאישור אורכים בדרך כלל 2 עד 4 שבועות. בפרויקטים תעשייתיים גדולים הדורשים תכנון מתח גבוה או הגדלות חיבור משמעותיות התהליך עשוי לקחת בין חודש ל-3 חודשים. הגשת תוכניות AutoCAD מדויקות מראש מונעת סבבי תיקונים ועיכובים."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "האם אתם מבצעים את עבודות החשמל בפועל או רק את התכנון?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "המשרד מתמקד בתכנון, שרטוט, ייעוץ ופיקוח הנדסי בלבד, ואינו קבלן מבצע. ההפרדה מבטיחה אובייקטיביות הנדסית מלאה וללא ניגוד עניינים — אנו מייצגים את האינטרס של הלקוח מול הקבלן ומוודאים ביצוע לפי התוכניות והתקן."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "מה ההבדל בין מהנדס חשמל רשוי למהנדס חשמל רשום?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "מהנדס חשמל רשום רשאי לתכנן מתקנים קטנים יחסית (עד מתח נמוך 3x630A). מהנדס חשמל רשוי עבר התמחות מעשית ומבחני משרד העבודה, ומורשה לתכנן, לחתום ולאשר מתקני חשמל בכל גודל ובכל רמות המתח — כולל מתח גבוה ועליון."
+              }
+            }
+          ]
+        }
+      ]
     }
     </script>
 </head>
