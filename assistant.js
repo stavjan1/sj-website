@@ -71,9 +71,9 @@
           '<select id="sj-assist-model" class="sj-assist-model" aria-label="בחירת מנוע AI">' +
             CONFIG.models.map(function (m) { return '<option value="' + m.value + '"' + (m.value === selectedModel ? ' selected' : '') + '>' + m.label + '</option>'; }).join('') +
           '</select>' +
-          '<a href="' + CONFIG.tel + '" class="sj-assist-iconbtn" title="חיוג" aria-label="חיוג">' +
-            '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>' +
-          '</a>' +
+          '<button class="sj-assist-iconbtn" id="sj-assist-email" title="שליחת השיחה למייל" aria-label="שליחת השיחה למייל">' +
+            '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>' +
+          '</button>' +
           '<button class="sj-assist-iconbtn" id="sj-assist-close" title="סגירה" aria-label="סגירה">' +
             '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>' +
           '</button>' +
@@ -101,6 +101,7 @@
 
     els.model = panel.querySelector('#sj-assist-model');
     if (els.model) els.model.addEventListener('change', function () { selectedModel = els.model.value; });
+    panel.querySelector('#sj-assist-email').addEventListener('click', openEmailForm);
     panel.querySelector('#sj-assist-close').addEventListener('click', close);
     els.send.addEventListener('click', onSend);
     els.input.addEventListener('keydown', function (e) {
@@ -179,6 +180,68 @@
     var match = CONFIG.models.filter(function (m) { return m.value.indexOf(used + '|') === 0; })[0];
     if (match) { selectedModel = match.value; if (els.model) els.model.value = match.value; }
     scrollDown();
+  }
+
+  // ── "Email me this conversation" ──
+  function openEmailForm() {
+    if (els.log.querySelector('.sj-assist-emailform')) return;
+    if (!messages.some(function (m) { return m.role === 'user'; })) {
+      addBubble('bot', 'אשמח לשלוח לך סיכום! ספרו לי קודם במה אפשר לעזור, ואז נשלח לכם את השיחה למייל.');
+      return;
+    }
+    clearSuggestions();
+    var form = el('div', 'sj-assist-emailform');
+    form.innerHTML =
+      '<div class="sj-assist-ef-title">✉️ נשמח לשלוח לך את סיכום השיחה למייל</div>' +
+      '<input type="text" class="sj-assist-ef-name" placeholder="שם מלא" autocomplete="name">' +
+      '<input type="email" class="sj-assist-ef-email" placeholder="כתובת מייל" autocomplete="email">' +
+      '<div class="sj-assist-ef-row">' +
+        '<button type="button" class="sj-assist-ef-send">שליחה</button>' +
+        '<button type="button" class="sj-assist-ef-cancel">ביטול</button>' +
+      '</div>' +
+      '<div class="sj-assist-ef-msg"></div>';
+    els.log.appendChild(form);
+    scrollDown();
+    var nameI = form.querySelector('.sj-assist-ef-name');
+    var emailI = form.querySelector('.sj-assist-ef-email');
+    var msg = form.querySelector('.sj-assist-ef-msg');
+    form.querySelector('.sj-assist-ef-cancel').addEventListener('click', function () { form.remove(); });
+    form.querySelector('.sj-assist-ef-send').addEventListener('click', function () { submitEmail(form, nameI, emailI, msg); });
+    emailI.addEventListener('keydown', function (e) { if (e.key === 'Enter') submitEmail(form, nameI, emailI, msg); });
+    setTimeout(function () { nameI.focus(); }, 60);
+  }
+
+  function submitEmail(form, nameI, emailI, msg) {
+    var name = (nameI.value || '').trim();
+    var email = (emailI.value || '').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      msg.textContent = 'נא להזין כתובת מייל תקינה.'; msg.className = 'sj-assist-ef-msg err'; return;
+    }
+    var btn = form.querySelector('.sj-assist-ef-send');
+    btn.disabled = true; btn.textContent = 'שולח…';
+    msg.textContent = ''; msg.className = 'sj-assist-ef-msg';
+    var parts = String(selectedModel).split('|');
+    fetch('/api/lead', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, email: email, messages: messages, provider: parts[0], model: parts[1] }),
+    })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (res.ok && res.d && res.d.ok) {
+          form.remove();
+          addBubble('bot', res.d.message || 'נשלח! נחזור אליך בהקדם.');
+        } else {
+          btn.disabled = false; btn.textContent = 'שליחה';
+          msg.textContent = (res.d && res.d.error && res.d.error.message) || 'השליחה נכשלה. נסו שוב.';
+          msg.className = 'sj-assist-ef-msg err';
+        }
+      })
+      .catch(function () {
+        btn.disabled = false; btn.textContent = 'שליחה';
+        msg.textContent = 'שגיאת רשת. נסו שוב או התקשרו 053-530-2887.';
+        msg.className = 'sj-assist-ef-msg err';
+      });
   }
 
   function setBusy(on) {
