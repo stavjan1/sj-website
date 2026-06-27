@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>אודות | SJ הנדסת חשמל</title>
+    <meta name="description" content="הכירו את SJ הנדסת חשמל — משרד תכנון, ייעוץ ושרטוט מערכות חשמל בסמכות מהנדס חשמל מורשה. הסיפור, הערכים ושיטת העבודה שלנו.">
+    <meta name="keywords" content="אודות, הנדסת חשמל, יועץ חשמל, מהנדס חשמל מורשה, SJ הנדסת חשמל, בת ים">
+    <meta property="og:title" content="אודות | SJ הנדסת חשמל">
+    <meta property="og:description" content="הסיפור, הערכים ושיטת העבודה של SJ הנדסת חשמל — תכנון וייעוץ חשמל בסמכות מהנדס מורשה.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.sj-eng.co.il/about.html">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=Rubik:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='none' stroke='%232b74db' stroke-width='6'/%3E%3Cpath d='M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z' fill='%23ffaa00'/%3E%3C/svg%3E">
+    <link rel="canonical" href="https://www.sj-eng.co.il/about.html">
+    <style>
+        /* ─── About page ─── */
+        .page-hero {
+            position: relative;
+            min-height: 360px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 140px 24px 70px;
+            overflow: hidden;
+            background:
+                linear-gradient(rgba(9,9,11,0.78), rgba(9,9,11,0.92)),
+                url('assets/mountain_powerlines.png');
+            background-size: cover;
+            background-position: center;
+        }
+        .page-hero::after {
+            content: '';
+            position: absolute; inset: 0;
+            background: radial-gradient(circle at 50% 30%, rgba(78,168,255,0.18), transparent 60%);
+            pointer-events: none;
+        }
+        .page-hero-content { position: relative; z-index: 2; max-width: 760px; }
+        .page-eyebrow {
+            display: inline-block;
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+            font-weight: 600;
+            color: var(--color-sky-glow);
+            margin-bottom: 16px;
+            text-transform: uppercase;
+        }
+        .page-hero h1 {
+            font-size: clamp(2.1rem, 5vw, 3.4rem);
+            font-weight: 900;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #ffffff 30%, var(--color-text-gray) 100%);
+            -webkit-background-clip: text; background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .page-hero p { font-size: 1.15rem; color: var(--color-text-gray); }
+
+        .about-section { max-width: 1080px; margin: 0 auto; padding: 80px 24px; }
+        .about-split {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 56px;
+            align-items: center;
+        }
+        .about-split h2 {
+            font-size: clamp(1.6rem, 3vw, 2.3rem);
+            font-weight: 800;
+            margin-bottom: 20px;
+            line-height: 1.3;
+        }
+        .about-split h2 .accent { color: var(--color-sky-glow); }
+        .about-split p { color: var(--color-text-gray); font-size: 1.05rem; line-height: 1.9; margin-bottom: 16px; }
+        .about-portrait {
+            position: relative;
+            border-radius: var(--border-radius-lg);
+            overflow: hidden;
+            border: 1px solid rgba(78,168,255,0.22);
+            background: linear-gradient(135deg, var(--color-sky-dark), #0c1a38);
+            aspect-ratio: 4/5;
+            display: flex; align-items: flex-end;
+            padding: 28px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .about-portrait .mark {
+            position: absolute; top: -30px; left: -30px;
+            width: 220px; height: 220px; opacity: 0.12;
+            color: var(--color-sky-glow);
+        }
+        .about-portrait .who { position: relative; z-index: 2; }
+        .about-portrait .who .name { font-size: 1.5rem; font-weight: 800; }
+        .about-portrait .who .role { color: var(--color-sky-glow); font-weight: 600; margin-top: 4px; }
+        .about-portrait .who .loc { color: var(--color-text-gray); margin-top: 8px; font-size: 0.95rem; }
+
+        .values-section { background: var(--color-dark-card); padding: 80px 24px; }
+        .values-wrap { max-width: 1080px; margin: 0 auto; }
+        .values-head { text-align: center; margin-bottom: 48px; }
+        .values-head h2 { font-size: clamp(1.6rem,3vw,2.2rem); font-weight: 800; margin-bottom: 10px; }
+        .values-head p { color: var(--color-text-gray); }
+        .values-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 24px;
+        }
+        .value-card {
+            background: var(--color-dark-bg);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: var(--border-radius-md);
+            padding: 32px 26px;
+            transition: transform .25s ease, border-color .25s ease;
+        }
+        .value-card:hover { transform: translateY(-5px); border-color: rgba(78,168,255,0.4); }
+        .value-card .ico {
+            width: 52px; height: 52px; border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, var(--color-sky-light), var(--color-sky-dark));
+            margin-bottom: 18px;
+        }
+        .value-card .ico svg { width: 26px; height: 26px; color: #fff; }
+        .value-card h3 { font-size: 1.2rem; font-weight: 700; margin-bottom: 10px; }
+        .value-card p { color: var(--color-text-gray); font-size: 0.97rem; line-height: 1.7; }
+
+        .process-section { max-width: 1080px; margin: 0 auto; padding: 80px 24px; }
+        .process-head { text-align:center; margin-bottom: 52px; }
+        .process-head h2 { font-size: clamp(1.6rem,3vw,2.2rem); font-weight: 800; margin-bottom: 10px; }
+        .process-head p { color: var(--color-text-gray); }
+        .process-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 24px; }
+        .step-card { position: relative; padding: 32px 24px 28px; background: var(--color-dark-card); border-radius: var(--border-radius-md); border: 1px solid rgba(255,255,255,0.06); }
+        .step-card .num {
+            position: absolute; top: -18px; inset-inline-start: 24px;
+            width: 40px; height: 40px; border-radius: 50%;
+            display:flex; align-items:center; justify-content:center;
+            font-weight: 800; color: #0a0a0a;
+            background: linear-gradient(135deg, var(--color-accent-amber), #ff8a00);
+            box-shadow: 0 6px 18px rgba(255,170,0,0.35);
+        }
+        .step-card h3 { margin: 14px 0 8px; font-size: 1.12rem; font-weight: 700; }
+        .step-card p { color: var(--color-text-gray); font-size: 0.95rem; line-height: 1.7; }
+
+        .about-cta {
+            max-width: 1000px; margin: 0 auto 90px; padding: 56px 32px;
+            text-align: center;
+            background: linear-gradient(135deg, var(--color-sky-dark), #0c1a38);
+            border: 1px solid rgba(78,168,255,0.25);
+            border-radius: var(--border-radius-lg);
+        }
+        .about-cta h2 { font-size: clamp(1.6rem,3vw,2.2rem); font-weight: 800; margin-bottom: 14px; }
+        .about-cta p { color: var(--color-text-gray); margin-bottom: 28px; font-size: 1.05rem; }
+        .about-cta .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+        @media (max-width: 820px) {
+            .about-split { grid-template-columns: 1fr; gap: 36px; }
+            .about-portrait { aspect-ratio: 16/10; }
+        }
+    </style>
+</head>
+<body>
+    <div class="cursor-glow" id="cursor-glow"></div>
+
+    <!-- Header -->
+    <header class="main-header scrolled" id="main-header">
+        <div class="header-container">
+            <a href="index.html" class="logo-area">
+                <svg class="logo-svg" viewBox="0 0 100 100" width="40" height="40">
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 2" class="logo-circle"/>
+                    <path d="M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z" fill="currentColor" class="logo-bolt"/>
+                </svg>
+                <div class="logo-text">
+                    <span class="logo-brand">SJ</span>
+                    <span class="logo-subbrand">הנדסת חשמל</span>
+                </div>
+            </a>
+            <nav class="desktop-nav" role="navigation" aria-label="תפריט ראשי">
+                <a href="index.html#services" class="nav-link">שירותים</a>
+                <a href="about.html" class="nav-link">אודות</a>
+                <a href="certificates.html" class="nav-link">הסמכות</a>
+                <a href="projects.html" class="nav-link">פרויקטים</a>
+                <a href="index.html#knowledge-hub" class="nav-link">מדריכים</a>
+                <a href="login.html" class="nav-link nav-link-staff">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M13 2L4.5 13h6l-1.5 8L18.5 10h-6z"/></svg>
+                    כניסת עובדים
+                </a>
+                <a href="contact.html" class="btn-primary">צור קשר</a>
+            </nav>
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="פתח תפריט">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </header>
+
+    <div class="mobile-drawer" id="mobile-drawer">
+        <nav class="mobile-nav">
+            <a href="index.html#services" class="mobile-nav-link">שירותים</a>
+            <a href="about.html" class="mobile-nav-link">אודות</a>
+            <a href="certificates.html" class="mobile-nav-link">הסמכות</a>
+            <a href="projects.html" class="mobile-nav-link">פרויקטים</a>
+            <a href="index.html#knowledge-hub" class="mobile-nav-link">מדריכים</a>
+            <a href="login.html" class="mobile-nav-link" style="color:#f0c040;">⚡ כניסת עובדים</a>
+            <a href="contact.html" class="btn-primary">צור קשר</a>
+        </nav>
+    </div>
+
+    <main>
+        <!-- Hero -->
+        <section class="page-hero">
+            <div class="page-hero-content">
+                <span class="page-eyebrow">מי אנחנו</span>
+                <h1>הנדסת חשמל מדויקת, אנושית ומקצועית</h1>
+                <p>SJ הנדסת חשמל הוא משרד תכנון, ייעוץ ושרטוט מערכות חשמל — מהיסודות ועד למסירה, בסמכות מהנדס חשמל מורשה.</p>
+            </div>
+        </section>
+
+        <!-- Story -->
+        <section class="about-section">
+            <div class="about-split reveal">
+                <div>
+                    <h2>הסיפור <span class="accent">שלנו</span></h2>
+                    <p>SJ הנדסת חשמל נולד מתוך אמונה פשוטה: שתכנון חשמל טוב הוא שילוב של דיוק הנדסי, שקיפות מלאה מול הלקוח ויחס אישי לכל פרויקט — קטן כגדול.</p>
+                    <p>אנחנו מלווים יזמים, קבלנים, עסקים ולקוחות פרטיים בכל שלבי הפרויקט: מהבנת הצורך והתכנון הראשוני, דרך שרטוט תוכניות מפורטות ב-AutoCAD, תכנון לוחות חשמל ומערכות מתח נמוך, ועד תיאום מול חברת החשמל והרשויות וקבלת האישורים.</p>
+                    <p>המטרה שלנו אחת: שתקבלו מערכת חשמל בטוחה, תקנית ויעילה — בלי הפתעות בדרך.</p>
+                </div>
+                <div class="about-portrait">
+                    <svg class="mark" viewBox="0 0 100 100" fill="currentColor"><path d="M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z"/></svg>
+                    <div class="who">
+                        <div class="name">סתיו ג'אן</div>
+                        <div class="role">מייסד · הנדסת חשמל</div>
+                        <div class="loc">דרך בן גוריון 138, בת ים</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Values -->
+        <section class="values-section">
+            <div class="values-wrap">
+                <div class="values-head reveal">
+                    <h2>הערכים שמנחים אותנו</h2>
+                    <p>מה שמבדל אותנו זה לא רק התוצאה — אלא הדרך שבה אנחנו מגיעים אליה.</p>
+                </div>
+                <div class="values-grid">
+                    <div class="value-card reveal">
+                        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+                        <h3>בטיחות ותקינה</h3>
+                        <p>כל תכנון מבוצע לפי חוק החשמל והתקנים העדכניים. אין פשרות בכל מה שנוגע לבטיחות.</p>
+                    </div>
+                    <div class="value-card reveal">
+                        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
+                        <h3>שקיפות מלאה</h3>
+                        <p>הצעת מחיר מפורטת וברורה, בלי כוכביות נסתרות. אתם יודעים בדיוק על מה אתם משלמים.</p>
+                    </div>
+                    <div class="value-card reveal">
+                        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+                        <h3>דיוק הנדסי</h3>
+                        <p>תוכניות AutoCAD מדויקות וברות-ביצוע, שמונעות טעויות יקרות בשטח.</p>
+                    </div>
+                    <div class="value-card reveal">
+                        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+                        <h3>יחס אישי</h3>
+                        <p>זמינות, סבלנות וליווי צמוד. אתם לא עוד מספר — אתם שותפים לפרויקט.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Process -->
+        <section class="process-section">
+            <div class="process-head reveal">
+                <h2>איך עובדים איתנו</h2>
+                <p>תהליך ברור בארבעה שלבים — משיחת הייעוץ ועד למסירת התוכניות.</p>
+            </div>
+            <div class="process-steps">
+                <div class="step-card reveal"><div class="num">1</div><h3>שיחת ייעוץ</h3><p>מבינים את הצורך, בודקים כדאיות ומגדירים את היקף העבודה — ללא התחייבות.</p></div>
+                <div class="step-card reveal"><div class="num">2</div><h3>תכנון ושרטוט</h3><p>בונים תוכניות מפורטות ב-AutoCAD, כולל לוחות חשמל ומערכות מתח נמוך.</p></div>
+                <div class="step-card reveal"><div class="num">3</div><h3>תיאום ואישורים</h3><p>מתאמים מול חברת החשמל והרשויות ודואגים לכל האישורים הנדרשים.</p></div>
+                <div class="step-card reveal"><div class="num">4</div><h3>מסירה וליווי</h3><p>מוסרים תוכניות סופיות ומלווים עד להשלמת הפרויקט בשטח.</p></div>
+            </div>
+        </section>
+
+        <!-- CTA -->
+        <section class="about-cta reveal">
+            <h2>יש לכם פרויקט על השולחן?</h2>
+            <p>בואו נתחיל בשיחת ייעוץ קצרה — נבין יחד מה אתם צריכים ונראה איך אפשר לעזור.</p>
+            <div class="cta-row">
+                <a href="contact.html" class="btn-primary">לשיחת ייעוץ</a>
+                <a href="tel:053-530-2887" class="btn-secondary">חיוג מהיר: 053-530-2887</a>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="main-footer" role="contentinfo">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <div class="brand-title">SJ הנדסת חשמל</div>
+                <div class="brand-tagline">תכנון, ייעוץ ושרטוט מערכות חשמל</div>
+            </div>
+            <div class="footer-links">
+                <a href="index.html#services">שירותים</a>
+                <a href="about.html">אודות</a>
+                <a href="certificates.html">הסמכות</a>
+                <a href="projects.html">פרויקטים</a>
+                <a href="contact.html">צור קשר</a>
+            </div>
+            <div class="footer-copy">
+                <p>&copy; 2026 SJ הנדסת חשמל. כל הזכויות שמורות. מבוצע ברישיון מהנדס חשמל מורשה.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Sticky widget -->
+    <div class="sticky-contact-widget">
+        <a href="https://wa.me/972535302887?text=%D7%94%D7%99%D7%99%20SJ" target="_blank" rel="noopener noreferrer" class="widget-btn whatsapp-btn" aria-label="פתיחת שיחה בוואטסאפ">
+            <svg viewBox="0 0 32 32" width="28" height="28" fill="currentColor"><path d="M16 1C7.716 1 1 7.716 1 16c0 2.68 0.686 5.197 1.89 7.39L1 31l7.82-2.05A14.936 14.936 0 0 0 16 31c8.284 0 15-6.716 15-15S24.284 1 16 1zm0 27.5a12.44 12.44 0 0 1-6.34-1.73l-0.455-0.27-4.64 1.22 1.24-4.52-0.295-0.47A12.45 12.45 0 0 1 3.5 16C3.5 9.096 9.096 3.5 16 3.5S28.5 9.096 28.5 16 22.904 28.5 16 28.5z"/></svg>
+            <span class="widget-tooltip">WhatsApp</span>
+        </a>
+        <a href="tel:053-530-2887" class="widget-btn phone-btn" aria-label="התקשר עכשיו">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            <span class="widget-tooltip">חיוג מהיר</span>
+        </a>
+    </div>
+
+    <script>
+        // Mobile menu
+        const toggle = document.getElementById('mobile-menu-toggle');
+        const drawer = document.getElementById('mobile-drawer');
+        toggle.addEventListener('click', () => { drawer.classList.toggle('open'); toggle.classList.toggle('open'); });
+        document.addEventListener('click', e => {
+            if (drawer.classList.contains('open') && !drawer.contains(e.target) && !toggle.contains(e.target)) {
+                drawer.classList.remove('open'); toggle.classList.remove('open');
+            }
+        });
+        // Scroll reveal
+        const obs = new IntersectionObserver((entries, o) => {
+            entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add('active'); o.unobserve(en.target); } });
+        }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+        document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+        // Cursor glow
+        const glow = document.getElementById('cursor-glow');
+        if (glow && window.matchMedia('(hover: hover)').matches) {
+            document.addEventListener('mousemove', e => { glow.style.left = e.clientX + 'px'; glow.style.top = e.clientY + 'px'; glow.style.opacity = '1'; });
+            document.addEventListener('mouseleave', () => { glow.style.opacity = '0'; });
+        }
+    </script>
+</body>
+</html>

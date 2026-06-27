@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>צור קשר | SJ הנדסת חשמל</title>
+    <meta name="description" content="צרו קשר עם SJ הנדסת חשמל — שיחת ייעוץ ללא התחייבות, טלפון, וואטסאפ ואימייל. תכנון, ייעוץ ושרטוט מערכות חשמל בבת ים והמרכז.">
+    <meta name="keywords" content="צור קשר, יועץ חשמל, מהנדס חשמל, בת ים, SJ הנדסת חשמל, שיחת ייעוץ">
+    <meta property="og:title" content="צור קשר | SJ הנדסת חשמל">
+    <meta property="og:description" content="שיחת ייעוץ ללא התחייבות — טלפון, וואטסאפ ואימייל. נשמח לשמוע על הפרויקט שלכם.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.sj-eng.co.il/contact.html">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=Rubik:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='none' stroke='%232b74db' stroke-width='6'/%3E%3Cpath d='M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z' fill='%23ffaa00'/%3E%3C/svg%3E">
+    <link rel="canonical" href="https://www.sj-eng.co.il/contact.html">
+    <style>
+        .page-hero {
+            position: relative; min-height: 320px;
+            display: flex; align-items: center; justify-content: center;
+            text-align: center; padding: 140px 24px 60px; overflow: hidden;
+            background: linear-gradient(rgba(9,9,11,0.78), rgba(9,9,11,0.92)), url('assets/hero_powerlines.webp');
+            background-size: cover; background-position: center;
+        }
+        .page-hero::after { content:''; position:absolute; inset:0; background: radial-gradient(circle at 50% 30%, rgba(78,168,255,0.18), transparent 60%); pointer-events:none; }
+        .page-hero-content { position: relative; z-index: 2; max-width: 720px; }
+        .page-eyebrow { display:inline-block; font-size:0.85rem; letter-spacing:2px; font-weight:600; color:var(--color-sky-glow); margin-bottom:16px; text-transform:uppercase; }
+        .page-hero h1 {
+            font-size: clamp(2.1rem, 5vw, 3.4rem); font-weight: 900; margin-bottom: 14px;
+            background: linear-gradient(135deg, #ffffff 30%, var(--color-text-gray) 100%);
+            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .page-hero p { font-size: 1.12rem; color: var(--color-text-gray); }
+
+        .contact-layout {
+            max-width: 1100px; margin: 0 auto; padding: 70px 24px 90px;
+            display: grid; grid-template-columns: 1fr 1.1fr; gap: 44px; align-items: start;
+        }
+        .contact-info-col { display: flex; flex-direction: column; gap: 18px; }
+        .contact-card {
+            display: flex; align-items: center; gap: 18px;
+            background: var(--color-dark-card);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: var(--border-radius-md);
+            padding: 22px 24px; text-decoration: none; color: inherit;
+            transition: transform .22s ease, border-color .22s ease;
+        }
+        .contact-card:hover { transform: translateY(-3px); border-color: rgba(78,168,255,0.4); }
+        .contact-card .ico {
+            flex-shrink: 0; width: 50px; height: 50px; border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, var(--color-sky-light), var(--color-sky-dark));
+        }
+        .contact-card.wa .ico { background: linear-gradient(135deg, #25d366, #128c42); }
+        .contact-card .ico svg { width: 24px; height: 24px; color: #fff; }
+        .contact-card .meta .label { font-size: 0.82rem; color: var(--color-text-gray); }
+        .contact-card .meta .val { font-size: 1.08rem; font-weight: 700; margin-top: 2px; }
+
+        .hours-card {
+            background: var(--color-dark-card); border: 1px solid rgba(255,255,255,0.06);
+            border-radius: var(--border-radius-md); padding: 22px 24px;
+        }
+        .hours-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 14px; display:flex; align-items:center; gap:10px; }
+        .hours-card h3 svg { width: 20px; height: 20px; color: var(--color-sky-glow); }
+        .hours-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed rgba(255,255,255,0.08); font-size: 0.95rem; }
+        .hours-row:last-child { border-bottom: none; }
+        .hours-row .day { color: var(--color-text-gray); }
+        .hours-row .time { font-weight: 600; }
+
+        .contact-form-card {
+            background: var(--color-dark-card);
+            border: 1px solid rgba(78,168,255,0.18);
+            border-radius: var(--border-radius-lg);
+            padding: 38px 34px;
+        }
+        .contact-form-card h2 { font-size: 1.5rem; font-weight: 800; margin-bottom: 6px; }
+        .contact-form-card .note { color: var(--color-text-gray); margin-bottom: 26px; font-size: 0.95rem; }
+        .cform .form-group { margin-bottom: 18px; }
+        .cform label { display: block; margin-bottom: 7px; font-size: 0.9rem; font-weight: 600; }
+        .cform input, .cform textarea {
+            width: 100%; padding: 13px 15px;
+            background: var(--color-dark-bg);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: var(--border-radius-sm);
+            color: var(--color-text-white); font-family: inherit; font-size: 1rem;
+            transition: border-color .2s ease, box-shadow .2s ease;
+        }
+        .cform input:focus, .cform textarea:focus {
+            outline: none; border-color: var(--color-sky-glow);
+            box-shadow: 0 0 0 3px rgba(78,168,255,0.15);
+        }
+        .cform .btn-submit {
+            width: 100%; padding: 15px; margin-top: 6px;
+            background: linear-gradient(135deg, var(--color-sky-light), var(--color-sky-dark));
+            color: #fff; border: none; border-radius: var(--border-radius-sm);
+            font-size: 1.05rem; font-weight: 700; cursor: pointer;
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+        .cform .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(43,116,219,0.4); }
+        .cform .btn-submit:disabled { opacity: 0.6; cursor: default; transform: none; }
+        .form-feedback { margin-top: 14px; text-align: center; font-weight: 600; min-height: 22px; }
+        .form-feedback.success { color: #34d399; }
+        .form-feedback.error { color: #f87171; }
+
+        @media (max-width: 880px) { .contact-layout { grid-template-columns: 1fr; gap: 32px; } }
+    </style>
+</head>
+<body>
+    <div class="cursor-glow" id="cursor-glow"></div>
+
+    <!-- Header -->
+    <header class="main-header scrolled" id="main-header">
+        <div class="header-container">
+            <a href="index.html" class="logo-area">
+                <svg class="logo-svg" viewBox="0 0 100 100" width="40" height="40">
+                    <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 2" class="logo-circle"/>
+                    <path d="M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z" fill="currentColor" class="logo-bolt"/>
+                </svg>
+                <div class="logo-text">
+                    <span class="logo-brand">SJ</span>
+                    <span class="logo-subbrand">הנדסת חשמל</span>
+                </div>
+            </a>
+            <nav class="desktop-nav" role="navigation" aria-label="תפריט ראשי">
+                <a href="index.html#services" class="nav-link">שירותים</a>
+                <a href="about.html" class="nav-link">אודות</a>
+                <a href="certificates.html" class="nav-link">הסמכות</a>
+                <a href="projects.html" class="nav-link">פרויקטים</a>
+                <a href="index.html#knowledge-hub" class="nav-link">מדריכים</a>
+                <a href="login.html" class="nav-link nav-link-staff">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M13 2L4.5 13h6l-1.5 8L18.5 10h-6z"/></svg>
+                    כניסת עובדים
+                </a>
+                <a href="contact.html" class="btn-primary">צור קשר</a>
+            </nav>
+            <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="פתח תפריט">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </header>
+
+    <div class="mobile-drawer" id="mobile-drawer">
+        <nav class="mobile-nav">
+            <a href="index.html#services" class="mobile-nav-link">שירותים</a>
+            <a href="about.html" class="mobile-nav-link">אודות</a>
+            <a href="certificates.html" class="mobile-nav-link">הסמכות</a>
+            <a href="projects.html" class="mobile-nav-link">פרויקטים</a>
+            <a href="index.html#knowledge-hub" class="mobile-nav-link">מדריכים</a>
+            <a href="login.html" class="mobile-nav-link" style="color:#f0c040;">⚡ כניסת עובדים</a>
+            <a href="contact.html" class="btn-primary">צור קשר</a>
+        </nav>
+    </div>
+
+    <main>
+        <section class="page-hero">
+            <div class="page-hero-content">
+                <span class="page-eyebrow">צור קשר</span>
+                <h1>בואו נדבר על הפרויקט שלכם</h1>
+                <p>שיחת ייעוץ ראשונית ובדיקת כדאיות — ללא התחייבות. נחזור אליכם בהקדם.</p>
+            </div>
+        </section>
+
+        <div class="contact-layout">
+            <!-- Info column -->
+            <div class="contact-info-col">
+                <a href="tel:053-530-2887" class="contact-card reveal">
+                    <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>
+                    <div class="meta"><div class="label">טלפון</div><div class="val">053-530-2887</div></div>
+                </a>
+                <a href="https://wa.me/972535302887?text=%D7%94%D7%99%D7%99%20SJ%2C%20%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%A9%D7%9E%D7%95%D7%A2%20%D7%A4%D7%A8%D7%98%D7%99%D7%9D" target="_blank" rel="noopener noreferrer" class="contact-card wa reveal">
+                    <div class="ico"><svg viewBox="0 0 32 32" fill="currentColor"><path d="M16 1C7.716 1 1 7.716 1 16c0 2.68 0.686 5.197 1.89 7.39L1 31l7.82-2.05A14.936 14.936 0 0 0 16 31c8.284 0 15-6.716 15-15S24.284 1 16 1zm0 27.5a12.44 12.44 0 0 1-6.34-1.73l-0.455-0.27-4.64 1.22 1.24-4.52-0.295-0.47A12.45 12.45 0 0 1 3.5 16C3.5 9.096 9.096 3.5 16 3.5S28.5 9.096 28.5 16 22.904 28.5 16 28.5z"/></svg></div>
+                    <div class="meta"><div class="label">וואטסאפ</div><div class="val">שלחו הודעה מהירה</div></div>
+                </a>
+                <a href="mailto:info@sj-eng.co.il" class="contact-card reveal">
+                    <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></div>
+                    <div class="meta"><div class="label">אימייל</div><div class="val">info@sj-eng.co.il</div></div>
+                </a>
+                <a href="https://maps.google.com/?q=דרך בן גוריון 138 בת ים" target="_blank" rel="noopener noreferrer" class="contact-card reveal">
+                    <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+                    <div class="meta"><div class="label">כתובת המשרד</div><div class="val">דרך בן גוריון 138, בת ים</div></div>
+                </a>
+
+                <div class="hours-card reveal">
+                    <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> שעות פעילות</h3>
+                    <div class="hours-row"><span class="day">ראשון – חמישי</span><span class="time">08:00 – 18:00</span></div>
+                    <div class="hours-row"><span class="day">שישי</span><span class="time">08:00 – 13:00</span></div>
+                    <div class="hours-row"><span class="day">שבת</span><span class="time">סגור</span></div>
+                </div>
+            </div>
+
+            <!-- Form -->
+            <div class="contact-form-card reveal">
+                <h2>השאירו פרטים ונחזור אליכם</h2>
+                <p class="note">בדיקת הכדאיות ושיחת הייעוץ הראשונית 🤝 ללא התחייבות</p>
+                <form id="contact-form" name="contact" method="POST" class="cform">
+                    <input type="hidden" name="access_key" value="da99a67b-ae1d-40b1-9354-74af5ee6d62d">
+                    <input type="hidden" name="subject" value="פנייה חדשה מעמוד צור קשר — SJ הנדסת חשמל">
+                    <input type="hidden" name="from_name" value="אתר SJ הנדסת חשמל">
+                    <div class="form-group">
+                        <label for="form-name">שם מלא *</label>
+                        <input type="text" id="form-name" name="name" required placeholder="ישראל ישראלי">
+                    </div>
+                    <div class="form-group">
+                        <label for="form-phone">טלפון *</label>
+                        <input type="tel" id="form-phone" name="phone" required placeholder="053-530-2887">
+                    </div>
+                    <div class="form-group">
+                        <label for="form-email">כתובת אימייל</label>
+                        <input type="email" id="form-email" name="email" placeholder="name@domain.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="form-message">פרטי הפרויקט / הודעה</label>
+                        <textarea id="form-message" name="message" rows="4" placeholder="נשמח לשמוע פרטים על הפרויקט שברצונכם לתכנן..."></textarea>
+                    </div>
+                    <button type="submit" class="btn-submit" id="btn-form-submit">שליחת פנייה ללא התחייבות</button>
+                    <div id="form-feedback" class="form-feedback"></div>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="main-footer" role="contentinfo">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <div class="brand-title">SJ הנדסת חשמל</div>
+                <div class="brand-tagline">תכנון, ייעוץ ושרטוט מערכות חשמל</div>
+            </div>
+            <div class="footer-links">
+                <a href="index.html#services">שירותים</a>
+                <a href="about.html">אודות</a>
+                <a href="certificates.html">הסמכות</a>
+                <a href="projects.html">פרויקטים</a>
+                <a href="contact.html">צור קשר</a>
+            </div>
+            <div class="footer-copy">
+                <p>&copy; 2026 SJ הנדסת חשמל. כל הזכויות שמורות. מבוצע ברישיון מהנדס חשמל מורשה.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Sticky widget -->
+    <div class="sticky-contact-widget">
+        <a href="https://wa.me/972535302887?text=%D7%94%D7%99%D7%99%20SJ" target="_blank" rel="noopener noreferrer" class="widget-btn whatsapp-btn" aria-label="פתיחת שיחה בוואטסאפ">
+            <svg viewBox="0 0 32 32" width="28" height="28" fill="currentColor"><path d="M16 1C7.716 1 1 7.716 1 16c0 2.68 0.686 5.197 1.89 7.39L1 31l7.82-2.05A14.936 14.936 0 0 0 16 31c8.284 0 15-6.716 15-15S24.284 1 16 1zm0 27.5a12.44 12.44 0 0 1-6.34-1.73l-0.455-0.27-4.64 1.22 1.24-4.52-0.295-0.47A12.45 12.45 0 0 1 3.5 16C3.5 9.096 9.096 3.5 16 3.5S28.5 9.096 28.5 16 22.904 28.5 16 28.5z"/></svg>
+            <span class="widget-tooltip">WhatsApp</span>
+        </a>
+        <a href="tel:053-530-2887" class="widget-btn phone-btn" aria-label="התקשר עכשיו">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            <span class="widget-tooltip">חיוג מהיר</span>
+        </a>
+    </div>
+
+    <script>
+        // Mobile menu
+        const toggle = document.getElementById('mobile-menu-toggle');
+        const drawer = document.getElementById('mobile-drawer');
+        toggle.addEventListener('click', () => { drawer.classList.toggle('open'); toggle.classList.toggle('open'); });
+        document.addEventListener('click', e => {
+            if (drawer.classList.contains('open') && !drawer.contains(e.target) && !toggle.contains(e.target)) {
+                drawer.classList.remove('open'); toggle.classList.remove('open');
+            }
+        });
+        // Scroll reveal
+        const obs = new IntersectionObserver((entries, o) => {
+            entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add('active'); o.unobserve(en.target); } });
+        }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+        document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+        // Cursor glow
+        const glow = document.getElementById('cursor-glow');
+        if (glow && window.matchMedia('(hover: hover)').matches) {
+            document.addEventListener('mousemove', e => { glow.style.left = e.clientX + 'px'; glow.style.top = e.clientY + 'px'; glow.style.opacity = '1'; });
+            document.addEventListener('mouseleave', () => { glow.style.opacity = '0'; });
+        }
+        // Contact form (web3forms)
+        const form = document.getElementById('contact-form');
+        const feedback = document.getElementById('form-feedback');
+        const submitBtn = document.getElementById('btn-form-submit');
+        function showFeedback(msg, type) {
+            feedback.textContent = msg; feedback.className = 'form-feedback ' + type;
+            setTimeout(() => { feedback.textContent = ''; feedback.className = 'form-feedback'; }, 6000);
+        }
+        form.addEventListener('submit', e => {
+            e.preventDefault();
+            const name = document.getElementById('form-name').value.trim();
+            const phone = document.getElementById('form-phone').value.trim();
+            if (!name || !phone) { showFeedback('אנא מלא את כל שדות החובה (*)', 'error'); return; }
+            if (!/^[0-9\-+ ]{9,15}$/.test(phone)) { showFeedback('אנא הזן מספר טלפון תקין', 'error'); return; }
+            submitBtn.disabled = true;
+            const orig = submitBtn.textContent; submitBtn.textContent = 'שולח...';
+            fetch('https://api.web3forms.com/submit', { method: 'POST', body: new FormData(form) })
+                .then(() => { submitBtn.disabled = false; submitBtn.textContent = orig; showFeedback('תודה! פנייתך התקבלה. נחזור אליך בהקדם 🎉', 'success'); form.reset(); })
+                .catch(() => { submitBtn.disabled = false; submitBtn.textContent = orig; showFeedback('שגיאה בשליחה. נסה שוב או התקשר אלינו ישירות.', 'error'); });
+        });
+    </script>
+</body>
+</html>
