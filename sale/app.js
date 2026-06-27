@@ -894,15 +894,16 @@ function savePriceCatalog(sync = true) {
 }
 
 // Reference block injected into the pricing agent so its material estimates use
-// the user's real supplier prices instead of guesses. Capped so it never blows
-// up the prompt.
+// the user's real supplier prices instead of guesses. Kept compact and in a
+// STABLE (sorted) order so it sits in a cacheable system-prompt prefix — both
+// DeepSeek and Gemini then serve the repeated catalog from cache (~10x cheaper),
+// which is what makes "resend every message" effectively free. Capped so a huge
+// catalog never blows up the prompt.
 function getPriceCatalogPromptBlock() {
     if (!priceCatalog || priceCatalog.length === 0) return '';
-    const lines = priceCatalog.slice(0, 150).map(it => {
-        const unit = it.unit ? ` (${it.unit})` : '';
-        return `• ${it.name}: ${it.price} ש"ח${unit}`;
-    });
-    return `\n\nמאגר מחירי הספקים של המשתמש — השתמש בו כמקור אמת למחירי חומרים (התאם כמויות/יחידות לפי הצורך; אם פריט לא במאגר, אמוד כרגיל וציין שזו הערכה):\n` + lines.join('\n');
+    const sorted = priceCatalog.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'he'));
+    const lines = sorted.slice(0, 150).map(it => `• ${it.name}: ${it.price}${it.unit ? ' ' + it.unit : ''}`);
+    return `\n\nמאגר מחירי ספקים (₪) — מקור אמת למחירי חומרים, התאם כמויות/יחידות; פריט שאינו ברשימה — אמוד כרגיל וציין שזו הערכה:\n` + lines.join('\n');
 }
 
 // Add or update a catalog item (dedup by name, case-insensitive).
