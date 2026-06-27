@@ -2307,3 +2307,54 @@ textarea#ai-input {
 .user-profile-field span:last-child {
     font-weight: 600;
 }
+
+/* ===== Loading splash (login → app transition) ===== */
+.app-splash {
+    position: fixed; inset: 0; z-index: 100000;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    background: radial-gradient(900px 600px at 50% 30%, #182035, #0b0f1a 72%);
+    transition: opacity 0.45s ease, visibility 0.45s ease;
+}
+.app-splash.hide { opacity: 0; visibility: hidden; }
+.splash-logo {
+    width: 76px; height: 76px; border-radius: 20px;
+    display: flex; align-items: center; justify-content: center; color: #fff;
+    background: linear-gradient(135deg, var(--color-accent), #2b52b8);
+    box-shadow: 0 14px 40px rgba(77,142,240,0.40);
+    animation: splash-pulse 1.8s ease-in-out infinite;
+}
+@keyframes splash-pulse { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.splash-brand { font-size: 1.25rem; font-weight: 800; color: #fff; }
+.splash-sub { font-size: 0.9rem; color: #93a0bd; }
+.splash-spinner {
+    margin-top: 8px; width: 30px; height: 30px; border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.12); border-top-color: var(--color-accent);
+    animation: splash-spin 0.8s linear infinite;
+}
+@keyframes splash-spin { to { transform: rotate(360deg); } }
+
+/* ===== Sidebar user chip + logout ===== */
+.user-chip {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border-color);
+    border-radius: 12px; padding: 8px 10px; margin-bottom: 8px;
+}
+.user-chip-avatar {
+    width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: #fff; font-size: 0.9rem;
+    background: linear-gradient(135deg, var(--color-accent), #2b52b8);
+    background-size: cover; background-position: center;
+}
+.user-chip-avatar.has-photo { color: transparent; }
+.user-chip-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.user-chip-name { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-chip-role { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-chip-logout {
+    flex-shrink: 0; width: 32px; height: 32px; border-radius: 9px; border: none; cursor: pointer;
+    background: rgba(240,82,82,0.10); color: #f05252;
+    display: flex; align-items: center; justify-content: center; transition: background 0.2s ease;
+}
+.user-chip-logout:hover { background: rgba(240,82,82,0.22); }
+.sidebar-footer .version { font-size: 0.7rem; color: var(--text-muted); display: block; text-align: center; }

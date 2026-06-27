@@ -394,7 +394,18 @@ document.addEventListener('DOMContentLoaded', () => {
         initUserSession();
     }
     updateQuotaUI(); // initialize the quota ring on page load
+    hideAppSplash();
 });
+
+// Fade out and remove the loading splash once the app/lock decision is made.
+function hideAppSplash() {
+    const splash = document.getElementById('app-splash');
+    if (!splash) return;
+    requestAnimationFrame(() => {
+        splash.classList.add('hide');
+        setTimeout(() => splash.remove(), 450);
+    });
+}
 
 function getActiveUser() {
     return localStorage.getItem('sj_logged_in_user') || sessionStorage.getItem('sj_logged_in_user');
@@ -3249,6 +3260,25 @@ function updateUserProfileUI() {
     const professionName = professionMap[professionKey] || professionKey;
     
     // Update UI elements
+    // Sidebar user chip (name, role, avatar — Google photo if available)
+    const chipName = document.getElementById('user-chip-name');
+    if (chipName) chipName.textContent = (localStorage.getItem('gsi_name') || displayName.split('@')[0]);
+    const chipRole = document.getElementById('user-chip-role');
+    if (chipRole) chipRole.textContent = professionName;
+    const chipAvatar = document.getElementById('user-chip-avatar');
+    if (chipAvatar) {
+        const pic = localStorage.getItem('gsi_picture');
+        if (pic) {
+            chipAvatar.style.backgroundImage = `url("${pic}")`;
+            chipAvatar.textContent = '';
+            chipAvatar.classList.add('has-photo');
+        } else {
+            chipAvatar.style.backgroundImage = '';
+            chipAvatar.textContent = (chipName ? chipName.textContent : displayName).trim().charAt(0).toUpperCase();
+            chipAvatar.classList.remove('has-photo');
+        }
+    }
+
     const profileNameDisplay = document.getElementById('profile-username-display');
     if (profileNameDisplay) profileNameDisplay.textContent = displayName;
     

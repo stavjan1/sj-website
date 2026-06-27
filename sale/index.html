@@ -27,7 +27,20 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body class="dark-theme">
-    <div class="app-container">
+    <!-- Branded loading splash — covers initial load so neither the app nor the
+         lock screen flashes before JS decides which to show. Removed by app.js. -->
+    <div id="app-splash" class="app-splash">
+        <div class="splash-logo">
+            <svg viewBox="0 0 100 100" width="40" height="40" fill="currentColor">
+                <path d="M40 82 L62 46 L46 46 L58 14 L33 52 L50 52 Z"/>
+            </svg>
+        </div>
+        <div class="splash-brand">SJ הנדסת חשמל</div>
+        <div class="splash-sub">טוען את סביבת העבודה…</div>
+        <div class="splash-spinner"></div>
+    </div>
+
+    <div class="app-container" style="display:none;">
         
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
@@ -82,7 +95,17 @@
             </nav>
 
             <div class="sidebar-footer">
-                <span class="version">v4.0</span>
+                <div class="user-chip" id="sidebar-user-chip">
+                    <div class="user-chip-avatar" id="user-chip-avatar">S</div>
+                    <div class="user-chip-info">
+                        <span class="user-chip-name" id="user-chip-name">משתמש</span>
+                        <span class="user-chip-role" id="user-chip-role">חשמלאי מוסמך</span>
+                    </div>
+                    <button class="user-chip-logout" id="user-chip-logout" onclick="logoutUser()" title="התנתקות" aria-label="התנתקות">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
+                </div>
+                <span class="version">v4.1</span>
             </div>
         </aside>
         

@@ -137,6 +137,20 @@
             text-decoration: none; font-size: .88rem; display: inline-flex; align-items: center; gap: 7px; }
         .back-home:hover { color: #fff; }
 
+        /* Redirect overlay — bridges the gap to the app for a smooth handoff */
+        .auth-redirect { position: fixed; inset: 0; z-index: 50; display: none;
+            flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+            background: rgba(7,11,24,0.92); backdrop-filter: blur(6px);
+            opacity: 0; transition: opacity .3s ease; }
+        .auth-redirect.show { display: flex; opacity: 1; }
+        .auth-redirect .ar-logo { width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center;
+            color: #fff; background: linear-gradient(135deg, var(--auth-blue), var(--auth-blue-2));
+            box-shadow: 0 14px 40px rgba(59,111,224,0.45); }
+        .auth-redirect .ar-text { color: var(--auth-ink); font-weight: 700; }
+        .auth-redirect .ar-spin { width: 28px; height: 28px; border-radius: 50%;
+            border: 3px solid rgba(255,255,255,0.14); border-top-color: #6ea8ff; animation: ar-spin .8s linear infinite; }
+        @keyframes ar-spin { to { transform: rotate(360deg); } }
+
         @media (max-width: 880px) {
             .auth-shell { grid-template-columns: 1fr; max-width: 480px; }
             .auth-aside { display: none; }
@@ -281,8 +295,22 @@
         </aside>
     </main>
 
+    <div class="auth-redirect" id="auth-redirect" aria-hidden="true">
+        <div class="ar-logo">
+            <svg viewBox="0 0 100 100" width="34" height="34" fill="currentColor"><path d="M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z"/></svg>
+        </div>
+        <div class="ar-text">מתחבר לסביבת העבודה…</div>
+        <div class="ar-spin"></div>
+    </div>
+
     <script>
         const APP_URL = '/sale/';
+
+        function goToApp() {
+            const ov = document.getElementById('auth-redirect');
+            if (ov) ov.classList.add('show');
+            setTimeout(function () { window.location.href = APP_URL; }, 450);
+        }
         const GOOGLE_CLIENT_ID = '4351198135-epoitoujhpofnasac18p4oonclbojj3k.apps.googleusercontent.com';
 
         // If already logged in → skip login page entirely
@@ -304,7 +332,7 @@
             const pass  = document.getElementById('auth-password').value;
             if (!email || !pass) return;
             localStorage.setItem('sj_logged_in_user', email);
-            window.location.href = APP_URL;
+            goToApp();
         });
 
         /* ---- Google Identity Services callback ---- */
@@ -314,7 +342,7 @@
             localStorage.setItem('gsi_email', payload.email);
             localStorage.setItem('gsi_name',  payload.name);
             localStorage.setItem('gsi_picture', payload.picture);
-            window.location.href = APP_URL;
+            goToApp();
         }
 
         /* ---- Show fallback Google button if GIS not loaded ---- */
