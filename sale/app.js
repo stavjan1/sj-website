@@ -21,7 +21,7 @@ function adminSaveGeminiKey() {
     const key = (document.getElementById('admin-gemini-key')?.value || '').trim();
     if (!key) { showToast('הזן מפתח תחילה', 'error'); return; }
     if (/googleusercontent\.com/i.test(key)) {
-        showToast('זהו מזהה OAuth (Client ID) ולא מפתח API. צור מפתח Gemini ב-aistudio.google.com/apikey.', 'error');
+        showToast('זהו מזהה OAuth (Client ID) ולא מפתח API. צור מפתח DeepSeek ב-platform.deepseek.com/api_keys.', 'error');
         return;
     }
     if (key.length < 20) {
@@ -95,8 +95,9 @@ function toggleManualLogin() {
 // ==========================================================================
 // Gemini model selection + daily quota
 // ==========================================================================
-let selectedGeminiModel = 'gemini-2.0-flash';
-const MODEL_QUOTAS = { 'gemini-2.0-flash': 30, 'gemini-1.5-flash': 100 };
+let selectedGeminiModel = 'deepseek-chat';
+const MODEL_QUOTAS = { 'deepseek-chat': 400, 'deepseek-reasoner': 200 };
+const MODEL_LABELS = { 'deepseek-chat': 'DeepSeek V3', 'deepseek-reasoner': 'DeepSeek R1' };
 const MODEL_CIRCUMFERENCE = 138.2; // 2ֿ€ֳ—22
 
 function _todayKey() {
@@ -116,8 +117,8 @@ function isQuotaExceeded(model) {
 }
 function getEffectiveModel() {
     if (!isQuotaExceeded(selectedGeminiModel)) return selectedGeminiModel;
-    // Auto-fallback
-    const fallback = selectedGeminiModel === 'gemini-2.0-flash' ? 'gemini-1.5-flash' : null;
+    // Auto-fallback to the other model if the chosen one hit its daily cap.
+    const fallback = selectedGeminiModel === 'deepseek-reasoner' ? 'deepseek-chat' : 'deepseek-reasoner';
     if (fallback && !isQuotaExceeded(fallback)) return fallback;
     return null; // both exhausted
 }
@@ -136,7 +137,7 @@ function updateQuotaUI() {
     const pctEl = document.getElementById('quota-pct');
     if (pctEl) pctEl.textContent = pct + '%';
     const nameEl = document.getElementById('quota-model-name');
-    if (nameEl) nameEl.textContent = (model === 'gemini-2.0-flash' ? 'Flash 2.0' : 'Flash 1.5') + ' · היום';
+    if (nameEl) nameEl.textContent = (MODEL_LABELS[model] || model) + ' · היום';
     // Legacy element (may be absent after redesign) — guard.
     const usedEl = document.getElementById('quota-used');
     if (usedEl) usedEl.textContent = Math.round(used);
@@ -148,7 +149,7 @@ function changeGeminiModel(model) {
 
 // Weighted "AI engine load": grows with message length and thinking time, so it
 // reflects real compute intensity instead of a crude X/30 request counter.
-const WEIGHTED_DAILY_BUDGET = { 'gemini-2.0-flash': 100, 'gemini-1.5-flash': 100 };
+const WEIGHTED_DAILY_BUDGET = { 'deepseek-chat': 400, 'deepseek-reasoner': 250 };
 function computeRequestCost(messageChars, latencyMs) {
     const base = 1.2;
     const lengthFactor = Math.min((messageChars || 0) / 350, 4);  // longer prompts cost more
@@ -168,6 +169,10 @@ function setQuotaCharging(on) {
     if (ring) ring.classList.toggle('charging', !!on);
 }
 
+// Personal DeepSeek API key (sk-...), used only as a fallback when the server
+// proxy isn't deployed (e.g. local file testing). The shared key normally lives
+// server-side and the browser never sees it.
+const DEEPSEEK_DIRECT_URL = 'https://api.deepseek.com/chat/completions';
 function getGeminiApiKey() {
     const key = appState.settings.geminiApiKey
         || localStorage.getItem('sj_gemini_key_global')
@@ -180,14 +185,16 @@ function saveGlobalGeminiKey(key) {
     localStorage.setItem('sj_gemini_key_global', key);
 }
 
-// Single entry point for every Gemini call.
+// Single entry point for every AI call (OpenAI-compatible chat completions).
 // Strategy: try the server proxy first (key stays server-side, works for ALL users
 // and on every domain). Only if the proxy isn't deployed / has no key configured
-// (501/404) do we fall back to a personal AIza key stored locally.
-async function callGemini(model, payload) {
+// (501/404) do we fall back to a personal DeepSeek key stored locally.
+//   payload = { messages:[{role,content}], response_format?, temperature?, max_tokens? }
+// Returns a fetch Response whose JSON exposes choices[0].message.content.
+async function callAI(model, payload) {
     let proxyRes = null;
     try {
-        proxyRes = await fetch('/api/gemini', {
+        proxyRes = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ model, ...payload })
@@ -195,7 +202,7 @@ async function callGemini(model, payload) {
     } catch (e) {
         proxyRes = null; // network error / local file testing → fall through to personal key
     }
-    // If the proxy answered (including a real Google error like 400/403), use it —
+    // If the proxy answered (including a real provider error like 400/402), use it —
     // EXCEPT when it signals "not available / no server key" (404 = not deployed, 501 = no key).
     if (proxyRes && proxyRes.status !== 404 && proxyRes.status !== 501) {
         return proxyRes;
@@ -203,27 +210,33 @@ async function callGemini(model, payload) {
 
     const personalKey = getGeminiApiKey();
     if (personalKey) {
-        return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${personalKey}`, {
+        return fetch(DEEPSEEK_DIRECT_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${personalKey}`
+            },
+            body: JSON.stringify({ model, stream: false, ...payload })
         });
     }
 
     // Neither a server key nor a personal key is configured.
     return new Response(JSON.stringify({
-        error: { message: 'שירות ה-AI אינו מוגדר עדיין. הגדר את GEMINI_API_KEY בשרת (Cloudflare Pages), או הזן מפתח אישי בלשונית הגדרות.' }
+        error: { message: 'שירות ה-AI אינו מוגדר עדיין. הגדר את DEEPSEEK_API_KEY בשרת (Cloudflare Pages), או הזן מפתח אישי בלשונית הגדרות.' }
     }), { status: 503, headers: { 'Content-Type': 'application/json' } });
 }
 
-// Turn any failed Gemini/proxy response into a clear Hebrew message.
-async function readGeminiError(response) {
+// Turn any failed AI/proxy response into a clear Hebrew message.
+async function readAIError(response) {
     try {
         const data = await response.json();
         if (data && data.error && data.error.message) {
             const m = data.error.message;
-            if (/API key not valid|invalid authentication|API_KEY_INVALID|OAuth 2/i.test(m)) {
-                return 'מפתח ה-AI אינו תקין. ודא שהוגדר מפתח Gemini תקין (מתחיל ב-AIza) — בשרת או בהגדרות.';
+            if (/invalid api key|authentication|invalid_request_error.*key|unauthor/i.test(m)) {
+                return 'מפתח ה-AI אינו תקין. ודא שהוגדר מפתח DeepSeek תקין (מתחיל ב-sk-) — בשרת או בהגדרות.';
+            }
+            if (/insufficient balance|quota|exceeded|payment/i.test(m)) {
+                return 'נגמרה היתרה/המכסה של חשבון ה-AI. טען יתרה ב-platform.deepseek.com או נסה שוב מאוחר יותר.';
             }
             return m;
         }
@@ -234,6 +247,31 @@ async function readGeminiError(response) {
         return `שגיאת שרת AI (${response.status}).`;
     }
     return 'שגיאה בתקשורת עם שירות ה-AI.';
+}
+
+// Convert the stored chat history (Gemini-style {role,parts:[{text}]}) into the
+// OpenAI-style messages array the AI proxy expects.
+function historyToMessages(systemText, chatHistory) {
+    const messages = [];
+    if (systemText) messages.push({ role: 'system', content: systemText });
+    (chatHistory || []).forEach(msg => {
+        const role = msg.role === 'user' ? 'user' : 'assistant';
+        const text = (msg.parts && msg.parts[0] && msg.parts[0].text) || '';
+        messages.push({ role, content: text });
+    });
+    return messages;
+}
+
+// Pull a clean JSON object out of a model reply, whether it's raw JSON, wrapped
+// in a ```json fence, or padded with prose (the reasoner model can do any of these).
+function extractJsonBlock(text) {
+    if (!text) return text;
+    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (fenced) return fenced[1].trim();
+    const first = text.indexOf('{');
+    const last = text.lastIndexOf('}');
+    if (first !== -1 && last > first) return text.slice(first, last + 1);
+    return text.trim();
 }
 
 // ==========================================================================
@@ -296,13 +334,13 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('sj_server_folder_id', '1GtFSs9uue5YQrfLOmF1w51KQW-d6Q44E');
     }
 
-    // One-time Gemini key setup via URL: /sale/?key=AIza...
+    // One-time AI key setup via URL: /sale/?key=sk-...
     const _urlParams = new URLSearchParams(window.location.search);
     const _urlKey = _urlParams.get('key');
     if (_urlKey) {
         saveGlobalGeminiKey(_urlKey);
         history.replaceState({}, '', window.location.pathname);
-        showToast('מפתח Gemini הוגדר בהצלחה');
+        showToast('מפתח ה-AI הוגדר בהצלחה');
     }
 
     // Load global Google Client ID from localStorage
@@ -498,9 +536,9 @@ function loadProject(id, navigate = true) {
     localStorage.setItem(getStorageKey('sj_active_project_id'), id);
 
     // Reset model to default each time a project is loaded
-    changeGeminiModel('gemini-2.0-flash');
+    changeGeminiModel('deepseek-chat');
     const modelSel = document.getElementById('gemini-model-select');
-    if (modelSel) modelSel.value = 'gemini-2.0-flash';
+    if (modelSel) modelSel.value = 'deepseek-chat';
 
     updateActiveProjectBanner(proj);
     filterProjectsList();
@@ -690,10 +728,13 @@ function loadSettings() {
         try {
             appState.settings = JSON.parse(saved);
             
-            document.getElementById('settings-gemini-key').value = appState.settings.geminiApiKey || '';
-            document.getElementById('settings-drive-client-id').value = appState.settings.googleClientId || localStorage.getItem('sj_global_google_client_id') || '';
-            document.getElementById('settings-drive-folder-id').value = appState.settings.googleFolderId || '';
-            document.getElementById('set-phrasing-db').value = appState.settings.phrasingDb || '';
+            // Some inputs were removed in later redesigns — guard each one so a
+            // single missing element can't abort loading the rest of the settings.
+            const _set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+            _set('settings-gemini-key', appState.settings.geminiApiKey || '');
+            _set('settings-drive-client-id', appState.settings.googleClientId || localStorage.getItem('sj_global_google_client_id') || '');
+            _set('settings-drive-folder-id', appState.settings.googleFolderId || '');
+            _set('set-phrasing-db', appState.settings.phrasingDb || '');
             
             const biz = appState.settings.businessDetails;
             if (biz) {
@@ -749,7 +790,9 @@ function saveBusinessSettings() {
 }
 
 function saveGeminiKey() {
-    const key = document.getElementById('settings-gemini-key').value.trim();
+    const keyEl = document.getElementById('settings-gemini-key');
+    if (!keyEl) return;
+    const key = keyEl.value.trim();
     appState.settings.geminiApiKey = key;
     saveGlobalGeminiKey(key); // שמור גלובלית — כל המשתמשים משתמשים במפתח הזה
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
@@ -1114,7 +1157,7 @@ async function sendChatMessage() {
         return;
     }
     if (effectiveModel !== selectedGeminiModel) {
-        showToast(`מכסת Flash 2.0 נוצלה — עובר אוטומטית ל-Flash 1.5`, 'error');
+        showToast(`המכסה של ${MODEL_LABELS[selectedGeminiModel] || selectedGeminiModel} נוצלה — עובר אוטומטית ל-${MODEL_LABELS[effectiveModel] || effectiveModel}`, 'error');
         document.getElementById('gemini-model-select').value = effectiveModel;
         changeGeminiModel(effectiveModel);
     }
@@ -1145,13 +1188,12 @@ async function sendChatMessage() {
     const _t0 = performance.now();
     setQuotaCharging(true);
     try {
-        const response = await callGemini(effectiveModel, {
-            systemInstruction: { parts: [{ text: systemInstructionText }] },
-            contents: activeProject.chatHistory
+        const response = await callAI(effectiveModel, {
+            messages: historyToMessages(systemInstructionText, activeProject.chatHistory)
         });
 
         if (!response.ok) {
-            throw new Error(await readGeminiError(response));
+            throw new Error(await readAIError(response));
         }
 
         incrementDailyUsage(effectiveModel);
@@ -1159,7 +1201,7 @@ async function sendChatMessage() {
         setQuotaCharging(false);
 
         const data = await response.json();
-        const responseText = data.candidates[0].content.parts[0].text;
+        const responseText = data.choices[0].message.content;
 
         // Save reply to history
         activeProject.chatHistory.push({
@@ -1419,13 +1461,13 @@ ${checkedMatsText}
     const _t0 = performance.now();
     setQuotaCharging(true);
     try {
-        const response = await callGemini(effectiveModel, {
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: "application/json" }
+        const response = await callAI(effectiveModel, {
+            messages: [{ role: 'user', content: prompt }],
+            response_format: { type: 'json_object' }
         });
 
         if (!response.ok) {
-            throw new Error(await readGeminiError(response));
+            throw new Error(await readAIError(response));
         }
 
         incrementDailyUsage(effectiveModel);
@@ -1433,8 +1475,8 @@ ${checkedMatsText}
         setQuotaCharging(false);
 
         const data = await response.json();
-        const resultText = data.candidates[0].content.parts[0].text;
-        const result = JSON.parse(resultText);
+        const resultText = data.choices[0].message.content;
+        const result = JSON.parse(extractJsonBlock(resultText));
 
         // Sync quote editor
         proj.quoteData.subject = result.subject || proj.quoteData.subject;

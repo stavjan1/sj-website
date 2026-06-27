@@ -169,8 +169,8 @@
                         <div class="model-selector-wrap">
                             <label class="model-lbl">מודל AI</label>
                             <select id="gemini-model-select" onchange="changeGeminiModel(this.value)" class="model-select-input">
-                                <option value="gemini-2.0-flash">⚡ Flash 2.0 (מומלץ)</option>
-                                <option value="gemini-1.5-flash">Flash 1.5 (גיבוי)</option>
+                                <option value="deepseek-chat">⚡ DeepSeek V3 (מהיר, מומלץ)</option>
+                                <option value="deepseek-reasoner">🧠 DeepSeek R1 (חשיבה מעמיקה)</option>
                             </select>
                         </div>
                         <div class="quota-ring-wrap">
@@ -186,7 +186,7 @@
                             </div>
                             <div class="quota-info-text">
                                 <span class="quota-load-label">צריכת מנוע AI</span>
-                                <span id="quota-model-name">Flash 2.0 · היום</span>
+                                <span id="quota-model-name">DeepSeek V3 · היום</span>
                             </div>
                         </div>
                     </div>
@@ -543,7 +543,7 @@
             <section id="panel-settings" class="content-panel">
                 <div class="section-header">
                     <h2><i class="fa-solid fa-sliders"></i> הגדרות מערכת</h2>
-                    <p class="section-subtitle">הגדרת מפתח ה-API של Gemini, שילוב Google Drive, תמונות רקע/לוגו ומאגר ניסוחים.</p>
+                    <p class="section-subtitle">הגדרת מפתח ה-API של ה-AI (DeepSeek), שילוב Google Drive, תמונות רקע/לוגו ומאגר ניסוחים.</p>
                 </div>
                 
                 <div class="settings-grid">
@@ -782,12 +782,12 @@
                     <div style="display:flex;flex-direction:column;gap:20px;">
                         <div class="section-card" style="border-color:rgba(240,192,64,0.25);">
                             <div class="card-header">
-                                <h3><i class="fa-solid fa-key" style="color:#f0c040;"></i> מפתח Gemini API (גלובלי לכל המשתמשים)</h3>
+                                <h3><i class="fa-solid fa-key" style="color:#f0c040;"></i> מפתח DeepSeek API (גלובלי לכל המשתמשים)</h3>
                             </div>
                             <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
-                                <p class="input-help">מפתח זה ישמש את <strong>כל המשתמשים</strong> באתר. לא נשמר ב-GitHub. מופק מ-<a href="https://aistudio.google.com/apikey" target="_blank" class="text-link">Google AI Studio</a>.</p>
+                                <p class="input-help">מפתח זה ישמש את <strong>כל המשתמשים</strong> באתר. עדיף להגדירו כ-<code>DEEPSEEK_API_KEY</code> בשרת (Cloudflare). מופק מ-<a href="https://platform.deepseek.com/api_keys" target="_blank" class="text-link">DeepSeek Platform</a>.</p>
                                 <div class="form-group" style="margin-bottom:0;">
-                                    <input type="password" id="admin-gemini-key" placeholder="AIza... (מפתח Gemini מ-AI Studio)">
+                                    <input type="password" id="admin-gemini-key" placeholder="sk-... (מפתח DeepSeek)">
                                 </div>
                                 <button class="btn btn-accent" onclick="adminSaveGeminiKey()">
                                     <i class="fa-solid fa-save"></i> שמור מפתח לכל המשתמשים
