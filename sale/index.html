@@ -399,6 +399,10 @@
                         <div class="preview-toolbar">
                             <span><i class="fa-solid fa-eye text-accent"></i> תצוגה מקדימה (A4)</span>
                             <div class="preview-actions">
+                                <button class="btn btn-secondary" onclick="openFullPdfPreview()">
+                                    <i class="fa-solid fa-expand"></i>
+                                    <span>תצוגה מלאה</span>
+                                </button>
                                 <button class="btn btn-success" onclick="downloadPDF()">
                                     <i class="fa-solid fa-file-pdf"></i>
                                     <span>הורד PDF</span>
@@ -969,6 +973,20 @@
 
     <!-- Notification Toast -->
     <div id="toast-container" class="toast-container"></div>
+
+    <!-- Full-screen PDF preview modal -->
+    <div id="pdf-fullscreen-modal" class="pdf-fs-modal" style="display:none;" onclick="if(event.target===this)closeFullPdfPreview()">
+        <div class="pdf-fs-bar">
+            <span class="pdf-fs-title"><i class="fa-solid fa-file-pdf"></i> תצוגה מקדימה — הצעת מחיר</span>
+            <div class="pdf-fs-actions">
+                <button class="btn btn-success btn-small" onclick="downloadPDF()"><i class="fa-solid fa-file-pdf"></i> הורד PDF</button>
+                <button class="btn btn-secondary btn-small" onclick="closeFullPdfPreview()"><i class="fa-solid fa-xmark"></i> סגור</button>
+            </div>
+        </div>
+        <div class="pdf-fs-stage">
+            <div id="pdf-fullscreen-content" class="pdf-fs-content"></div>
+        </div>
+    </div>
 
     <!-- Application Script -->
     <script src="app.js"></script>

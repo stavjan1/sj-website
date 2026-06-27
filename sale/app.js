@@ -485,6 +485,9 @@ function switchTab(tabId) {
     if (tabId === 'history') {
         renderHistoryList();
     }
+    if (tabId === 'create') {
+        ensureQuoteNumber();
+    }
 }
 
 // ==========================================================================
@@ -862,14 +865,28 @@ function saveHistory() {
 
 function getNextQuoteNumber() {
     const year = new Date().getFullYear();
-    const yearQuotes = appState.history.filter(q => q.quoteNumber && q.quoteNumber.startsWith(year.toString()));
-    let nextNum = yearQuotes.length + 101;
-    
-    while (appState.history.some(q => q.quoteNumber === `${year}-${nextNum}`)) {
-        nextNum++;
+    const prefix = year + '-';
+    // Robust: one past the highest existing number this year (survives deletions,
+    // unlike a count-based scheme which could reuse a number).
+    let maxNum = 100;
+    appState.history.forEach(q => {
+        if (q.quoteNumber && q.quoteNumber.startsWith(prefix)) {
+            const n = parseInt(q.quoteNumber.slice(prefix.length), 10);
+            if (!isNaN(n) && n > maxNum) maxNum = n;
+        }
+    });
+    return `${year}-${maxNum + 1}`;
+}
+
+// Guarantee the quote has a running number — auto-fill it if the field is empty
+// (e.g. when editing the form directly instead of via "new quote").
+function ensureQuoteNumber() {
+    const el = document.getElementById('form-quote-number');
+    if (el && !el.value.trim()) {
+        el.value = getNextQuoteNumber();
+        if (appState.currentQuote) appState.currentQuote.quoteNumber = el.value;
     }
-    
-    return `${year}-${nextNum}`;
+    return el ? el.value : '';
 }
 
 function initNewQuote() {
@@ -1912,6 +1929,7 @@ function addSternItemToQuote(dbIndex) {
 // PDF Generation & Download
 // ==========================================================================
 function downloadPDF() {
+    ensureQuoteNumber();
     const clientName = document.getElementById('form-client-name').value.trim() || 'לקוח';
     const subject = document.getElementById('form-quote-subject').value.trim() || 'הצעת מחיר';
     const quoteNumber = document.getElementById('form-quote-number').value.trim() || '000';
@@ -1972,6 +1990,37 @@ function downloadPDF() {
         });
 }
 
+// Full-screen preview: clone the live A4 sheet into a modal so you can eyeball
+// the exact PDF (much bigger than the side preview) before downloading.
+function openFullPdfPreview() {
+    updatePreviewFromForm();
+    const sheet = document.getElementById('quote-pdf-sheet');
+    const target = document.getElementById('pdf-fullscreen-content');
+    const modal = document.getElementById('pdf-fullscreen-modal');
+    if (!sheet || !target || !modal) return;
+    target.innerHTML = '';
+    const clone = sheet.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.style.margin = '0 auto';
+    target.appendChild(clone);
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+function closeFullPdfPreview() {
+    const modal = document.getElementById('pdf-fullscreen-modal');
+    if (modal) modal.style.display = 'none';
+    const target = document.getElementById('pdf-fullscreen-content');
+    if (target) target.innerHTML = '';
+    document.body.style.overflow = '';
+}
+// Esc closes the full-screen preview
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('pdf-fullscreen-modal');
+        if (modal && modal.style.display === 'flex') closeFullPdfPreview();
+    }
+});
+
 function shareWhatsApp() {
     const clientName = document.getElementById('form-client-name').value.trim();
     const subject = document.getElementById('form-quote-subject').value.trim();
@@ -1996,8 +2045,9 @@ function shareWhatsApp() {
 }
 
 function saveToHistory(showToastFlag = true) {
+    ensureQuoteNumber();
     const q = appState.currentQuote;
-    
+
     q.clientName = document.getElementById('form-client-name').value.trim();
     q.clientSub = document.getElementById('form-client-sub').value.trim();
     q.quoteNumber = document.getElementById('form-quote-number').value.trim();
@@ -2040,6 +2090,26 @@ function loadQuoteFromHistory(id) {
     showToast(`הצעת מחיר מס' ${quote.quoteNumber} נטענה לעריכה`);
 }
 
+// Duplicate an existing quote as a fresh, unsaved one — same items/prices/subject
+// but a new running number and today's date. Great base for a similar quote.
+function duplicateQuoteFromHistory(id, event) {
+    if (event) event.stopPropagation();
+    const orig = appState.history.find(item => item.id === id);
+    if (!orig) { showToast('ההצעה לא נמצאה לשכפול', 'error'); return; }
+
+    const copy = JSON.parse(JSON.stringify(orig));
+    copy.id = null;                          // new quote — will save as a new entry
+    copy.quoteNumber = getNextQuoteNumber();
+    copy.date = getTodayDateString();
+    appState.currentQuote = copy;
+
+    fillFormFromState();
+    updatePreviewFromForm();
+
+    switchTab('create');
+    showToast(`שוכפל להצעה חדשה ${copy.quoteNumber} — ערוך את פרטי הלקוח ושמור`);
+}
+
 function deleteQuoteFromHistory(id, event) {
     if (event) event.stopPropagation();
     
@@ -2076,15 +2146,18 @@ function renderHistoryList() {
         if (q.vatType === 'include') vatText = 'כולל מע"מ';
         
         row.innerHTML = `
-            <td style="font-family: 'Outfit', sans-serif; font-weight:700;">${q.quoteNumber}</td>
+            <td style="font-family: 'Outfit', sans-serif; font-weight:700;">${escapeHtml(q.quoteNumber)}</td>
             <td style="font-family: 'Outfit', sans-serif;">${formatHebrewDate(q.date)}</td>
-            <td style="font-weight:600; color: var(--color-accent);">${q.clientName}</td>
-            <td>${q.subject}</td>
+            <td style="font-weight:600; color: var(--color-accent);">${escapeHtml(q.clientName)}</td>
+            <td>${escapeHtml(q.subject)}</td>
             <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight:600;">${formatPriceString(q.finalPrice)} ש"ח <span style="font-size:0.75rem; color:var(--text-muted);">${vatText}</span></td>
             <td><span class="badge active">שמור</span></td>
             <td class="actions-cell">
                 <button class="btn btn-secondary btn-small" onclick="loadQuoteFromHistory('${q.id}')">
                     <i class="fa-solid fa-pen"></i> ערוך
+                </button>
+                <button class="btn btn-secondary btn-small" onclick="duplicateQuoteFromHistory('${q.id}', event)" title="שכפול לבסיס הצעה חדשה">
+                    <i class="fa-solid fa-copy"></i> שכפל
                 </button>
                 <button class="btn btn-danger btn-small" onclick="deleteQuoteFromHistory('${q.id}', event)">
                     <i class="fa-solid fa-trash-can"></i> מחק
@@ -2849,6 +2922,7 @@ async function autoDetectQuoteNumber(showAlerts = false) {
 }
 
 function uploadPDFToDrive() {
+    ensureQuoteNumber();
     const clientName = document.getElementById('form-client-name').value.trim() || 'לקוח';
     const subject = document.getElementById('form-quote-subject').value.trim() || 'הצעת מחיר';
     const quoteNumber = document.getElementById('form-quote-number').value.trim() || '000';
