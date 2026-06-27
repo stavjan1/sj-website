@@ -95,10 +95,25 @@ function toggleManualLogin() {
 // ==========================================================================
 // Gemini model selection + daily quota
 // ==========================================================================
-let selectedGeminiModel = 'deepseek-chat';
-const MODEL_QUOTAS = { 'deepseek-chat': 400, 'deepseek-reasoner': 200 };
-const MODEL_LABELS = { 'deepseek-chat': 'DeepSeek V3', 'deepseek-reasoner': 'DeepSeek R1' };
-const MODEL_CIRCUMFERENCE = 138.2; // 2ֿ€ֳ—22
+// Selected AI as a "provider|model" value (matches the dropdown). Default: Gemini.
+let selectedGeminiModel = 'gemini|gemini-2.0-flash';
+const MODEL_LABELS = {
+    'gemini|gemini-2.0-flash': 'Gemini 2.0 Flash',
+    'gemini|gemini-2.5-flash': 'Gemini 2.5 Flash',
+    'deepseek|deepseek-chat': 'DeepSeek V3',
+    'deepseek|deepseek-reasoner': 'DeepSeek R1',
+    'grok|grok-2-latest': 'Grok 2',
+};
+// Each provider's default "provider|model" value — used when an automatic
+// server-side fallback switches us to a different provider.
+const PROVIDER_DEFAULT_VALUE = {
+    gemini: 'gemini|gemini-2.0-flash',
+    deepseek: 'deepseek|deepseek-chat',
+    grok: 'grok|grok-2-latest',
+};
+const WEIGHTED_DAILY_BUDGET_DEFAULT = 400;
+const MODEL_CIRCUMFERENCE = 138.2; // 2π×22
+function aiLabel(value) { return MODEL_LABELS[value] || value; }
 
 function _todayKey() {
     return new Date().toISOString().slice(0, 10); // "2026-06-26"
@@ -112,20 +127,15 @@ function incrementDailyUsage(model) {
     localStorage.setItem(key, (getDailyUsage(model) + 1).toString());
     updateQuotaUI();
 }
-function isQuotaExceeded(model) {
-    return getDailyUsage(model) >= MODEL_QUOTAS[model];
-}
+// Quota/fallback are now handled server-side (the proxy switches providers when
+// one runs out), so the client always uses the selected value.
 function getEffectiveModel() {
-    if (!isQuotaExceeded(selectedGeminiModel)) return selectedGeminiModel;
-    // Auto-fallback to the other model if the chosen one hit its daily cap.
-    const fallback = selectedGeminiModel === 'deepseek-reasoner' ? 'deepseek-chat' : 'deepseek-reasoner';
-    if (fallback && !isQuotaExceeded(fallback)) return fallback;
-    return null; // both exhausted
+    return selectedGeminiModel;
 }
 function updateQuotaUI() {
     const model  = selectedGeminiModel;
     const used   = getWeightedUsage(model);
-    const budget = WEIGHTED_DAILY_BUDGET[model] || 100;
+    const budget = WEIGHTED_DAILY_BUDGET_DEFAULT;
     const pct    = Math.min(100, Math.round((used / budget) * 100));
     const offset = MODEL_CIRCUMFERENCE * (1 - pct / 100);
 
@@ -137,7 +147,7 @@ function updateQuotaUI() {
     const pctEl = document.getElementById('quota-pct');
     if (pctEl) pctEl.textContent = pct + '%';
     const nameEl = document.getElementById('quota-model-name');
-    if (nameEl) nameEl.textContent = (MODEL_LABELS[model] || model) + ' · היום';
+    if (nameEl) nameEl.textContent = aiLabel(model) + ' · היום';
     // Legacy element (may be absent after redesign) — guard.
     const usedEl = document.getElementById('quota-used');
     if (usedEl) usedEl.textContent = Math.round(used);
@@ -185,19 +195,21 @@ function saveGlobalGeminiKey(key) {
     localStorage.setItem('sj_gemini_key_global', key);
 }
 
-// Single entry point for every AI call (OpenAI-compatible chat completions).
-// Strategy: try the server proxy first (key stays server-side, works for ALL users
-// and on every domain). Only if the proxy isn't deployed / has no key configured
-// (501/404) do we fall back to a personal DeepSeek key stored locally.
-//   payload = { messages:[{role,content}], response_format?, temperature?, max_tokens? }
+// Single entry point for every AI call. `value` is a "provider|model" string
+// (from the model dropdown). The server proxy picks the provider, translates the
+// format, and auto-falls-back to another provider when one is out of quota —
+// signalling that via the X-AI-Fallback-From response header, which we surface
+// to the user and reflect in the model selector.
+//   payload = { messages:[{role,content}], response_format?, temperature?, max_tokens?, stream? }
 // Returns a fetch Response whose JSON exposes choices[0].message.content.
-async function callAI(model, payload) {
+async function callAI(value, payload) {
+    const [provider, model] = String(value || selectedGeminiModel).split('|');
     let proxyRes = null;
     try {
         proxyRes = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model, ...payload })
+            body: JSON.stringify({ provider, model, ...payload })
         });
     } catch (e) {
         proxyRes = null; // network error / local file testing → fall through to personal key
@@ -205,25 +217,42 @@ async function callAI(model, payload) {
     // If the proxy answered (including a real provider error like 400/402), use it —
     // EXCEPT when it signals "not available / no server key" (404 = not deployed, 501 = no key).
     if (proxyRes && proxyRes.status !== 404 && proxyRes.status !== 501) {
+        handleProviderFallback(proxyRes);
         return proxyRes;
     }
 
     const personalKey = getGeminiApiKey();
     if (personalKey) {
+        // Local-testing fallback only: hit DeepSeek directly with a personal key.
         return fetch(DEEPSEEK_DIRECT_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${personalKey}`
             },
-            body: JSON.stringify({ model, stream: false, ...payload })
+            body: JSON.stringify({ model: 'deepseek-chat', stream: false, ...payload })
         });
     }
 
     // Neither a server key nor a personal key is configured.
     return new Response(JSON.stringify({
-        error: { message: 'שירות ה-AI אינו מוגדר עדיין. הגדר את DEEPSEEK_API_KEY בשרת (Cloudflare Pages), או הזן מפתח אישי בלשונית הגדרות.' }
+        error: { message: 'שירות ה-AI אינו מוגדר עדיין. הגדירו GEMINI_API_KEY ו/או DEEPSEEK_API_KEY בשרת (Cloudflare Pages).' }
     }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+}
+
+// When the server auto-switched providers (e.g. Gemini quota ran out), tell the
+// user and move the dropdown to the provider that actually answered.
+function handleProviderFallback(res) {
+    const from = res.headers.get('X-AI-Fallback-From');
+    const used = res.headers.get('X-AI-Provider');
+    if (!from || !used || from === used) return;
+    const fromLabel = (PROVIDER_DEFAULT_VALUE[from] && aiLabel(PROVIDER_DEFAULT_VALUE[from])) || from;
+    const usedValue = PROVIDER_DEFAULT_VALUE[used] || selectedGeminiModel;
+    showToast(`נגמרו הבקשות ב-${fromLabel} — עברתי אוטומטית ל-${aiLabel(usedValue)}`, 'error');
+    selectedGeminiModel = usedValue;
+    const sel = document.getElementById('gemini-model-select');
+    if (sel) sel.value = usedValue;
+    updateQuotaUI();
 }
 
 // Turn any failed AI/proxy response into a clear Hebrew message.
@@ -536,9 +565,9 @@ function loadProject(id, navigate = true) {
     localStorage.setItem(getStorageKey('sj_active_project_id'), id);
 
     // Reset model to default each time a project is loaded
-    changeGeminiModel('deepseek-chat');
+    changeGeminiModel('gemini|gemini-2.0-flash');
     const modelSel = document.getElementById('gemini-model-select');
-    if (modelSel) modelSel.value = 'deepseek-chat';
+    if (modelSel) modelSel.value = 'gemini|gemini-2.0-flash';
 
     updateActiveProjectBanner(proj);
     filterProjectsList();
@@ -1176,16 +1205,6 @@ async function sendChatMessage() {
 // (after a new user turn) and regenerateLastAnswer (after dropping the last reply).
 async function runPricingAgent(activeProject, promptChars) {
     const effectiveModel = getEffectiveModel();
-    if (!effectiveModel) {
-        showToast('המכסה היומית נוצלה עבור שני המודלים. נסה שוב מחר.', 'error');
-        return;
-    }
-    if (effectiveModel !== selectedGeminiModel) {
-        showToast(`המכסה של ${MODEL_LABELS[selectedGeminiModel] || selectedGeminiModel} נוצלה — עובר אוטומטית ל-${MODEL_LABELS[effectiveModel] || effectiveModel}`, 'error');
-        const sel = document.getElementById('gemini-model-select');
-        if (sel) sel.value = effectiveModel;
-        changeGeminiModel(effectiveModel);
-    }
 
     showTypingIndicator(true);
     const systemInstructionText = getProfessionSystemInstruction();

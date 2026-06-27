@@ -13,10 +13,19 @@
     whatsapp: 'https://wa.me/972535302887?text=%D7%94%D7%99%D7%99%20SJ%2C%20%D7%99%D7%A9%20%D7%9C%D7%99%20%D7%A9%D7%90%D7%9C%D7%94%20%D7%91%D7%97%D7%A9%D7%9E%D7%9C',
     contactPage: 'contact.html',
     maxUserMessages: 25, // light client-side guard against abuse of the shared key
+    models: [
+      { value: 'gemini|gemini-2.0-flash', label: 'Gemini 2.0' },
+      { value: 'deepseek|deepseek-chat', label: 'DeepSeek V3' },
+      { value: 'grok|grok-2-latest', label: 'Grok 2' },
+    ],
+    defaultModel: 'gemini|gemini-2.0-flash',
+    providerLabels: { gemini: 'Gemini', deepseek: 'DeepSeek', grok: 'Grok' },
   };
 
+  var selectedModel = CONFIG.defaultModel;
+
   var WELCOME =
-    'שלום! אני העוזר ההנדסי של SJ הנדסת חשמל. אפשר לשאול אותי כל שאלה על חשמל — תקלות בבית, פחת ומאמ"תים, עמדות טעינה, לוחות, הארקה ובטיחות. שאלות שתלויות בחוק או ברישוי אעביר ישירות למהנדס סתיו מ-SJ. אז במה אפשר לעזור?';
+    'שלום וברוכים הבאים 🙂 אני העוזר ההנדסי של SJ הנדסת חשמל. אשמח לעזור בכל שאלה על חשמל — תקלות בבית, פחת ומאמ"תים, עמדות טעינה, לוחות, הארקה ובטיחות. שאלות שתלויות בחוק או ברישוי אפנה ישירות ל-SJ. אז במה אפשר לעזור?';
 
   var SUGGESTIONS = [
     'הפחת קפץ ולא עולה, מה לעשות?',
@@ -59,6 +68,9 @@
           '<div class="sj-assist-titles"><span class="sj-assist-title">' + CONFIG.title + '</span><span class="sj-assist-sub"><span class="sj-assist-dot"></span>' + CONFIG.subtitle + '</span></div>' +
         '</div>' +
         '<div class="sj-assist-head-actions">' +
+          '<select id="sj-assist-model" class="sj-assist-model" aria-label="בחירת מנוע AI">' +
+            CONFIG.models.map(function (m) { return '<option value="' + m.value + '"' + (m.value === selectedModel ? ' selected' : '') + '>' + m.label + '</option>'; }).join('') +
+          '</select>' +
           '<a href="' + CONFIG.tel + '" class="sj-assist-iconbtn" title="חיוג" aria-label="חיוג">' +
             '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>' +
           '</a>' +
@@ -87,6 +99,8 @@
     els.input = panel.querySelector('#sj-assist-input');
     els.send = panel.querySelector('#sj-assist-send');
 
+    els.model = panel.querySelector('#sj-assist-model');
+    if (els.model) els.model.addEventListener('change', function () { selectedModel = els.model.value; });
     panel.querySelector('#sj-assist-close').addEventListener('click', close);
     els.send.addEventListener('click', onSend);
     els.input.addEventListener('keydown', function (e) {
@@ -152,6 +166,21 @@
 
   function scrollDown() { els.log.scrollTop = els.log.scrollHeight; }
 
+  // If the server auto-switched providers (e.g. Gemini quota ran out), tell the
+  // visitor and move the selector to the engine that actually answered.
+  function noteFallback(res) {
+    var from = res.headers.get('X-AI-Fallback-From');
+    var used = res.headers.get('X-AI-Provider');
+    if (!from || !used || from === used) return;
+    var fl = CONFIG.providerLabels[from] || from;
+    var ul = CONFIG.providerLabels[used] || used;
+    var n = el('div', 'sj-assist-note', 'נגמרו הבקשות ב-' + fl + ' — ממשיכים עם ' + ul + ' ⚡');
+    els.log.appendChild(n);
+    var match = CONFIG.models.filter(function (m) { return m.value.indexOf(used + '|') === 0; })[0];
+    if (match) { selectedModel = match.value; if (els.model) els.model.value = match.value; }
+    scrollDown();
+  }
+
   function setBusy(on) {
     sending = on;
     els.send.disabled = on;
@@ -190,12 +219,14 @@
   }
 
   function streamReply(typingEl) {
+    var parts = String(selectedModel).split('|');
     fetch('/api/assistant', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: messages }),
+      body: JSON.stringify({ provider: parts[0], model: parts[1], messages: messages }),
     })
       .then(function (res) {
+        noteFallback(res);
         var ctype = res.headers.get('content-type') || '';
         if (!res.ok) {
           return res.json().catch(function () { return null; }).then(function (data) {
