@@ -84,6 +84,10 @@
                     <i class="fa-solid fa-briefcase"></i>
                     <span>פרטי עסק</span>
                 </button>
+                <button class="nav-btn" id="tab-catalog" onclick="switchTab('catalog')">
+                    <i class="fa-solid fa-tags"></i>
+                    <span>מאגר מחירים</span>
+                </button>
                 <button class="nav-btn" id="tab-settings" onclick="switchTab('settings')">
                     <i class="fa-solid fa-sliders"></i>
                     <span>הגדרות מערכת</span>
@@ -676,6 +680,62 @@
                     </div>
                     <!-- hidden security card (kept for JS refs) -->
                     <div id="settings-security-card" style="display:none;"></div>
+                </div>
+            </section>
+
+            <!-- Price Catalog Panel -->
+            <section id="panel-catalog" class="content-panel">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-tags text-accent"></i> מאגר מחירים</h2>
+                    <p class="section-subtitle">סרוק דף ספק פעם אחת, וה-AI יחלץ ממנו את המחירים. הם נשמרים כאן ומשמשים את סוכן התמחור כמקור אמת — בלי לסרוק כל פעם מחדש.</p>
+                </div>
+
+                <div class="settings-grid">
+                    <!-- Scan + manual add -->
+                    <div style="display:flex;flex-direction:column;gap:20px;">
+                        <div class="section-card">
+                            <div class="card-header"><h3><i class="fa-solid fa-robot text-accent"></i> סריקת מחירים מאתר ספק</h3></div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+                                <p class="input-help">הדבק כתובת של דף קטגוריה/מוצרים (למשל באתר ספק חשמל). ה-AI יקרא את הדף ויחלץ את רשימת המחירים לאישורך.</p>
+                                <div style="display:flex;gap:8px;">
+                                    <input type="url" id="catalog-url" placeholder="https://supplier.co.il/category/..." style="flex:1;">
+                                    <button class="btn btn-accent" id="btn-scan-prices" onclick="scanSupplierPrices()">
+                                        <i class="fa-solid fa-magnifying-glass"></i> סרוק
+                                    </button>
+                                </div>
+                                <div id="catalog-scan-status" class="input-help" style="display:none;"></div>
+                                <div id="catalog-scan-results"></div>
+                            </div>
+                        </div>
+
+                        <div class="section-card">
+                            <div class="card-header"><h3><i class="fa-solid fa-plus text-accent"></i> הוספת מחיר ידנית</h3></div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+                                <p class="input-help">הדרך הכי מדויקת — מחירי הסחר האמיתיים שלך (שלרוב לא מופיעים באתר).</p>
+                                <div class="catalog-manual-row">
+                                    <input type="text" id="cat-manual-name" placeholder="שם הפריט (למשל: כבל XLPE 5x6)">
+                                    <input type="number" id="cat-manual-price" placeholder="מחיר ₪" style="max-width:110px;">
+                                    <input type="text" id="cat-manual-unit" placeholder="יחידה" style="max-width:110px;">
+                                    <button class="btn btn-success btn-small" onclick="addManualCatalogItem()"><i class="fa-solid fa-plus"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Saved catalog -->
+                    <div class="section-card">
+                        <div class="card-header flex-header">
+                            <h3><i class="fa-solid fa-database text-accent"></i> המאגר השמור (<span id="catalog-count">0</span>)</h3>
+                            <button class="btn btn-danger btn-small" onclick="clearPriceCatalog()" title="רוקן מאגר"><i class="fa-solid fa-trash-can"></i></button>
+                        </div>
+                        <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+                            <div class="project-search-input-wrap">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="catalog-search" placeholder="חיפוש במאגר…" oninput="renderPriceCatalog()">
+                            </div>
+                            <div id="catalog-list" class="catalog-list"></div>
+                        </div>
+                    </div>
                 </div>
             </section>
 

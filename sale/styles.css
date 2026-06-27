@@ -2388,3 +2388,31 @@ textarea#ai-input {
     .pdf-fs-content { width: 100%; }
     .pdf-fs-content .a4-sheet { transform: scale(0.62); transform-origin: top center; }
 }
+
+/* ===== Price catalog ===== */
+.catalog-manual-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.catalog-manual-row input { flex: 1; min-width: 100px; }
+.scrape-actions { margin: 10px 0 8px; }
+.scrape-results-list, .catalog-list {
+    display: flex; flex-direction: column; gap: 6px;
+    max-height: 340px; overflow-y: auto;
+}
+.scrape-result-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px; background: var(--bg-input); border: 1px solid var(--border-color);
+    border-radius: 8px; cursor: pointer; font-size: 0.88rem;
+}
+.scrape-result-row .srn { flex: 1; }
+.scrape-result-row .srp { font-weight: 700; color: var(--color-success); white-space: nowrap; }
+.scrape-result-row em, .catalog-row em { color: var(--text-muted); font-style: normal; font-size: 0.8rem; }
+.catalog-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px;
+}
+.catalog-row .cr-name { flex: 1; font-size: 0.88rem; }
+.catalog-row .cr-price { font-weight: 700; color: var(--color-success); white-space: nowrap; }
+.catalog-row .cr-del {
+    background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; border-radius: 6px;
+}
+.catalog-row .cr-del:hover { color: var(--color-danger); background: rgba(240,82,82,0.1); }
+.catalog-empty { color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 18px; }

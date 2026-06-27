@@ -41,6 +41,16 @@ functions/api/
 | `AI_PROVIDER` | optional | Force a default provider (`gemini` \| `deepseek` \| `grok`). Default: gemini. |
 | `RESEND_API_KEY` | optional | If set, `/api/lead` emails the visitor directly from SJ via Resend (needs a verified `sj-eng.co.il` domain in Resend). Without it, the lead is emailed to SJ via web3forms. |
 | `RESEND_FROM` | optional | Override the From address (default `SJ הנדסת חשמל <info@sj-eng.co.il>`). |
+| `FIRECRAWL_API_KEY` | optional | If set, `/api/scrape` uses Firecrawl (handles JS-rendered / anti-bot supplier sites). Without it, a free server-side fetch is used (good for normal pages). |
+
+## Price catalog (sale app → "מאגר מחירים" tab)
+
+Scrape a supplier page once → the AI extracts a `{name, price, unit}` list →
+saved to the per-user catalog (localStorage + Drive sync). The pricing agent
+then receives the catalog as a reference block, so material estimates use real
+supplier prices instead of guesses. Prices can also be added/edited manually
+(usually the most accurate — trade prices aren't on public sites). Endpoint:
+`POST /api/scrape { url, provider?, model? }`.
 
 After changing any variable: **Save → redeploy**. At least one of `GEMINI_API_KEY`
 / `DEEPSEEK_API_KEY` must be set or the AI features return a clear "not configured"

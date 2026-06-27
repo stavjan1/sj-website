@@ -352,6 +352,7 @@ let activeProjectId = null;
 
 // Global variables for Stern Pricing and Google OAuth
 let sternPricingDatabase = [];
+let priceCatalog = []; // user-curated supplier price catalog (scraped + manual)
 let googleTokenClient = null;
 let googleAccessToken = null;
 
@@ -424,6 +425,7 @@ function initUserSession() {
     loadSettings();
     loadHistory();
     loadProjects();
+    loadPriceCatalog();
     loadSternPricing();
     loadUploadedImages();
     checkGoogleSession();
@@ -487,6 +489,9 @@ function switchTab(tabId) {
     if (tabId === 'create') {
         ensureQuoteNumber();
     }
+    if (tabId === 'catalog') {
+        renderPriceCatalog();
+    }
 }
 
 // ==========================================================================
@@ -535,7 +540,8 @@ function backupLocalSnapshot(reason) {
             settings: appState.settings,
             history: appState.history,
             projects: projectsList,
-            trash: trashedProjectsList
+            trash: trashedProjectsList,
+            catalog: priceCatalog
         };
         localStorage.setItem(getStorageKey('sj_local_backup'), JSON.stringify(snap));
     } catch (e) { /* storage full / serialization issue — non-fatal */ }
@@ -867,6 +873,163 @@ function saveHistory() {
     localStorage.setItem(getStorageKey('sj_quote_history'), JSON.stringify(appState.history));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
     syncDatabaseToDrive(true);
+}
+
+// ==========================================================================
+// Supplier price catalog (scrape once → reuse as the pricing agent's source)
+// ==========================================================================
+function loadPriceCatalog() {
+    const saved = localStorage.getItem(getStorageKey('sj_price_catalog'));
+    if (saved) {
+        try { priceCatalog = JSON.parse(saved) || []; } catch (e) { priceCatalog = []; }
+    } else {
+        priceCatalog = [];
+    }
+}
+
+function savePriceCatalog(sync = true) {
+    localStorage.setItem(getStorageKey('sj_price_catalog'), JSON.stringify(priceCatalog));
+    localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
+    if (sync) syncDatabaseToDrive(true);
+}
+
+// Reference block injected into the pricing agent so its material estimates use
+// the user's real supplier prices instead of guesses. Capped so it never blows
+// up the prompt.
+function getPriceCatalogPromptBlock() {
+    if (!priceCatalog || priceCatalog.length === 0) return '';
+    const lines = priceCatalog.slice(0, 150).map(it => {
+        const unit = it.unit ? ` (${it.unit})` : '';
+        return `• ${it.name}: ${it.price} ש"ח${unit}`;
+    });
+    return `\n\nמאגר מחירי הספקים של המשתמש — השתמש בו כמקור אמת למחירי חומרים (התאם כמויות/יחידות לפי הצורך; אם פריט לא במאגר, אמוד כרגיל וציין שזו הערכה):\n` + lines.join('\n');
+}
+
+// Add or update a catalog item (dedup by name, case-insensitive).
+function upsertCatalogItem(it) {
+    const name = String(it.name || '').trim();
+    const price = Number(it.price);
+    if (!name || !Number.isFinite(price)) return false;
+    const existing = priceCatalog.find(x => x.name.toLowerCase() === name.toLowerCase());
+    if (existing) { existing.price = price; existing.unit = it.unit || existing.unit || ''; }
+    else priceCatalog.push({ name, price, unit: String(it.unit || '').trim() });
+    return true;
+}
+
+// Scrape a supplier page via /api/scrape and let the user review what to keep.
+async function scanSupplierPrices() {
+    const url = (document.getElementById('catalog-url').value || '').trim();
+    const status = document.getElementById('catalog-scan-status');
+    const results = document.getElementById('catalog-scan-results');
+    const btn = document.getElementById('btn-scan-prices');
+    if (!/^https?:\/\//i.test(url)) { showToast('הזן כתובת אתר תקינה (http/https)', 'error'); return; }
+    results.innerHTML = '';
+    status.style.display = 'block';
+    status.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> סורק את הדף ומחלץ מחירים…';
+    btn.disabled = true;
+    const [provider, model] = String(selectedGeminiModel).split('|');
+    try {
+        const res = await fetch('/api/scrape', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url, provider, model })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.error) throw new Error((data.error && data.error.message) || 'הסריקה נכשלה');
+        const items = data.items || [];
+        if (items.length === 0) { status.innerHTML = 'לא נמצאו מחירים בדף הזה. נסה דף קטגוריה אחר או הזן ידנית.'; return; }
+        status.innerHTML = `נמצאו ${items.length} פריטים (מנוע: ${data.engine}). סמן מה להוסיף:`;
+        renderScrapeResults(items);
+    } catch (e) {
+        status.innerHTML = '⚠️ ' + e.message;
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+let _scrapeBuffer = [];
+function renderScrapeResults(items) {
+    _scrapeBuffer = items;
+    const c = document.getElementById('catalog-scan-results');
+    c.innerHTML =
+        `<div class="scrape-actions"><button class="btn btn-success btn-small" onclick="addScrapedToCatalog()"><i class="fa-solid fa-check"></i> הוסף נבחרים למאגר</button></div>` +
+        `<div class="scrape-results-list">` +
+        items.map((it, i) => `
+            <label class="scrape-result-row">
+                <input type="checkbox" class="scrape-chk" data-i="${i}" checked>
+                <span class="srn">${escapeHtml(it.name)}</span>
+                <span class="srp">${it.price} ₪${it.unit ? ` <em>(${escapeHtml(it.unit)})</em>` : ''}</span>
+            </label>`).join('') +
+        `</div>`;
+}
+
+function addScrapedToCatalog() {
+    const checks = document.querySelectorAll('#catalog-scan-results .scrape-chk');
+    let added = 0;
+    checks.forEach(chk => {
+        if (chk.checked) {
+            const it = _scrapeBuffer[parseInt(chk.dataset.i, 10)];
+            if (it && upsertCatalogItem(it)) added++;
+        }
+    });
+    savePriceCatalog();
+    renderPriceCatalog();
+    document.getElementById('catalog-scan-results').innerHTML = '';
+    document.getElementById('catalog-scan-status').style.display = 'none';
+    document.getElementById('catalog-url').value = '';
+    showToast(`${added} פריטים נוספו למאגר`);
+}
+
+function addManualCatalogItem() {
+    const name = (document.getElementById('cat-manual-name').value || '').trim();
+    const price = parseFloat(document.getElementById('cat-manual-price').value);
+    const unit = (document.getElementById('cat-manual-unit').value || '').trim();
+    if (!name || !Number.isFinite(price)) { showToast('הזן שם ומחיר תקין', 'error'); return; }
+    upsertCatalogItem({ name, price, unit });
+    savePriceCatalog();
+    renderPriceCatalog();
+    document.getElementById('cat-manual-name').value = '';
+    document.getElementById('cat-manual-price').value = '';
+    document.getElementById('cat-manual-unit').value = '';
+    showToast('הפריט נוסף למאגר');
+}
+
+function renderPriceCatalog() {
+    const list = document.getElementById('catalog-list');
+    const countEl = document.getElementById('catalog-count');
+    if (countEl) countEl.textContent = priceCatalog.length;
+    if (!list) return;
+    const q = (document.getElementById('catalog-search')?.value || '').toLowerCase().trim();
+    if (priceCatalog.length === 0) {
+        list.innerHTML = '<div class="catalog-empty">המאגר ריק. סרוק דף ספק או הוסף פריט ידנית.</div>';
+        return;
+    }
+    const items = priceCatalog.filter(it => !q || it.name.toLowerCase().includes(q));
+    if (items.length === 0) { list.innerHTML = '<div class="catalog-empty">לא נמצאו פריטים תואמים.</div>'; return; }
+    list.innerHTML = items.map(it => {
+        const idx = priceCatalog.indexOf(it);
+        return `<div class="catalog-row">
+            <span class="cr-name">${escapeHtml(it.name)}</span>
+            <span class="cr-price">${it.price} ₪${it.unit ? ` <em>(${escapeHtml(it.unit)})</em>` : ''}</span>
+            <button class="cr-del" onclick="deleteCatalogItem(${idx})" title="מחק"><i class="fa-solid fa-xmark"></i></button>
+        </div>`;
+    }).join('');
+}
+
+function deleteCatalogItem(idx) {
+    if (idx < 0 || idx >= priceCatalog.length) return;
+    priceCatalog.splice(idx, 1);
+    savePriceCatalog();
+    renderPriceCatalog();
+}
+
+function clearPriceCatalog() {
+    if (priceCatalog.length === 0) return;
+    if (!confirm('לרוקן את כל מאגר המחירים? פעולה זו אינה הפיכה.')) return;
+    priceCatalog = [];
+    savePriceCatalog();
+    renderPriceCatalog();
+    showToast('המאגר רוקן');
 }
 
 function getNextQuoteNumber() {
@@ -1255,7 +1418,7 @@ async function runPricingAgent(activeProject, promptChars) {
     const effectiveModel = getEffectiveModel();
 
     showTypingIndicator(true);
-    const systemInstructionText = getProfessionSystemInstruction();
+    const systemInstructionText = getProfessionSystemInstruction() + getPriceCatalogPromptBlock();
     const _t0 = performance.now();
     setQuotaCharging(true);
     try {
@@ -2723,6 +2886,10 @@ async function syncDatabaseFromDrive(silent = false) {
                         trashedProjectsList = cloudData.trash;
                         localStorage.setItem(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList));
                     }
+                    if (cloudData.catalog) {
+                        priceCatalog = cloudData.catalog;
+                        localStorage.setItem(getStorageKey('sj_price_catalog'), JSON.stringify(priceCatalog));
+                    }
                     if (cloudData.users && cloudData.users.length > 0) {
                         const currentUsers = JSON.parse(localStorage.getItem('sj_app_users') || '[]');
                         // Merge: keep local entries for emails not in cloud, use cloud entries otherwise
@@ -2814,7 +2981,8 @@ async function syncDatabaseToDrive(silent = true) {
         // fresh login) silently wiping the user's cloud data.
         const localEmpty = (appState.history || []).length === 0
             && (projectsList || []).length === 0
-            && (trashedProjectsList || []).length === 0;
+            && (trashedProjectsList || []).length === 0
+            && (priceCatalog || []).length === 0;
         if (localEmpty && fileId) {
             console.warn('Sync push skipped: local dataset is empty but a cloud backup exists — not overwriting.');
             setSyncLoading(false);
@@ -2830,6 +2998,7 @@ async function syncDatabaseToDrive(silent = true) {
             history: appState.history,
             projects: projectsList,
             trash: trashedProjectsList,
+            catalog: priceCatalog,
             users: usersRaw ? JSON.parse(usersRaw) : [],
             lastUpdated: timestamp
         };
@@ -3965,7 +4134,11 @@ async function recoverDriveBackup() {
             projectsList = cloudData.projects;
             localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList));
         }
-        
+        if (cloudData.catalog) {
+            priceCatalog = cloudData.catalog;
+            localStorage.setItem(getStorageKey('sj_price_catalog'), JSON.stringify(priceCatalog));
+        }
+
         // Update folder settings to point to the parent of this file!
         if (targetFile.parents && targetFile.parents.length > 0) {
             const dataFolderId = targetFile.parents[0];
