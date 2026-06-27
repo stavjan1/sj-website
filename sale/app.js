@@ -920,21 +920,31 @@ function fillFormFromState() {
     calculateTotal();
 }
 
+// Escape user/AI text before inserting via innerHTML / attributes, so a quote,
+// "<", or "&" in a title/description can't break the editor or the PDF.
+function escapeHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function escapeAttr(s) {
+    return escapeHtml(s).replace(/"/g, '&quot;');
+}
+
 function addWorkItemRow(title = '', description = '', price = 0) {
     const container = document.getElementById('work-items-container');
     const index = container.children.length + 1;
     const isItemized = appState.currentQuote.showItemizedPrices;
-    
+
     const row = document.createElement('div');
     row.className = 'work-item-form-row';
     row.innerHTML = `
         <div class="work-item-form-grid ${isItemized ? '' : 'no-price-col'}">
             <div class="row-index">${index}</div>
             <div class="form-group" style="margin-bottom:0">
-                <input type="text" class="item-title-input" placeholder="נושא הסעיף (למשל: חיווט כבלי תקשורת)" value="${title}" oninput="updatePreviewFromForm()">
+                <input type="text" class="item-title-input" placeholder="נושא הסעיף (למשל: חיווט כבלי תקשורת)" value="${escapeAttr(title)}" oninput="updatePreviewFromForm()">
             </div>
             <div class="form-group" style="margin-bottom:0">
-                <textarea class="item-desc-input" rows="2" placeholder="פירוט תכולת העבודה..." oninput="updatePreviewFromForm()">${description}</textarea>
+                <textarea class="item-desc-input" rows="2" placeholder="פירוט תכולת העבודה..." oninput="updatePreviewFromForm()">${escapeHtml(description)}</textarea>
             </div>
             ${isItemized ? `
             <div class="form-group" style="margin-bottom:0">
@@ -1015,19 +1025,23 @@ function calculateItemizedTotal() {
     calculateTotal();
 }
 
+// Israeli VAT rate (18% since 2025-01-01). Single source of truth.
+const VAT_RATE = 0.18;
+const VAT_PCT = Math.round(VAT_RATE * 100);
+
 function calculateTotal() {
     const basePriceInput = document.getElementById('form-base-price').value;
     const basePrice = parseFloat(basePriceInput) || 0;
     const vatType = document.getElementById('form-vat-type').value;
-    
+
     let finalPrice = basePrice;
     let vatLabel = 'פטור ממע"מ (עוסק פטור)';
-    
+
     if (vatType === 'exclude') {
-        finalPrice = basePrice * 1.17;
-        vatLabel = 'לא כולל מע"מ (נוסף 17% מע"מ)';
+        finalPrice = basePrice * (1 + VAT_RATE);
+        vatLabel = `לא כולל מע"מ (נוסף ${VAT_PCT}% מע"מ)`;
     } else if (vatType === 'include') {
-        vatLabel = 'כולל מע"מ (בשיעור 17%)';
+        vatLabel = `כולל מע"מ (בשיעור ${VAT_PCT}%)`;
     }
     
     const roundedPrice = Number(finalPrice.toFixed(2));
@@ -1118,8 +1132,8 @@ function updatePreviewFromForm() {
             tr.innerHTML = `
                 <td style="font-family: 'Outfit', sans-serif; font-weight: 700; text-align: center;">${idx + 1}</td>
                 <td>
-                    <div style="font-weight: 700; color: var(--pdf-primary); text-decoration: underline; margin-bottom: 4px;">${item.title || 'סעיף ללא כותרת'}</div>
-                    <div style="white-space: pre-line; line-height: 1.5; color: var(--pdf-text-main); font-size: 0.9rem;">${item.description || 'אין פירוט לסעיף זה'}</div>
+                    <div style="font-weight: 700; color: var(--pdf-primary); text-decoration: underline; margin-bottom: 4px;">${escapeHtml(item.title) || 'סעיף ללא כותרת'}</div>
+                    <div style="white-space: pre-line; line-height: 1.5; color: var(--pdf-text-main); font-size: 0.9rem;">${escapeHtml(item.description) || 'אין פירוט לסעיף זה'}</div>
                 </td>
                 <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight: 700; text-align: left; color: var(--pdf-primary);">${formatPriceString(item.price || 0)} ₪</td>
             `;
@@ -1131,8 +1145,8 @@ function updatePreviewFromForm() {
             const itemEl = document.createElement('div');
             itemEl.className = 'pdf-work-item';
             itemEl.innerHTML = `
-                <div class="pdf-item-title">${idx + 1}. ${item.title || 'סעיף ללא כותרת'}</div>
-                <div class="pdf-item-desc">${item.description || 'אין פירוט לסעיף זה'}</div>
+                <div class="pdf-item-title">${idx + 1}. ${escapeHtml(item.title) || 'סעיף ללא כותרת'}</div>
+                <div class="pdf-item-desc">${escapeHtml(item.description) || 'אין פירוט לסעיף זה'}</div>
             `;
             pdfItemsContainer.appendChild(itemEl);
         });
@@ -1911,27 +1925,40 @@ function downloadPDF() {
     appState.currentQuote.summary = document.getElementById('form-summary').value;
     
     updatePreviewFromForm();
-    
+
     const element = document.getElementById('quote-pdf-sheet');
     const filename = `הצעת מחיר_${quoteNumber}_${clientName.replace(/\s+/g, '_')}.pdf`;
-    
+
+    // Robustness: if the html2pdf CDN didn't load, fall back to the browser's
+    // print dialog (the print CSS already isolates the quote sheet → save as PDF).
+    if (typeof html2pdf === 'undefined') {
+        showToast('מנוע ה-PDF לא נטען — נפתח חלון הדפסה (בחר "שמירה כ-PDF").', 'error');
+        saveToHistory(false);
+        setTimeout(() => window.print(), 300);
+        return;
+    }
+
     const options = {
         margin: 10,
         filename: filename,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-            scale: 2, 
+        html2canvas: {
+            scale: 2,
             useCORS: true,
             logging: false,
-            letterRendering: true
+            letterRendering: true,
+            backgroundColor: '#ffffff',
+            scrollY: 0
         },
-        jsPDF: { 
-            unit: 'mm', 
-            format: 'a4', 
-            orientation: 'portrait' 
-        }
+        jsPDF: {
+            unit: 'mm',
+            format: 'a4',
+            orientation: 'portrait'
+        },
+        // Avoid slicing a work item / table row across two pages.
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     };
-    
+
     showToast('מכין קובץ PDF להורדה...');
     
     return html2pdf().set(options).from(element).save()
@@ -1960,7 +1987,9 @@ function shareWhatsApp() {
         return;
     }
     
-    const msg = `שלום ${clientName},\n\nהפקתי עבורך הצעת מחיר מפורטת בנושא: *${subject}*.\nסה"כ לתשלום: *${finalPrice}* (${vatLabel}).\n\nשלחתי לך את קובץ ה-PDF המפורט במייל. אשמח לעבור עליו יחד איתך.\n\nבברכה,\n*סתיו ג'אן - SJ הנדסת חשמל*`;
+    const biz = (appState.settings && appState.settings.businessDetails) || {};
+    const signName = [biz.owner, biz.name].filter(Boolean).join(' - ') || 'SJ הנדסת חשמל';
+    const msg = `שלום ${clientName},\n\nהפקתי עבורך הצעת מחיר מפורטת בנושא: *${subject}*.\nסה"כ לתשלום: *${finalPrice}* (${vatLabel}).\n\nשלחתי לך את קובץ ה-PDF המפורט במייל. אשמח לעבור עליו יחד איתך.\n\nבברכה,\n*${signName}*`;
     const encodedMsg = encodeURIComponent(msg);
     
     window.open(`https://api.whatsapp.com/send?text=${encodedMsg}`, '_blank');
@@ -2847,17 +2876,21 @@ function uploadPDFToDrive() {
         margin: 10,
         filename: filename,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-            scale: 2, 
+        html2canvas: {
+            scale: 2,
             useCORS: true,
             logging: false,
-            letterRendering: true
+            letterRendering: true,
+            backgroundColor: '#ffffff',
+            scrollY: 0
         },
-        jsPDF: { 
-            unit: 'mm', 
-            format: 'a4', 
-            orientation: 'portrait' 
-        }
+        jsPDF: {
+            unit: 'mm',
+            format: 'a4',
+            orientation: 'portrait'
+        },
+        // Avoid slicing a work item / table row across two pages.
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     };
     
     const btn = document.getElementById('btn-save-drive');
