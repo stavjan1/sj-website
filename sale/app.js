@@ -93,7 +93,7 @@ function toggleManualLogin() {
 }
 
 // ==========================================================================
-// Gemini model selection + daily quota
+// AI model selection + usage meter
 // ==========================================================================
 // Selected AI as a "provider|model" value (matches the dropdown). Default: Gemini.
 let selectedGeminiModel = 'gemini|gemini-2.0-flash';
@@ -604,7 +604,7 @@ function loadProject(id, navigate = true) {
     updateActiveProjectBanner(proj);
     filterProjectsList();
     
-    // Load Gemini Pricing Chat log
+    // Load AI pricing chat log
     renderChatHistory(proj.chatHistory);
     
     // Load Materials checklist
@@ -1219,7 +1219,7 @@ function updatePriceDisplayMode() {
 }
 
 // ==========================================================================
-// Gemini Pricing Chat (סוכן תמחור מומחה)
+// AI Pricing Chat (סוכן תמחור מומחה)
 // ==========================================================================
 async function sendChatMessage() {
     if (!activeProjectId) {
@@ -1565,7 +1565,7 @@ function calculateWizardTotal() {
 }
 
 // ==========================================================================
-// Gemini Phrasing Agent (סוכן ניסוח הצעת מחיר)
+// AI Phrasing Agent (סוכן ניסוח הצעת מחיר)
 // ==========================================================================
 async function exportChatToQuote() {
     if (!activeProjectId) {
