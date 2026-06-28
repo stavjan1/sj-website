@@ -1767,6 +1767,7 @@ textarea#ai-input {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
     transition: all var(--transition-speed) ease;
 }
 
@@ -1803,6 +1804,13 @@ textarea#ai-input {
 .project-actions {
     display: flex;
     gap: 8px;
+}
+
+.project-badge-row {
+    flex-basis: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: 10px;
 }
 
 .no-price-col {
