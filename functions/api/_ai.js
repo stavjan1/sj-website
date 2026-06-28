@@ -11,6 +11,9 @@
 //   GEMINI_API_KEY   — Google AI Studio key (primary, free tier)
 //   DEEPSEEK_API_KEY — DeepSeek key (fallback, cheap)
 //   XAI_API_KEY      — xAI/Grok key (optional)
+// Workers AI (free, no key — runs on Cloudflare itself, works everywhere):
+//   add a "Workers AI" binding named `AI` in Pages → Settings → Functions → Bindings.
+//   It is used as the last-resort fallback so the AI works even with no external keys.
 
 export const PROVIDERS = {
   gemini: {
@@ -36,10 +39,19 @@ export const PROVIDERS = {
     defaultModel: 'grok-2-latest',
     models: ['grok-2-latest', 'grok-3', 'grok-3-mini'],
   },
+  cloudflare: {
+    label: 'Cloudflare',
+    kind: 'cloudflare',
+    binding: 'AI', // Workers AI binding (env.AI) — free, no API key, region-independent
+    defaultModel: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+    models: ['@cf/meta/llama-3.3-70b-instruct-fp8-fast', '@cf/meta/llama-3.1-8b-instruct'],
+  },
 };
 
 // Order tried on fallback once the explicitly-requested provider is placed first.
-const FALLBACK_SEQUENCE = ['gemini', 'deepseek', 'grok'];
+// `cloudflare` is last: preferred only when no external key works, but always
+// available (free, via binding) so the chain never ends empty.
+const FALLBACK_SEQUENCE = ['gemini', 'deepseek', 'grok', 'cloudflare'];
 
 // Statuses that mean "this provider can't serve right now — try the next":
 // 429 quota/rate, 401/403 bad/expired key, 402 no balance, 5xx upstream.
@@ -55,6 +67,8 @@ const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' };
 export function keyFor(env, name) {
   const cfg = PROVIDERS[name];
   if (!cfg) return null;
+  // Workers AI uses a runtime binding (env.AI), not a string key.
+  if (cfg.kind === 'cloudflare') return env && env[cfg.binding] ? env[cfg.binding] : null;
   for (const k of cfg.keyEnv) if (env && env[k]) return env[k];
   return null;
 }
@@ -168,6 +182,57 @@ export function geminiStreamToOpenAI(upstreamBody) {
   });
 }
 
+// Workers AI streams SSE as  data: {"response":"token"}  — convert to OpenAI shape.
+export function cfStreamToOpenAI(upstreamBody) {
+  const reader = upstreamBody.getReader();
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+  let buffer = '';
+  return new ReadableStream({
+    async pull(controller) {
+      const { value, done } = await reader.read();
+      if (done) {
+        controller.enqueue(enc.encode('data: [DONE]\n\n'));
+        controller.close();
+        return;
+      }
+      buffer += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (line.indexOf('data:') !== 0) continue;
+        const p = line.slice(5).trim();
+        if (!p || p === '[DONE]') continue;
+        try {
+          const t = JSON.parse(p).response || '';
+          if (t) controller.enqueue(enc.encode('data: ' + JSON.stringify({ choices: [{ delta: { content: t } }] }) + '\n\n'));
+        } catch (e) { /* partial / keep-alive */ }
+      }
+    },
+    cancel() { try { reader.cancel(); } catch (e) {} },
+  });
+}
+
+// Call the Workers AI binding (env.AI) and return a normalized Response (OpenAI shape).
+async function callCloudflare(binding, opts, headers) {
+  const cfg = PROVIDERS.cloudflare;
+  const model = pickModel(cfg, opts.model);
+  const input = { messages: opts.messages, stream: !!opts.stream };
+  if (opts.max_tokens) input.max_tokens = opts.max_tokens;
+  if (typeof opts.temperature === 'number') input.temperature = opts.temperature;
+
+  const out = await binding.run(model, input);
+  if (opts.stream) {
+    return new Response(cfStreamToOpenAI(out), { status: 200, headers: { ...SSE_HEADERS, ...headers } });
+  }
+  const text = (out && (out.response != null ? out.response : (out.result && out.result.response))) || '';
+  return new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content: text } }] }), {
+    status: 200,
+    headers: { ...JSON_HEADERS, ...headers },
+  });
+}
+
 async function normalize(name, upstream, stream, extraHeaders) {
   const headers = { ...extraHeaders };
   const kind = PROVIDERS[name].kind;
@@ -204,12 +269,25 @@ function errorResponse(message, status) {
 export async function generate(env, opts) {
   const order = buildOrder(opts.provider, env);
   if (order.length === 0) {
-    return errorResponse('לא הוגדר אף מפתח AI בשרת. הוסיפו GEMINI_API_KEY ו/או DEEPSEEK_API_KEY בהגדרות Cloudflare Pages.', 501);
+    return errorResponse('לא הוגדר מנוע AI בשרת. הוסיפו "AI binding" (Workers AI) בהגדרות Cloudflare Pages — חינם, ללא מפתח — או GEMINI_API_KEY / DEEPSEEK_API_KEY.', 501);
   }
 
   for (let i = 0; i < order.length; i++) {
     const name = order[i];
     const key = keyFor(env, name);
+
+    // Workers AI: called via runtime binding, not fetch — handle separately.
+    if (PROVIDERS[name].kind === 'cloudflare') {
+      const headers = { 'X-AI-Provider': name };
+      if (i > 0) headers['X-AI-Fallback-From'] = order[0];
+      try {
+        return await callCloudflare(key, opts, headers);
+      } catch (e) {
+        if (i < order.length - 1) continue;
+        return errorResponse('מנוע ה-AI של Cloudflare נכשל: ' + (e && e.message ? e.message : e), 502);
+      }
+    }
+
     const modelForThis = PROVIDERS[name].models.includes(opts.model) ? opts.model : undefined;
 
     let upstream;
