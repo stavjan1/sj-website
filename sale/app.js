@@ -3464,22 +3464,39 @@ function handleUserRegister(event) {
     showToast(`ברוך הבא למערכת, ${username}!`);
 }
 
+// Reveal/hide the first-time-login confirmation block (confirm password + profession).
+function setFirstLoginMode(on) {
+    const extra = document.getElementById('first-login-extra');
+    const btn = document.getElementById('manual-login-btn');
+    if (extra) extra.style.display = on ? 'flex' : 'none';
+    if (btn) btn.textContent = on ? 'הרשמה וכניסה' : 'כניסה';
+    if (!on) {
+        const c = document.getElementById('login-password-confirm');
+        const p = document.getElementById('login-profession');
+        if (c) c.value = '';
+        if (p) p.value = '';
+    }
+}
+
+// Single smart entry point for manual auth: logs in an existing user, or — on a
+// first-time username — switches to a registration step that requires confirming
+// the password, so a typo can never silently lock the account.
 function handleUserLogin(event) {
     if (event) event.preventDefault();
-    
+
     const usernameInput = document.getElementById('login-username');
     const passwordInput = document.getElementById('login-password');
-    
+
     if (!usernameInput || !passwordInput) return;
-    
+
     const username = usernameInput.value.trim();
     const password = passwordInput.value;
-    
+
     if (!username || !password) {
         showToast('אנא מלא את כל השדות', 'error');
         return;
     }
-    
+
     // Load existing users
     const usersStr = localStorage.getItem('sj_app_users');
     let users = [];
@@ -3490,27 +3507,84 @@ function handleUserLogin(event) {
             console.error('Error parsing users list', e);
         }
     }
-    
-    // Find user
+
+    // Find user (case-insensitive — the storage namespace is lowercased too)
     const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
-    if (!user || user.password !== password) {
-        showToast('שם משתמש או סיסמה שגויים', 'error');
+
+    if (user) {
+        // Existing account → straightforward login.
+        if (user.isGoogleUser && !user.password) {
+            showToast('המשתמש הזה נרשם דרך Google. אנא היכנס בכפתור "כניסה עם חשבון Google".', 'error');
+            return;
+        }
+        if (user.password !== password) {
+            showToast('שם משתמש או סיסמה שגויים', 'error');
+            return;
+        }
+        finishManualLogin(user.username, `שלום, ${user.username}!`);
         return;
     }
-    
-    // Set active user
-    localStorage.setItem('sj_logged_in_user', user.username);
-    
-    // Transition UI
+
+    // First-time username → register, but require password confirmation first.
+    const extra = document.getElementById('first-login-extra');
+    const inRegisterMode = extra && extra.style.display !== 'none';
+
+    if (!inRegisterMode) {
+        // Reveal the confirmation step instead of silently creating the account.
+        setFirstLoginMode(true);
+        const c = document.getElementById('login-password-confirm');
+        if (c) c.focus();
+        showToast('זו התחברותך הראשונה — אנא אמת את הסיסמה כדי להשלים הרשמה');
+        return;
+    }
+
+    // We're in register mode: validate the confirmation.
+    const confirmInput = document.getElementById('login-password-confirm');
+    const professionInput = document.getElementById('login-profession');
+    const confirmPassword = confirmInput ? confirmInput.value : '';
+    const profession = professionInput ? professionInput.value.trim() : '';
+
+    if (password !== confirmPassword) {
+        showToast('הסיסמאות אינן תואמות — אנא הקלד שוב בזהירות', 'error');
+        if (confirmInput) { confirmInput.value = ''; confirmInput.focus(); }
+        return;
+    }
+
+    // Create the new account.
+    const newUser = {
+        username: username,
+        password: password,
+        profession: profession,
+        created: getTodayDateString()
+    };
+    users.push(newUser);
+    localStorage.setItem('sj_app_users', JSON.stringify(users));
+
+    // Seed the per-user profession setting so the AI tunes itself.
+    localStorage.setItem('sj_logged_in_user', username);
+    if (profession) {
+        appState.settings.profession = profession;
+        localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
+    }
+
+    setFirstLoginMode(false);
+    finishManualLogin(username, `ברוך הבא למערכת, ${username}!`);
+}
+
+// Shared tail for a successful manual login/registration.
+function finishManualLogin(canonicalUsername, toastMsg) {
+    localStorage.setItem('sj_logged_in_user', canonicalUsername);
+
     document.getElementById('lock-screen').style.display = 'none';
     document.querySelector('.app-container').style.display = 'flex';
-    
-    // Clear inputs
-    usernameInput.value = '';
-    passwordInput.value = '';
-    
+
+    const u = document.getElementById('login-username');
+    const p = document.getElementById('login-password');
+    if (u) u.value = '';
+    if (p) p.value = '';
+
     initUserSession();
-    showToast(`שלום, ${user.username}!`);
+    showToast(toastMsg);
 }
 
 function handleUserLogout() {
@@ -3955,15 +4029,21 @@ function saveGoogleUserProfession(event) {
         try { users = JSON.parse(usersStr); } catch(e) {}
     }
     
-    const newUser = {
-        username: email,
-        password: '',
-        profession: profession,
-        created: getTodayDateString(),
-        isGoogleUser: true
-    };
-    
-    users.push(newUser);
+    // Reuse an existing record for this email (consistent storage namespace),
+    // otherwise create it. Never create a duplicate username.
+    const existing = users.find(u => u.username.toLowerCase() === email.toLowerCase());
+    if (existing) {
+        existing.profession = profession;
+        existing.isGoogleUser = true;
+    } else {
+        users.push({
+            username: email,
+            password: '',
+            profession: profession,
+            created: getTodayDateString(),
+            isGoogleUser: true
+        });
+    }
     localStorage.setItem('sj_app_users', JSON.stringify(users));
     
     window.tempGoogleUser = null;

@@ -998,9 +998,18 @@
             </div>
             <div id="manual-login-section" style="display:none; margin-top:12px;">
                 <form id="form-login-user" onsubmit="handleUserLogin(event)" style="display:flex;flex-direction:column;gap:10px;">
-                    <input type="text" id="login-username" required placeholder="שם משתמש" style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:10px 14px;font-family:inherit;font-size:0.9rem;">
-                    <input type="password" id="login-password" required placeholder="סיסמה" style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:10px 14px;font-family:inherit;font-size:0.9rem;">
-                    <button type="submit" class="btn btn-accent btn-full">כניסה</button>
+                    <input type="text" id="login-username" required autocomplete="username" placeholder="שם משתמש" style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:10px 14px;font-family:inherit;font-size:0.9rem;">
+                    <input type="password" id="login-password" required autocomplete="current-password" placeholder="סיסמה" style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:10px 14px;font-family:inherit;font-size:0.9rem;">
+                    <!-- Revealed automatically on first-time login to prevent a typo'd password from locking the account -->
+                    <div id="first-login-extra" style="display:none;flex-direction:column;gap:10px;">
+                        <div style="background:rgba(43,116,219,0.12);border:1px solid rgba(43,116,219,0.3);border-radius:8px;padding:9px 12px;font-size:0.82rem;color:var(--text-secondary);line-height:1.55;text-align:right;">
+                            <i class="fa-solid fa-circle-info" style="color:#2b74db;margin-left:5px;"></i>
+                            זו התחברותך הראשונה — אנא אמת את הסיסמה לצורך ההרשמה, כדי שלא תיווצר שגיאת הקלדה שתנעל את החשבון.
+                        </div>
+                        <input type="password" id="login-password-confirm" autocomplete="new-password" placeholder="אימות סיסמה" style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:10px 14px;font-family:inherit;font-size:0.9rem;">
+                        <input type="text" id="login-profession" placeholder="תחום עיסוק (לא חובה) — למשל חשמלאי מוסמך" style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:10px 14px;font-family:inherit;font-size:0.9rem;">
+                    </div>
+                    <button type="submit" id="manual-login-btn" class="btn btn-accent btn-full">כניסה</button>
                 </form>
             </div>
 
@@ -1050,5 +1059,8 @@
 
     <!-- Application Script -->
     <script src="app.js"></script>
+    <!-- In-app helper assistant (teaches how to operate the tool) -->
+    <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
+    <script src="../assistant.js" defer></script>
 </body>
 </html>
