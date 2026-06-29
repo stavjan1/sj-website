@@ -521,31 +521,104 @@ function loadProjects() {
 }
 
 function saveProjects() {
+    guardBeforeShrink('sj_projects', projectsList.length, 'before saveProjects');
     localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList));
     localStorage.setItem(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
     syncDatabaseToDrive(true);
 }
 
-// Recoverable safety snapshot of the current local data, taken right before a
-// cloud sync replaces it. Keeps the single most recent snapshot per user so a
-// bad/stale cloud overwrite never causes permanent loss.
+// Recoverable safety snapshots of the current local data, taken right before
+// anything replaces or shrinks it (cloud sync, import, a save that wipes a
+// collection, a username migration). Keeps a rolling list of the most recent
+// snapshots per user so no single bad event — including a future code change —
+// can cause permanent loss. The legacy single-slot key is kept for back-compat.
+var MAX_LOCAL_BACKUPS = 8;
 function backupLocalSnapshot(reason) {
     try {
-        const hasData = (appState.history || []).length || (projectsList || []).length || (trashedProjectsList || []).length;
-        if (!hasData) return; // nothing worth backing up
+        // Snapshot the data that is currently PERSISTED in localStorage — i.e. the
+        // about-to-be-overwritten state — not the in-memory copy, which during a
+        // shrinking save already holds the new (smaller/empty) data.
+        const read = (k) => {
+            const v = localStorage.getItem(getStorageKey(k));
+            if (v == null) return undefined;
+            try { return JSON.parse(v); } catch (e) { return v; }
+        };
         const snap = {
             reason: reason || '',
             at: Date.now(),
-            settings: appState.settings,
-            history: appState.history,
-            projects: projectsList,
-            trash: trashedProjectsList,
-            catalog: priceCatalog
+            settings: read('sj_quote_settings'),
+            history: read('sj_quote_history') || [],
+            projects: read('sj_projects') || [],
+            trash: read('sj_trash_projects') || [],
+            catalog: read('sj_price_catalog') || []
         };
-        localStorage.setItem(getStorageKey('sj_local_backup'), JSON.stringify(snap));
-    } catch (e) { /* storage full / serialization issue — non-fatal */ }
+        const hasData = (snap.history || []).length || (snap.projects || []).length ||
+                        (snap.trash || []).length || (snap.catalog || []).length;
+        if (!hasData) return; // nothing worth backing up
+        const snapStr = JSON.stringify(snap);
+        // Legacy single-slot snapshot (kept so existing recovery paths still work).
+        localStorage.setItem(getStorageKey('sj_local_backup'), snapStr);
+        // Rolling list, newest first, capped at MAX_LOCAL_BACKUPS.
+        let list = [];
+        try { list = JSON.parse(localStorage.getItem(getStorageKey('sj_local_backups')) || '[]'); } catch (e) { list = []; }
+        list.unshift(snap);
+        if (list.length > MAX_LOCAL_BACKUPS) list = list.slice(0, MAX_LOCAL_BACKUPS);
+        try {
+            localStorage.setItem(getStorageKey('sj_local_backups'), JSON.stringify(list));
+        } catch (quota) {
+            // Storage full — keep only the newest few and retry once.
+            try { localStorage.setItem(getStorageKey('sj_local_backups'), JSON.stringify(list.slice(0, 3))); } catch (e2) {}
+        }
+    } catch (e) { /* serialization issue — non-fatal */ }
 }
+
+// Snapshot before persisting a collection that shrank vs. what is already
+// stored. An accidental wipe (a bug, a bad merge, a future refactor that empties
+// an array, a failed parse on load followed by a save) is therefore always
+// recoverable from the rolling backups above. Never blocks a legitimate save.
+function guardBeforeShrink(storageKey, newCount, reason) {
+    try {
+        const stored = localStorage.getItem(getStorageKey(storageKey));
+        if (!stored) return;
+        const prev = JSON.parse(stored);
+        const prevCount = Array.isArray(prev) ? prev.length : 0;
+        if (prevCount > 0 && newCount < prevCount) {
+            backupLocalSnapshot(reason || ('shrink:' + storageKey));
+        }
+    } catch (e) { /* parse/storage issue — non-fatal */ }
+}
+
+// Emergency recovery surface (usable from the browser console if ever needed):
+//   sjDataRecovery.list()        → see available snapshots (newest first)
+//   sjDataRecovery.restore(0)    → restore the newest snapshot
+window.sjDataRecovery = {
+    list: function () {
+        let list = [];
+        try { list = JSON.parse(localStorage.getItem(getStorageKey('sj_local_backups')) || '[]'); } catch (e) {}
+        return list.map(function (s, i) {
+            return { index: i, when: new Date(s.at).toLocaleString('he-IL'), reason: s.reason,
+                     projects: (s.projects || []).length, history: (s.history || []).length, catalog: (s.catalog || []).length };
+        });
+    },
+    restore: function (index) {
+        let list = [];
+        try { list = JSON.parse(localStorage.getItem(getStorageKey('sj_local_backups')) || '[]'); } catch (e) {}
+        const snap = list[index || 0];
+        if (!snap) { console.warn('אין גיבוי במיקום הזה'); return false; }
+        // Snapshot the (possibly damaged) current state first, so restore is reversible too.
+        backupLocalSnapshot('before recovery restore');
+        if (snap.settings) { appState.settings = snap.settings; localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings)); }
+        if (snap.history) { appState.history = snap.history; localStorage.setItem(getStorageKey('sj_quote_history'), JSON.stringify(appState.history)); }
+        if (snap.projects) { projectsList = snap.projects; localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList)); }
+        if (snap.trash) { trashedProjectsList = snap.trash; localStorage.setItem(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList)); }
+        if (snap.catalog) { priceCatalog = snap.catalog; localStorage.setItem(getStorageKey('sj_price_catalog'), JSON.stringify(priceCatalog)); }
+        localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
+        try { filterProjectsList(); renderHistoryList(); loadSettings(); } catch (e) {}
+        if (typeof showToast === 'function') showToast('הנתונים שוחזרו מהגיבוי המקומי');
+        return true;
+    }
+};
 
 function createNewProject() {
     const input = document.getElementById('new-project-name');
@@ -867,6 +940,7 @@ function loadHistory() {
 }
 
 function saveHistory() {
+    guardBeforeShrink('sj_quote_history', (appState.history || []).length, 'before saveHistory');
     localStorage.setItem(getStorageKey('sj_quote_history'), JSON.stringify(appState.history));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
     syncDatabaseToDrive(true);
@@ -885,6 +959,7 @@ function loadPriceCatalog() {
 }
 
 function savePriceCatalog(sync = true) {
+    guardBeforeShrink('sj_price_catalog', (priceCatalog || []).length, 'before savePriceCatalog');
     localStorage.setItem(getStorageKey('sj_price_catalog'), JSON.stringify(priceCatalog));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
     if (sync) syncDatabaseToDrive(true);
@@ -3749,6 +3824,9 @@ function handleUpdateCredentials(event) {
         return;
     }
     
+    // Snapshot before touching any keys, so a failed/partial migration is recoverable.
+    backupLocalSnapshot('before username migration');
+
     // 1. Migrate Local Storage keys
     const oldPrefix = `sj_user_${activeUser.toLowerCase()}_`;
     const newPrefix = `sj_user_${newUsername.toLowerCase()}_`;
