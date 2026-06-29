@@ -593,6 +593,23 @@
                 <div class="settings-grid">
                     <!-- Column 1: Drive Configuration -->
                     <div style="display:flex; flex-direction:column; gap:20px;">
+                        <!-- Guest → cloud backup upgrade (shown only in guest mode) -->
+                        <div class="section-card" id="guest-upgrade-box" style="display:none; border:1px solid rgba(43,116,219,0.4);">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-cloud-arrow-up text-accent"></i> שמירת העבודה בענן</h3>
+                            </div>
+                            <div class="card-body" style="display:flex; flex-direction:column; gap:12px;">
+                                <p class="input-help" style="line-height:1.6; margin:0;">
+                                    אתה כרגע במצב <strong>אורח</strong> — העבודה נשמרת רק במכשיר זה.
+                                    התחבר עם Google כדי לשמור את כל מה שעשית לחשבון האישי שלך, ולהיכנס מכל מכשיר.
+                                </p>
+                                <button type="button" class="btn-google-login" onclick="connectGoogleToSaveGuestWork()">
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="G" style="width:20px;height:20px;">
+                                    <span>שמור את עבודתי — התחברות עם Google</span>
+                                </button>
+                            </div>
+                        </div>
+
                         <div class="section-card">
                             <div class="card-header">
                                 <h3><i class="fa-brands fa-google-drive text-accent"></i> חיבור ל-Google Drive</h3>
@@ -991,27 +1008,19 @@
                 <span>כניסה עם חשבון Google</span>
             </button>
 
-            <!-- Secondary: manual login (collapsed) -->
-            <div class="lock-manual-toggle" onclick="toggleManualLogin()">
-                <i class="fa-solid fa-chevron-down" id="manual-toggle-icon" style="font-size:0.75rem;transition:transform 0.2s;"></i>
-                כניסה עם שם משתמש וסיסמה
+            <!-- Divider -->
+            <div style="display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--text-muted);font-size:0.8rem;">
+                <span style="flex:1;height:1px;background:var(--border-color);"></span>או<span style="flex:1;height:1px;background:var(--border-color);"></span>
             </div>
-            <div id="manual-login-section" style="display:none; margin-top:12px;">
-                <form id="form-login-user" onsubmit="handleUserLogin(event)" style="display:flex;flex-direction:column;gap:10px;">
-                    <input type="text" id="login-username" required autocomplete="username" placeholder="שם משתמש" style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:10px 14px;font-family:inherit;font-size:0.9rem;">
-                    <input type="password" id="login-password" required autocomplete="current-password" placeholder="סיסמה" style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:10px 14px;font-family:inherit;font-size:0.9rem;">
-                    <!-- Revealed automatically on first-time login to prevent a typo'd password from locking the account -->
-                    <div id="first-login-extra" style="display:none;flex-direction:column;gap:10px;">
-                        <div style="background:rgba(43,116,219,0.12);border:1px solid rgba(43,116,219,0.3);border-radius:8px;padding:9px 12px;font-size:0.82rem;color:var(--text-secondary);line-height:1.55;text-align:right;">
-                            <i class="fa-solid fa-circle-info" style="color:#2b74db;margin-left:5px;"></i>
-                            זו התחברותך הראשונה — אנא אמת את הסיסמה לצורך ההרשמה, כדי שלא תיווצר שגיאת הקלדה שתנעל את החשבון.
-                        </div>
-                        <input type="password" id="login-password-confirm" autocomplete="new-password" placeholder="אימות סיסמה" style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:10px 14px;font-family:inherit;font-size:0.9rem;">
-                        <input type="text" id="login-profession" placeholder="תחום עיסוק (לא חובה) — למשל חשמלאי מוסמך" style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:10px 14px;font-family:inherit;font-size:0.9rem;">
-                    </div>
-                    <button type="submit" id="manual-login-btn" class="btn btn-accent btn-full">כניסה</button>
-                </form>
-            </div>
+
+            <!-- Secondary: try as guest (saved on this device only, no account) -->
+            <button type="button" class="btn-guest-login" onclick="enterGuestMode()">
+                <i class="fa-solid fa-user-clock" style="margin-left:8px;"></i>
+                התנסות במערכת כאורח
+            </button>
+            <p style="margin-top:10px;font-size:0.76rem;color:var(--text-muted);text-align:center;line-height:1.5;">
+                במצב אורח העבודה נשמרת רק במכשיר זה.<br>התחברות עם Google שומרת את הכל בענן.
+            </p>
 
             <!-- Hidden fields kept for JS compatibility -->
             <input type="hidden" id="lock-remember-me" value="true">
@@ -1037,6 +1046,26 @@
                 </div>
                 <button type="submit" class="btn btn-accent btn-full" style="margin-top: 10px;">סיום והמשך לאפליקציה</button>
             </form>
+        </div>
+    </div>
+
+    <!-- Guest-mode warning modal -->
+    <div id="guest-warning-modal" class="lock-screen-container" style="display: none; z-index: 100000; background: radial-gradient(circle at center, rgba(15, 23, 42, 0.98) 0%, rgba(2, 6, 23, 0.99) 100%);">
+        <div class="lock-card">
+            <div class="lock-logo">
+                <div style="width:56px;height:56px;background:rgba(255,170,0,0.15);border:1px solid rgba(255,170,0,0.35);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size:1.5rem;color:#ffaa00;"></i>
+                </div>
+                <h2 style="font-size:1.25rem;font-weight:700;margin-bottom:6px;">שים לב</h2>
+                <p style="color:var(--text-muted);font-size:0.9rem;line-height:1.6;">שימוש במצב אורח <strong>לא יגבה את עבודתך</strong> — הנתונים יישמרו רק במכשיר ובדפדפן הזה. אם תרצה לשמור הכל בענן ולהיכנס מכל מכשיר, התחבר עם Google.</p>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+                <button type="button" class="btn-google-login" onclick="closeGuestWarning(); handleGoogleLogin();">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="G" style="width:20px;height:20px;">
+                    <span>התחברות עם Google</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-full" onclick="proceedAsGuest()">המשך בכל זאת כאורח</button>
+            </div>
         </div>
     </div>
 

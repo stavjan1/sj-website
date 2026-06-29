@@ -421,6 +421,139 @@ function getStorageKey(key) {
     return `sj_user_${activeUser.toLowerCase()}_${key}`;
 }
 
+// ==========================================================================
+// Cloudflare KV cloud storage — primary backup for Google-authenticated users.
+// Identity is the verified Google account (the server checks the token); guests
+// stay local-only. Degrades gracefully: if the KV binding isn't configured yet
+// (501) or the network is down, the local copy remains the source of truth.
+// ==========================================================================
+var _cloudSaveTimer = null;
+
+function isGuestUser() {
+    return (getActiveUser() || '').toLowerCase() === 'guest';
+}
+
+// A "cloud user" is someone signed in with Google (we hold a live token and the
+// active user isn't the local-only guest).
+function isCloudUser() {
+    return !!googleAccessToken && !isGuestUser() && !!getActiveUser();
+}
+
+// The full per-user database blob (same shape the legacy Drive sync used).
+function buildDatabaseObject() {
+    const usersRaw = localStorage.getItem('sj_app_users');
+    return {
+        settings: appState.settings,
+        history: appState.history,
+        projects: projectsList,
+        trash: trashedProjectsList,
+        catalog: priceCatalog,
+        users: usersRaw ? JSON.parse(usersRaw) : [],
+        lastUpdated: Date.now()
+    };
+}
+
+// Apply a cloud blob onto in-memory state + localStorage (does not re-render).
+function applyDatabaseObject(cloudData) {
+    if (!cloudData) return;
+    if (cloudData.settings) { appState.settings = cloudData.settings; localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings)); }
+    if (cloudData.history) { appState.history = cloudData.history; localStorage.setItem(getStorageKey('sj_quote_history'), JSON.stringify(appState.history)); }
+    if (cloudData.projects) { projectsList = cloudData.projects; localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList)); }
+    if (cloudData.trash) { trashedProjectsList = cloudData.trash; localStorage.setItem(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList)); }
+    if (cloudData.catalog) { priceCatalog = cloudData.catalog; localStorage.setItem(getStorageKey('sj_price_catalog'), JSON.stringify(priceCatalog)); }
+    if (cloudData.lastUpdated) localStorage.setItem(getStorageKey('sj_db_last_updated'), String(cloudData.lastUpdated));
+}
+
+// Debounced save — protects the free-tier KV write budget (1k/day). Multiple
+// rapid edits collapse into a single upload ~1.5s after the last change.
+function scheduleCloudSync() {
+    if (!isCloudUser()) return; // guests are local-only by design
+    if (_cloudSaveTimer) clearTimeout(_cloudSaveTimer);
+    _cloudSaveTimer = setTimeout(cloudSaveNow, 1500);
+}
+
+async function cloudSaveNow() {
+    if (!isCloudUser()) return;
+    try {
+        const res = await fetch('/api/data', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({ data: buildDatabaseObject() })
+        });
+        // 501 = KV binding not configured yet → stay local-only, silently.
+        if (res.status === 501) return false;
+        return res.ok;
+    } catch (e) {
+        // Offline / transient — local copy stays authoritative until reconnect.
+        return false;
+    }
+}
+
+// Pull the cloud copy on login and adopt it if it's newer than local; if local
+// is newer (e.g. work done offline), push local up instead.
+async function cloudLoadAndMerge(silent) {
+    if (!isCloudUser()) return;
+    try {
+        const res = await fetch('/api/data', { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
+        if (res.status === 501) {
+            if (!silent) showToast('אחסון הענן (KV) עדיין לא הוגדר — נשמר מקומית בינתיים');
+            return;
+        }
+        if (!res.ok) return;
+        const body = await res.json();
+        const cloud = body && body.data;
+        const cloudTs = (cloud && cloud.lastUpdated) || 0;
+        const localTs = parseInt(localStorage.getItem(getStorageKey('sj_db_last_updated')) || '0', 10);
+        if (cloud && cloudTs > localTs) {
+            backupLocalSnapshot('before cloud(KV) load');
+            applyDatabaseObject(cloud);
+            try {
+                loadSettings(); filterProjectsList(); renderHistoryList();
+                if (typeof activeProjectId !== 'undefined' && activeProjectId) loadProject(activeProjectId, false);
+            } catch (e) {}
+            if (!silent) showToast('הנתונים סונכרנו מהענן');
+        } else if (localTs > cloudTs) {
+            cloudSaveNow();
+        }
+    } catch (e) { /* non-fatal */ }
+}
+
+// ===== Guest mode (local-only) and upgrade-to-Google =====
+function enterGuestMode() {
+    const m = document.getElementById('guest-warning-modal');
+    if (m) m.style.display = 'flex';
+    else proceedAsGuest();
+}
+
+function closeGuestWarning() {
+    const m = document.getElementById('guest-warning-modal');
+    if (m) m.style.display = 'none';
+}
+
+function proceedAsGuest() {
+    closeGuestWarning();
+    localStorage.setItem('sj_logged_in_user', 'guest');
+    googleAccessToken = null;
+    document.getElementById('lock-screen').style.display = 'none';
+    document.querySelector('.app-container').style.display = 'flex';
+    initUserSession();
+    updateGuestUpgradeUI();
+    showToast('נכנסת כאורח — העבודה נשמרת במכשיר זה בלבד');
+}
+
+// Invoked from Settings: a guest connects Google so all their work this session
+// is carried into a real account and backed up to the cloud (KV).
+function connectGoogleToSaveGuestWork() {
+    window._upgradingGuest = true;
+    handleGoogleLogin();
+}
+
+// Show the "save your work with Google" prompt only while in guest mode.
+function updateGuestUpgradeUI() {
+    const box = document.getElementById('guest-upgrade-box');
+    if (box) box.style.display = isGuestUser() ? 'block' : 'none';
+}
+
 function initUserSession() {
     loadSettings();
     loadHistory();
@@ -433,6 +566,7 @@ function initUserSession() {
     document.getElementById('form-quote-date').value = getTodayDateString();
     switchTab('projects');
     updateUserProfileUI();
+    updateGuestUpgradeUI();
     showAdminTabIfNeeded();
     if (isAdmin()) {
         setTimeout(() => { adminRefreshStatus(); adminRefreshUserList(); }, 300);
@@ -525,7 +659,7 @@ function saveProjects() {
     localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList));
     localStorage.setItem(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
-    syncDatabaseToDrive(true);
+    scheduleCloudSync();
 }
 
 // Recoverable safety snapshots of the current local data, taken right before
@@ -943,7 +1077,7 @@ function saveHistory() {
     guardBeforeShrink('sj_quote_history', (appState.history || []).length, 'before saveHistory');
     localStorage.setItem(getStorageKey('sj_quote_history'), JSON.stringify(appState.history));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
-    syncDatabaseToDrive(true);
+    scheduleCloudSync();
 }
 
 // ==========================================================================
@@ -962,7 +1096,7 @@ function savePriceCatalog(sync = true) {
     guardBeforeShrink('sj_price_catalog', (priceCatalog || []).length, 'before savePriceCatalog');
     localStorage.setItem(getStorageKey('sj_price_catalog'), JSON.stringify(priceCatalog));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
-    if (sync) syncDatabaseToDrive(true);
+    if (sync) scheduleCloudSync();
 }
 
 // Reference block injected into the pricing agent so its material estimates use
@@ -2501,18 +2635,13 @@ function importHistoryData(event) {
 // ==========================================================================
 function checkGoogleSession() {
     const savedToken = getSessionOrLocalStorageItem(getStorageKey('sj_drive_access_token'));
-    if (savedToken) {
+    if (savedToken && !isGuestUser()) {
         googleAccessToken = savedToken;
         updateDriveStatus(true);
-        // Sync on startup (delayed slightly so settings and projects render first)
-        setTimeout(async () => {
-            try {
-                await resolveSjDriveFolders();
-                syncDatabaseFromDrive(true);
-            } catch (err) {
-                console.error('Error resolving folders on startup:', err);
-            }
-        }, 800);
+        // Pull this account's cloud (KV) copy on startup. The saved OAuth token
+        // may have expired (Google tokens are short-lived); if so this fails
+        // silently and the local copy is kept until the user signs in again.
+        setTimeout(() => { cloudLoadAndMerge(true); }, 800);
     }
 }
 
@@ -4024,7 +4153,10 @@ function handleGoogleLogin() {
     try {
         googleTokenClient = google.accounts.oauth2.initTokenClient({
             client_id: clientId,
-            scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+            // Identity only — no Drive scopes. Data lives in Cloudflare KV now,
+            // so we don't touch the user's Drive, which also removes Google's
+            // "unverified app" warning (no sensitive/restricted scopes).
+            scope: 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
             callback: async (response) => {
                 if (response.error !== undefined) {
                     showToast('שגיאה בהתחברות לגוגל: ' + response.error, 'error');
@@ -4131,20 +4263,26 @@ function saveGoogleUserProfession(event) {
     completeGoogleLogin(email, profession, token, rememberMe);
 }
 
-function completeGoogleLogin(email, profession, token, rememberMe) {
+async function completeGoogleLogin(email, profession, token, rememberMe) {
+    // If a guest is "upgrading" to Google, capture their current in-memory work
+    // now (before we switch namespaces) so we can carry it into the account.
+    const upgrading = !!window._upgradingGuest;
+    const guestWork = upgrading ? buildDatabaseObject() : null;
+    window._upgradingGuest = false;
+
     // Always use localStorage — no cookie notice needed for functional storage
     localStorage.setItem('sj_logged_in_user', email);
 
     googleAccessToken = token;
     localStorage.setItem(getStorageKey('sj_drive_access_token'), token);
-    
+
     const settingsKey = getStorageKey('sj_quote_settings');
     let settings = null;
     const savedSettings = localStorage.getItem(settingsKey);
     if (savedSettings) {
         try { settings = JSON.parse(savedSettings); } catch(e) {}
     }
-    
+
     if (!settings) {
         settings = JSON.parse(JSON.stringify(appState.settings));
         settings.profession = profession;
@@ -4153,17 +4291,38 @@ function completeGoogleLogin(email, profession, token, rememberMe) {
         settings.profession = profession;
         localStorage.setItem(settingsKey, JSON.stringify(settings));
     }
-    
+
     const clientId = localStorage.getItem('sj_global_google_client_id');
     if (clientId) {
         settings.googleClientId = clientId;
         localStorage.setItem(settingsKey, JSON.stringify(settings));
     }
-    
+
     document.getElementById('lock-screen').style.display = 'none';
     document.querySelector('.app-container').style.display = 'flex';
-    
+
     initUserSession();
+
+    // Pull this account's cloud (KV) copy. Adopts it if newer than local.
+    await cloudLoadAndMerge(true);
+
+    // Guest upgrade: if the account had no real cloud/local data yet, carry the
+    // guest's work into it and push it up. If the account already has data, we
+    // keep it (the guest's work remains under the 'guest' namespace, recoverable).
+    if (upgrading && guestWork) {
+        const accountEmpty = (appState.history || []).length === 0
+            && (projectsList || []).length === 0
+            && (priceCatalog || []).length === 0;
+        const guestHasWork = (guestWork.history || []).length || (guestWork.projects || []).length || (guestWork.catalog || []).length;
+        if (accountEmpty && guestHasWork) {
+            applyDatabaseObject(guestWork);
+            try { loadSettings(); filterProjectsList(); renderHistoryList(); } catch (e) {}
+            await cloudSaveNow();
+            showToast('עבודתך נשמרה לחשבון Google ✓');
+            return;
+        }
+    }
+
     showToast(`ברוך הבא למערכת, ${email}!`);
 }
 
