@@ -5,33 +5,40 @@
 (function () {
   'use strict';
 
+  // 'sale' = the in-app helper inside /sale; otherwise the public site assistant.
+  var MODE = (typeof window !== 'undefined' && window.SJ_ASSISTANT_MODE === 'sale') ? 'sale' : 'public';
+
   var CONFIG = {
-    title: 'העוזר ההנדסי של SJ',
-    subtitle: 'שאלות חשמל — תשובה מיידית',
     phone: '053-530-2887',
     tel: 'tel:053-530-2887',
     whatsapp: 'https://wa.me/972535302887?text=%D7%94%D7%99%D7%99%20SJ%2C%20%D7%99%D7%A9%20%D7%9C%D7%99%20%D7%A9%D7%90%D7%9C%D7%94%20%D7%91%D7%97%D7%A9%D7%9E%D7%9C',
-    contactPage: 'contact.html',
-    maxUserMessages: 25, // light client-side guard against abuse of the shared key
-    models: [
-      { value: 'gemini|gemini-2.0-flash', label: 'Gemini 2.0' },
-      { value: 'deepseek|deepseek-chat', label: 'DeepSeek V3' },
-      { value: 'grok|grok-2-latest', label: 'Grok 2' },
-    ],
+    contactPage: MODE === 'sale' ? '../contact.html' : 'contact.html',
+    maxUserMessages: 40,
+    // No user-facing model picker — the server picks the engine and auto-falls-back
+    // (Gemini → DeepSeek → Grok → Cloudflare) when one runs out.
     defaultModel: 'gemini|gemini-2.0-flash',
-    providerLabels: { gemini: 'Gemini', deepseek: 'DeepSeek', grok: 'Grok' },
+    providerLabels: { gemini: 'Gemini', deepseek: 'DeepSeek', grok: 'Grok', cloudflare: 'Cloudflare' },
+  };
+
+  var COPY = MODE === 'sale' ? {
+    title: 'עוזר המערכת',
+    subtitle: 'איך משתמשים בכלי?',
+    welcome: 'היי! אני העוזר של מערכת הצעות המחיר של SJ. אשמח להסביר איך לעבוד עם הכלי — ניהול פרויקטים, צ\'אט התמחור, עריכת ההצעה, ייצוא PDF, מאגר המחירים וסנכרון Drive. מה תרצה לדעת?',
+    suggestions: ['איך יוצרים הצעת מחיר חדשה?', 'איך מוסיפים מחירים למאגר?', 'איך מייצאים PDF?'],
+    placeholder: 'שאלה על השימוש במערכת…',
+    disclaimer: 'עוזר להפעלת המערכת. לשאלות חשבונאיות/משפטיות התייעצו עם איש מקצוע.',
+  } : {
+    title: 'העוזר ההנדסי של SJ',
+    subtitle: 'שאלות חשמל — תשובה מיידית',
+    welcome: 'שלום וברוכים הבאים 🙂 אני העוזר ההנדסי של SJ הנדסת חשמל. אשמח לעזור בכל שאלה על חשמל — תקלות בבית, פחת ומאמ"תים, עמדות טעינה, לוחות, הארקה ובטיחות. שאלות שתלויות בחוק או ברישוי אפנה ישירות ל-SJ. אז במה אפשר לעזור?',
+    suggestions: ['הפחת קפץ ולא עולה, מה לעשות?', 'השקע מתחמם — זה מסוכן?', 'מה לבדוק לפני התקנת עמדת טעינה?'],
+    placeholder: 'כתבו שאלה על חשמל…',
+    disclaimer: 'תשובות כלליות בלבד. במצב חירום נתקו את המפסק הראשי; אש — 102.',
   };
 
   var selectedModel = CONFIG.defaultModel;
-
-  var WELCOME =
-    'שלום וברוכים הבאים 🙂 אני העוזר ההנדסי של SJ הנדסת חשמל. אשמח לעזור בכל שאלה על חשמל — תקלות בבית, פחת ומאמ"תים, עמדות טעינה, לוחות, הארקה ובטיחות. שאלות שתלויות בחוק או ברישוי אפנה ישירות ל-SJ. אז במה אפשר לעזור?';
-
-  var SUGGESTIONS = [
-    'הפחת קפץ ולא עולה, מה לעשות?',
-    'השקע מתחמם — זה מסוכן?',
-    'מה לבדוק לפני התקנת עמדת טעינה?',
-  ];
+  var WELCOME = COPY.welcome;
+  var SUGGESTIONS = COPY.suggestions;
 
   // Conversation as sent to the API: [{role:'user'|'assistant', content}]
   var messages = [];
@@ -60,17 +67,14 @@
     var panel = el('div', 'sj-assist-panel');
     panel.id = 'sj-assist-panel';
     panel.setAttribute('role', 'dialog');
-    panel.setAttribute('aria-label', CONFIG.title);
+    panel.setAttribute('aria-label', COPY.title);
     panel.innerHTML =
       '<div class="sj-assist-head">' +
         '<div class="sj-assist-head-id">' +
           '<div class="sj-assist-avatar"><svg viewBox="0 0 100 100" width="22" height="22" fill="currentColor"><path d="M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z"/></svg></div>' +
-          '<div class="sj-assist-titles"><span class="sj-assist-title">' + CONFIG.title + '</span><span class="sj-assist-sub"><span class="sj-assist-dot"></span>' + CONFIG.subtitle + '</span></div>' +
+          '<div class="sj-assist-titles"><span class="sj-assist-title">' + COPY.title + '</span><span class="sj-assist-sub"><span class="sj-assist-dot"></span>' + COPY.subtitle + '</span></div>' +
         '</div>' +
         '<div class="sj-assist-head-actions">' +
-          '<select id="sj-assist-model" class="sj-assist-model" aria-label="בחירת מנוע AI">' +
-            CONFIG.models.map(function (m) { return '<option value="' + m.value + '"' + (m.value === selectedModel ? ' selected' : '') + '>' + m.label + '</option>'; }).join('') +
-          '</select>' +
           '<button class="sj-assist-iconbtn" id="sj-assist-email" title="שליחת השיחה למייל" aria-label="שליחת השיחה למייל">' +
             '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>' +
           '</button>' +
@@ -82,12 +86,12 @@
       '<div class="sj-assist-log" id="sj-assist-log" aria-live="polite"></div>' +
       '<div class="sj-assist-suggest" id="sj-assist-suggest"></div>' +
       '<div class="sj-assist-inputbar">' +
-        '<textarea id="sj-assist-input" rows="1" placeholder="כתבו שאלה על חשמל…" aria-label="הקלדת שאלה"></textarea>' +
+        '<textarea id="sj-assist-input" rows="1" placeholder="' + COPY.placeholder + '" aria-label="הקלדת שאלה"></textarea>' +
         '<button id="sj-assist-send" class="sj-assist-send" aria-label="שליחה">' +
           '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4 20-7z"/></svg>' +
         '</button>' +
       '</div>' +
-      '<div class="sj-assist-disclaimer">תשובות כלליות בלבד. במצב חירום נתקו את המפסק הראשי; אש — 102.</div>';
+      '<div class="sj-assist-disclaimer">' + COPY.disclaimer + '</div>';
 
     document.body.appendChild(launcher);
     document.body.appendChild(panel);
@@ -99,8 +103,6 @@
     els.input = panel.querySelector('#sj-assist-input');
     els.send = panel.querySelector('#sj-assist-send');
 
-    els.model = panel.querySelector('#sj-assist-model');
-    if (els.model) els.model.addEventListener('change', function () { selectedModel = els.model.value; });
     panel.querySelector('#sj-assist-email').addEventListener('click', openEmailForm);
     panel.querySelector('#sj-assist-close').addEventListener('click', close);
     els.send.addEventListener('click', onSend);
@@ -167,18 +169,15 @@
 
   function scrollDown() { els.log.scrollTop = els.log.scrollHeight; }
 
-  // If the server auto-switched providers (e.g. Gemini quota ran out), tell the
-  // visitor and move the selector to the engine that actually answered.
+  // If the server auto-switched engines (e.g. Gemini quota ran out), let the
+  // user know quietly. There's no model picker — the server handles fallback.
   function noteFallback(res) {
     var from = res.headers.get('X-AI-Fallback-From');
     var used = res.headers.get('X-AI-Provider');
     if (!from || !used || from === used) return;
     var fl = CONFIG.providerLabels[from] || from;
     var ul = CONFIG.providerLabels[used] || used;
-    var n = el('div', 'sj-assist-note', 'נגמרו הבקשות ב-' + fl + ' — ממשיכים עם ' + ul + ' ⚡');
-    els.log.appendChild(n);
-    var match = CONFIG.models.filter(function (m) { return m.value.indexOf(used + '|') === 0; })[0];
-    if (match) { selectedModel = match.value; if (els.model) els.model.value = match.value; }
+    els.log.appendChild(el('div', 'sj-assist-note', 'עברנו אוטומטית ל-' + ul + ' ⚡'));
     scrollDown();
   }
 
@@ -286,7 +285,7 @@
     fetch('/api/assistant', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider: parts[0], model: parts[1], messages: messages }),
+      body: JSON.stringify({ provider: parts[0], model: parts[1], mode: MODE, messages: messages }),
     })
       .then(function (res) {
         noteFallback(res);
