@@ -2560,3 +2560,39 @@ section[id], [id].scroll-anchor { scroll-margin-top: 96px; }
 .sj-assist-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .sj-assist-head-actions { flex-shrink: 0; }
 .sj-assist-model { max-width: 96px; }
+
+/* ===== Guides — 2-column categorized layout (homeowner vs professional) ===== */
+.guides-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    margin-top: 10px;
+}
+.guides-column {
+    background: rgba(255,255,255,0.015);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: var(--border-radius-lg);
+    padding: 24px 22px;
+}
+.guides-col-head {
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.guides-col-title {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 1.25rem; font-weight: 800; color: #fff;
+}
+.gc-ico { font-style: normal; font-size: 1.35rem; line-height: 1; }
+.gc-ico.home::before { content: '🏠'; }
+.gc-ico.pro::before { content: '⚡'; }
+.guides-col-sub {
+    display: block; margin-top: 6px; font-size: 0.86rem; color: var(--color-text-gray);
+}
+.guides-col-cards { display: flex; flex-direction: column; gap: 14px; }
+.guides-col-cards .article-card { padding: 20px 22px; }
+.guides-col-cards .article-badge { margin-bottom: 12px; }
+.guides-col-cards .article-title { font-size: 1.1rem; margin-bottom: 8px; }
+@media (max-width: 820px) {
+    .guides-columns { grid-template-columns: 1fr; gap: 18px; }
+}
