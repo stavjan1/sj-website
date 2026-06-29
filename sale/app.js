@@ -742,23 +742,20 @@ function renderProjectsList(list) {
 
         card.innerHTML = `
             <div class="project-info">
-                <div class="project-title" style="display:flex; align-items:center; gap:8px;">
-                    ${p.name}
-                    <span class="project-status-badge status-badge-${status}"
-                          onclick="cycleProjectStatus('${p.id}', event)"
-                          title="לחץ לשינוי סטטוס">${status}</span>
-                </div>
+                <div class="project-title">${p.name}</div>
                 <div class="project-meta">
                     <span><i class="fa-solid fa-calendar"></i> ${formatHebrewDate(p.created)}</span>
                 </div>
             </div>
             <div class="project-actions">
-                <button class="btn btn-secondary btn-small" onclick="loadProject('${p.id}', true)">
-                    <i class="fa-solid fa-folder-open"></i> טען
-                </button>
                 <button class="btn btn-danger btn-small" onclick="deleteProject('${p.id}', event)">
                     <i class="fa-solid fa-trash-can"></i>
                 </button>
+            </div>
+            <div class="project-badge-row">
+                <span class="project-status-badge status-badge-${status}"
+                      onclick="cycleProjectStatus('${p.id}', event)"
+                      title="לחץ לשינוי סטטוס">${status}</span>
             </div>
         `;
         container.appendChild(card);
