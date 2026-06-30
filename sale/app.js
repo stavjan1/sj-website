@@ -1,4 +1,4 @@
-﻿// ==========================================================================
+// ==========================================================================
 // Application Logic for SJ Electrical Engineering Quote Generator (Phase 4)
 // Projects Manager & Dual-Agent AI Architecture (Pricing & Phrasing)
 // ==========================================================================
@@ -421,6 +421,139 @@ function getStorageKey(key) {
     return `sj_user_${activeUser.toLowerCase()}_${key}`;
 }
 
+// ==========================================================================
+// Cloudflare KV cloud storage — primary backup for Google-authenticated users.
+// Identity is the verified Google account (the server checks the token); guests
+// stay local-only. Degrades gracefully: if the KV binding isn't configured yet
+// (501) or the network is down, the local copy remains the source of truth.
+// ==========================================================================
+var _cloudSaveTimer = null;
+
+function isGuestUser() {
+    return (getActiveUser() || '').toLowerCase() === 'guest';
+}
+
+// A "cloud user" is someone signed in with Google (we hold a live token and the
+// active user isn't the local-only guest).
+function isCloudUser() {
+    return !!googleAccessToken && !isGuestUser() && !!getActiveUser();
+}
+
+// The full per-user database blob (same shape the legacy Drive sync used).
+function buildDatabaseObject() {
+    const usersRaw = localStorage.getItem('sj_app_users');
+    return {
+        settings: appState.settings,
+        history: appState.history,
+        projects: projectsList,
+        trash: trashedProjectsList,
+        catalog: priceCatalog,
+        users: usersRaw ? JSON.parse(usersRaw) : [],
+        lastUpdated: Date.now()
+    };
+}
+
+// Apply a cloud blob onto in-memory state + localStorage (does not re-render).
+function applyDatabaseObject(cloudData) {
+    if (!cloudData) return;
+    if (cloudData.settings) { appState.settings = cloudData.settings; localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings)); }
+    if (cloudData.history) { appState.history = cloudData.history; localStorage.setItem(getStorageKey('sj_quote_history'), JSON.stringify(appState.history)); }
+    if (cloudData.projects) { projectsList = cloudData.projects; localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList)); }
+    if (cloudData.trash) { trashedProjectsList = cloudData.trash; localStorage.setItem(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList)); }
+    if (cloudData.catalog) { priceCatalog = cloudData.catalog; localStorage.setItem(getStorageKey('sj_price_catalog'), JSON.stringify(priceCatalog)); }
+    if (cloudData.lastUpdated) localStorage.setItem(getStorageKey('sj_db_last_updated'), String(cloudData.lastUpdated));
+}
+
+// Debounced save — protects the free-tier KV write budget (1k/day). Multiple
+// rapid edits collapse into a single upload ~1.5s after the last change.
+function scheduleCloudSync() {
+    if (!isCloudUser()) return; // guests are local-only by design
+    if (_cloudSaveTimer) clearTimeout(_cloudSaveTimer);
+    _cloudSaveTimer = setTimeout(cloudSaveNow, 1500);
+}
+
+async function cloudSaveNow() {
+    if (!isCloudUser()) return;
+    try {
+        const res = await fetch('/api/data', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({ data: buildDatabaseObject() })
+        });
+        // 501 = KV binding not configured yet → stay local-only, silently.
+        if (res.status === 501) return false;
+        return res.ok;
+    } catch (e) {
+        // Offline / transient — local copy stays authoritative until reconnect.
+        return false;
+    }
+}
+
+// Pull the cloud copy on login and adopt it if it's newer than local; if local
+// is newer (e.g. work done offline), push local up instead.
+async function cloudLoadAndMerge(silent) {
+    if (!isCloudUser()) return;
+    try {
+        const res = await fetch('/api/data', { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
+        if (res.status === 501) {
+            if (!silent) showToast('אחסון הענן (KV) עדיין לא הוגדר — נשמר מקומית בינתיים');
+            return;
+        }
+        if (!res.ok) return;
+        const body = await res.json();
+        const cloud = body && body.data;
+        const cloudTs = (cloud && cloud.lastUpdated) || 0;
+        const localTs = parseInt(localStorage.getItem(getStorageKey('sj_db_last_updated')) || '0', 10);
+        if (cloud && cloudTs > localTs) {
+            backupLocalSnapshot('before cloud(KV) load');
+            applyDatabaseObject(cloud);
+            try {
+                loadSettings(); filterProjectsList(); renderHistoryList();
+                if (typeof activeProjectId !== 'undefined' && activeProjectId) loadProject(activeProjectId, false);
+            } catch (e) {}
+            if (!silent) showToast('הנתונים סונכרנו מהענן');
+        } else if (localTs > cloudTs) {
+            cloudSaveNow();
+        }
+    } catch (e) { /* non-fatal */ }
+}
+
+// ===== Guest mode (local-only) and upgrade-to-Google =====
+function enterGuestMode() {
+    const m = document.getElementById('guest-warning-modal');
+    if (m) m.style.display = 'flex';
+    else proceedAsGuest();
+}
+
+function closeGuestWarning() {
+    const m = document.getElementById('guest-warning-modal');
+    if (m) m.style.display = 'none';
+}
+
+function proceedAsGuest() {
+    closeGuestWarning();
+    localStorage.setItem('sj_logged_in_user', 'guest');
+    googleAccessToken = null;
+    document.getElementById('lock-screen').style.display = 'none';
+    document.querySelector('.app-container').style.display = 'flex';
+    initUserSession();
+    updateGuestUpgradeUI();
+    showToast('נכנסת כאורח — העבודה נשמרת במכשיר זה בלבד');
+}
+
+// Invoked from Settings: a guest connects Google so all their work this session
+// is carried into a real account and backed up to the cloud (KV).
+function connectGoogleToSaveGuestWork() {
+    window._upgradingGuest = true;
+    handleGoogleLogin();
+}
+
+// Show the "save your work with Google" prompt only while in guest mode.
+function updateGuestUpgradeUI() {
+    const box = document.getElementById('guest-upgrade-box');
+    if (box) box.style.display = isGuestUser() ? 'block' : 'none';
+}
+
 function initUserSession() {
     loadSettings();
     loadHistory();
@@ -433,6 +566,7 @@ function initUserSession() {
     document.getElementById('form-quote-date').value = getTodayDateString();
     switchTab('projects');
     updateUserProfileUI();
+    updateGuestUpgradeUI();
     showAdminTabIfNeeded();
     if (isAdmin()) {
         setTimeout(() => { adminRefreshStatus(); adminRefreshUserList(); }, 300);
@@ -521,31 +655,104 @@ function loadProjects() {
 }
 
 function saveProjects() {
+    guardBeforeShrink('sj_projects', projectsList.length, 'before saveProjects');
     localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList));
     localStorage.setItem(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
-    syncDatabaseToDrive(true);
+    scheduleCloudSync();
 }
 
-// Recoverable safety snapshot of the current local data, taken right before a
-// cloud sync replaces it. Keeps the single most recent snapshot per user so a
-// bad/stale cloud overwrite never causes permanent loss.
+// Recoverable safety snapshots of the current local data, taken right before
+// anything replaces or shrinks it (cloud sync, import, a save that wipes a
+// collection, a username migration). Keeps a rolling list of the most recent
+// snapshots per user so no single bad event — including a future code change —
+// can cause permanent loss. The legacy single-slot key is kept for back-compat.
+var MAX_LOCAL_BACKUPS = 8;
 function backupLocalSnapshot(reason) {
     try {
-        const hasData = (appState.history || []).length || (projectsList || []).length || (trashedProjectsList || []).length;
-        if (!hasData) return; // nothing worth backing up
+        // Snapshot the data that is currently PERSISTED in localStorage — i.e. the
+        // about-to-be-overwritten state — not the in-memory copy, which during a
+        // shrinking save already holds the new (smaller/empty) data.
+        const read = (k) => {
+            const v = localStorage.getItem(getStorageKey(k));
+            if (v == null) return undefined;
+            try { return JSON.parse(v); } catch (e) { return v; }
+        };
         const snap = {
             reason: reason || '',
             at: Date.now(),
-            settings: appState.settings,
-            history: appState.history,
-            projects: projectsList,
-            trash: trashedProjectsList,
-            catalog: priceCatalog
+            settings: read('sj_quote_settings'),
+            history: read('sj_quote_history') || [],
+            projects: read('sj_projects') || [],
+            trash: read('sj_trash_projects') || [],
+            catalog: read('sj_price_catalog') || []
         };
-        localStorage.setItem(getStorageKey('sj_local_backup'), JSON.stringify(snap));
-    } catch (e) { /* storage full / serialization issue — non-fatal */ }
+        const hasData = (snap.history || []).length || (snap.projects || []).length ||
+                        (snap.trash || []).length || (snap.catalog || []).length;
+        if (!hasData) return; // nothing worth backing up
+        const snapStr = JSON.stringify(snap);
+        // Legacy single-slot snapshot (kept so existing recovery paths still work).
+        localStorage.setItem(getStorageKey('sj_local_backup'), snapStr);
+        // Rolling list, newest first, capped at MAX_LOCAL_BACKUPS.
+        let list = [];
+        try { list = JSON.parse(localStorage.getItem(getStorageKey('sj_local_backups')) || '[]'); } catch (e) { list = []; }
+        list.unshift(snap);
+        if (list.length > MAX_LOCAL_BACKUPS) list = list.slice(0, MAX_LOCAL_BACKUPS);
+        try {
+            localStorage.setItem(getStorageKey('sj_local_backups'), JSON.stringify(list));
+        } catch (quota) {
+            // Storage full — keep only the newest few and retry once.
+            try { localStorage.setItem(getStorageKey('sj_local_backups'), JSON.stringify(list.slice(0, 3))); } catch (e2) {}
+        }
+    } catch (e) { /* serialization issue — non-fatal */ }
 }
+
+// Snapshot before persisting a collection that shrank vs. what is already
+// stored. An accidental wipe (a bug, a bad merge, a future refactor that empties
+// an array, a failed parse on load followed by a save) is therefore always
+// recoverable from the rolling backups above. Never blocks a legitimate save.
+function guardBeforeShrink(storageKey, newCount, reason) {
+    try {
+        const stored = localStorage.getItem(getStorageKey(storageKey));
+        if (!stored) return;
+        const prev = JSON.parse(stored);
+        const prevCount = Array.isArray(prev) ? prev.length : 0;
+        if (prevCount > 0 && newCount < prevCount) {
+            backupLocalSnapshot(reason || ('shrink:' + storageKey));
+        }
+    } catch (e) { /* parse/storage issue — non-fatal */ }
+}
+
+// Emergency recovery surface (usable from the browser console if ever needed):
+//   sjDataRecovery.list()        → see available snapshots (newest first)
+//   sjDataRecovery.restore(0)    → restore the newest snapshot
+window.sjDataRecovery = {
+    list: function () {
+        let list = [];
+        try { list = JSON.parse(localStorage.getItem(getStorageKey('sj_local_backups')) || '[]'); } catch (e) {}
+        return list.map(function (s, i) {
+            return { index: i, when: new Date(s.at).toLocaleString('he-IL'), reason: s.reason,
+                     projects: (s.projects || []).length, history: (s.history || []).length, catalog: (s.catalog || []).length };
+        });
+    },
+    restore: function (index) {
+        let list = [];
+        try { list = JSON.parse(localStorage.getItem(getStorageKey('sj_local_backups')) || '[]'); } catch (e) {}
+        const snap = list[index || 0];
+        if (!snap) { console.warn('אין גיבוי במיקום הזה'); return false; }
+        // Snapshot the (possibly damaged) current state first, so restore is reversible too.
+        backupLocalSnapshot('before recovery restore');
+        if (snap.settings) { appState.settings = snap.settings; localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings)); }
+        if (snap.history) { appState.history = snap.history; localStorage.setItem(getStorageKey('sj_quote_history'), JSON.stringify(appState.history)); }
+        if (snap.projects) { projectsList = snap.projects; localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList)); }
+        if (snap.trash) { trashedProjectsList = snap.trash; localStorage.setItem(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList)); }
+        if (snap.catalog) { priceCatalog = snap.catalog; localStorage.setItem(getStorageKey('sj_price_catalog'), JSON.stringify(priceCatalog)); }
+        localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
+        try { filterProjectsList(); renderHistoryList(); loadSettings(); } catch (e) {}
+        if (typeof showToast === 'function') showToast('הנתונים שוחזרו מהגיבוי המקומי');
+        return true;
+    }
+};
 
 function createNewProject() {
     const input = document.getElementById('new-project-name');
@@ -704,6 +911,41 @@ function filterProjectsList() {
     else if (sort === 'name-desc') filtered.sort((a, b) => b.name.localeCompare(a.name, 'he'));
 
     renderProjectsList(filtered);
+    updateMetricsDashboard();
+}
+
+function updateMetricsDashboard() {
+    let sentCount = 0;
+    let approvedCount = 0;
+    let approvedSum = 0;
+    let totalCount = projectsList.length;
+
+    projectsList.forEach(proj => {
+        const status = proj.status || 'טיוטה';
+        const finalPrice = (proj.quote && proj.quote.finalPrice) ? parseFloat(proj.quote.finalPrice) : 0;
+        
+        if (status === 'נשלח') {
+            sentCount++;
+        } else if (status === 'הושלם') {
+            approvedCount++;
+            approvedSum += finalPrice;
+        }
+    });
+
+    const conversionRate = totalCount > 0 ? Math.round((approvedCount / totalCount) * 100) : 0;
+
+    // Update UI elements
+    const elSent = document.getElementById('metric-sent-count');
+    if (elSent) elSent.textContent = sentCount;
+    
+    const elApproved = document.getElementById('metric-approved-count');
+    if (elApproved) elApproved.textContent = approvedCount;
+    
+    const elSum = document.getElementById('metric-approved-sum');
+    if (elSum) elSum.textContent = formatPriceString(approvedSum) + ' ₪';
+    
+    const elConversion = document.getElementById('metric-conversion-rate');
+    if (elConversion) elConversion.textContent = conversionRate + '%';
 }
 
 function cycleProjectStatus(projectId, e) {
@@ -825,8 +1067,205 @@ function loadSettings() {
                 const professionInput = document.getElementById('settings-profession-input');
                 if (professionInput) professionInput.value = appState.settings.profession;
             }
+
+            // Load PDF design parameters
+            const _setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+            const _setCheck = (id, checked) => { const el = document.getElementById(id); if (el) el.checked = checked; };
+            _setVal('pdf-font-family', appState.settings.pdfFontFamily || "'Heebo', sans-serif");
+            _setVal('pdf-font-size-body', appState.settings.pdfFontSizeBody || '12');
+            _setVal('pdf-line-height', appState.settings.pdfLineHeight || '1.4');
+            _setVal('pdf-primary-color', appState.settings.pdfPrimaryColor || '#1e3a8a');
+            _setVal('pdf-secondary-color', appState.settings.pdfSecondaryColor || '#3b82f6');
+            _setCheck('pdf-show-watermark', appState.settings.pdfShowWatermark ?? true);
+            _setCheck('pdf-show-signature', appState.settings.pdfShowSignature ?? false);
+
+            // Apply saved theme and background on load
+            applySystemTheme(appState.settings.theme || 'dark');
+            applySystemBackground(appState.settings.selectedBackground || 'none');
+            updatePdfCustomStyles();
         } catch (e) {
             console.error('Error loading settings', e);
+        }
+    } else {
+        // Apply defaults if no settings are saved
+        applySystemTheme('dark');
+        applySystemBackground('none');
+        updatePdfCustomStyles();
+    }
+}
+
+// ===== Theme & Custom Background Handlers =====
+function applySystemTheme(theme) {
+    if (theme === 'light') {
+        document.body.classList.add('light-theme');
+        document.body.classList.remove('dark-theme');
+    } else {
+        document.body.classList.add('dark-theme');
+        document.body.classList.remove('light-theme');
+    }
+    
+    // Update active button classes in Settings UI
+    const btnDark = document.getElementById('theme-btn-dark');
+    const btnLight = document.getElementById('theme-btn-light');
+    if (btnDark && btnLight) {
+        if (theme === 'light') {
+            btnLight.classList.add('active');
+            btnLight.style.backgroundColor = 'var(--color-accent)';
+            btnLight.style.color = '#fff';
+            
+            btnDark.classList.remove('active');
+            btnDark.style.backgroundColor = '';
+            btnDark.style.color = '';
+        } else {
+            btnDark.classList.add('active');
+            btnDark.style.backgroundColor = 'var(--color-accent)';
+            btnDark.style.color = '#fff';
+            
+            btnLight.classList.remove('active');
+            btnLight.style.backgroundColor = '';
+            btnLight.style.color = '';
+        }
+    }
+
+    // Update global sidebar Sun/Moon icon toggle
+    const toggleIcon = document.getElementById('theme-toggle-icon');
+    if (toggleIcon) {
+        if (theme === 'light') {
+            toggleIcon.className = 'fa-solid fa-moon';
+        } else {
+            toggleIcon.className = 'fa-solid fa-sun';
+        }
+    }
+}
+
+function toggleSystemTheme() {
+    const current = (appState.settings && appState.settings.theme) || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    setSystemTheme(next);
+}
+
+function setSystemTheme(theme) {
+    if (!appState.settings) appState.settings = {};
+    appState.settings.theme = theme;
+    applySystemTheme(theme);
+    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
+    showToast(theme === 'light' ? 'עבר למצב בהיר' : 'עבר למצב כהה');
+}
+
+function applySystemBackground(bg) {
+    if (bg && bg !== 'none') {
+        document.body.style.backgroundImage = `url('${bg}')`;
+        document.body.classList.add('has-custom-bg');
+    } else {
+        document.body.style.backgroundImage = 'none';
+        document.body.classList.remove('has-custom-bg');
+    }
+    
+    // Update active visual borders in the settings grid
+    const options = document.querySelectorAll('.background-grid .bg-option');
+    options.forEach(opt => {
+        opt.style.borderColor = 'transparent';
+        opt.classList.remove('active');
+    });
+    
+    if (bg && bg !== 'none') {
+        const matchedOpt = Array.from(options).find(opt => {
+            const clickAttr = opt.getAttribute('onclick');
+            return clickAttr && clickAttr.includes(bg);
+        });
+        if (matchedOpt) {
+            matchedOpt.style.borderColor = 'var(--color-accent)';
+            matchedOpt.classList.add('active');
+        }
+    } else {
+        const noneOpt = document.getElementById('bg-opt-none');
+        if (noneOpt) {
+            noneOpt.style.borderColor = 'var(--color-accent)';
+            noneOpt.classList.add('active');
+        }
+    }
+}
+
+function selectSystemBackground(bg, elementId) {
+    if (!appState.settings) appState.settings = {};
+    appState.settings.selectedBackground = bg;
+    applySystemBackground(bg);
+    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
+    if (bg === 'none') {
+        showToast('רקע תמונה הוסר');
+    } else {
+        showToast('רקע קולנועי הוחל בהצלחה!');
+    }
+}
+
+
+function updatePdfCustomStyles() {
+    const fontFamily = document.getElementById('pdf-font-family')?.value || "'Heebo', sans-serif";
+    const fontSizeBody = document.getElementById('pdf-font-size-body')?.value || '12';
+    const lineHeight = document.getElementById('pdf-line-height')?.value || '1.4';
+    const primaryColor = document.getElementById('pdf-primary-color')?.value || '#1e3a8a';
+    const secondaryColor = document.getElementById('pdf-secondary-color')?.value || '#3b82f6';
+    const showWatermark = document.getElementById('pdf-show-watermark')?.checked ?? true;
+    const showSignature = document.getElementById('pdf-show-signature')?.checked ?? false;
+
+    // Update UI slider labels
+    const fontLabel = document.getElementById('val-pdf-font-size-body');
+    if (fontLabel) fontLabel.textContent = fontSizeBody + 'px';
+    const lhLabel = document.getElementById('val-pdf-line-height');
+    if (lhLabel) lhLabel.textContent = lineHeight;
+
+    // Apply to Miniature Preview A4 Document
+    const miniBox = document.getElementById('mini-a4-preview-box');
+    if (miniBox) {
+        miniBox.style.fontFamily = fontFamily;
+        
+        const miniBody = document.getElementById('mini-body-text-container');
+        if (miniBody) {
+            miniBody.style.fontSize = `calc(0.28rem * (${fontSizeBody} / 12))`;
+            miniBody.style.lineHeight = lineHeight;
+        }
+        
+        const miniWatermark = document.getElementById('mini-pdf-watermark');
+        if (miniWatermark) {
+            miniWatermark.style.opacity = showWatermark ? '0.04' : '0';
+            const svg = miniWatermark.querySelector('svg');
+            if (svg) svg.style.color = primaryColor;
+        }
+        
+        const miniLogo = document.getElementById('mini-logo-color');
+        if (miniLogo) miniLogo.style.backgroundColor = primaryColor;
+        
+        const miniTitle = document.getElementById('mini-title-color');
+        if (miniTitle) {
+            miniTitle.style.color = primaryColor;
+            miniTitle.style.borderBottomColor = secondaryColor;
+        }
+        
+        const miniTotal = document.getElementById('mini-total-price');
+        if (miniTotal) miniTotal.style.color = primaryColor;
+
+        const miniSig = document.getElementById('mini-pdf-signature-row');
+        if (miniSig) miniSig.style.display = showSignature ? 'flex' : 'none';
+    }
+
+    // Apply to actual PDF Sheet (if rendered)
+    const sheet = document.getElementById('quote-pdf-sheet');
+    if (sheet) {
+        sheet.style.setProperty('--pdf-custom-font', fontFamily);
+        sheet.style.setProperty('--pdf-custom-font-size-body', fontSizeBody + 'px');
+        sheet.style.setProperty('--pdf-custom-line-height', lineHeight);
+        sheet.style.setProperty('--pdf-custom-primary', primaryColor);
+        sheet.style.setProperty('--pdf-custom-secondary', secondaryColor);
+        
+        const watermark = document.getElementById('pdf-watermark-bg');
+        if (watermark) {
+            watermark.style.opacity = showWatermark ? '0.04' : '0';
+            watermark.style.color = primaryColor;
+        }
+
+        const sigRow = document.getElementById('pdf-signature-row');
+        if (sigRow) {
+            sigRow.style.display = showSignature ? 'flex' : 'none';
         }
     }
 }
@@ -844,10 +1283,21 @@ function saveBusinessSettings() {
     };
     appState.settings.phrasingDb = document.getElementById('set-phrasing-db').value;
     
+    // Save PDF design parameters
+    appState.settings.pdfFontFamily = document.getElementById('pdf-font-family')?.value || "'Heebo', sans-serif";
+    appState.settings.pdfFontSizeBody = document.getElementById('pdf-font-size-body')?.value || '12';
+    appState.settings.pdfLineHeight = document.getElementById('pdf-line-height')?.value || '1.4';
+    appState.settings.pdfPrimaryColor = document.getElementById('pdf-primary-color')?.value || '#1e3a8a';
+    appState.settings.pdfSecondaryColor = document.getElementById('pdf-secondary-color')?.value || '#3b82f6';
+    appState.settings.pdfShowWatermark = document.getElementById('pdf-show-watermark')?.checked ?? true;
+    appState.settings.pdfShowSignature = document.getElementById('pdf-show-signature')?.checked ?? false;
+
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
     showToast('הגדרות העסק נשמרו בהצלחה');
     
+    // Re-apply design styles and update document
+    updatePdfCustomStyles();
     updatePreviewFromForm();
     syncCurrentQuoteToProject();
     syncDatabaseToDrive(true);
@@ -867,9 +1317,10 @@ function loadHistory() {
 }
 
 function saveHistory() {
+    guardBeforeShrink('sj_quote_history', (appState.history || []).length, 'before saveHistory');
     localStorage.setItem(getStorageKey('sj_quote_history'), JSON.stringify(appState.history));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
-    syncDatabaseToDrive(true);
+    scheduleCloudSync();
 }
 
 // ==========================================================================
@@ -885,9 +1336,10 @@ function loadPriceCatalog() {
 }
 
 function savePriceCatalog(sync = true) {
+    guardBeforeShrink('sj_price_catalog', (priceCatalog || []).length, 'before savePriceCatalog');
     localStorage.setItem(getStorageKey('sj_price_catalog'), JSON.stringify(priceCatalog));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
-    if (sync) syncDatabaseToDrive(true);
+    if (sync) scheduleCloudSync();
 }
 
 // Reference block injected into the pricing agent so its material estimates use
@@ -2426,18 +2878,13 @@ function importHistoryData(event) {
 // ==========================================================================
 function checkGoogleSession() {
     const savedToken = getSessionOrLocalStorageItem(getStorageKey('sj_drive_access_token'));
-    if (savedToken) {
+    if (savedToken && !isGuestUser()) {
         googleAccessToken = savedToken;
         updateDriveStatus(true);
-        // Sync on startup (delayed slightly so settings and projects render first)
-        setTimeout(async () => {
-            try {
-                await resolveSjDriveFolders();
-                syncDatabaseFromDrive(true);
-            } catch (err) {
-                console.error('Error resolving folders on startup:', err);
-            }
-        }, 800);
+        // Pull this account's cloud (KV) copy on startup. The saved OAuth token
+        // may have expired (Google tokens are short-lived); if so this fails
+        // silently and the local copy is kept until the user signs in again.
+        setTimeout(() => { cloudLoadAndMerge(true); }, 800);
     }
 }
 
@@ -3464,22 +3911,39 @@ function handleUserRegister(event) {
     showToast(`ברוך הבא למערכת, ${username}!`);
 }
 
+// Reveal/hide the first-time-login confirmation block (confirm password + profession).
+function setFirstLoginMode(on) {
+    const extra = document.getElementById('first-login-extra');
+    const btn = document.getElementById('manual-login-btn');
+    if (extra) extra.style.display = on ? 'flex' : 'none';
+    if (btn) btn.textContent = on ? 'הרשמה וכניסה' : 'כניסה';
+    if (!on) {
+        const c = document.getElementById('login-password-confirm');
+        const p = document.getElementById('login-profession');
+        if (c) c.value = '';
+        if (p) p.value = '';
+    }
+}
+
+// Single smart entry point for manual auth: logs in an existing user, or — on a
+// first-time username — switches to a registration step that requires confirming
+// the password, so a typo can never silently lock the account.
 function handleUserLogin(event) {
     if (event) event.preventDefault();
-    
+
     const usernameInput = document.getElementById('login-username');
     const passwordInput = document.getElementById('login-password');
-    
+
     if (!usernameInput || !passwordInput) return;
-    
+
     const username = usernameInput.value.trim();
     const password = passwordInput.value;
-    
+
     if (!username || !password) {
         showToast('אנא מלא את כל השדות', 'error');
         return;
     }
-    
+
     // Load existing users
     const usersStr = localStorage.getItem('sj_app_users');
     let users = [];
@@ -3490,27 +3954,84 @@ function handleUserLogin(event) {
             console.error('Error parsing users list', e);
         }
     }
-    
-    // Find user
+
+    // Find user (case-insensitive — the storage namespace is lowercased too)
     const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
-    if (!user || user.password !== password) {
-        showToast('שם משתמש או סיסמה שגויים', 'error');
+
+    if (user) {
+        // Existing account → straightforward login.
+        if (user.isGoogleUser && !user.password) {
+            showToast('המשתמש הזה נרשם דרך Google. אנא היכנס בכפתור "כניסה עם חשבון Google".', 'error');
+            return;
+        }
+        if (user.password !== password) {
+            showToast('שם משתמש או סיסמה שגויים', 'error');
+            return;
+        }
+        finishManualLogin(user.username, `שלום, ${user.username}!`);
         return;
     }
-    
-    // Set active user
-    localStorage.setItem('sj_logged_in_user', user.username);
-    
-    // Transition UI
+
+    // First-time username → register, but require password confirmation first.
+    const extra = document.getElementById('first-login-extra');
+    const inRegisterMode = extra && extra.style.display !== 'none';
+
+    if (!inRegisterMode) {
+        // Reveal the confirmation step instead of silently creating the account.
+        setFirstLoginMode(true);
+        const c = document.getElementById('login-password-confirm');
+        if (c) c.focus();
+        showToast('זו התחברותך הראשונה — אנא אמת את הסיסמה כדי להשלים הרשמה');
+        return;
+    }
+
+    // We're in register mode: validate the confirmation.
+    const confirmInput = document.getElementById('login-password-confirm');
+    const professionInput = document.getElementById('login-profession');
+    const confirmPassword = confirmInput ? confirmInput.value : '';
+    const profession = professionInput ? professionInput.value.trim() : '';
+
+    if (password !== confirmPassword) {
+        showToast('הסיסמאות אינן תואמות — אנא הקלד שוב בזהירות', 'error');
+        if (confirmInput) { confirmInput.value = ''; confirmInput.focus(); }
+        return;
+    }
+
+    // Create the new account.
+    const newUser = {
+        username: username,
+        password: password,
+        profession: profession,
+        created: getTodayDateString()
+    };
+    users.push(newUser);
+    localStorage.setItem('sj_app_users', JSON.stringify(users));
+
+    // Seed the per-user profession setting so the AI tunes itself.
+    localStorage.setItem('sj_logged_in_user', username);
+    if (profession) {
+        appState.settings.profession = profession;
+        localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
+    }
+
+    setFirstLoginMode(false);
+    finishManualLogin(username, `ברוך הבא למערכת, ${username}!`);
+}
+
+// Shared tail for a successful manual login/registration.
+function finishManualLogin(canonicalUsername, toastMsg) {
+    localStorage.setItem('sj_logged_in_user', canonicalUsername);
+
     document.getElementById('lock-screen').style.display = 'none';
     document.querySelector('.app-container').style.display = 'flex';
-    
-    // Clear inputs
-    usernameInput.value = '';
-    passwordInput.value = '';
-    
+
+    const u = document.getElementById('login-username');
+    const p = document.getElementById('login-password');
+    if (u) u.value = '';
+    if (p) p.value = '';
+
     initUserSession();
-    showToast(`שלום, ${user.username}!`);
+    showToast(toastMsg);
 }
 
 function handleUserLogout() {
@@ -3675,6 +4196,9 @@ function handleUpdateCredentials(event) {
         return;
     }
     
+    // Snapshot before touching any keys, so a failed/partial migration is recoverable.
+    backupLocalSnapshot('before username migration');
+
     // 1. Migrate Local Storage keys
     const oldPrefix = `sj_user_${activeUser.toLowerCase()}_`;
     const newPrefix = `sj_user_${newUsername.toLowerCase()}_`;
@@ -3872,7 +4396,10 @@ function handleGoogleLogin() {
     try {
         googleTokenClient = google.accounts.oauth2.initTokenClient({
             client_id: clientId,
-            scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+            // Identity only — no Drive scopes. Data lives in Cloudflare KV now,
+            // so we don't touch the user's Drive, which also removes Google's
+            // "unverified app" warning (no sensitive/restricted scopes).
+            scope: 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
             callback: async (response) => {
                 if (response.error !== undefined) {
                     showToast('שגיאה בהתחברות לגוגל: ' + response.error, 'error');
@@ -3955,15 +4482,21 @@ function saveGoogleUserProfession(event) {
         try { users = JSON.parse(usersStr); } catch(e) {}
     }
     
-    const newUser = {
-        username: email,
-        password: '',
-        profession: profession,
-        created: getTodayDateString(),
-        isGoogleUser: true
-    };
-    
-    users.push(newUser);
+    // Reuse an existing record for this email (consistent storage namespace),
+    // otherwise create it. Never create a duplicate username.
+    const existing = users.find(u => u.username.toLowerCase() === email.toLowerCase());
+    if (existing) {
+        existing.profession = profession;
+        existing.isGoogleUser = true;
+    } else {
+        users.push({
+            username: email,
+            password: '',
+            profession: profession,
+            created: getTodayDateString(),
+            isGoogleUser: true
+        });
+    }
     localStorage.setItem('sj_app_users', JSON.stringify(users));
     
     window.tempGoogleUser = null;
@@ -3973,20 +4506,26 @@ function saveGoogleUserProfession(event) {
     completeGoogleLogin(email, profession, token, rememberMe);
 }
 
-function completeGoogleLogin(email, profession, token, rememberMe) {
+async function completeGoogleLogin(email, profession, token, rememberMe) {
+    // If a guest is "upgrading" to Google, capture their current in-memory work
+    // now (before we switch namespaces) so we can carry it into the account.
+    const upgrading = !!window._upgradingGuest;
+    const guestWork = upgrading ? buildDatabaseObject() : null;
+    window._upgradingGuest = false;
+
     // Always use localStorage — no cookie notice needed for functional storage
     localStorage.setItem('sj_logged_in_user', email);
 
     googleAccessToken = token;
     localStorage.setItem(getStorageKey('sj_drive_access_token'), token);
-    
+
     const settingsKey = getStorageKey('sj_quote_settings');
     let settings = null;
     const savedSettings = localStorage.getItem(settingsKey);
     if (savedSettings) {
         try { settings = JSON.parse(savedSettings); } catch(e) {}
     }
-    
+
     if (!settings) {
         settings = JSON.parse(JSON.stringify(appState.settings));
         settings.profession = profession;
@@ -3995,17 +4534,38 @@ function completeGoogleLogin(email, profession, token, rememberMe) {
         settings.profession = profession;
         localStorage.setItem(settingsKey, JSON.stringify(settings));
     }
-    
+
     const clientId = localStorage.getItem('sj_global_google_client_id');
     if (clientId) {
         settings.googleClientId = clientId;
         localStorage.setItem(settingsKey, JSON.stringify(settings));
     }
-    
+
     document.getElementById('lock-screen').style.display = 'none';
     document.querySelector('.app-container').style.display = 'flex';
-    
+
     initUserSession();
+
+    // Pull this account's cloud (KV) copy. Adopts it if newer than local.
+    await cloudLoadAndMerge(true);
+
+    // Guest upgrade: if the account had no real cloud/local data yet, carry the
+    // guest's work into it and push it up. If the account already has data, we
+    // keep it (the guest's work remains under the 'guest' namespace, recoverable).
+    if (upgrading && guestWork) {
+        const accountEmpty = (appState.history || []).length === 0
+            && (projectsList || []).length === 0
+            && (priceCatalog || []).length === 0;
+        const guestHasWork = (guestWork.history || []).length || (guestWork.projects || []).length || (guestWork.catalog || []).length;
+        if (accountEmpty && guestHasWork) {
+            applyDatabaseObject(guestWork);
+            try { loadSettings(); filterProjectsList(); renderHistoryList(); } catch (e) {}
+            await cloudSaveNow();
+            showToast('עבודתך נשמרה לחשבון Google ✓');
+            return;
+        }
+    }
+
     showToast(`ברוך הבא למערכת, ${email}!`);
 }
 

@@ -44,17 +44,22 @@
         
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
-            <!-- Logo -->
-            <div class="sidebar-logo">
-                <div class="logo-icon">
-                    <svg viewBox="0 0 100 100" width="22" height="22" fill="currentColor">
-                        <path d="M40 82 L62 46 L46 46 L58 14 L33 52 L50 52 Z"/>
-                    </svg>
+            <!-- Logo & Global Theme Toggle -->
+            <div class="sidebar-logo" style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:8px;">
+                <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+                    <div class="logo-icon">
+                        <svg viewBox="0 0 100 100" width="22" height="22" fill="currentColor">
+                            <path d="M40 82 L62 46 L46 46 L58 14 L33 52 L50 52 Z"/>
+                        </svg>
+                    </div>
+                    <div class="logo-text">
+                        <span class="brand-name" style="font-size: 0.95rem;">SJ הנדסת חשמל</span>
+                        <span class="brand-sub" style="font-size: 0.72rem;">מערכת הצעות מחיר</span>
+                    </div>
                 </div>
-                <div class="logo-text">
-                    <span class="brand-name">SJ הנדסת חשמל</span>
-                    <span class="brand-sub">מערכת הצעות מחיר</span>
-                </div>
+                <button id="global-theme-toggle" class="theme-toggle-btn" onclick="toggleSystemTheme()" title="החלף מצב תאורה" style="background:none; border:none; color:var(--text-primary); cursor:pointer; font-size:1.15rem; display:flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; transition: all 0.2s ease;">
+                    <i class="fa-solid fa-sun" id="theme-toggle-icon"></i>
+                </button>
             </div>
 
             <!-- Back to main site — at the top so it's never missed -->
@@ -133,6 +138,46 @@
                     <p class="section-subtitle">נהל את שלב התמחור והצעת המחיר לכל לקוח תחת פרויקט ייעודי.</p>
                 </div>
                 
+                <!-- Metrics Dashboard (ServiceTitan / Jobber Style) -->
+                <div class="metrics-dashboard" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:20px;">
+                    <div class="metric-card" style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:12px; padding:16px; display:flex; align-items:center; gap:16px; box-shadow:0 4px 10px rgba(0,0,0,0.1); transition: transform 0.2s ease;">
+                        <div class="metric-icon" style="width:44px; height:44px; border-radius:10px; background:rgba(37,99,235,0.12); color:var(--color-accent); display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
+                            <i class="fa-solid fa-file-signature"></i>
+                        </div>
+                        <div class="metric-info" style="display:flex; flex-direction:column; min-width:0;">
+                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">הצעות שנשלחו</span>
+                            <span id="metric-sent-count" style="font-size:1.45rem; font-weight:800; color:var(--text-primary);">0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card" style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:12px; padding:16px; display:flex; align-items:center; gap:16px; box-shadow:0 4px 10px rgba(0,0,0,0.1); transition: transform 0.2s ease;">
+                        <div class="metric-icon" style="width:44px; height:44px; border-radius:10px; background:rgba(34,197,94,0.12); color:var(--color-success); display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                        <div class="metric-info" style="display:flex; flex-direction:column; min-width:0;">
+                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">הצעות שאושרו</span>
+                            <span id="metric-approved-count" style="font-size:1.45rem; font-weight:800; color:var(--text-primary);">0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card" style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:12px; padding:16px; display:flex; align-items:center; gap:16px; box-shadow:0 4px 10px rgba(0,0,0,0.1); transition: transform 0.2s ease;">
+                        <div class="metric-icon" style="width:44px; height:44px; border-radius:10px; background:rgba(245,158,11,0.12); color:var(--color-warning); display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
+                            <i class="fa-solid fa-shekel-sign"></i>
+                        </div>
+                        <div class="metric-info" style="display:flex; flex-direction:column; min-width:0;">
+                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">צבר אושר (₪)</span>
+                            <span id="metric-approved-sum" style="font-size:1.45rem; font-weight:800; color:var(--text-primary);">0 ₪</span>
+                        </div>
+                    </div>
+                    <div class="metric-card" style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:12px; padding:16px; display:flex; align-items:center; gap:16px; box-shadow:0 4px 10px rgba(0,0,0,0.1); transition: transform 0.2s ease;">
+                        <div class="metric-icon" style="width:44px; height:44px; border-radius:10px; background:rgba(168,85,247,0.12); color:#a855f7; display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
+                            <i class="fa-solid fa-chart-line"></i>
+                        </div>
+                        <div class="metric-info" style="display:flex; flex-direction:column; min-width:0;">
+                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">אחוז סגירה</span>
+                            <span id="metric-conversion-rate" style="font-size:1.45rem; font-weight:800; color:var(--text-primary);">0%</span>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="split-view">
                     <!-- Right side: Create Project -->
                     <div class="control-side">
@@ -193,7 +238,7 @@
 
                     <!-- Model selector + quota ring -->
                     <div class="model-quota-bar">
-                        <div class="model-selector-wrap">
+                        <div class="model-selector-wrap" style="display: none;">
                             <label class="model-lbl">מודל AI</label>
                             <select id="gemini-model-select" onchange="changeGeminiModel(this.value)" class="model-select-input">
                                 <option value="gemini|gemini-2.0-flash">✨ Gemini 2.0 Flash (ראשי)</option>
@@ -496,6 +541,22 @@
                                         </div>
                                     </div>
                                     
+                                    <!-- Client & Contractor Signature Row -->
+                                    <div id="pdf-signature-row" style="display:none; margin-top:20px; margin-bottom:20px; justify-content:space-between; border-top:1px dashed var(--pdf-custom-secondary, #cbd5e1); padding-top:12px; direction: rtl;">
+                                        <div style="display:flex; flex-direction:column; gap:4px; width:45%; text-align:right;">
+                                            <span style="font-weight:700; font-size:0.92rem; color:var(--pdf-custom-primary, #1e3a8a);">חתימת מאשר ההצעה (הלקוח):</span>
+                                            <div style="height:35px; border-bottom:1px solid #94a3b8; margin-top:6px; position:relative;">
+                                                <span style="font-size:0.7rem; color:#94a3b8; position:absolute; bottom:-18px; right:0;">שם ותאריך החתימה</span>
+                                            </div>
+                                        </div>
+                                        <div style="display:flex; flex-direction:column; gap:4px; width:45%; text-align:left; align-items:flex-end;">
+                                            <span style="font-weight:700; font-size:0.92rem; color:var(--pdf-custom-primary, #1e3a8a); width:100%; text-align:left;">חתימת מכין ההצעה:</span>
+                                            <div style="height:35px; border-bottom:1px solid #94a3b8; margin-top:6px; position:relative; width:100%;">
+                                                <span style="font-size:0.7rem; color:#94a3b8; position:absolute; bottom:-18px; left:0;">חתימה וחותמת העסק</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
                                     <!-- Pricing and Footer -->
                                     <div class="pdf-footer-section">
                                         <div class="pdf-price-row">
@@ -593,6 +654,23 @@
                 <div class="settings-grid">
                     <!-- Column 1: Drive Configuration -->
                     <div style="display:flex; flex-direction:column; gap:20px;">
+                        <!-- Guest → cloud backup upgrade (shown only in guest mode) -->
+                        <div class="section-card" id="guest-upgrade-box" style="display:none; border:1px solid rgba(43,116,219,0.4);">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-cloud-arrow-up text-accent"></i> שמירת העבודה בענן</h3>
+                            </div>
+                            <div class="card-body" style="display:flex; flex-direction:column; gap:12px;">
+                                <p class="input-help" style="line-height:1.6; margin:0;">
+                                    אתה כרגע במצב <strong>אורח</strong> — העבודה נשמרת רק במכשיר זה.
+                                    התחבר עם Google כדי לשמור את כל מה שעשית לחשבון האישי שלך, ולהיכנס מכל מכשיר.
+                                </p>
+                                <button type="button" class="btn-google-login" onclick="connectGoogleToSaveGuestWork()">
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="G" style="width:20px;height:20px;">
+                                    <span>שמור את עבודתי — התחברות עם Google</span>
+                                </button>
+                            </div>
+                        </div>
+
                         <div class="section-card">
                             <div class="card-header">
                                 <h3><i class="fa-brands fa-google-drive text-accent"></i> חיבור ל-Google Drive</h3>
@@ -630,6 +708,41 @@
                                         <span id="sync-spinner" style="display:none; color:var(--color-success)">
                                             <i class="fa-solid fa-spinner fa-spin" style="font-size:1.4rem;"></i>
                                         </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Theme & Cinematic Background Selector -->
+                        <div class="section-card" style="margin-top:20px;">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-palette text-accent"></i> ערכת נושא ועיצוב המערכת</h3>
+                            </div>
+                            <div class="card-body" style="display:flex; flex-direction:column; gap:16px;">
+                                <div class="form-group">
+                                    <label style="font-weight:600; margin-bottom:8px; display:block;">בחר ערכת נושא</label>
+                                    <div style="display:flex; gap:10px;">
+                                        <button type="button" class="btn btn-secondary active" id="theme-btn-dark" onclick="setSystemTheme('dark')" style="flex:1; display:flex; align-items:center; justify-content:center; gap:8px; padding:10px;">
+                                            <i class="fa-solid fa-moon"></i> מצב כהה
+                                        </button>
+                                        <button type="button" class="btn btn-secondary" id="theme-btn-light" onclick="setSystemTheme('light')" style="flex:1; display:flex; align-items:center; justify-content:center; gap:8px; padding:10px;">
+                                            <i class="fa-solid fa-sun"></i> מצב בהיר
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-group" style="margin-top:8px;">
+                                    <label style="font-weight:600; margin-bottom:8px; display:block;">רקע קולנועי (Cinematic Background)</label>
+                                    <div class="background-grid" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px;">
+                                        <!-- None / Solid Option -->
+                                        <div id="bg-opt-none" class="bg-option active" onclick="selectSystemBackground('none', 'bg-opt-none')" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid var(--color-accent); display:flex; align-items:center; justify-content:center; background:#1e293b; color:#fff;" title="ללא רקע (ברירת מחדל)">
+                                            <i class="fa-solid fa-ban"></i>
+                                        </div>
+                                        <!-- Option 1: Nebula Glow -->
+                                        <div class="bg-option" onclick="selectSystemBackground('https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?q=80&w=600', this)" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid transparent; background-image:url('https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?q=80&w=100'); background-size:cover; background-position:center;" title="נביולה זוהרת"></div>
+                                        <!-- Option 2: Dark Cyber -->
+                                        <div class="bg-option" onclick="selectSystemBackground('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=600', this)" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid transparent; background-image:url('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=100'); background-size:cover; background-position:center;" title="סייבר כהה"></div>
+                                        <!-- Option 3: Deep Forest -->
+                                        <div class="bg-option" onclick="selectSystemBackground('https://images.unsplash.com/photo-1511497584788-876760111969?q=80&w=600', this)" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid transparent; background-image:url('https://images.unsplash.com/photo-1511497584788-876760111969?q=80&w=100'); background-size:cover; background-position:center;" title="יער עמוק"></div>
                                     </div>
                                 </div>
                             </div>
@@ -718,6 +831,15 @@
                                     <input type="text" id="cat-manual-unit" placeholder="יחידה" style="max-width:110px;">
                                     <button class="btn btn-success btn-small" onclick="addManualCatalogItem()"><i class="fa-solid fa-plus"></i></button>
                                 </div>
+                        </div>
+
+                        <!-- Phrasing DB (Moved from Business Details) -->
+                        <div class="section-card">
+                            <div class="card-header"><h3><i class="fa-solid fa-book-open-reader"></i> מאגר ניסוחים</h3></div>
+                            <div class="card-body">
+                                <p class="card-subtitle" style="margin-bottom:8px;">סוכן ה-AI ישתמש בניסוחים האלה כמודל לכתיבת הצעות מחיר.</p>
+                                <textarea id="set-phrasing-db" rows="10" placeholder="הדבק את מאגר הניסוחים כאן..."></textarea>
+                                <button type="button" class="btn btn-success" style="margin-top:10px;" onclick="saveBusinessSettings()">שמור מאגר ניסוחים</button>
                             </div>
                         </div>
                     </div>
@@ -857,14 +979,123 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- Phrasing DB -->
-                        <div class="section-card">
-                            <div class="card-header"><h3><i class="fa-solid fa-book-open-reader"></i> מאגר ניסוחים</h3></div>
-                            <div class="card-body">
-                                <p class="card-subtitle" style="margin-bottom:8px;">סוכן ה-AI ישתמש בניסוחים האלה כמודל לכתיבת הצעות מחיר.</p>
-                                <textarea id="set-phrasing-db" rows="10" placeholder="הדבק את מאגר הניסוחים כאן..."></textarea>
-                                <button type="button" class="btn btn-success" style="margin-top:10px;" onclick="saveBusinessSettings()">שמור</button>
+
+                        <!-- PDF Template Customizer & Miniature Live Preview -->
+                        <div class="section-card" id="pdf-customizer-card" style="margin-top:20px;">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-file-invoice text-accent"></i> עיצוב תבנית הצעת המחיר (דינמי)</h3>
                             </div>
+                            <div class="card-body" style="display:flex; flex-direction:column; gap:20px;">
+                                <div class="customizer-layout" style="display:flex; gap:20px; flex-wrap:wrap;">
+                                    <!-- Controls Side -->
+                                    <div class="customizer-controls" style="flex:1; min-width:240px; display:flex; flex-direction:column; gap:12px;">
+                                        <div class="form-group">
+                                            <label for="pdf-font-family">גופן הצעה (Font Family)</label>
+                                            <select id="pdf-font-family" onchange="updatePdfCustomStyles()">
+                                                <option value="'Heebo', sans-serif">Heebo (מודרני ורשמי)</option>
+                                                <option value="'Rubik', sans-serif">Rubik (נקי וברור)</option>
+                                                <option value="'David Libre', serif">David (קלאסי / ספרותי)</option>
+                                                <option value="'Frank Ruhl Libre', serif">Frank Ruhl (מסורתי בעברית)</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-grid-2">
+                                            <div class="form-group">
+                                                <label for="pdf-font-size-body">גודל גופן סעיפים: <span id="val-pdf-font-size-body">12px</span></label>
+                                                <input type="range" id="pdf-font-size-body" min="10" max="18" value="12" oninput="updatePdfCustomStyles()">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="pdf-line-height">מרווח שורות (Line Spacing): <span id="val-pdf-line-height">1.4</span></label>
+                                                <input type="range" id="pdf-line-height" min="1.1" max="2.2" step="0.1" value="1.4" oninput="updatePdfCustomStyles()">
+                                            </div>
+                                        </div>
+                                        <div class="form-grid-2">
+                                            <div class="form-group">
+                                                <label for="pdf-primary-color">צבע ראשי (Primary)</label>
+                                                <input type="color" id="pdf-primary-color" value="#1e3a8a" onchange="updatePdfCustomStyles()" style="padding:0; height:36px; cursor:pointer;">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="pdf-secondary-color">צבע משני (Secondary)</label>
+                                                <input type="color" id="pdf-secondary-color" value="#3b82f6" onchange="updatePdfCustomStyles()" style="padding:0; height:36px; cursor:pointer;">
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="toggle-container" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; font-size:0.88rem;">
+                                                <input type="checkbox" id="pdf-show-watermark" checked onchange="updatePdfCustomStyles()" style="width:16px; height:16px;">
+                                                <span>הצג לוגו רקע עמום (סימן מים) מאחורי הטקסט</span>
+                                            </label>
+                                         </div>
+                                         <div class="form-group" style="margin-top:-6px;">
+                                             <label class="toggle-container" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; font-size:0.88rem;">
+                                                 <input type="checkbox" id="pdf-show-signature" onchange="updatePdfCustomStyles()" style="width:16px; height:16px;">
+                                                 <span>הצג שורת חתימה לאישור הלקוח ב-PDF</span>
+                                             </label>
+                                         </div>
+                                         <button type="button" class="btn btn-success" onclick="saveBusinessSettings()" style="margin-top:12px; width:100%;">
+                                             <i class="fa-solid fa-floppy-disk"></i> שמור עיצוב תבנית
+                                         </button>
+                                     </div>
+                                     
+                                     <!-- Live Mini Preview Side (styled like a miniature document) -->
+                                     <div class="customizer-preview-container" style="flex:1; min-width:240px; background:var(--bg-main); border:1px solid var(--border-color); border-radius:10px; padding:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; overflow:hidden;">
+                                         <div style="font-size:0.8rem; font-weight:700; color:var(--text-muted); margin-bottom:8px; display:flex; align-items:center; gap:5px;"><i class="fa-solid fa-laptop-code"></i> תצוגת תבנית מוקטנת (דינמי)</div>
+                                         
+                                         <!-- The mini doc container -->
+                                         <div id="mini-a4-preview-box" class="mini-a4-preview" style="width: 210px; height: 297px; background: #ffffff; color: #000; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); padding: 14px; position: relative; display: flex; flex-direction: column; justify-content: space-between; overflow:hidden; font-family:'Heebo';">
+                                             <!-- Mini Watermark -->
+                                             <div id="mini-pdf-watermark" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; opacity:0.04; pointer-events:none; z-index:1;">
+                                                 <svg viewBox="0 0 100 100" style="width:60%; height:60%; fill:currentColor; color: #1e3a8a;"><path d="M40 82 L62 46 L46 46 L58 14 L33 52 L50 52 Z"/></svg>
+                                             </div>
+                                             
+                                             <div style="z-index:2; position:relative; font-size:0.5rem; display:flex; flex-direction:column; gap:4px; height:100%;">
+                                                 <!-- Mini Header -->
+                                                 <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #cbd5e1; padding-bottom:4px; margin-bottom:6px;">
+                                                     <div style="display:flex; align-items:center; gap:3px;">
+                                                         <div id="mini-logo-color" style="width:8px; height:8px; border-radius:50%; background:#1e3a8a;"></div>
+                                                         <div style="font-weight:700; font-size:0.32rem;">SJ הנדסת חשמל</div>
+                                                     </div>
+                                                     <div style="font-size:0.28rem; color:#475569;">תאריך: 21/06/2026</div>
+                                                 </div>
+                                                 
+                                                 <!-- Mini Title -->
+                                                 <div style="text-align:center; margin-bottom:8px;">
+                                                     <div id="mini-title-color" style="font-weight:700; font-size:0.45rem; color:#1e3a8a; display:inline-block; border-bottom: 2px solid #3b82f6; padding-bottom:1px;">הצעת מחיר עבור פרויקט וילה</div>
+                                                 </div>
+                                                 
+                                                 <!-- Mini Body Text / Items -->
+                                                 <div id="mini-body-text-container" style="flex:1; display:flex; flex-direction:column; gap:3px; font-size:0.28rem; line-height:1.4; color:#334155;">
+                                                     <div style="font-weight:700;">1. התקנת לוח תלת-פאזי 3x25A:</div>
+                                                     <div style="margin-right:4px;">עבודה כולל חיווט ומפסקים תקניים.</div>
+                                                     <div style="font-weight:700; margin-top:2px;">2. ביצוע הארקת יסוד ובדיקה במגר:</div>
+                                                     <div style="margin-right:4px;">מדידה והפקת דוח רשמי לרישוי חברת חשמל.</div>
+                                                 </div>
+                                                 
+                                                 <!-- Mini Exclusions Box -->
+                                                 <div style="background:#f1f5f9; border-radius:2px; padding:3px; font-size:0.22rem; color:#ef4444; border:1px solid #e2e8f0; text-align:center;">
+                                                     המחיר אינו כולל חפירות או עבודות עפר !
+                                                 </div>
+                                                 
+                                                 <!-- Mini Signature Row representation -->
+                                                 <div id="mini-pdf-signature-row" style="display:none; justify-content:space-between; border-top:1px dashed #cbd5e1; padding-top:2px; margin-top:2px; font-size:0.18rem; color:#475569;">
+                                                     <div style="display:flex; flex-direction:column; gap:1px; width:45%;">
+                                                         <span style="font-weight:700;">חתימת לקוח:</span>
+                                                         <div style="border-bottom:0.5px solid #cbd5e1; height:6px;"></div>
+                                                     </div>
+                                                     <div style="display:flex; flex-direction:column; gap:1px; width:45%;">
+                                                         <span style="font-weight:700;">חתימת קבלן:</span>
+                                                         <div style="border-bottom:0.5px solid #cbd5e1; height:6px;"></div>
+                                                     </div>
+                                                 </div>
+                                                 
+                                                 <!-- Mini Footer / Pricing -->
+                                                 <div style="border-top:1px solid #cbd5e1; padding-top:4px; margin-top:6px; display:flex; justify-content:space-between; align-items:center;">
+                                                     <div style="font-size:0.25rem; font-weight:700;">סה"כ לתשלום:</div>
+                                                     <div id="mini-total-price" style="font-size:0.38rem; font-weight:900; color:#1e3a8a;">4,500 ₪</div>
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
                         </div>
                     </div>
                 </div>
@@ -991,18 +1222,19 @@
                 <span>כניסה עם חשבון Google</span>
             </button>
 
-            <!-- Secondary: manual login (collapsed) -->
-            <div class="lock-manual-toggle" onclick="toggleManualLogin()">
-                <i class="fa-solid fa-chevron-down" id="manual-toggle-icon" style="font-size:0.75rem;transition:transform 0.2s;"></i>
-                כניסה עם שם משתמש וסיסמה
+            <!-- Divider -->
+            <div style="display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--text-muted);font-size:0.8rem;">
+                <span style="flex:1;height:1px;background:var(--border-color);"></span>או<span style="flex:1;height:1px;background:var(--border-color);"></span>
             </div>
-            <div id="manual-login-section" style="display:none; margin-top:12px;">
-                <form id="form-login-user" onsubmit="handleUserLogin(event)" style="display:flex;flex-direction:column;gap:10px;">
-                    <input type="text" id="login-username" required placeholder="שם משתמש" style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:10px 14px;font-family:inherit;font-size:0.9rem;">
-                    <input type="password" id="login-password" required placeholder="סיסמה" style="background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;color:var(--text-primary);padding:10px 14px;font-family:inherit;font-size:0.9rem;">
-                    <button type="submit" class="btn btn-accent btn-full">כניסה</button>
-                </form>
-            </div>
+
+            <!-- Secondary: try as guest (saved on this device only, no account) -->
+            <button type="button" class="btn-guest-login" onclick="enterGuestMode()">
+                <i class="fa-solid fa-user-clock" style="margin-left:8px;"></i>
+                התנסות במערכת כאורח
+            </button>
+            <p style="margin-top:10px;font-size:0.76rem;color:var(--text-muted);text-align:center;line-height:1.5;">
+                במצב אורח העבודה נשמרת רק במכשיר זה.<br>התחברות עם Google שומרת את הכל בענן.
+            </p>
 
             <!-- Hidden fields kept for JS compatibility -->
             <input type="hidden" id="lock-remember-me" value="true">
@@ -1031,6 +1263,26 @@
         </div>
     </div>
 
+    <!-- Guest-mode warning modal -->
+    <div id="guest-warning-modal" class="lock-screen-container" style="display: none; z-index: 100000; background: radial-gradient(circle at center, rgba(15, 23, 42, 0.98) 0%, rgba(2, 6, 23, 0.99) 100%);">
+        <div class="lock-card">
+            <div class="lock-logo">
+                <div style="width:56px;height:56px;background:rgba(255,170,0,0.15);border:1px solid rgba(255,170,0,0.35);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+                    <i class="fa-solid fa-triangle-exclamation" style="font-size:1.5rem;color:#ffaa00;"></i>
+                </div>
+                <h2 style="font-size:1.25rem;font-weight:700;margin-bottom:6px;">שים לב</h2>
+                <p style="color:var(--text-muted);font-size:0.9rem;line-height:1.6;">שימוש במצב אורח <strong>לא יגבה את עבודתך</strong> — הנתונים יישמרו רק במכשיר ובדפדפן הזה. אם תרצה לשמור הכל בענן ולהיכנס מכל מכשיר, התחבר עם Google.</p>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+                <button type="button" class="btn-google-login" onclick="closeGuestWarning(); handleGoogleLogin();">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="G" style="width:20px;height:20px;">
+                    <span>התחברות עם Google</span>
+                </button>
+                <button type="button" class="btn btn-secondary btn-full" onclick="proceedAsGuest()">המשך בכל זאת כאורח</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Notification Toast -->
     <div id="toast-container" class="toast-container"></div>
 
@@ -1050,5 +1302,8 @@
 
     <!-- Application Script -->
     <script src="app.js"></script>
+    <!-- In-app helper assistant (teaches how to operate the tool) -->
+    <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
+    <script src="../assistant.js" defer></script>
 </body>
 </html>
