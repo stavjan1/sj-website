@@ -712,6 +712,41 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Theme & Cinematic Background Selector -->
+                        <div class="section-card" style="margin-top:20px;">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-palette text-accent"></i> ערכת נושא ועיצוב המערכת</h3>
+                            </div>
+                            <div class="card-body" style="display:flex; flex-direction:column; gap:16px;">
+                                <div class="form-group">
+                                    <label style="font-weight:600; margin-bottom:8px; display:block;">בחר ערכת נושא</label>
+                                    <div style="display:flex; gap:10px;">
+                                        <button type="button" class="btn btn-secondary active" id="theme-btn-dark" onclick="setSystemTheme('dark')" style="flex:1; display:flex; align-items:center; justify-content:center; gap:8px; padding:10px;">
+                                            <i class="fa-solid fa-moon"></i> מצב כהה
+                                        </button>
+                                        <button type="button" class="btn btn-secondary" id="theme-btn-light" onclick="setSystemTheme('light')" style="flex:1; display:flex; align-items:center; justify-content:center; gap:8px; padding:10px;">
+                                            <i class="fa-solid fa-sun"></i> מצב בהיר
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-group" style="margin-top:8px;">
+                                    <label style="font-weight:600; margin-bottom:8px; display:block;">רקע קולנועי (Cinematic Background)</label>
+                                    <div class="background-grid" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px;">
+                                        <!-- None / Solid Option -->
+                                        <div id="bg-opt-none" class="bg-option active" onclick="selectSystemBackground('none', 'bg-opt-none')" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid var(--color-accent); display:flex; align-items:center; justify-content:center; background:#1e293b; color:#fff;" title="ללא רקע (ברירת מחדל)">
+                                            <i class="fa-solid fa-ban"></i>
+                                        </div>
+                                        <!-- Option 1: Nebula Glow -->
+                                        <div class="bg-option" onclick="selectSystemBackground('https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?q=80&w=600', this)" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid transparent; background-image:url('https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?q=80&w=100'); background-size:cover; background-position:center;" title="נביולה זוהרת"></div>
+                                        <!-- Option 2: Dark Cyber -->
+                                        <div class="bg-option" onclick="selectSystemBackground('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=600', this)" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid transparent; background-image:url('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=100'); background-size:cover; background-position:center;" title="סייבר כהה"></div>
+                                        <!-- Option 3: Deep Forest -->
+                                        <div class="bg-option" onclick="selectSystemBackground('https://images.unsplash.com/photo-1511497584788-876760111969?q=80&w=600', this)" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid transparent; background-image:url('https://images.unsplash.com/photo-1511497584788-876760111969?q=80&w=100'); background-size:cover; background-position:center;" title="יער עמוק"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- Column 2: Profile only -->
