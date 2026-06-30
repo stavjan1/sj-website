@@ -367,4 +367,32 @@ function initGuidesCarousel() {
     updateGuidesDots();
 }
 
+function toggleMoreServices() {
+    const cards = document.querySelectorAll('.extra-service-card');
+    const btn = document.getElementById('btn-show-more-services');
+    if (!cards.length || !btn) return;
+    const isHidden = cards[0].style.display === 'none';
+    cards.forEach(card => {
+        card.style.display = isHidden ? 'flex' : 'none';
+        if (isHidden) {
+            card.classList.add('active');
+        }
+    });
+    btn.textContent = isHidden ? 'הצג פחות' : 'הצג עוד שירותים';
+}
+
+function toggleMoreGuides() {
+    const cards = document.querySelectorAll('.extra-guide-card');
+    const btn = document.getElementById('btn-show-more-guides');
+    if (!cards.length || !btn) return;
+    const isHidden = cards[0].style.display === 'none';
+    cards.forEach(card => {
+        card.style.display = isHidden ? 'block' : 'none';
+        if (isHidden) {
+            card.classList.add('active');
+        }
+    });
+    btn.textContent = isHidden ? 'הצג פחות' : 'הצג עוד מדריכים';
+}
+
 
