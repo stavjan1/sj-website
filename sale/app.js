@@ -1,4 +1,4 @@
-﻿// ==========================================================================
+// ==========================================================================
 // Application Logic for SJ Electrical Engineering Quote Generator (Phase 4)
 // Projects Manager & Dual-Agent AI Architecture (Pricing & Phrasing)
 // ==========================================================================
@@ -911,6 +911,41 @@ function filterProjectsList() {
     else if (sort === 'name-desc') filtered.sort((a, b) => b.name.localeCompare(a.name, 'he'));
 
     renderProjectsList(filtered);
+    updateMetricsDashboard();
+}
+
+function updateMetricsDashboard() {
+    let sentCount = 0;
+    let approvedCount = 0;
+    let approvedSum = 0;
+    let totalCount = projectsList.length;
+
+    projectsList.forEach(proj => {
+        const status = proj.status || 'טיוטה';
+        const finalPrice = (proj.quote && proj.quote.finalPrice) ? parseFloat(proj.quote.finalPrice) : 0;
+        
+        if (status === 'נשלח') {
+            sentCount++;
+        } else if (status === 'הושלם') {
+            approvedCount++;
+            approvedSum += finalPrice;
+        }
+    });
+
+    const conversionRate = totalCount > 0 ? Math.round((approvedCount / totalCount) * 100) : 0;
+
+    // Update UI elements
+    const elSent = document.getElementById('metric-sent-count');
+    if (elSent) elSent.textContent = sentCount;
+    
+    const elApproved = document.getElementById('metric-approved-count');
+    if (elApproved) elApproved.textContent = approvedCount;
+    
+    const elSum = document.getElementById('metric-approved-sum');
+    if (elSum) elSum.textContent = formatPriceString(approvedSum) + ' ₪';
+    
+    const elConversion = document.getElementById('metric-conversion-rate');
+    if (elConversion) elConversion.textContent = conversionRate + '%';
 }
 
 function cycleProjectStatus(projectId, e) {
@@ -1032,8 +1067,205 @@ function loadSettings() {
                 const professionInput = document.getElementById('settings-profession-input');
                 if (professionInput) professionInput.value = appState.settings.profession;
             }
+
+            // Load PDF design parameters
+            const _setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+            const _setCheck = (id, checked) => { const el = document.getElementById(id); if (el) el.checked = checked; };
+            _setVal('pdf-font-family', appState.settings.pdfFontFamily || "'Heebo', sans-serif");
+            _setVal('pdf-font-size-body', appState.settings.pdfFontSizeBody || '12');
+            _setVal('pdf-line-height', appState.settings.pdfLineHeight || '1.4');
+            _setVal('pdf-primary-color', appState.settings.pdfPrimaryColor || '#1e3a8a');
+            _setVal('pdf-secondary-color', appState.settings.pdfSecondaryColor || '#3b82f6');
+            _setCheck('pdf-show-watermark', appState.settings.pdfShowWatermark ?? true);
+            _setCheck('pdf-show-signature', appState.settings.pdfShowSignature ?? false);
+
+            // Apply saved theme and background on load
+            applySystemTheme(appState.settings.theme || 'dark');
+            applySystemBackground(appState.settings.selectedBackground || 'none');
+            updatePdfCustomStyles();
         } catch (e) {
             console.error('Error loading settings', e);
+        }
+    } else {
+        // Apply defaults if no settings are saved
+        applySystemTheme('dark');
+        applySystemBackground('none');
+        updatePdfCustomStyles();
+    }
+}
+
+// ===== Theme & Custom Background Handlers =====
+function applySystemTheme(theme) {
+    if (theme === 'light') {
+        document.body.classList.add('light-theme');
+        document.body.classList.remove('dark-theme');
+    } else {
+        document.body.classList.add('dark-theme');
+        document.body.classList.remove('light-theme');
+    }
+    
+    // Update active button classes in Settings UI
+    const btnDark = document.getElementById('theme-btn-dark');
+    const btnLight = document.getElementById('theme-btn-light');
+    if (btnDark && btnLight) {
+        if (theme === 'light') {
+            btnLight.classList.add('active');
+            btnLight.style.backgroundColor = 'var(--color-accent)';
+            btnLight.style.color = '#fff';
+            
+            btnDark.classList.remove('active');
+            btnDark.style.backgroundColor = '';
+            btnDark.style.color = '';
+        } else {
+            btnDark.classList.add('active');
+            btnDark.style.backgroundColor = 'var(--color-accent)';
+            btnDark.style.color = '#fff';
+            
+            btnLight.classList.remove('active');
+            btnLight.style.backgroundColor = '';
+            btnLight.style.color = '';
+        }
+    }
+
+    // Update global sidebar Sun/Moon icon toggle
+    const toggleIcon = document.getElementById('theme-toggle-icon');
+    if (toggleIcon) {
+        if (theme === 'light') {
+            toggleIcon.className = 'fa-solid fa-moon';
+        } else {
+            toggleIcon.className = 'fa-solid fa-sun';
+        }
+    }
+}
+
+function toggleSystemTheme() {
+    const current = (appState.settings && appState.settings.theme) || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    setSystemTheme(next);
+}
+
+function setSystemTheme(theme) {
+    if (!appState.settings) appState.settings = {};
+    appState.settings.theme = theme;
+    applySystemTheme(theme);
+    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
+    showToast(theme === 'light' ? 'עבר למצב בהיר' : 'עבר למצב כהה');
+}
+
+function applySystemBackground(bg) {
+    if (bg && bg !== 'none') {
+        document.body.style.backgroundImage = `url('${bg}')`;
+        document.body.classList.add('has-custom-bg');
+    } else {
+        document.body.style.backgroundImage = 'none';
+        document.body.classList.remove('has-custom-bg');
+    }
+    
+    // Update active visual borders in the settings grid
+    const options = document.querySelectorAll('.background-grid .bg-option');
+    options.forEach(opt => {
+        opt.style.borderColor = 'transparent';
+        opt.classList.remove('active');
+    });
+    
+    if (bg && bg !== 'none') {
+        const matchedOpt = Array.from(options).find(opt => {
+            const clickAttr = opt.getAttribute('onclick');
+            return clickAttr && clickAttr.includes(bg);
+        });
+        if (matchedOpt) {
+            matchedOpt.style.borderColor = 'var(--color-accent)';
+            matchedOpt.classList.add('active');
+        }
+    } else {
+        const noneOpt = document.getElementById('bg-opt-none');
+        if (noneOpt) {
+            noneOpt.style.borderColor = 'var(--color-accent)';
+            noneOpt.classList.add('active');
+        }
+    }
+}
+
+function selectSystemBackground(bg, elementId) {
+    if (!appState.settings) appState.settings = {};
+    appState.settings.selectedBackground = bg;
+    applySystemBackground(bg);
+    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
+    if (bg === 'none') {
+        showToast('רקע תמונה הוסר');
+    } else {
+        showToast('רקע קולנועי הוחל בהצלחה!');
+    }
+}
+
+
+function updatePdfCustomStyles() {
+    const fontFamily = document.getElementById('pdf-font-family')?.value || "'Heebo', sans-serif";
+    const fontSizeBody = document.getElementById('pdf-font-size-body')?.value || '12';
+    const lineHeight = document.getElementById('pdf-line-height')?.value || '1.4';
+    const primaryColor = document.getElementById('pdf-primary-color')?.value || '#1e3a8a';
+    const secondaryColor = document.getElementById('pdf-secondary-color')?.value || '#3b82f6';
+    const showWatermark = document.getElementById('pdf-show-watermark')?.checked ?? true;
+    const showSignature = document.getElementById('pdf-show-signature')?.checked ?? false;
+
+    // Update UI slider labels
+    const fontLabel = document.getElementById('val-pdf-font-size-body');
+    if (fontLabel) fontLabel.textContent = fontSizeBody + 'px';
+    const lhLabel = document.getElementById('val-pdf-line-height');
+    if (lhLabel) lhLabel.textContent = lineHeight;
+
+    // Apply to Miniature Preview A4 Document
+    const miniBox = document.getElementById('mini-a4-preview-box');
+    if (miniBox) {
+        miniBox.style.fontFamily = fontFamily;
+        
+        const miniBody = document.getElementById('mini-body-text-container');
+        if (miniBody) {
+            miniBody.style.fontSize = `calc(0.28rem * (${fontSizeBody} / 12))`;
+            miniBody.style.lineHeight = lineHeight;
+        }
+        
+        const miniWatermark = document.getElementById('mini-pdf-watermark');
+        if (miniWatermark) {
+            miniWatermark.style.opacity = showWatermark ? '0.04' : '0';
+            const svg = miniWatermark.querySelector('svg');
+            if (svg) svg.style.color = primaryColor;
+        }
+        
+        const miniLogo = document.getElementById('mini-logo-color');
+        if (miniLogo) miniLogo.style.backgroundColor = primaryColor;
+        
+        const miniTitle = document.getElementById('mini-title-color');
+        if (miniTitle) {
+            miniTitle.style.color = primaryColor;
+            miniTitle.style.borderBottomColor = secondaryColor;
+        }
+        
+        const miniTotal = document.getElementById('mini-total-price');
+        if (miniTotal) miniTotal.style.color = primaryColor;
+
+        const miniSig = document.getElementById('mini-pdf-signature-row');
+        if (miniSig) miniSig.style.display = showSignature ? 'flex' : 'none';
+    }
+
+    // Apply to actual PDF Sheet (if rendered)
+    const sheet = document.getElementById('quote-pdf-sheet');
+    if (sheet) {
+        sheet.style.setProperty('--pdf-custom-font', fontFamily);
+        sheet.style.setProperty('--pdf-custom-font-size-body', fontSizeBody + 'px');
+        sheet.style.setProperty('--pdf-custom-line-height', lineHeight);
+        sheet.style.setProperty('--pdf-custom-primary', primaryColor);
+        sheet.style.setProperty('--pdf-custom-secondary', secondaryColor);
+        
+        const watermark = document.getElementById('pdf-watermark-bg');
+        if (watermark) {
+            watermark.style.opacity = showWatermark ? '0.04' : '0';
+            watermark.style.color = primaryColor;
+        }
+
+        const sigRow = document.getElementById('pdf-signature-row');
+        if (sigRow) {
+            sigRow.style.display = showSignature ? 'flex' : 'none';
         }
     }
 }
@@ -1051,10 +1283,21 @@ function saveBusinessSettings() {
     };
     appState.settings.phrasingDb = document.getElementById('set-phrasing-db').value;
     
+    // Save PDF design parameters
+    appState.settings.pdfFontFamily = document.getElementById('pdf-font-family')?.value || "'Heebo', sans-serif";
+    appState.settings.pdfFontSizeBody = document.getElementById('pdf-font-size-body')?.value || '12';
+    appState.settings.pdfLineHeight = document.getElementById('pdf-line-height')?.value || '1.4';
+    appState.settings.pdfPrimaryColor = document.getElementById('pdf-primary-color')?.value || '#1e3a8a';
+    appState.settings.pdfSecondaryColor = document.getElementById('pdf-secondary-color')?.value || '#3b82f6';
+    appState.settings.pdfShowWatermark = document.getElementById('pdf-show-watermark')?.checked ?? true;
+    appState.settings.pdfShowSignature = document.getElementById('pdf-show-signature')?.checked ?? false;
+
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
     showToast('הגדרות העסק נשמרו בהצלחה');
     
+    // Re-apply design styles and update document
+    updatePdfCustomStyles();
     updatePreviewFromForm();
     syncCurrentQuoteToProject();
     syncDatabaseToDrive(true);

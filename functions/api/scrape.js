@@ -9,11 +9,11 @@
 
 import { generate } from './_ai.js';
 
-const MAX_CONTENT = 14000; // chars of page text fed to the extractor (token guard)
+const MAX_CONTENT = 35000; // chars of page text fed to the extractor (token guard)
 
-const EXTRACT_PROMPT = `אתה מחלץ מחירים מדפי ספקים. מהתוכן הבא של דף אינטרנט, חלץ כל מוצר נבדל שיש לו מחיר ברור.
-החזר אך ורק JSON במבנה: {"items":[{"name":"שם המוצר","price":<מספר בש"ח>,"unit":"יחידה/מטר/אריזה (אם ידוע)"}]}.
-כללים: price הוא מספר בלבד (ללא ₪ או פסיקים). התעלם מתפריטים, ניווט, דמי משלוח, סכומי ביניים, ופריטים ללא מחיר ברור. אל תמציא מחירים. אם אין מוצרים עם מחיר — החזר {"items":[]}.`;
+const EXTRACT_PROMPT = `אתה מחלץ מחירים ומחירונים מדפי ספקים ומחירוני עבודות. מהתוכן הבא של דף אינטרנט, חלץ כל מוצר או סעיף עבודה נבדל שיש לו מחיר ברור.
+החזר אך ורק JSON במבנה: {"items":[{"name":"שם המוצר או שם העבודה/השירות","price":<מספר בש"ח>,"unit":"יחידה/מטר/אריזה/נקודה/שעה (אם ידוע)"}]}.
+כללים: price הוא מספר בלבד (ללא ₪ או פסיקים). התעלם מתפריטים, ניווט, דמי משלוח, סכומי ביניים, ופריטים ללא מחיר ברור. אל תמציא מחירים. אם אין מוצרים או עבודות עם מחיר — החזר {"items":[]}.`;
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -103,6 +103,11 @@ export async function onRequestPost(context) {
 // Strip scripts/styles/tags → readable text.
 function htmlToText(html) {
   return html
+    .replace(/<head[\s\S]*?<\/head>/gi, ' ')
+    .replace(/<header[\s\S]*?<\/header>/gi, ' ')
+    .replace(/<footer[\s\S]*?<\/footer>/gi, ' ')
+    .replace(/<nav[\s\S]*?<\/nav>/gi, ' ')
+    .replace(/<svg[\s\S]*?<\/svg>/gi, ' ')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<!--[\s\S]*?-->/g, ' ')

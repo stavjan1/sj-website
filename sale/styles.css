@@ -2605,3 +2605,213 @@ textarea#ai-input {
     .sj-assist-panel { bottom: 0; left: 0; right: 0; width: 100%; max-width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
     .sj-assist-launcher { bottom: 22px; left: 22px; }
 }
+
+/* ===== Light Theme & Custom Background Support ===== */
+
+/* Light Theme Variables */
+body.light-theme {
+    --bg-main: #f0f2f5;
+    --bg-card: #ffffff;
+    --bg-card-header: #f8fafc;
+    --bg-input: #f1f5f9;
+    --border-color: #cbd5e1;
+    --border-hover: #94a3b8;
+
+    --text-primary: #0f172a;
+    --text-secondary: #334155;
+    --text-muted: #64748b;
+
+    --color-accent: #2563eb;
+    --color-accent-hover: #1d4ed8;
+    --color-accent-glow: rgba(37, 99, 235, 0.12);
+}
+
+body.light-theme .sidebar {
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    border-left: 1px solid #cbd5e1;
+}
+
+body.light-theme .brand-name {
+    color: #0f172a;
+}
+
+body.light-theme .nav-btn {
+    color: #475569;
+}
+
+body.light-theme .nav-btn:hover {
+    background-color: #e2e8f0;
+    color: #0f172a;
+}
+
+body.light-theme .nav-btn.active {
+    background-color: var(--color-accent-glow);
+    color: var(--color-accent);
+}
+
+body.light-theme .sidebar-home-link {
+    border-color: rgba(240,192,64,0.6);
+    background: rgba(240,192,64,0.15);
+    color: #b25900;
+}
+
+body.light-theme .sidebar-home-link:hover {
+    background: rgba(240,192,64,0.25);
+    color: #8c4600;
+}
+
+body.light-theme .user-chip {
+    background: #e2e8f0 !important;
+}
+
+body.light-theme .active-project-banner {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+    color: #334155;
+}
+
+body.light-theme input, 
+body.light-theme textarea, 
+body.light-theme select {
+    background-color: #ffffff;
+    border-color: #cbd5e1;
+    color: #0f172a;
+}
+
+body.light-theme input:focus, 
+body.light-theme textarea:focus, 
+body.light-theme select:focus {
+    border-color: var(--color-accent);
+}
+
+body.light-theme .chip {
+    background: #e2e8f0;
+    color: #334155;
+}
+
+body.light-theme .chip:hover {
+    background: #cbd5e1;
+}
+
+body.light-theme .chat-bubble.system {
+    background-color: #f1f5f9;
+    color: #334155;
+    border-color: #cbd5e1;
+}
+
+body.light-theme .chat-bubble.user {
+    background-color: var(--color-accent);
+    color: #ffffff;
+}
+
+body.light-theme .model-quota-bar {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+}
+
+body.light-theme .model-select-input {
+    background: #ffffff;
+    color: #0f172a;
+}
+
+/* Glassmorphism Overrides when Custom Background is Active */
+body.has-custom-bg {
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+}
+
+body.has-custom-bg .app-container {
+    background: rgba(12, 16, 32, 0.45);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+body.has-custom-bg.light-theme .app-container {
+    background: rgba(240, 242, 245, 0.55);
+}
+
+body.has-custom-bg .sidebar {
+    background: rgba(10, 15, 30, 0.75) !important;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+}
+
+body.has-custom-bg.light-theme .sidebar {
+    background: rgba(248, 250, 252, 0.82) !important;
+}
+
+body.has-custom-bg .section-card,
+body.has-custom-bg .preview-side,
+body.has-custom-bg .chat-container,
+body.has-custom-bg .control-side .chat-container {
+    background: rgba(20, 29, 46, 0.65) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+body.has-custom-bg.light-theme .section-card,
+body.has-custom-bg.light-theme .preview-side,
+body.has-custom-bg.light-theme .chat-container {
+    background: rgba(255, 255, 255, 0.72) !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Custom Background options grid items hover states */
+.background-grid .bg-option {
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+.background-grid .bg-option:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 15px rgba(77, 142, 240, 0.3);
+}
+.background-grid .bg-option.active {
+    box-shadow: 0 0 10px var(--color-accent);
+}
+
+/* ===== Dynamic PDF Styling variables and Mini Preview layout ===== */
+#quote-pdf-sheet {
+    font-family: var(--pdf-custom-font, 'Heebo', sans-serif) !important;
+    line-height: var(--pdf-custom-line-height, 1.4) !important;
+}
+
+#quote-pdf-sheet .pdf-wrapper {
+    font-size: var(--pdf-custom-font-size-body, 12px) !important;
+}
+
+#quote-pdf-sheet td, 
+#quote-pdf-sheet th, 
+#quote-pdf-sheet .summary-text, 
+#quote-pdf-sheet .pdf-warning-box, 
+#quote-pdf-sheet .pdf-company-footer {
+    font-size: var(--pdf-custom-font-size-body, 12px) !important;
+}
+
+#quote-pdf-sheet .pdf-title {
+    color: var(--pdf-custom-primary, #1e3a8a) !important;
+}
+
+#quote-pdf-sheet .underline-bar {
+    background-color: var(--pdf-custom-secondary, #3b82f6) !important;
+}
+
+#quote-pdf-sheet #pdf-total-price {
+    color: var(--pdf-custom-primary, #1e3a8a) !important;
+}
+
+#quote-pdf-sheet #pdf-logo-container svg {
+    color: var(--pdf-custom-primary, #1e3a8a) !important;
+}
+
+/* Mini Preview Styles */
+.mini-a4-preview {
+    transition: all 0.3s ease;
+    user-select: none;
+}
+.mini-a4-preview * {
+    transition: font-size 0.2s ease, font-family 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
