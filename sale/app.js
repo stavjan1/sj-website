@@ -2051,6 +2051,16 @@ function scrollChatToBottom() {
     if (log) log.scrollTop = log.scrollHeight;
 }
 
+// Render a chat message safely with light markdown: escape HTML first, then
+// turn **bold** into <strong>, *italic* into <em>, and newlines into <br>.
+function formatChatMarkdown(text) {
+    let s = escapeHtmlSafe(text || '');
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+    s = s.replace(/\n/g, '<br>');
+    return s;
+}
+
 // Text shown live while streaming — hide the trailing JSON block as it arrives.
 function visibleChatText(text) {
     if (!text) return '';
@@ -2168,8 +2178,8 @@ function renderChatHistory(chatHistory) {
         let text = msg.parts[0].text;
         text = text.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
         text = text.replace(/({[\s\S]*?})/, '').trim();
-        
-        bubble.textContent = text;
+
+        bubble.innerHTML = formatChatMarkdown(text);
         log.appendChild(bubble);
     });
 
