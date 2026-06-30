@@ -1940,7 +1940,9 @@ textarea#ai-input {
         overflow-y: auto;
     }
 
-    /* Sidebar as Bottom Navigation Bar */
+    /* Sidebar as Bottom Navigation Bar — horizontally scrollable so every tab
+       stays reachable instead of being squeezed/cut off (8+ tabs don't fit a
+       phone width at readable size). */
     .sidebar {
         width: 100%;
         height: 65px;
@@ -1949,24 +1951,38 @@ textarea#ai-input {
         left: 0;
         right: 0;
         flex-direction: row;
-        justify-content: space-around;
-        padding: 6px 4px;
+        justify-content: flex-start;
+        align-items: center;
+        padding: 6px 10px;
         background-color: #070a13;
         border-top: 1px solid var(--border-color);
         border-left: none;
         z-index: 1000;
         box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
     }
+    .sidebar::-webkit-scrollbar { display: none; }
 
     .sidebar-logo,
     .sidebar-footer {
         display: none !important;
     }
 
+    .sidebar-home-link {
+        flex-shrink: 0;
+        margin-bottom: 0;
+        padding: 8px 12px;
+        white-space: nowrap;
+    }
+
     .nav-menu {
         flex-direction: row;
-        justify-content: space-around;
-        width: 100%;
+        justify-content: flex-start;
+        width: max-content;
+        flex-shrink: 0;
         gap: 2px;
     }
 
@@ -1975,14 +1991,17 @@ textarea#ai-input {
         align-items: center;
         justify-content: center;
         gap: 3px;
-        padding: 4px;
-        font-size: 0.72rem;
+        padding: 6px 10px;
+        font-size: 0.7rem;
         text-align: center;
         width: auto;
-        flex-grow: 1;
+        min-width: 60px;
+        flex-grow: 0;
+        flex-shrink: 0;
         background: none;
         border-radius: 6px;
         color: var(--text-secondary);
+        white-space: nowrap;
     }
 
     .nav-btn i {
@@ -2644,6 +2663,29 @@ textarea#ai-input {
 @media (max-width: 480px) {
     .sj-assist-panel { bottom: 0; left: 0; right: 0; width: 100%; max-width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
     .sj-assist-launcher { bottom: 22px; left: 22px; }
+}
+
+/* Lock screen on small phones: a floating centered card wastes ~half the
+   screen in empty space above/below it. Switch to a top-aligned, edge-to-edge
+   page (closer to how native apps like Yad2 do sign-in) so it reads as
+   compact instead of a tiny card lost in a sea of dark background. */
+@media (max-width: 480px) {
+    .lock-screen-container {
+        align-items: flex-start;
+        padding: 0;
+    }
+    .lock-card {
+        max-width: 100%;
+        min-height: 100vh;
+        border-radius: 0;
+        border: none;
+        box-shadow: none;
+        padding: 64px 22px 28px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+    }
+    .lock-logo { margin-bottom: 22px; }
 }
 
 /* ===== Light Theme & Custom Background Support ===== */
