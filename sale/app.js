@@ -822,7 +822,11 @@ function loadProject(id, navigate = true) {
     
     // Load Materials checklist
     renderMaterialsChecklist(proj.materials);
-    
+
+    // Load the side dashboard cards (scope + toolkit) for this project
+    renderWizardScope(proj.scope);
+    renderWizardTools(proj.tools);
+
     // Load labor price
     const laborInput = document.getElementById('wizard-labor-price');
     if (laborInput) {
@@ -1874,6 +1878,9 @@ async function runPricingAgent(activeProject, promptChars) {
     try {
         const response = await callAI(effectiveModel, {
             messages: historyToMessages(systemInstructionText, activeProject.chatHistory),
+            max_tokens: 3000, // pricing replies are long & staged — without this the
+                              // Cloudflare Workers AI fallback caps output at ~256 and
+                              // the answer gets cut off mid-sentence.
             stream: true
         });
 
@@ -1927,32 +1934,91 @@ function applyMaterialsFromResponse(activeProject, responseText) {
     try {
         const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
         if (!parsed) return;
-        activeProject.laborPrice = parsed.laborPriceEstimate || 0;
-        const laborEl = document.getElementById('wizard-labor-price');
-        if (laborEl) laborEl.value = activeProject.laborPrice;
 
-        const existingMaterials = activeProject.materials || [];
-        const newMaterials = (parsed.materials || []).map(newMat => {
-            const matched = existingMaterials.find(m => m.name === newMat.name);
-            return {
-                name: newMat.name,
-                price: newMat.price || 0,
-                details: newMat.details || '',
-                checked: matched ? matched.checked : true
-            };
-        });
-        activeProject.materials = newMaterials;
-        renderMaterialsChecklist(newMaterials);
-
-        const tipsBox = document.getElementById('wizard-tips-box');
-        if (tipsBox && parsed.blindSpots && parsed.blindSpots.length > 0) {
-            tipsBox.style.display = 'block';
-            tipsBox.innerHTML = `<strong>נקודות עיוורון שכדאי לבדוק:</strong><ul>` + parsed.blindSpots.map(s => `<li>${s}</li>`).join('') + `</ul>`;
+        // Staged flow: each reply's JSON carries only the fields relevant to its
+        // stage, so update non-destructively — never wipe data a later stage omits.
+        if (parsed.laborPriceEstimate != null) {
+            activeProject.laborPrice = parsed.laborPriceEstimate || 0;
+            const laborEl = document.getElementById('wizard-labor-price');
+            if (laborEl) laborEl.value = activeProject.laborPrice;
         }
+
+        if (Array.isArray(parsed.materials) && parsed.materials.length > 0) {
+            const existingMaterials = activeProject.materials || [];
+            activeProject.materials = parsed.materials.map(newMat => {
+                const matched = existingMaterials.find(m => m.name === newMat.name);
+                return {
+                    name: newMat.name,
+                    price: newMat.price || 0,
+                    details: newMat.details || '',
+                    checked: matched ? matched.checked : true
+                };
+            });
+            renderMaterialsChecklist(activeProject.materials);
+        }
+
+        if (Array.isArray(parsed.blindSpots) && parsed.blindSpots.length > 0) {
+            const tipsBox = document.getElementById('wizard-tips-box');
+            if (tipsBox) {
+                tipsBox.style.display = 'block';
+                tipsBox.innerHTML = `<strong>נקודות עיוורון שכדאי לבדוק:</strong><ul>` + parsed.blindSpots.map(s => `<li>${s}</li>`).join('') + `</ul>`;
+            }
+        }
+
+        if (Array.isArray(parsed.scope) && parsed.scope.length > 0) {
+            activeProject.scope = parsed.scope;
+            renderWizardScope(activeProject.scope);
+        }
+
+        if (Array.isArray(parsed.tools) && parsed.tools.length > 0) {
+            const existingTools = activeProject.tools || [];
+            activeProject.tools = parsed.tools.map(t => {
+                const matched = existingTools.find(x => x.name === t.name);
+                return { name: t.name, checked: matched ? matched.checked : false };
+            });
+            renderWizardTools(activeProject.tools);
+        }
+
         saveProjects();
     } catch (e) {
         console.error("Failed to parse JSON block from AI response", e);
     }
+}
+
+// Render the "אפיון הפרויקט" scope tags card.
+function renderWizardScope(scope) {
+    const card = document.getElementById('wizard-scope-card');
+    const box = document.getElementById('wizard-scope-tags');
+    if (!card || !box) return;
+    if (!scope || scope.length === 0) { card.style.display = 'none'; return; }
+    box.innerHTML = scope.map(s => `<span class="wizard-scope-tag">${escapeHtmlSafe(s)}</span>`).join('');
+    card.style.display = 'block';
+}
+
+// Render the "ארגז הכלים" toolkit checklist card.
+function renderWizardTools(tools) {
+    const card = document.getElementById('wizard-tools-card');
+    const box = document.getElementById('wizard-tools-list');
+    if (!card || !box) return;
+    if (!tools || tools.length === 0) { card.style.display = 'none'; return; }
+    box.innerHTML = tools.map((t, i) =>
+        `<label class="wizard-tool-row"><input type="checkbox" ${t.checked ? 'checked' : ''} onchange="toggleWizardTool(${i})"><span>${escapeHtmlSafe(t.name)}</span></label>`
+    ).join('');
+    card.style.display = 'block';
+}
+
+function toggleWizardTool(index) {
+    const activeProject = projectsList.find(p => p.id === activeProjectId);
+    if (!activeProject || !activeProject.tools || !activeProject.tools[index]) return;
+    activeProject.tools[index].checked = !activeProject.tools[index].checked;
+    saveProjects();
+}
+
+// Minimal HTML escaper for AI-supplied strings rendered into the dashboard.
+function escapeHtmlSafe(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // Drop the most recent AI reply and ask the agent to answer again.
@@ -2263,6 +2329,7 @@ ${checkedMatsText}
     try {
         const response = await callAI(effectiveModel, {
             messages: [{ role: 'user', content: prompt }],
+            max_tokens: 3000, // avoid mid-quote truncation on the Cloudflare fallback
             response_format: { type: 'json_object' }
         });
 
@@ -3742,7 +3809,7 @@ function getProfessionSystemInstruction() {
             specificContent = `אתה מומחה תמחור, חישוב חומרים וניהול עבודות של התקנת עמדות טעינה לרכבים חשמליים בישראל (עבור סתיו ג'אן - SJ הנדסת חשמל).
 תפקידך לנהל שיחה מקצועית, ממוקדת ומסייעת כדי לעזור לסתיו לתמחר התקנת עמדת טעינה לרכב חשמלי.
 
-בכל הודעה שלך:
+הידע המקצועי שלך — שלוף ממנו לפי שלב השיחה (אל תשפוך את הכול בהודעה אחת):
 1. נתח את עבודת התקנת עמדת הטעינה שסתיו מתאר.
 2. זהה נקודות עיוורון (Blind spots) ודרישות קריטיות - דברים שצריך לקחת בחשבון (למשל: סוג הלוח - חד-פאזי או תלת-פאזי, הארקה של הבניין, מגן זליגה 6mA DC מובנה או מפסק מגן Type B ייעודי בלוח, מוליכי כבל מתאימים 5x6 או 5x10, אופן קיבוע המוביל - צינור מריכף, תעלה סגורה או חציבה, מרחק בפועל מהלוח, עבודה בגובה, הפרעות בשטח, הגדלת חיבור ותיאום מול חברת החשמל, שאלות לקיבוע המוביל וכדומה).
 3. הצע רשימת חומרים נלווים ואביזרים שסתיו צריך לקנות כדי להשלים את עבודת ההתקנה קומפלט פרפקט (כגון דיבלים, ברגים, כבל XLPE, תעלות PVC, קופסאות חיבור, עמדת טעינה, צינורות הגנה, מהדקים, חציבות וכו').
@@ -3754,7 +3821,7 @@ function getProfessionSystemInstruction() {
             specificContent = `אתה מומחה תמחור, חישוב חומרים וניהול עבודות של התקנת מערכות סולאריות (PV) בישראל (עבור סתיו ג'אן - SJ הנדסת חשמל).
 תפקידך לנהל שיחה מקצועית, ממוקדת ומסייעת כדי לעזור לסתיו לתמחר התקנת מערכת סולארית לייצור חשמל.
 
-בכל הודעה שלך:
+הידע המקצועי שלך — שלוף ממנו לפי שלב השיחה (אל תשפוך את הכול בהודעה אחת):
 1. נתח את עבודת ההתקנה הסולארית שסתיו מתאר.
 2. זהה נקודות עיוורון (Blind spots) ודרישות קריטיות - דברים שצריך לקחת בחשבון (למשל: סוג הגג - בטון, רעפים או איסכורית, הצללות אפשריות, כבילת DC ייעודית עמידה בקרני UV, סוג הממיר - Inverter, עגינה וקונסטרוקציה מתאימה לעומסי רוח, הארקות שלדת הפנלים, הכנות לחיבור ללוח הראשי, מונה נטו ואישורים מול חברת החשמל, דרישות כיבוי אש, עבודה בגובה, פיגומים או מנוף, בטיחות בשטח וכו').
 3. הצע רשימת חומרים נלווים ואביזרים שסתיו צריך לקנות כדי להשלים את ההתקנה קומפלט פרפקט (כגון פנלים סולאריים, ממיר, מסילות אלומיניום, תופסנים, ברגי עגינה, כבלי DC 4/6 ממ"ר, מהדקים, מפסקי DC, לוח הגנות וכו').
@@ -3766,7 +3833,7 @@ function getProfessionSystemInstruction() {
             specificContent = `אתה מומחה תמחור, חישוב חומרים וניהול עבודות שיפוצים ובינוי פנים בישראל (עבור סתיו ג'אן - SJ הנדסת חשמל).
 תפקידך לנהל שיחה מקצועית, ממוקדת ומסייעת כדי לעזור לסתיו לתמחר עבודות שיפוץ וגמר פנים.
 
-בכל הודעה שלך:
+הידע המקצועי שלך — שלוף ממנו לפי שלב השיחה (אל תשפוך את הכול בהודעה אחת):
 1. נתח את עבודת השיפוצים שסתיו מתאר.
 2. זהה נקודות עיוורון (Blind spots) ודרישות קריטיות - דברים שצריך לקחת בחשבון (למשל: עבודות הריסה ופינוי פסולת למכולה מורשית, מצב התשתיות הישנות כמו אינסטלציה וחשמל, איטום חדרים רטובים - מקלחות/מרפסות, פילוס הרצפה, סוגי לוחות גבס - ירוק/ורוד/לבן, שפכטל אמריקאי וצבע, חלוקת עומסים, פתחי שירות למערכות, עבודה בשעות מותרות, הגנה על מעליות ורכוש משותף וכו').
 3. הצע רשימת חומרים נלווים ואביזרים שסתיו צריך לקנות כדי להשלים את העבודה קומפלט פרפקט (כגון מלט, חול, טיח, בלוקים, לוחות גבס, פרופילים, ברגים, דבקי קרמיקה, רובה, חומרי איטום צמנטיים/אקריליים, צנרת מים SP/פקסגול, קופסאות חיבור וכו').
@@ -3778,7 +3845,7 @@ function getProfessionSystemInstruction() {
             specificContent = `אתה מומחה תמחור, חישוב חומרים וניהול עבודות בנייה וגמר שלד בישראל (עבור סתיו ג'אן - SJ הנדסת חשמל).
 תפקידך לנהל שיחה מקצועית, ממוקדת ומסייעת כדי לעזור לסתיו לתמחר פרויקטי בנייה, עבודות שלד וגמר של בניינים ובתים פרטיים.
 
-בכל הודעה שלך:
+הידע המקצועי שלך — שלוף ממנו לפי שלב השיחה (אל תשפוך את הכול בהודעה אחת):
 1. נתח את עבודת הבנייה או השלד שסתיו מתאר.
 2. זהה נקודות עיוורון (Blind spots) ודרישות קריטיות - דברים שצריך לקחת בחשבון (למשל: סוג הלוח או הביסוס והכלונסאות, אישורי קונסטרוקטור, בדיקות מעבדה לבטון, ברזל זיון ותפסנות, איטום יסודות וקירות מסד, פיגומים תקניים ועבודה בגובה, דרכי גישה למערבלי בטון ומשאבות, בטיחות אתר הבנייה, תיאום מערכות חשמל/אינסטלציה/מיזוג בתוך יציקות השלד, שלבי התקדמות הבנייה, לוחות זמנים וכו').
 3. הצע רשימת חומרים נלווים ואביזרים שסתיו צריך לקנות כדי להשלים את העבודה קומפלט פרפקט (כגון בטון מוכן מסוגים שונים, ברזל בניין בעוביים שונים, עץ תבניות, בלוקים מכל הסוגים - פומיס/איטונג, רשתות ברזל, חומרי איטום ביטומניים, צינורות שרוול וכו').
@@ -3791,7 +3858,7 @@ function getProfessionSystemInstruction() {
             specificContent = `אתה מומחה תמחור, חישוב חומרים וניהול עבודות חשמל עבור חשמלאי מוסמך בישראל (סתיו ג'אן - SJ הנדסת חשמל).
 תפקידך לנהל שיחה מקצועית, ממוקדת ומסייעת כדי לעזור לסתיו לתמחר עבודות חשמל.
 
-בכל הודעה שלך:
+הידע המקצועי שלך — שלוף ממנו לפי שלב השיחה (אל תשפוך את הכול בהודעה אחת):
 1. נתח את העבודה שסתיו מתאר.
 2. זהה נקודות עיוורון (Blind spots) - דברים שצריך לקחת בחשבון (למשל: סוג הלוח, מרחק בפועל, חציבות בבטון/בלוק, הארקה, מפסקי מגן, אישורים, הגדלת חיבור, עבודה בגובה, הפרעות בשטח וכו').
 3. הצע רשימת חומרים נלווים ואביזרים שסתיו צריך לקנות כדי להשלים את העבודה קומפלט פרפקט (כגון דיבלים, ברגים, כבלים, תעלות, קופסאות חיבור, עמדת טעינה, צינורות וכו').
@@ -3802,25 +3869,48 @@ function getProfessionSystemInstruction() {
 
     return `${specificContent}
 
-כדי שהתוכנה תדע לעדכן את הממשק הדינמי (הצ'קליסט ועלות העבודה בצד ימין), עליך לסיים כל תשובה שלך עם גוש JSON מובנה בתוך בלוק קוד של json (למשל \`\`\`json ... \`\`\`).
-המבנה של ה-JSON חייב להיות בדיוק כזה:
+# איך לנהל את השיחה — בשלבים, כמו עובד מצטיין (לא כהטחת מידע)
+דבר בעברית, בחום ובביטחון, קצר ולעניין. נהל את השיחה בשלבים לפי המצב, ואל תשפוך את הכול בהודעה אחת:
+
+שלב 1 — אפיון העבודה (כשסתיו רק תיאר עבודה ועדיין חסרים פרטים):
+- פתח באישור קצר ובטוח, למשל: "אין בעיה, מתחיל מיד בניתוח העבודה. <סוג העבודה> מצריכה…".
+- פרק את העבודה למרכיביה בנקודות קצרות וברורות (מה כוללת העבודה בפועל), ושלב בהן את נקודות העיוורון הרלוונטיות.
+- בקש מסתיו את הפרטים החסרים הדרושים לתמחור (מידות, כמויות, שקוע/צמוד-קיר, מרחקים, מצב קיים וכו'). אל תתמחר עדיין.
+- דוגמת סגנון (החלפת לוח): "1. מבנה לוח — אנא ציין את הגודל הנדרש או פרט מה יש בלוח. 2. לרוב חידוש מאמ"תים. 3. חיווט מחדש והארכת קווים קצרים. 4. חציבה וקיבוע בקיר (בטון, ברגים, דיבלים, אזיקונים, אזיקוני דגלון לסימון כל מעגל לפני הפירוק). אנא ציין אם הלוח שקוע או צמוד קיר."
+
+שלב 2 — חישוב עלויות (אחרי שסתיו סיפק את הפרטים):
+- פתח ב"אין בעיה, עוברים לחישוב עלויות:" והצג בשלושה חלקים מסומנים:
+  A — חומרים: פרט כל פריט עם מחיר משוער בש"ח (היעזר במאגר המחירים אם קיים), וסכם "סה"כ חומרים".
+  B — עבודה: הערך את שעות העבודה לפירוק/הרכבה/חיווט, הכפל בתעריף שעתי (ברירת מחדל 150 ₪ לשעה אם סתיו לא ציין אחרת), ותן "סה"כ עבודה".
+  C — סה"כ להצעה: סכום חומרים + עבודה.
+- סיים בהצעה: "היית רוצה שנעבור על רשימת הכלים והציוד הדרושים לעבודה?".
+
+שלב 3 — כלי עבודה וציוד (רק אם סתיו ביקש):
+- פרט את הכלים והציוד הנדרשים לביצוע (למשל פטישון, דיסק יהלום, ג'קר, תוכי, מברגים, מברגה, מכשירי מדידה וכו') בהתאם לסוג העבודה.
+
+הקשב לסתיו: אם הוא מבקש לדלג שלב או שואל שאלה ישירה — ענה לעניין. אל תמציא מחירים מופרכים; כשאינך בטוח אמור זאת ותן טווח סביר.
+
+חוק חשוב: אל תקפוץ משלב לשלב בלי אישור מהמשתמש. סיים כל שלב, המתן לתשובתו, ורק אז המשך.
+
+# פלט JSON לעדכון הדשבורד הצדדי (רק כשרלוונטי)
+המערכת מציגה בצד 3 כרטיסיות שמתמלאות מהשיחה: "אפיון הפרויקט", "כתב כמויות" (חומרים+עבודה) ו"ארגז הכלים". כדי לעדכן אותן, סיים את התשובה בגוש JSON בתוך בלוק \`\`\`json ... \`\`\` — אך ורק כשיש לך תוכן רלוונטי:
+- בשלב 1 (שאלות בלבד) — אל תוסיף JSON כלל.
+- בשלב 2 (תמחור) — כלול scope (תגיות אפיון), materials, laborPriceEstimate, blindSpots.
+- בשלב 3 (כלים) — כלול tools.
+שלח רק את השדות הרלוונטיים לשלב הנוכחי. המבנה:
 {
-  "laborPriceEstimate": 1500, // מחיר עבודה מוערך בלבד (מספר)
-  "blindSpots": [
-    "פרט כאן נקודת עיוורון ראשונה המבוססת על העיסוק",
-    "פרט כאן נקודת עיוורון שנייה המבוססת על העיסוק"
-  ],
+  "scope": ["לוח שקוע", "36 מודול", "כולל חציבה"],        // תגיות אפיון קצרות (אופציונלי)
+  "laborPriceEstimate": 1500,                              // מחיר עבודה מוערך בלבד (מספר)
+  "blindSpots": ["נקודת עיוורון ראשונה", "נקודת עיוורון שנייה"],
   "materials": [
-    {
-      "name": "שם החומר או האביזר",
-      "price": 25, // מחיר מוערך ליחידה או סה"כ (מספר)
-      "details": "כמות והערה (למשל: 15 מטר)",
-      "checked": true
-    }
+    { "name": "שם החומר/האביזר", "price": 25, "details": "כמות והערה (למשל: 15 מטר)", "checked": true }
+  ],
+  "tools": [
+    { "name": "פטישון עם איזמל שטוח", "checked": false }    // כלי עבודה (אופציונלי, שלב 3)
   ]
 }
 
-חשוב מאוד: אל תכתוב את ה-JSON באמצע התשובה אלא רק בסופה. החלק העיקרי של התשובה צריך להיות הסבר אנושי, חם ומקצועי בעברית, המפרט את הניתוח שלך, הטיפים וההסברים על מחירי החומרים.`;
+חשוב: ה-JSON תמיד בסוף בלבד, אף פעם לא באמצע. גוף התשובה הוא הסבר אנושי, חם ומקצועי בעברית.`;
 }
 
 // ==========================================================================

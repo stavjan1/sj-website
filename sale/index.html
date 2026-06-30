@@ -312,7 +312,13 @@
                             <p class="card-subtitle">סיכום החומרים והתמחור שהופקו מהשיחה עם ה-AI. לחץ על 'ייצא להצעה' כדי לנסח קובץ מוכן.</p>
                         </div>
                         <div class="card-body" style="overflow-y:auto; flex-grow:1; display:flex; flex-direction:column; gap:16px;">
-                            
+
+                            <!-- Card 1: project scope characterization (from AI 'scope') -->
+                            <div id="wizard-scope-card" class="wizard-dash-card" style="display:none;">
+                                <h5 class="wizard-dash-title"><i class="fa-solid fa-clipboard-list text-accent"></i> אפיון הפרויקט</h5>
+                                <div id="wizard-scope-tags" class="wizard-scope-tags"></div>
+                            </div>
+
                             <div class="results-price-summary">
                                 <span class="lbl">אומדן מחיר עבודה (עבודה בלבד):</span>
                                 <input type="number" id="wizard-labor-price" class="readonly-highlight" style="width:120px; text-align:center;" value="0" oninput="calculateWizardTotal()">
@@ -333,7 +339,14 @@
                             </div>
                             
                             <div class="ai-helper-tips" id="wizard-tips-box" style="display:none;"></div>
-                            
+
+                            <!-- Card 3: toolkit checklist (from AI 'tools' in stage 3) -->
+                            <div id="wizard-tools-card" class="wizard-dash-card" style="display:none;">
+                                <h5 class="wizard-dash-title"><i class="fa-solid fa-screwdriver-wrench text-accent"></i> ארגז הכלים</h5>
+                                <p class="card-subtitle" style="margin:0 0 8px;">כלים וציוד לעבודה — סמן בזמן העמסת הרכב בבוקר</p>
+                                <div id="wizard-tools-list" class="helper-tools-checklist"></div>
+                            </div>
+
                             <button class="btn btn-success" id="btn-export-to-quote" style="margin-top:auto; width:100%; font-size:1.05rem;" onclick="exportChatToQuote()">
                                 <i class="fa-solid fa-file-export"></i>
                                 <span>ייצא להצעת מחיר (סוכן ניסוח)</span>
