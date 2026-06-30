@@ -518,6 +518,62 @@ async function cloudLoadAndMerge(silent) {
     } catch (e) { /* non-fatal */ }
 }
 
+// ===== Login transition spinner ("pose" before entering the app) =====
+let _authLoadingShownAt = 0;
+function showAuthLoading() {
+    const o = document.getElementById('auth-loading');
+    if (o) { o.classList.add('show'); o.setAttribute('aria-hidden', 'false'); }
+    _authLoadingShownAt = Date.now();
+}
+function hideAuthLoadingAfterMin(minMs) {
+    const o = document.getElementById('auth-loading');
+    if (!o) return;
+    const wait = Math.max(0, (minMs || 2000) - (Date.now() - _authLoadingShownAt));
+    setTimeout(() => { o.classList.remove('show'); o.setAttribute('aria-hidden', 'true'); }, wait);
+}
+
+// ===== Hebrew name mojibake repair =====
+// A Google display name that was once decoded with atob() (Latin-1) comes out as
+// garbled bytes (e.g. an old login.html session). escape()+decodeURIComponent()
+// reverses that exact corruption back to proper UTF-8 Hebrew.
+function repairMojibake(s) {
+    if (!s) return s;
+    const hasHebrew = /[֐-׿]/.test(s);
+    const hasLatin1Hi = /[-ÿ]/.test(s);
+    if (hasHebrew || !hasLatin1Hi) return s; // already fine
+    try {
+        const fixed = decodeURIComponent(escape(s));
+        if (/[֐-׿]/.test(fixed)) return fixed; // recovered Hebrew
+    } catch (e) { /* not repairable */ }
+    return s;
+}
+
+// ===== Live A4 preview fit (scale the sheet so the whole page fits the pane) =====
+function fitQuotePreview() {
+    const scroller = document.querySelector('#panel-create .sheet-scroller');
+    const sheet = document.getElementById('quote-pdf-sheet');
+    if (!scroller || !sheet) return;
+    sheet.style.transform = 'none';
+    sheet.style.marginBottom = '0';
+    const avail = scroller.clientWidth - 60; // 30px scroller padding each side
+    let s = avail > 0 ? Math.min(1, avail / 794) : 1; // 794px = A4 width @96dpi
+    if (!isFinite(s) || s <= 0) s = 1;
+    sheet.style.transform = `scale(${s})`;
+    // Collapse the empty space the unscaled height would otherwise reserve.
+    sheet.style.marginBottom = `${-(1 - s) * sheet.offsetHeight}px`;
+}
+function setupQuotePreviewFit() {
+    if (window._quoteFitObs) { fitQuotePreview(); return; }
+    const scroller = document.querySelector('#panel-create .sheet-scroller');
+    const sheet = document.getElementById('quote-pdf-sheet');
+    if (!scroller || !sheet || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => fitQuotePreview());
+    ro.observe(scroller);
+    ro.observe(sheet);
+    window._quoteFitObs = ro;
+    fitQuotePreview();
+}
+
 // ===== Guest mode (local-only) and upgrade-to-Google =====
 function enterGuestMode() {
     const m = document.getElementById('guest-warning-modal');
@@ -532,12 +588,14 @@ function closeGuestWarning() {
 
 function proceedAsGuest() {
     closeGuestWarning();
+    showAuthLoading();
     localStorage.setItem('sj_logged_in_user', 'guest');
     googleAccessToken = null;
     document.getElementById('lock-screen').style.display = 'none';
     document.querySelector('.app-container').style.display = 'flex';
     initUserSession();
     updateGuestUpgradeUI();
+    hideAuthLoadingAfterMin(2000);
     showToast('נכנסת כאורח — העבודה נשמרת במכשיר זה בלבד');
 }
 
@@ -567,6 +625,7 @@ function initUserSession() {
     switchTab('projects');
     updateUserProfileUI();
     updateGuestUpgradeUI();
+    setupQuotePreviewFit();
     showAdminTabIfNeeded();
     if (isAdmin()) {
         setTimeout(() => { adminRefreshStatus(); adminRefreshUserList(); }, 300);
@@ -622,6 +681,7 @@ function switchTab(tabId) {
     }
     if (tabId === 'create') {
         ensureQuoteNumber();
+        requestAnimationFrame(fitQuotePreview); // scale the A4 preview to fit the pane
     }
     if (tabId === 'catalog') {
         renderPriceCatalog();
@@ -4079,7 +4139,10 @@ function updateUserProfileUI() {
     // Update UI elements
     // Sidebar user chip (name, role, avatar — Google photo if available)
     const chipName = document.getElementById('user-chip-name');
-    if (chipName) chipName.textContent = (localStorage.getItem('gsi_name') || displayName.split('@')[0]);
+    // Repair any mojibake left by an old atob()-based login, and persist the fix.
+    const gsiName = repairMojibake(localStorage.getItem('gsi_name'));
+    if (gsiName && gsiName !== localStorage.getItem('gsi_name')) localStorage.setItem('gsi_name', gsiName);
+    if (chipName) chipName.textContent = (gsiName || displayName.split('@')[0]);
     const chipRole = document.getElementById('user-chip-role');
     if (chipRole) chipRole.textContent = professionName;
     const chipAvatar = document.getElementById('user-chip-avatar');
@@ -4416,7 +4479,13 @@ function handleGoogleLogin() {
                     if (!userInfoRes.ok) throw new Error('Failed to fetch user info from Google');
                     const userInfo = await userInfoRes.json();
                     const email = userInfo.email;
-                    
+
+                    // Verified display name/photo come as proper UTF-8 JSON here
+                    // (no atob mojibake) — store them for the sidebar chip.
+                    if (userInfo.name) localStorage.setItem('gsi_name', userInfo.name);
+                    else localStorage.removeItem('gsi_name');
+                    if (userInfo.picture) localStorage.setItem('gsi_picture', userInfo.picture);
+
                     if (!email) {
                         showToast('שגיאה בקבלת כתובת האימייל מחשבון גוגל', 'error');
                         return;
@@ -4512,6 +4581,7 @@ async function completeGoogleLogin(email, profession, token, rememberMe) {
     const upgrading = !!window._upgradingGuest;
     const guestWork = upgrading ? buildDatabaseObject() : null;
     window._upgradingGuest = false;
+    showAuthLoading();
 
     // Always use localStorage — no cookie notice needed for functional storage
     localStorage.setItem('sj_logged_in_user', email);
@@ -4561,11 +4631,13 @@ async function completeGoogleLogin(email, profession, token, rememberMe) {
             applyDatabaseObject(guestWork);
             try { loadSettings(); filterProjectsList(); renderHistoryList(); } catch (e) {}
             await cloudSaveNow();
+            hideAuthLoadingAfterMin(2000);
             showToast('עבודתך נשמרה לחשבון Google ✓');
             return;
         }
     }
 
+    hideAuthLoadingAfterMin(2000);
     showToast(`ברוך הבא למערכת, ${email}!`);
 }
 

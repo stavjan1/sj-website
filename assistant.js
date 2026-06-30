@@ -46,6 +46,45 @@
   var userCount = 0;
   var els = {};
 
+  // ── Persist the conversation locally so a refresh doesn't wipe it ──
+  // Keyed per mode so the public assistant and the in-app helper stay separate.
+  var STORE_KEY = 'sj_assist_msgs_' + MODE;
+  function saveConvo() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(messages.slice(-40))); } catch (e) {}
+  }
+  function loadConvo() {
+    try {
+      var s = localStorage.getItem(STORE_KEY);
+      messages = s ? JSON.parse(s) : [];
+    } catch (e) { messages = []; }
+    if (!Array.isArray(messages)) messages = [];
+    userCount = messages.filter(function (m) { return m && m.role === 'user'; }).length;
+  }
+  // Re-paint the log from `messages` (on reopen after a refresh), or show the
+  // welcome bubble + suggestions when there's no saved conversation.
+  function renderConvo() {
+    if (!els.log) return;
+    els.log.innerHTML = '';
+    if (!messages.length) {
+      addBubble('bot', WELCOME);
+      renderSuggestions();
+      return;
+    }
+    clearSuggestions();
+    messages.forEach(function (m) {
+      if (m && (m.role === 'user' || m.role === 'assistant')) {
+        addBubble(m.role === 'user' ? 'user' : 'bot', m.content || '');
+      }
+    });
+  }
+  function newConversation() {
+    messages = [];
+    userCount = 0;
+    try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+    renderConvo();
+    if (els.input) els.input.focus();
+  }
+
   function el(tag, cls, html) {
     var e = document.createElement(tag);
     if (cls) e.className = cls;
@@ -75,6 +114,9 @@
           '<div class="sj-assist-titles"><span class="sj-assist-title">' + COPY.title + '</span><span class="sj-assist-sub"><span class="sj-assist-dot"></span>' + COPY.subtitle + '</span></div>' +
         '</div>' +
         '<div class="sj-assist-head-actions">' +
+          '<button class="sj-assist-iconbtn" id="sj-assist-new" title="שיחה חדשה" aria-label="שיחה חדשה">' +
+            '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>' +
+          '</button>' +
           '<button class="sj-assist-iconbtn" id="sj-assist-email" title="שליחת השיחה למייל" aria-label="שליחת השיחה למייל">' +
             '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>' +
           '</button>' +
@@ -85,6 +127,12 @@
       '</div>' +
       '<div class="sj-assist-log" id="sj-assist-log" aria-live="polite"></div>' +
       '<div class="sj-assist-suggest" id="sj-assist-suggest"></div>' +
+      (MODE === 'public'
+        ? '<div class="sj-assist-escalate" id="sj-assist-escalate" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 14px;border-top:1px solid rgba(255,255,255,0.07);">' +
+            '<span style="font-size:12px;color:#9aa6c0;">לא מרוצה מהתשובה?</span>' +
+            '<button type="button" id="sj-assist-tosj" style="background:rgba(43,116,219,0.16);color:#7fb0ff;border:1px solid rgba(43,116,219,0.45);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">שלח הודעה אל SJ ✉️</button>' +
+          '</div>'
+        : '') +
       '<div class="sj-assist-inputbar">' +
         '<textarea id="sj-assist-input" rows="1" placeholder="' + COPY.placeholder + '" aria-label="הקלדת שאלה"></textarea>' +
         '<button id="sj-assist-send" class="sj-assist-send" aria-label="שליחה">' +
@@ -103,7 +151,11 @@
     els.input = panel.querySelector('#sj-assist-input');
     els.send = panel.querySelector('#sj-assist-send');
 
-    panel.querySelector('#sj-assist-email').addEventListener('click', openEmailForm);
+    var newBtn = panel.querySelector('#sj-assist-new');
+    if (newBtn) newBtn.addEventListener('click', newConversation);
+    panel.querySelector('#sj-assist-email').addEventListener('click', function () { openEmailForm(false); });
+    var toSjBtn = panel.querySelector('#sj-assist-tosj');
+    if (toSjBtn) toSjBtn.addEventListener('click', function () { openEmailForm(true); });
     panel.querySelector('#sj-assist-close').addEventListener('click', close);
     els.send.addEventListener('click', onSend);
     els.input.addEventListener('keydown', function (e) {
@@ -113,6 +165,8 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape' && els.panel.classList.contains('open')) close();
     });
+
+    loadConvo(); // restore any saved conversation for this mode
   }
 
   function autoGrow() {
@@ -125,10 +179,7 @@
   function open() {
     els.panel.classList.add('open');
     els.launcher.classList.add('hidden');
-    if (els.log.childElementCount === 0) {
-      addBubble('bot', WELCOME);
-      renderSuggestions();
-    }
+    if (els.log.childElementCount === 0) renderConvo();
     setTimeout(function () { els.input.focus(); }, 120);
   }
 
@@ -182,16 +233,18 @@
   }
 
   // ── "Email me this conversation" ──
-  function openEmailForm() {
+  function openEmailForm(toSJ) {
     if (els.log.querySelector('.sj-assist-emailform')) return;
     if (!messages.some(function (m) { return m.role === 'user'; })) {
-      addBubble('bot', 'אשמח לשלוח לך סיכום! ספרו לי קודם במה אפשר לעזור, ואז נשלח לכם את השיחה למייל.');
+      addBubble('bot', toSJ
+        ? 'בשמחה! ספרו לי קודם במשפט במה מדובר, ואז נעביר את הפנייה ל-SJ ונחזור אליכם.'
+        : 'אשמח לשלוח לך סיכום! ספרו לי קודם במה אפשר לעזור, ואז נשלח לכם את השיחה למייל.');
       return;
     }
     clearSuggestions();
     var form = el('div', 'sj-assist-emailform');
     form.innerHTML =
-      '<div class="sj-assist-ef-title">✉️ נשמח לשלוח לך את סיכום השיחה למייל</div>' +
+      '<div class="sj-assist-ef-title">' + (toSJ ? '✉️ נעביר את שיחתך ל-SJ — נחזור אליך בהקדם' : '✉️ נשמח לשלוח לך את סיכום השיחה למייל') + '</div>' +
       '<input type="text" class="sj-assist-ef-name" placeholder="שם מלא" autocomplete="name">' +
       '<input type="email" class="sj-assist-ef-email" placeholder="כתובת מייל" autocomplete="email">' +
       '<div class="sj-assist-ef-row">' +
@@ -272,6 +325,7 @@
     clearSuggestions();
     addBubble('user', text);
     messages.push({ role: 'user', content: text });
+    saveConvo();
     els.input.value = '';
     autoGrow();
 
@@ -356,6 +410,7 @@
     }
     var reply = text || '';
     messages.push({ role: 'assistant', content: reply });
+    saveConvo();
     // When the bot hands off to SJ, surface the contact card.
     if (/SJ|סתיו|חשמלאי מוסמך|מהנדס|צרו? קשר|פרטי הקשר|053/.test(reply)) addContactCard();
     setBusy(false);
