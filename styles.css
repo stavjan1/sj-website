@@ -37,6 +37,16 @@
     scroll-behavior: smooth;
 }
 
+html, body {
+    /* Decorative absolutely/fixed-positioned elements (glows, blobs) are sized
+       for desktop and can nudge the page a few pixels wider than a narrow phone
+       viewport, creating an accidental sideways scroll that feels like content
+       is randomly shifting/clipped. This never removes real content — anything
+       still scrolls normally within its own container (e.g. the guides carousel,
+       the mobile bottom nav). */
+    overflow-x: hidden;
+}
+
 body {
     background-color: var(--color-dark-bg);
     color: var(--color-text-white);
