@@ -303,6 +303,26 @@ export async function generate(env, opts) {
       return errorResponse('שגיאת רשת מול שירות ה-AI: ' + e.message, 502);
     }
 
+    // Gemini only: a second personal key (env.GEMINI_API_KEY_2, e.g. a backup
+    // Google account) is tried immediately on a quota/auth error, before
+    // falling through to a weaker provider further down the chain. This is
+    // the same "retry on error" idiom already used for the whole provider
+    // chain below -- just one level deeper, since only Gemini has 2 keys.
+    // No shared "requests used today" counter: that would need cross-request
+    // state (a KV/Durable Object counter, race conditions between concurrent
+    // visitors, timezone-aware daily resets) to solve a problem this simpler
+    // per-request retry already handles.
+    if (name === 'gemini' && RETRIABLE.includes(upstream.status) && env.GEMINI_API_KEY_2 && env.GEMINI_API_KEY_2 !== key) {
+      try { await upstream.text(); } catch (e) {} // drain the failed attempt
+      try {
+        const retryUpstream = await callOnce(name, env.GEMINI_API_KEY_2, { ...opts, model: modelForThis });
+        if (!RETRIABLE.includes(retryUpstream.status)) {
+          return normalize(name, retryUpstream, !!opts.stream, { 'X-AI-Provider': name });
+        }
+        upstream = retryUpstream; // both Gemini keys failed; fall through to the next provider below
+      } catch (e) { /* keep the original upstream response, fall through below */ }
+    }
+
     if (RETRIABLE.includes(upstream.status) && i < order.length - 1) {
       try { await upstream.text(); } catch (e) {} // drain before next attempt
       continue;

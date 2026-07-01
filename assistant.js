@@ -366,6 +366,31 @@
       });
   }
 
+  // The server appends this exact marker (on its own line) only when the
+  // system prompt decided this is a genuine complex/legal referral or a
+  // deliberate soft-promotion — never on an ordinary safety mention like
+  // "חשמלאי מוסמך". Keeps the contact card from popping up on every reply.
+  var CONTACT_MARKER = '[[SJ_CONTACT]]';
+
+  function stripContactMarker(text) {
+    var idx = text.indexOf(CONTACT_MARKER);
+    if (idx === -1) return { visible: text, hasMarker: false };
+    return { visible: text.slice(0, idx).replace(/\s+$/, ''), hasMarker: true };
+  }
+
+  // While streaming, hold back a trailing partial prefix of the marker (e.g.
+  // "[[SJ_CON") so it never flashes on screen before the closing "]]" arrives.
+  function liveVisibleText(full) {
+    var idx = full.indexOf(CONTACT_MARKER);
+    if (idx !== -1) return full.slice(0, idx).replace(/\s+$/, '');
+    for (var len = Math.min(CONTACT_MARKER.length - 1, full.length); len > 0; len--) {
+      if (full.slice(full.length - len) === CONTACT_MARKER.slice(0, len)) {
+        return full.slice(0, full.length - len).replace(/\s+$/, '');
+      }
+    }
+    return full;
+  }
+
   function consumeStream(res, typingEl) {
     var reader = res.body.getReader();
     var decoder = new TextDecoder();
@@ -390,7 +415,7 @@
             if (d) {
               full += d;
               if (!bubble) { if (typingEl && typingEl.parentNode) typingEl.remove(); bubble = addBubble('bot', ''); }
-              bubble.textContent = full;
+              bubble.textContent = liveVisibleText(full);
               scrollDown();
             }
           } catch (e) { /* ignore partial */ }
@@ -402,17 +427,19 @@
   }
 
   function finishReply(bubbleOrTyping, text) {
+    var parsed = stripContactMarker(text || '');
+    var reply = parsed.visible;
     if (bubbleOrTyping && bubbleOrTyping.classList && bubbleOrTyping.classList.contains('sj-assist-typing')) {
       if (bubbleOrTyping.parentNode) bubbleOrTyping.remove();
-      bubbleOrTyping = addBubble('bot', text || '');
+      bubbleOrTyping = addBubble('bot', reply);
     } else if (bubbleOrTyping) {
-      bubbleOrTyping.textContent = text || bubbleOrTyping.textContent;
+      bubbleOrTyping.textContent = reply || bubbleOrTyping.textContent;
     }
-    var reply = text || '';
     messages.push({ role: 'assistant', content: reply });
     saveConvo();
-    // When the bot hands off to SJ, surface the contact card.
-    if (/SJ|סתיו|חשמלאי מוסמך|מהנדס|צרו? קשר|פרטי הקשר|053/.test(reply)) addContactCard();
+    // Only the server's explicit marker surfaces the contact card now — not a
+    // guess based on words like "מהנדס"/"SJ" that show up in ordinary replies.
+    if (parsed.hasMarker) addContactCard();
     setBusy(false);
     scrollDown();
     els.input.focus();

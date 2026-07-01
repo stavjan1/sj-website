@@ -109,7 +109,7 @@ export async function onRequestPost(context) {
     sentToVisitor,
     message: sentToVisitor
       ? 'הסיכום נשלח אליך למייל ✓ נשמח לעזור בכל שאלה.'
-      : 'קיבלנו את הפנייה ✓ נשלח אליך סיכום ונחזור אליך בהקדם.',
+      : 'קיבלנו את הפנייה ✓ ניצור איתך קשר בהקדם.',
   });
 }
 

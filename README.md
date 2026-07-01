@@ -36,6 +36,7 @@ functions/api/
 | Variable | Required | Purpose |
 |---|---|---|
 | `GEMINI_API_KEY` | recommended (primary) | Google AI Studio key — primary AI engine (free tier). aistudio.google.com/apikey |
+| `GEMINI_API_KEY_2` | optional | A second Gemini key (e.g. a backup Google account). Tried automatically, per-request, the moment the primary key hits a quota/auth error — before falling through to DeepSeek/Grok/Cloudflare. No shared "requests used today" counter needed. |
 | `DEEPSEEK_API_KEY` | recommended (fallback) | DeepSeek key — automatic fallback when Gemini is out of quota. platform.deepseek.com/api_keys |
 | `XAI_API_KEY` | optional | xAI/Grok key (third option). |
 | `AI_PROVIDER` | optional | Force a default provider (`gemini` \| `deepseek` \| `grok`). Default: gemini. |
