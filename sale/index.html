@@ -678,7 +678,7 @@
                                     התחבר עם Google כדי לשמור את כל מה שעשית לחשבון האישי שלך, ולהיכנס מכל מכשיר.
                                 </p>
                                 <button type="button" class="btn-google-login" onclick="connectGoogleToSaveGuestWork()">
-                                    <img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2048%2048%22%3E%3Cpath%20fill%3D%22%23FFC107%22%20d%3D%22M43.611%2020.083H42V20H24v8h11.303c-1.649%204.657-6.08%208-11.303%208-6.627%200-12-5.373-12-12s5.373-12%2012-12c3.059%200%205.842%201.154%207.961%203.039l5.657-5.657C34.046%206.053%2029.268%204%2024%204%2012.955%204%204%2012.955%204%2024s8.955%2020%2020%2020%2020-8.955%2020-20c0-1.341-.138-2.65-.389-3.917z%22%2F%3E%3Cpath%20fill%3D%22%23FF3D00%22%20d%3D%22M6.306%2014.691l6.571%204.819C14.655%2015.108%2018.961%2012%2024%2012c3.059%200%205.842%201.154%207.961%203.039l5.657-5.657C34.046%206.053%2029.268%204%2024%204%2016.318%204%209.656%208.337%206.306%2014.691z%22%2F%3E%3Cpath%20fill%3D%22%234CAF50%22%20d%3D%22M24%2044c5.166%200%209.86-1.977%2013.409-5.192l-6.19-5.238C29.211%2035.091%2026.715%2036%2024%2036c-5.202%200-9.619-3.317-11.283-7.946l-6.522%205.025C9.505%2039.556%2016.227%2044%2024%2044z%22%2F%3E%3Cpath%20fill%3D%22%231976D2%22%20d%3D%22M43.611%2020.083H42V20H24v8h11.303c-.792%202.237-2.231%204.166-4.087%205.571.001-.001.002-.001.003-.002l6.19%205.238C36.971%2039.205%2044%2034%2044%2024c0-1.341-.138-2.65-.389-3.917z%22%2F%3E%3C%2Fsvg%3E" alt="G" style="width:20px;height:20px;">
+                                    <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
                                     <span>שמור את עבודתי — התחברות עם Google</span>
                                 </button>
                             </div>
@@ -750,12 +750,13 @@
                                         <div id="bg-opt-none" class="bg-option active" onclick="selectSystemBackground('none', 'bg-opt-none')" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid var(--color-accent); display:flex; align-items:center; justify-content:center; background:#1e293b; color:#fff;" title="ללא רקע (ברירת מחדל)">
                                             <i class="fa-solid fa-ban"></i>
                                         </div>
-                                        <!-- Option 1: Nebula Glow -->
-                                        <div class="bg-option" onclick="selectSystemBackground('https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?q=80&w=600', this)" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid transparent; background-image:url('https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?q=80&w=100'); background-size:cover; background-position:center;" title="נביולה זוהרת"></div>
-                                        <!-- Option 2: Dark Cyber -->
-                                        <div class="bg-option" onclick="selectSystemBackground('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=600', this)" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid transparent; background-image:url('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?q=80&w=100'); background-size:cover; background-position:center;" title="סייבר כהה"></div>
-                                        <!-- Option 3: Deep Forest -->
-                                        <div class="bg-option" onclick="selectSystemBackground('https://images.unsplash.com/photo-1511497584788-876760111969?q=80&w=600', this)" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid transparent; background-image:url('https://images.unsplash.com/photo-1511497584788-876760111969?q=80&w=100'); background-size:cover; background-position:center;" title="יער עמוק"></div>
+                                        <!-- Local cinematic backgrounds (optimized) -->
+                                        <div class="bg-option" onclick="selectSystemBackground('backgrounds/bg-1.jpeg', this)" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid transparent; background-image:url('backgrounds/bg-1.jpeg'); background-size:cover; background-position:center;" title="תחנת משנה"></div>
+                                        <div class="bg-option" onclick="selectSystemBackground('backgrounds/bg-2.jpeg', this)" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid transparent; background-image:url('backgrounds/bg-2.jpeg'); background-size:cover; background-position:center;" title="שרטוטי חשמל"></div>
+                                        <div class="bg-option" onclick="selectSystemBackground('backgrounds/bg-3.jpeg', this)" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid transparent; background-image:url('backgrounds/bg-3.jpeg'); background-size:cover; background-position:center;" title="נוף קולנועי"></div>
+                                        <div class="bg-option" onclick="selectSystemBackground('backgrounds/bg-4.jpeg', this)" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid transparent; background-image:url('backgrounds/bg-4.jpeg'); background-size:cover; background-position:center;" title="קולנועי 1"></div>
+                                        <div class="bg-option" onclick="selectSystemBackground('backgrounds/bg-5.jpeg', this)" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid transparent; background-image:url('backgrounds/bg-5.jpeg'); background-size:cover; background-position:center;" title="קולנועי 2"></div>
+                                        <div class="bg-option" onclick="selectSystemBackground('backgrounds/bg-6.jpeg', this)" style="height:46px; border-radius:8px; cursor:pointer; border:2px solid transparent; background-image:url('backgrounds/bg-6.jpeg'); background-size:cover; background-position:center;" title="קולנועי 3"></div>
                                     </div>
                                 </div>
                             </div>
@@ -1231,7 +1232,7 @@
 
             <!-- Primary: Google Login -->
             <button type="button" class="btn-google-login" onclick="handleGoogleLogin()">
-                <img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2048%2048%22%3E%3Cpath%20fill%3D%22%23FFC107%22%20d%3D%22M43.611%2020.083H42V20H24v8h11.303c-1.649%204.657-6.08%208-11.303%208-6.627%200-12-5.373-12-12s5.373-12%2012-12c3.059%200%205.842%201.154%207.961%203.039l5.657-5.657C34.046%206.053%2029.268%204%2024%204%2012.955%204%204%2012.955%204%2024s8.955%2020%2020%2020%2020-8.955%2020-20c0-1.341-.138-2.65-.389-3.917z%22%2F%3E%3Cpath%20fill%3D%22%23FF3D00%22%20d%3D%22M6.306%2014.691l6.571%204.819C14.655%2015.108%2018.961%2012%2024%2012c3.059%200%205.842%201.154%207.961%203.039l5.657-5.657C34.046%206.053%2029.268%204%2024%204%2016.318%204%209.656%208.337%206.306%2014.691z%22%2F%3E%3Cpath%20fill%3D%22%234CAF50%22%20d%3D%22M24%2044c5.166%200%209.86-1.977%2013.409-5.192l-6.19-5.238C29.211%2035.091%2026.715%2036%2024%2036c-5.202%200-9.619-3.317-11.283-7.946l-6.522%205.025C9.505%2039.556%2016.227%2044%2024%2044z%22%2F%3E%3Cpath%20fill%3D%22%231976D2%22%20d%3D%22M43.611%2020.083H42V20H24v8h11.303c-.792%202.237-2.231%204.166-4.087%205.571.001-.001.002-.001.003-.002l6.19%205.238C36.971%2039.205%2044%2034%2044%2024c0-1.341-.138-2.65-.389-3.917z%22%2F%3E%3C%2Fsvg%3E" alt="G" style="width:20px;height:20px;">
+                <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
                 <span>כניסה עם חשבון Google</span>
             </button>
 
@@ -1289,12 +1290,21 @@
             </div>
             <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
                 <button type="button" class="btn-google-login" onclick="closeGuestWarning(); handleGoogleLogin();">
-                    <img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2048%2048%22%3E%3Cpath%20fill%3D%22%23FFC107%22%20d%3D%22M43.611%2020.083H42V20H24v8h11.303c-1.649%204.657-6.08%208-11.303%208-6.627%200-12-5.373-12-12s5.373-12%2012-12c3.059%200%205.842%201.154%207.961%203.039l5.657-5.657C34.046%206.053%2029.268%204%2024%204%2012.955%204%204%2012.955%204%2024s8.955%2020%2020%2020%2020-8.955%2020-20c0-1.341-.138-2.65-.389-3.917z%22%2F%3E%3Cpath%20fill%3D%22%23FF3D00%22%20d%3D%22M6.306%2014.691l6.571%204.819C14.655%2015.108%2018.961%2012%2024%2012c3.059%200%205.842%201.154%207.961%203.039l5.657-5.657C34.046%206.053%2029.268%204%2024%204%2016.318%204%209.656%208.337%206.306%2014.691z%22%2F%3E%3Cpath%20fill%3D%22%234CAF50%22%20d%3D%22M24%2044c5.166%200%209.86-1.977%2013.409-5.192l-6.19-5.238C29.211%2035.091%2026.715%2036%2024%2036c-5.202%200-9.619-3.317-11.283-7.946l-6.522%205.025C9.505%2039.556%2016.227%2044%2024%2044z%22%2F%3E%3Cpath%20fill%3D%22%231976D2%22%20d%3D%22M43.611%2020.083H42V20H24v8h11.303c-.792%202.237-2.231%204.166-4.087%205.571.001-.001.002-.001.003-.002l6.19%205.238C36.971%2039.205%2044%2034%2044%2024c0-1.341-.138-2.65-.389-3.917z%22%2F%3E%3C%2Fsvg%3E" alt="G" style="width:20px;height:20px;">
+                    <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
                     <span>התחברות עם Google</span>
                 </button>
                 <button type="button" class="btn btn-secondary btn-full" onclick="proceedAsGuest()">המשך בכל זאת כאורח</button>
             </div>
         </div>
+    </div>
+
+    <!-- Login transition overlay (brief branded spinner after sign-in / guest entry) -->
+    <div id="auth-loading" class="auth-loading" aria-hidden="true">
+        <div class="auth-loading-logo">
+            <svg viewBox="0 0 100 100" width="32" height="32" fill="currentColor"><path d="M40 82 L62 46 L46 46 L58 14 L33 52 L50 52 Z"/></svg>
+        </div>
+        <div class="auth-loading-text">מתחבר לסביבת העבודה…</div>
+        <div class="auth-loading-spin"></div>
     </div>
 
     <!-- Notification Toast -->

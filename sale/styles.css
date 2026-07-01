@@ -133,8 +133,15 @@ body {
 .nav-menu {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    flex-grow: 1;
+    gap: 9px;
+    flex: 1 1 auto;
+    /* min-height:0 lets this flex item shrink below its content height so it
+       scrolls internally instead of pushing the footer (logout) off-screen. */
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 2px 2px;
+    margin: 0 -2px;
 }
 
 .nav-btn {
@@ -203,8 +210,11 @@ body {
 
 .sidebar-footer {
     padding-top: 14px;
+    margin-top: 10px;
     border-top: 1px solid var(--border-color);
     text-align: center;
+    /* Never compress or hide — the logout lives here. */
+    flex-shrink: 0;
 }
 
 .version {
@@ -225,7 +235,7 @@ body {
 /* Content Panels */
 .content-panel {
     display: none;
-    padding: 32px 40px;
+    padding: 36px 46px;
     min-height: 100%;
     animation: fadeIn 0.25s ease-in-out;
 }
@@ -1930,7 +1940,9 @@ textarea#ai-input {
         overflow-y: auto;
     }
 
-    /* Sidebar as Bottom Navigation Bar */
+    /* Sidebar as Bottom Navigation Bar — horizontally scrollable so every tab
+       stays reachable instead of being squeezed/cut off (8+ tabs don't fit a
+       phone width at readable size). */
     .sidebar {
         width: 100%;
         height: 65px;
@@ -1939,24 +1951,38 @@ textarea#ai-input {
         left: 0;
         right: 0;
         flex-direction: row;
-        justify-content: space-around;
-        padding: 6px 4px;
+        justify-content: flex-start;
+        align-items: center;
+        padding: 6px 10px;
         background-color: #070a13;
         border-top: 1px solid var(--border-color);
         border-left: none;
         z-index: 1000;
         box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
     }
+    .sidebar::-webkit-scrollbar { display: none; }
 
     .sidebar-logo,
     .sidebar-footer {
         display: none !important;
     }
 
+    .sidebar-home-link {
+        flex-shrink: 0;
+        margin-bottom: 0;
+        padding: 8px 12px;
+        white-space: nowrap;
+    }
+
     .nav-menu {
         flex-direction: row;
-        justify-content: space-around;
-        width: 100%;
+        justify-content: flex-start;
+        width: max-content;
+        flex-shrink: 0;
         gap: 2px;
     }
 
@@ -1965,14 +1991,17 @@ textarea#ai-input {
         align-items: center;
         justify-content: center;
         gap: 3px;
-        padding: 4px;
-        font-size: 0.72rem;
+        padding: 6px 10px;
+        font-size: 0.7rem;
         text-align: center;
         width: auto;
-        flex-grow: 1;
+        min-width: 60px;
+        flex-grow: 0;
+        flex-shrink: 0;
         background: none;
         border-radius: 6px;
         color: var(--text-secondary);
+        white-space: nowrap;
     }
 
     .nav-btn i {
@@ -2177,6 +2206,36 @@ textarea#ai-input {
     justify-content: center;
     padding: 20px;
 }
+
+/* Login transition overlay — a brief branded spinner shown right after sign-in
+   or guest entry, before the workspace is revealed. */
+.auth-loading {
+    position: fixed;
+    inset: 0;
+    z-index: 100001;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    background: radial-gradient(circle at center, rgba(15,23,42,0.97) 0%, rgba(2,6,23,0.99) 100%);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+.auth-loading.show { display: flex; }
+.auth-loading-logo {
+    width: 60px; height: 60px; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #2b74db, #f0c040);
+    box-shadow: 0 12px 36px rgba(43,116,219,0.45); color: #fff;
+}
+.auth-loading-text { color: #e8edf8; font-weight: 600; font-size: 1rem; }
+.auth-loading-spin {
+    width: 30px; height: 30px; border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.14); border-top-color: #4d8ef0;
+    animation: auth-spin 0.8s linear infinite;
+}
+@keyframes auth-spin { to { transform: rotate(360deg); } }
 
 .lock-card {
     background: rgba(30, 41, 59, 0.45);
@@ -2606,6 +2665,29 @@ textarea#ai-input {
     .sj-assist-launcher { bottom: 22px; left: 22px; }
 }
 
+/* Lock screen on small phones: a floating centered card wastes ~half the
+   screen in empty space above/below it. Switch to a top-aligned, edge-to-edge
+   page (closer to how native apps like Yad2 do sign-in) so it reads as
+   compact instead of a tiny card lost in a sea of dark background. */
+@media (max-width: 480px) {
+    .lock-screen-container {
+        align-items: flex-start;
+        padding: 0;
+    }
+    .lock-card {
+        max-width: 100%;
+        min-height: 100vh;
+        border-radius: 0;
+        border: none;
+        box-shadow: none;
+        padding: 64px 22px 28px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+    }
+    .lock-logo { margin-bottom: 22px; }
+}
+
 /* ===== Light Theme & Custom Background Support ===== */
 
 /* Light Theme Variables */
@@ -2730,6 +2812,12 @@ body.has-custom-bg .app-container {
 
 body.has-custom-bg.light-theme .app-container {
     background: rgba(240, 242, 245, 0.55);
+}
+
+/* The work area is opaque by default and would hide the body background — make
+   it transparent so the chosen cinematic background actually shows through. */
+body.has-custom-bg .main-content {
+    background-color: transparent;
 }
 
 body.has-custom-bg .sidebar {

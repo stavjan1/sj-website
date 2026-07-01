@@ -1835,15 +1835,15 @@ img {
     margin-top: 36px;
 }
 
-/* Medium desktop: hide low-priority nav links so staff button never gets clipped */
+/* Medium desktop: tighten nav spacing so every link fits without clipping the
+   staff button (previously these 3 links were hidden here, which made the home
+   page nav look incomplete). */
 @media (min-width: 992px) and (max-width: 1300px) {
-    #link-articles,
-    #link-testimonials,
-    #link-faq {
-        display: none;
-    }
     .desktop-nav {
         gap: 10px;
+    }
+    .desktop-nav .nav-link {
+        font-size: 0.84rem;
     }
 }
 
