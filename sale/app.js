@@ -96,7 +96,7 @@ function toggleManualLogin() {
 // AI model selection + usage meter
 // ==========================================================================
 // Selected AI as a "provider|model" value (matches the dropdown). Default: Gemini.
-let selectedGeminiModel = 'gemini|gemini-2.0-flash';
+let selectedGeminiModel = 'gemini|gemini-2.5-flash';
 const MODEL_LABELS = {
     'gemini|gemini-2.0-flash': 'Gemini 2.0 Flash',
     'gemini|gemini-2.5-flash': 'Gemini 2.5 Flash',
@@ -107,7 +107,7 @@ const MODEL_LABELS = {
 // Each provider's default "provider|model" value — used when an automatic
 // server-side fallback switches us to a different provider.
 const PROVIDER_DEFAULT_VALUE = {
-    gemini: 'gemini|gemini-2.0-flash',
+    gemini: 'gemini|gemini-2.5-flash',
     deepseek: 'deepseek|deepseek-chat',
     grok: 'grok|grok-2-latest',
 };
@@ -870,9 +870,9 @@ function loadProject(id, navigate = true) {
     localStorage.setItem(getStorageKey('sj_active_project_id'), id);
 
     // Reset model to default each time a project is loaded
-    changeGeminiModel('gemini|gemini-2.0-flash');
+    changeGeminiModel('gemini|gemini-2.5-flash');
     const modelSel = document.getElementById('gemini-model-select');
-    if (modelSel) modelSel.value = 'gemini|gemini-2.0-flash';
+    if (modelSel) modelSel.value = 'gemini|gemini-2.5-flash';
 
     updateActiveProjectBanner(proj);
     filterProjectsList();

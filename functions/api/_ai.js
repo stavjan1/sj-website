@@ -20,7 +20,12 @@ export const PROVIDERS = {
     label: 'Gemini',
     kind: 'gemini',
     keyEnv: ['GEMINI_API_KEY'],
-    defaultModel: 'gemini-2.0-flash',
+    // gemini-2.0-flash was deprecated by Google on 2026-06-01 — requesting it
+    // can surface as a misleading "429 limit: 0" free-tier quota error instead
+    // of a clear "model retired" message. gemini-2.5-flash is the current
+    // free-tier-capable default (2.0-flash kept in the list for compatibility
+    // if a caller explicitly asks for it).
+    defaultModel: 'gemini-2.5-flash',
     models: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'],
   },
   deepseek: {
