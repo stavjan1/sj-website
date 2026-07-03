@@ -2684,21 +2684,27 @@ async function regenerateLastAnswer() {
         return;
     }
     const activeProject = projectsList.find(p => p.id === activeProjectId);
-    if (!activeProject || !activeProject.chatHistory || activeProject.chatHistory.length === 0) {
+    if (!activeProject) return;
+
+    // Mode-aware: regenerate in whichever conversation is on screen.
+    const planning = activeChatMode === 'plan';
+    const history = planning ? ensurePlanHistory(activeProject) : activeProject.chatHistory;
+    if (!history || history.length === 0) {
         showToast('אין עדיין תשובה לנסח מחדש', 'error');
         return;
     }
     // Remove a trailing model reply (if present) so we re-answer the last user turn.
-    if (activeProject.chatHistory[activeProject.chatHistory.length - 1].role === 'model') {
-        activeProject.chatHistory.pop();
+    if (history[history.length - 1].role === 'model') {
+        history.pop();
     }
-    if (!activeProject.chatHistory.some(m => m.role === 'user')) {
+    if (!history.some(m => m.role === 'user')) {
         showToast('אין הודעת משתמש לנסח עליה תשובה', 'error');
         return;
     }
     saveProjects();
-    renderChatHistory(activeProject.chatHistory);
-    await runPricingAgent(activeProject);
+    renderChatHistory(history);
+    if (planning) await runPlanningAgent(activeProject);
+    else await runPricingAgent(activeProject);
 }
 
 // ── Streaming + chat-search helpers ──
