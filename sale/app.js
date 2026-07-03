@@ -287,9 +287,13 @@ async function callAI(value, payload) {
     const [provider, model] = String(value || selectedGeminiModel).split('|');
     let proxyRes = null;
     try {
+        // Identify the caller so the server counts the daily quota per Google
+        // account (guests are counted per IP; admin is exempt server-side).
+        const headers = { 'Content-Type': 'application/json' };
+        if (googleAccessToken && !isGuestUser()) headers['Authorization'] = 'Bearer ' + googleAccessToken;
         proxyRes = await fetch('/api/chat', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({ provider, model, ...payload })
         });
     } catch (e) {
@@ -1551,7 +1555,7 @@ function savePriceCatalog(sync = true) {
 // DeepSeek and Gemini then serve the repeated catalog from cache (~10x cheaper),
 // which is what makes "resend every message" effectively free. Capped so a huge
 // catalog never blows up the prompt.
-function getPriceCatalogPromptBlock() {
+function getPriceCatalogPromptBlock(contextText) {
     // Merge: the shared system catalog is the baseline; a personal item with the
     // same (case-insensitive) name overrides it. Personal-only items are added.
     const merged = new Map();
@@ -1562,8 +1566,35 @@ function getPriceCatalogPromptBlock() {
         if (it && it.name) merged.set(String(it.name).trim().toLowerCase(), it); // personal wins
     });
     if (merged.size === 0) return '';
-    const sorted = [...merged.values()].sort((a, b) => String(a.name).localeCompare(String(b.name), 'he'));
-    const lines = sorted.slice(0, 150).map(it => `• ${it.name}: ${it.price}${it.unit ? ' ' + it.unit : ''}`);
+
+    const all = [...merged.values()];
+    let chosen;
+    if (all.length <= 150) {
+        // Small catalog: send the whole thing in a STABLE sorted order, so the
+        // repeated identical prompt prefix is served from the provider's cache.
+        chosen = all;
+    } else {
+        // Large catalog (e.g. a full supplier import): no second AI needed —
+        // a cheap lexical match against the recent conversation picks the
+        // relevant items. The user's PERSONAL items always ride along (their
+        // own trade prices, usually few and always relevant).
+        const personalKeys = new Set((priceCatalog || []).filter(it => it && it.name)
+            .map(it => String(it.name).trim().toLowerCase()));
+        const personal = all.filter(it => personalKeys.has(String(it.name).trim().toLowerCase())).slice(0, 60);
+        const rest = all.filter(it => !personalKeys.has(String(it.name).trim().toLowerCase()));
+        const tokens = String(contextText || '').toLowerCase().split(/[^א-תa-z0-9]+/).filter(t => t.length >= 2);
+        const scored = rest.map(it => {
+            const name = String(it.name).toLowerCase();
+            let score = 0;
+            for (const t of tokens) if (name.includes(t)) score++;
+            return { it, score };
+        }).filter(s => s.score > 0).sort((a, b) => b.score - a.score);
+        chosen = personal.concat(scored.slice(0, 150 - personal.length).map(s => s.it));
+        if (chosen.length === 0) chosen = all.slice(0, 150); // no context match — generic slice
+    }
+
+    const sorted = chosen.sort((a, b) => String(a.name).localeCompare(String(b.name), 'he'));
+    const lines = sorted.map(it => `• ${it.name}: ${it.price}${it.unit ? ' ' + it.unit : ''}`);
     return `\n\nמאגר מחירי ספקים (₪) — מקור אמת למחירי חומרים, התאם כמויות/יחידות; פריט שאינו ברשימה — אמוד כרגיל וציין שזו הערכה:\n` + lines.join('\n');
 }
 
@@ -2181,7 +2212,12 @@ async function runPricingAgent(activeProject, promptChars) {
     const effectiveModel = getEffectiveModel();
 
     showTypingIndicator(true);
-    const systemInstructionText = getProfessionSystemInstruction() + getPriceCatalogPromptBlock();
+    // Recent user turns steer which catalog items are worth sending (only
+    // matters when the merged catalog exceeds the 150-line prompt budget).
+    const recentUserText = (activeProject.chatHistory || [])
+        .filter(m => m.role === 'user').slice(-2)
+        .map(m => (m.parts && m.parts[0] && m.parts[0].text) || '').join(' ');
+    const systemInstructionText = getProfessionSystemInstruction() + getPriceCatalogPromptBlock(recentUserText);
     const _t0 = performance.now();
     setQuotaCharging(true);
     try {
@@ -3665,215 +3701,15 @@ function getCloudDatabaseFilename() {
     return `.sys_config_${activeUser.toLowerCase().replace(/[^a-z0-9_]/g, '_')}.dat`;
 }
 
+// The legacy Google Drive sync engine was retired — Cloudflare KV is the cloud
+// copy. The two entry points below are kept as thin redirects so every old
+// "sync with Drive" call site now syncs with KV instead.
 async function syncDatabaseFromDrive(silent = false) {
-    if (!googleAccessToken) return;
-    
-    setSyncLoading(true);
-    
-    try {
-        const syncFolderId = await getOrCreateSyncFolder();
-        if (!syncFolderId) {
-            setSyncLoading(false);
-            return;
-        }
-        
-        const dbFilename = getCloudDatabaseFilename();
-        const query = `name = '${dbFilename}' and '${syncFolderId}' in parents and trashed = false`;
-        const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&access_token=${googleAccessToken}`);
-        
-        if (!res.ok) throw new Error('Failed to query sync file');
-        
-        const data = await res.json();
-        if (data.files && data.files.length > 0) {
-            const fileId = data.files[0].id;
-            
-            const downloadRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-                headers: { 'Authorization': `Bearer ${googleAccessToken}` }
-            });
-            
-            if (downloadRes.ok) {
-                const cloudData = await downloadRes.json();
-                
-                const localTimestamp = parseInt(localStorage.getItem(getStorageKey('sj_db_last_updated')) || '0');
-                const cloudTimestamp = cloudData.lastUpdated || 0;
-                
-                if (cloudTimestamp > localTimestamp) {
-                    // Snapshot the local data before the cloud copy replaces it,
-                    // so a stale/unexpected cloud overwrite is always recoverable.
-                    backupLocalSnapshot('before cloud sync');
-                    if (cloudData.settings) {
-                        appState.settings = cloudData.settings;
-                        localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
-                    }
-                    if (cloudData.history) {
-                        appState.history = cloudData.history;
-                        localStorage.setItem(getStorageKey('sj_quote_history'), JSON.stringify(appState.history));
-                    }
-                    if (cloudData.projects) {
-                        projectsList = cloudData.projects;
-                        localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList));
-                    }
-                    if (cloudData.trash) {
-                        trashedProjectsList = cloudData.trash;
-                        localStorage.setItem(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList));
-                    }
-                    if (cloudData.catalog) {
-                        priceCatalog = cloudData.catalog;
-                        localStorage.setItem(getStorageKey('sj_price_catalog'), JSON.stringify(priceCatalog));
-                    }
-                    if (cloudData.users && cloudData.users.length > 0) {
-                        const currentUsers = JSON.parse(localStorage.getItem('sj_app_users') || '[]');
-                        // Merge: keep local entries for emails not in cloud, use cloud entries otherwise
-                        const merged = [...cloudData.users];
-                        currentUsers.forEach(cu => {
-                            if (!merged.find(m => m.username.toLowerCase() === cu.username.toLowerCase())) {
-                                merged.push(cu);
-                            }
-                        });
-                        localStorage.setItem('sj_app_users', JSON.stringify(merged));
-                    }
-                    
-                    localStorage.setItem(getStorageKey('sj_db_last_updated'), cloudTimestamp.toString());
-                    
-                    // Reload views
-                    loadSettings();
-                    filterProjectsList();
-                    renderHistoryList();
-                    
-                    if (activeProjectId) {
-                        loadProject(activeProjectId, false);
-                    }
-                    
-                    if (!silent) {
-                        showToast('נתוני האפליקציה סונכרנו מהענן בהצלחה!');
-                    }
-                } else if (localTimestamp > cloudTimestamp) {
-                    await syncDatabaseToDrive(true);
-                } else {
-                    if (!silent) showToast('הנתונים בענן כבר מעודכנים');
-                }
-            }
-        } else {
-            // No sync file found — try to recover old JSON files before first write
-            const recovered = await scanForLegacyData(syncFolderId);
-            if (recovered) {
-                if (recovered.settings) {
-                    appState.settings = Object.assign({}, appState.settings, recovered.settings);
-                    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
-                }
-                if (recovered.history && recovered.history.length > 0) {
-                    appState.history = recovered.history;
-                    localStorage.setItem(getStorageKey('sj_quote_history'), JSON.stringify(appState.history));
-                }
-                if (recovered.projects && recovered.projects.length > 0) {
-                    projectsList = recovered.projects;
-                    localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList));
-                }
-                loadSettings();
-                filterProjectsList();
-                renderHistoryList();
-                if (!silent) showToast('שוחזרו נתונים ישנים מהדרייב!');
-            }
-            await syncDatabaseToDrive(true);
-        }
-    } catch (e) {
-        console.error('Error syncing from cloud:', e);
-        if (!silent) showToast('שגיאה בסנכרון מהענן: ' + e.message, 'error');
-    } finally {
-        setSyncLoading(false);
-    }
+    await cloudLoadAndMerge(silent);
 }
 
 async function syncDatabaseToDrive(silent = true) {
-    if (!googleAccessToken) return;
-    
-    setSyncLoading(true);
-    
-    try {
-        const syncFolderId = await getOrCreateSyncFolder();
-        if (!syncFolderId) {
-            setSyncLoading(false);
-            return;
-        }
-        
-        const dbFilename = getCloudDatabaseFilename();
-        let fileId = null;
-        const query = `name = '${dbFilename}' and '${syncFolderId}' in parents and trashed = false`;
-        const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)&access_token=${googleAccessToken}`);
-        if (res.ok) {
-            const data = await res.json();
-            if (data.files && data.files.length > 0) {
-                fileId = data.files[0].id;
-            }
-        }
-
-        // SAFETY: never overwrite an existing cloud backup with a fully-empty
-        // local dataset. This guards against a corrupt/blank local load (or a
-        // fresh login) silently wiping the user's cloud data.
-        const localEmpty = (appState.history || []).length === 0
-            && (projectsList || []).length === 0
-            && (trashedProjectsList || []).length === 0
-            && (priceCatalog || []).length === 0;
-        if (localEmpty && fileId) {
-            console.warn('Sync push skipped: local dataset is empty but a cloud backup exists — not overwriting.');
-            setSyncLoading(false);
-            return;
-        }
-
-        const timestamp = Date.now();
-        localStorage.setItem(getStorageKey('sj_db_last_updated'), timestamp.toString());
-        
-        const usersRaw = localStorage.getItem('sj_app_users');
-        const payload = {
-            settings: appState.settings,
-            history: appState.history,
-            projects: projectsList,
-            trash: trashedProjectsList,
-            catalog: priceCatalog,
-            users: usersRaw ? JSON.parse(usersRaw) : [],
-            lastUpdated: timestamp
-        };
-        
-        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-        
-        const metadata = {
-            name: dbFilename,
-            mimeType: 'application/json'
-        };
-        
-        if (!fileId) {
-            metadata.parents = [syncFolderId];
-        }
-        
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-        form.append('file', blob);
-        
-        const uploadUrl = fileId 
-            ? `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`
-            : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
-            
-        const method = fileId ? 'PATCH' : 'POST';
-        
-        const uploadRes = await fetch(uploadUrl, {
-            method: method,
-            headers: {
-                'Authorization': `Bearer ${googleAccessToken}`
-            },
-            body: form
-        });
-        
-        if (!uploadRes.ok) throw new Error('Upload request failed');
-        
-        if (!silent) {
-            showToast('נתוני האפליקציה נשמרו וסונכרנו לענן בהצלחה!');
-        }
-    } catch (e) {
-        console.error('Error syncing to cloud:', e);
-        if (!silent) showToast('שגיאה בשמירה לענן: ' + e.message, 'error');
-    } finally {
-        setSyncLoading(false);
-    }
+    scheduleCloudSync();
 }
 
 function manualSyncFromCloud() {

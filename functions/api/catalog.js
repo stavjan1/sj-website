@@ -10,7 +10,8 @@
 
 const ADMIN_EMAIL = 'stavjan19989@gmail.com';
 const KEY = 'system:catalog';
-const MAX_ITEMS = 1000;
+const MAX_ITEMS = 2000; // full supplier imports (e.g. Arkha) can be large;
+                        // the client sends the AI only ~150 relevant lines anyway
 
 export async function onRequest(context) {
   const { request, env } = context;
