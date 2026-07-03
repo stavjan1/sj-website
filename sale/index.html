@@ -272,6 +272,16 @@
                     <!-- Right Side: AI Chat Box -->
                     <div class="control-side" style="display:flex; flex-direction:column; height:calc(100vh - 160px);">
                         <div class="chat-container">
+                            <!-- Workflow mode: planning conversation vs. pricing conversation -->
+                            <div class="chat-mode-toggle" id="chat-mode-toggle">
+                                <button type="button" id="mode-btn-plan" class="mode-pill active" onclick="setChatMode('plan')">
+                                    <i class="fa-solid fa-compass-drafting"></i> תכנון העבודה
+                                </button>
+                                <button type="button" id="mode-btn-price" class="mode-pill" onclick="setChatMode('price')">
+                                    <i class="fa-solid fa-coins"></i> תמחור
+                                </button>
+                                <span class="stage-hint" id="stage-hint"></span>
+                            </div>
                             <div class="chat-toolbar">
                                 <div class="chat-search-wrap">
                                     <i class="fa-solid fa-magnifying-glass"></i>
@@ -290,6 +300,19 @@
                                 </div>
                             </div>
                             
+                            <!-- After a planning reply: confirm the list is complete → auto-handoff to pricing -->
+                            <div class="plan-action-bar" id="plan-action-bar" style="display:none;">
+                                <span class="pab-q">אלו באמת כל המוצרים לפרויקט הזה?</span>
+                                <div class="pab-btns">
+                                    <button type="button" class="btn btn-success btn-small" onclick="approvePlanAndPrice()">
+                                        <i class="fa-solid fa-check"></i> כן — מעבר לתמחור העבודה
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-small" onclick="continuePlanning()">
+                                        <i class="fa-solid fa-plus"></i> זה לא הכל — הוספת פריטים
+                                    </button>
+                                </div>
+                            </div>
+
                             <div class="chat-suggestions">
                                 <button class="chip" onclick="sendSuggestedChatPrompt('התקנת עמדת טעינה לרכב חשמלי בחניון תת-קרקעי במרחק 15 מטר מהלוח')">עמדת טעינה</button>
                                 <button class="chip" onclick="sendSuggestedChatPrompt('החלפת לוח חשמל דירתי חד פאזי ללוח תלת פאזי 3x25 כולל מפסקים חדשים')">החלפת לוח</button>
@@ -796,9 +819,11 @@
                         <div class="section-card">
                             <div class="card-header"><h3><i class="fa-solid fa-file-excel" style="color:var(--color-success);"></i> ייבוא מאקסל / CSV</h3></div>
                             <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
-                                <p class="input-help" style="line-height:1.6;">
-                                    מעתיקים מאקסל שלוש עמודות — <strong>שם פריט, מחיר, יחידה</strong> (יחידה אופציונלית) —
-                                    ומדביקים כאן, או בוחרים קובץ CSV. עד 1,000 פריטים במאגר האישי.
+                                <p class="input-help" style="line-height:1.7;">
+                                    להעלאת מחירון משלך יש להשתמש באקסל עם <strong>3 עמודות בלבד וללא כותרת</strong>.
+                                    סדר העמודות יהיה בדיוק: <strong>שם המוצר , מחיר , יחידה</strong>.<br>
+                                    יש אפשרות להעלות עד 1,000 שורות. מעתיקים מהאקסל, מדביקים כאן — או בוחרים קובץ CSV.
+                                    המערכת בודקת את הקובץ ומדווחת על כל שורה שאינה תקינה.
                                 </p>
                                 <textarea id="catalog-import-text" rows="5" placeholder="כבל XLPE 5x6	38	מטר&#10;מפסק פחת 40A	95	יח'&#10;..."></textarea>
                                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -838,10 +863,24 @@
                                     רוצה לחלוק את המחירים שלך עם כולם? שלח את המאגר אל שרת המערכת — ואם המחירים יאומתו,
                                     כל המשתמשים יוכלו להנות מהידע שלך בתמחור 🙂
                                 </p>
+                                <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                                    <label style="display:flex;align-items:center;gap:6px;font-size:0.88rem;cursor:pointer;">
+                                        <input type="radio" name="catalog-share-mode" value="named" checked> שליחה עם הפרטים שלי
+                                    </label>
+                                    <label style="display:flex;align-items:center;gap:6px;font-size:0.88rem;cursor:pointer;">
+                                        <input type="radio" name="catalog-share-mode" value="anonymous"> שליחה אנונימית
+                                    </label>
+                                </div>
                                 <input type="tel" id="catalog-share-phone" placeholder="טלפון ליצירת קשר (אופציונלי)" style="max-width:220px;">
-                                <button class="btn btn-secondary" style="align-self:flex-start;" onclick="shareCatalogWithSystem()">
-                                    <i class="fa-solid fa-paper-plane"></i> שלח את המאגר שלי למערכת
-                                </button>
+                                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                    <button class="btn btn-secondary" onclick="shareCatalogWithSystem()">
+                                        <i class="fa-solid fa-paper-plane"></i> שלח את המאגר שלי
+                                    </button>
+                                    <label class="btn btn-secondary" style="cursor:pointer;">
+                                        <i class="fa-solid fa-file-arrow-up"></i> שלח קובץ מחירים
+                                        <input type="file" id="catalog-share-file" accept=".csv,.txt,.xls,.xlsx,.pdf" style="display:none;" onchange="shareCatalogFile(this)">
+                                    </label>
+                                </div>
                                 <div id="catalog-share-status" class="input-help" style="display:none;"></div>
                             </div>
                         </div>

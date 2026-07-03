@@ -26,6 +26,13 @@ export async function onRequestPost(context) {
     return json({ error: { message: 'נא להזין כתובת אתר תקינה (http/https).' } }, 400);
   }
 
+  // 0) Shopify fast-path: collection pages expose a public products.json —
+  // structured names+prices with zero AI cost and no scraping fragility.
+  const shopifyItems = await tryShopifyCollection(url);
+  if (shopifyItems && shopifyItems.length) {
+    return json({ items: shopifyItems.slice(0, 300), source: url, engine: 'shopify', count: Math.min(shopifyItems.length, 300) });
+  }
+
   // 1) Get the page content (markdown via Firecrawl, or raw HTML→text).
   let content = '';
   let engine = 'fetch';
@@ -43,10 +50,13 @@ export async function onRequestPost(context) {
     } else {
       const res = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; SJ-PriceBot/1.0)',
-          Accept: 'text/html,application/xhtml+xml',
+          // A real-browser UA — many suppliers block anything that looks like a bot.
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'he-IL,he;q=0.9,en;q=0.6',
         },
       });
+      if (res.status === 403 || res.status === 503) throw new Error(`האתר חוסם גישה אוטומטית (${res.status})`);
       if (!res.ok) throw new Error(`האתר החזיר שגיאה ${res.status}`);
       const html = await res.text();
       content = htmlToText(html);
@@ -98,6 +108,36 @@ export async function onRequestPost(context) {
     .slice(0, 200);
 
   return json({ items: clean, source: url, engine, count: clean.length });
+}
+
+// Shopify stores expose /collections/<handle>/products.json publicly.
+// If the URL looks like a Shopify collection, pull the structured data
+// directly — exact titles, variants and prices, no AI extraction needed.
+async function tryShopifyCollection(url) {
+  try {
+    const u = new URL(url);
+    const m = u.pathname.match(/\/collections\/([^/?#]+)/);
+    if (!m) return null;
+    const res = await fetch(`${u.origin}/collections/${m[1]}/products.json?limit=250`, {
+      headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36' },
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    if (!data || !Array.isArray(data.products)) return null;
+    const items = [];
+    for (const p of data.products) {
+      const variants = Array.isArray(p.variants) ? p.variants : [];
+      for (const v of variants) {
+        const price = parseFloat(v.price);
+        if (!Number.isFinite(price) || price <= 0) continue;
+        const vt = (v.title && v.title !== 'Default Title') ? ` — ${v.title}` : '';
+        items.push({ name: `${p.title}${vt}`.trim().slice(0, 120), price, unit: '' });
+      }
+    }
+    return items;
+  } catch {
+    return null;
+  }
 }
 
 // Strip scripts/styles/tags → readable text.

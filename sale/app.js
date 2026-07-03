@@ -755,6 +755,12 @@ function updateGuestUpgradeUI() {
 }
 
 function initUserSession() {
+    // Defense in depth: a guest session must never display a leftover Google
+    // identity, no matter which path led here (fresh entry, restored session).
+    if (isGuestUser()) {
+        localStorage.removeItem('gsi_name');
+        localStorage.removeItem('gsi_picture');
+    }
     loadSettings();
     loadHistory();
     loadProjects();
@@ -970,6 +976,16 @@ function createNewProject() {
         name: name,
         created: getTodayDateString(),
         status: 'טיוטה',
+        // Workflow: plan → price → draft. Planning first, so the pricing agent
+        // later receives the FULL product list (incl. accessories), not just
+        // the headline item ("עמדת טעינה" בלי כל הציוד הנלווה).
+        stage: 'planning',
+        planChatHistory: [
+            {
+                role: 'model',
+                parts: [{ text: `בוא נתכנן את העבודה לפני שמדברים על כסף 🙂\nתאר לי את הפרויקט (למשל: "התקנת עמדת טעינה בחניון תת-קרקעי, 15 מטר מהלוח") — ואבנה עבורך **רשימת מוצרים מלאה**: הציוד הראשי, כל האביזרים הנלווים, חומרי ההתקנה וכלי העבודה הנדרשים.` }]
+            }
+        ],
         chatHistory: [
             {
                 role: 'model',
@@ -1019,9 +1035,11 @@ function loadProject(id, navigate = true) {
 
     updateActiveProjectBanner(proj);
     filterProjectsList();
-    
-    // Load AI pricing chat log
-    renderChatHistory(proj.chatHistory);
+
+    // Load the chat in the mode matching the project's workflow stage
+    // (plan → price → draft). Legacy projects that already have a pricing
+    // conversation jump straight to pricing.
+    setChatMode(getProjectStage(proj) === 'planning' ? 'plan' : 'price', proj);
     
     // Load Materials checklist
     renderMaterialsChecklist(proj.materials);
@@ -1185,6 +1203,9 @@ function renderProjectsList(list) {
     list.forEach(p => {
         const isActive = p.id === activeProjectId;
         const status = p.status || 'טיוטה';
+        const stage = getProjectStage(p);
+        const so = STAGE_ORDER[stage] || 0;
+        const stepCls = (i) => i < so ? 'done' : (i === so ? 'current' : 'locked');
         const card = document.createElement('div');
         card.className = `project-card ${isActive ? 'active' : ''}`;
         card.onclick = () => loadProject(p.id);
@@ -1205,6 +1226,19 @@ function renderProjectsList(list) {
                 <span class="project-status-badge status-badge-${status}"
                       onclick="cycleProjectStatus('${p.id}', event)"
                       title="לחץ לשינוי סטטוס">${status}</span>
+            </div>
+            <div class="stage-chain" title="שרשרת העבודה של הפרויקט">
+                <button class="stage-step ${stepCls(0)}" onclick="openProjectStage('${p.id}','plan',event)">
+                    <i class="fa-solid fa-compass-drafting"></i> תכנון
+                </button>
+                <span class="stage-arrow">←</span>
+                <button class="stage-step ${stepCls(1)}" onclick="openProjectStage('${p.id}','price',event)">
+                    <i class="fa-solid fa-coins"></i> תמחור
+                </button>
+                <span class="stage-arrow">←</span>
+                <button class="stage-step ${stepCls(2)}" onclick="openProjectStage('${p.id}','draft',event)">
+                    <i class="fa-solid fa-file-pdf"></i> הכנת טיוטה
+                </button>
             </div>
         `;
         container.appendChild(card);
@@ -1693,43 +1727,75 @@ function addManualCatalogItem() {
 // Header rows and junk lines are skipped; personal catalog is capped at 1,000.
 const PERSONAL_CATALOG_MAX = 1000;
 
+// Dekel-style validation: parse every line and explain exactly what's wrong
+// with the ones we can't use, instead of silently skipping them.
 function parseCatalogImportText(text) {
     const items = [];
-    for (const rawLine of String(text || '').split(/\r?\n/)) {
+    const problems = []; // { line: <1-based>, reason }
+    let headerSkipped = false;
+    const rawLines = String(text || '').split(/\r?\n/);
+    rawLines.forEach((rawLine, i) => {
+        const lineNo = i + 1;
         const line = rawLine.trim();
-        if (!line) continue;
+        if (!line) return;
         // Prefer TAB (Excel paste); otherwise comma/semicolon CSV.
         const parts = (line.includes('\t') ? line.split('\t') : line.split(/[;,]/)).map(p => p.trim().replace(/^"|"$/g, ''));
-        if (parts.length < 2) continue;
+        // A header row ("שם", "מחיר"...) — recognize and skip once, quietly.
+        if (i === 0 && parts.length >= 2 && !Number.isFinite(parseFloat(String(parts[1]).replace(/[₪,\s]/g, '')))
+            && /שם|מוצר|פריט|תיאור|name|item/i.test(parts[0])) {
+            headerSkipped = true;
+            return;
+        }
+        if (parts.length < 2) { problems.push({ line: lineNo, reason: 'זוהתה עמודה אחת בלבד — נדרשות לפחות 2 (שם, מחיר)' }); return; }
+        if (parts.length > 3) { problems.push({ line: lineNo, reason: `זוהו ${parts.length} עמודות — נדרשות בדיוק 3 (שם, מחיר, יחידה)` }); return; }
         const name = parts[0];
         const price = parseFloat(String(parts[1]).replace(/[₪,\s]/g, ''));
-        if (!name || !Number.isFinite(price)) continue; // skips header rows too
+        if (!name) { problems.push({ line: lineNo, reason: 'שם פריט ריק' }); return; }
+        if (!Number.isFinite(price)) { problems.push({ line: lineNo, reason: `"${parts[1]}" אינו מחיר מספרי` }); return; }
+        if (price < 0) { problems.push({ line: lineNo, reason: 'מחיר שלילי' }); return; }
         items.push({ name, price, unit: parts[2] || '' });
-    }
-    return items;
+    });
+    return { items, problems, headerSkipped };
 }
 
-function _applyCatalogImport(items) {
+function _applyCatalogImport(report) {
     const status = document.getElementById('catalog-import-status');
+    const show = (color, html) => {
+        if (!status) return;
+        status.style.display = 'block';
+        status.style.color = color;
+        status.innerHTML = html;
+    };
+    const { items, problems, headerSkipped } = report;
+
     if (items.length === 0) {
-        if (status) { status.style.display = 'block'; status.style.color = 'var(--color-danger)'; status.textContent = 'לא זוהו שורות תקינות. ודא: שם פריט, מחיר, יחידה (מופרדים בטאב או פסיק).'; }
+        const details = problems.slice(0, 6).map(p => `• שורה ${p.line}: ${p.reason}`).join('<br>');
+        show('var(--color-danger)',
+            'לא נמצאו שורות תקינות לייבוא.' + (details ? '<br>' + details : '') +
+            '<br>הפורמט הנדרש: <strong>שם המוצר , מחיר , יחידה</strong> — בדיוק 3 עמודות, ללא שורת כותרת.');
         return;
     }
-    let added = 0, skipped = 0;
+
+    let added = 0, capSkipped = 0;
     for (const it of items) {
         if (priceCatalog.length >= PERSONAL_CATALOG_MAX && !priceCatalog.find(x => x.name.toLowerCase() === it.name.toLowerCase())) {
-            skipped++;
+            capSkipped++;
             continue;
         }
         if (upsertCatalogItem(it)) added++;
     }
     savePriceCatalog();
     renderPriceCatalog();
-    if (status) {
-        status.style.display = 'block';
-        status.style.color = 'var(--color-success)';
-        status.textContent = `יובאו ${added} פריטים` + (skipped ? ` (${skipped} דולגו — המאגר מוגבל ל-${PERSONAL_CATALOG_MAX} פריטים)` : '') + '.';
+
+    const parts = [`✓ יובאו <strong>${added}</strong> פריטים.`];
+    if (headerSkipped) parts.push('שורת הכותרת זוהתה ודולגה.');
+    if (problems.length) {
+        parts.push(`${problems.length} שורות בפורמט לא מתאים:` + '<br>' +
+            problems.slice(0, 6).map(p => `• שורה ${p.line}: ${p.reason}`).join('<br>') +
+            (problems.length > 6 ? `<br>…ועוד ${problems.length - 6}` : ''));
     }
+    if (capSkipped) parts.push(`${capSkipped} שורות דולגו — המאגר מוגבל ל-${PERSONAL_CATALOG_MAX} פריטים.`);
+    show(problems.length || capSkipped ? '#f0c040' : 'var(--color-success)', parts.join('<br>'));
     showToast(`${added} פריטים יובאו למאגר`);
 }
 
@@ -1791,32 +1857,33 @@ function clearPriceCatalog() {
 // and email (never a phone — that scope doesn't exist), so we ask for a phone
 // optionally. Delivered by email server-side (/api/share-catalog), which works
 // across devices immediately without extra infrastructure.
-async function shareCatalogWithSystem() {
-    if (!priceCatalog || priceCatalog.length === 0) {
-        showToast('אין פריטים במאגר לשיתוף', 'error');
-        return;
-    }
-    const statusEl = document.getElementById('catalog-share-status');
+// Sender identity per the chosen share mode: named (Google details) or anonymous.
+function _shareSenderDetails() {
+    const mode = document.querySelector('input[name="catalog-share-mode"]:checked')?.value || 'named';
     const phone = (document.getElementById('catalog-share-phone')?.value || '').trim();
+    if (mode === 'anonymous') return { name: 'אנונימי', email: '', phone, profession: '' };
     const activeUser = getActiveUser() || '';
     const senderEmail = isGuestUser() ? '' : (activeUser.includes('@') ? activeUser : '');
-    const senderName = isGuestUser() ? 'אורח' : (localStorage.getItem('gsi_name') || senderEmail.split('@')[0] || 'משתמש');
-    const profession = (appState.settings && appState.settings.profession) || '';
+    return {
+        name: isGuestUser() ? 'אורח' : (localStorage.getItem('gsi_name') || senderEmail.split('@')[0] || 'משתמש'),
+        email: senderEmail,
+        phone,
+        profession: (appState.settings && appState.settings.profession) || ''
+    };
+}
 
+async function _postCatalogShare(statusEl, payload, successMsg) {
     if (statusEl) { statusEl.style.display = 'block'; statusEl.style.color = ''; statusEl.textContent = 'שולח…'; }
     try {
         const res = await fetch('/api/share-catalog', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name: senderName, email: senderEmail, phone, profession,
-                catalog: priceCatalog.slice(0, 500)
-            })
+            body: JSON.stringify(payload)
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok && data.ok) {
-            if (statusEl) { statusEl.style.color = 'var(--color-success)'; statusEl.textContent = 'תודה! המאגר נשלח לבדיקה 🙂'; }
-            showToast('המאגר נשלח לבדיקה — תודה על השיתוף!');
+            if (statusEl) { statusEl.style.color = 'var(--color-success)'; statusEl.textContent = successMsg; }
+            showToast(successMsg);
         } else {
             const msg = (data && data.error && data.error.message) || 'השליחה נכשלה. נסה שוב מאוחר יותר.';
             if (statusEl) { statusEl.style.color = 'var(--color-danger)'; statusEl.textContent = msg; }
@@ -1824,6 +1891,42 @@ async function shareCatalogWithSystem() {
     } catch (e) {
         if (statusEl) { statusEl.style.color = 'var(--color-danger)'; statusEl.textContent = 'שגיאת רשת — נסה שוב.'; }
     }
+}
+
+async function shareCatalogWithSystem() {
+    if (!priceCatalog || priceCatalog.length === 0) {
+        showToast('אין פריטים במאגר לשיתוף', 'error');
+        return;
+    }
+    const statusEl = document.getElementById('catalog-share-status');
+    await _postCatalogShare(statusEl,
+        { ..._shareSenderDetails(), catalog: priceCatalog.slice(0, 500) },
+        'תודה! המאגר נשלח לבדיקה 🙂');
+}
+
+// "Send a price file" — any file from the user's computer (their supplier's
+// Excel/CSV/PDF price list). Text formats are embedded for review; binary
+// formats send the file name + a note to contact the sender.
+function shareCatalogFile(input) {
+    const file = input && input.files && input.files[0];
+    if (!file) return;
+    const statusEl = document.getElementById('catalog-share-status');
+    if (file.size > 2 * 1024 * 1024) {
+        if (statusEl) { statusEl.style.display = 'block'; statusEl.style.color = 'var(--color-danger)'; statusEl.textContent = 'הקובץ גדול מ-2MB — שלח קובץ קטן יותר או את המאגר עצמו.'; }
+        input.value = '';
+        return;
+    }
+    const isTextLike = /\.(csv|txt)$/i.test(file.name);
+    const reader = new FileReader();
+    reader.onload = async () => {
+        const fileText = isTextLike ? String(reader.result).slice(0, 60000) : '';
+        await _postCatalogShare(statusEl,
+            { ..._shareSenderDetails(), fileName: file.name, fileText },
+            'תודה! הקובץ נשלח לבדיקה 🙂');
+        input.value = '';
+    };
+    if (isTextLike) reader.readAsText(file);
+    else { reader.onload = null; _postCatalogShare(statusEl, { ..._shareSenderDetails(), fileName: file.name, fileText: '' }, 'תודה! שם הקובץ נשלח — ניצור קשר להעברתו 🙂').then(() => { input.value = ''; }); }
 }
 
 function getNextQuoteNumber() {
@@ -2176,6 +2279,202 @@ function updatePriceDisplayMode() {
 }
 
 // ==========================================================================
+// Project workflow: plan → price → draft
+// Planning builds the FULL product list first, so pricing receives every
+// accessory and consumable — not just the headline item.
+// ==========================================================================
+const STAGE_ORDER = { planning: 0, pricing: 1, draft: 2 };
+let activeChatMode = 'price'; // 'plan' | 'price' — which conversation the input feeds
+
+function getProjectStage(proj) {
+    if (!proj) return 'planning';
+    if (proj.stage) return proj.stage;
+    // Legacy projects (created before the workflow): if a pricing conversation
+    // already happened, treat them as being in the pricing stage.
+    return (proj.chatHistory || []).some(m => m.role === 'user') ? 'pricing' : 'planning';
+}
+
+function ensurePlanHistory(proj) {
+    if (!Array.isArray(proj.planChatHistory)) {
+        proj.planChatHistory = [{
+            role: 'model',
+            parts: [{ text: `בוא נתכנן את העבודה לפני שמדברים על כסף 🙂\nתאר לי את הפרויקט — ואבנה עבורך **רשימת מוצרים מלאה**: הציוד הראשי, כל האביזרים הנלווים, חומרי ההתקנה וכלי העבודה הנדרשים.` }]
+        }];
+    }
+    return proj.planChatHistory;
+}
+
+// Switch the chat between the planning and pricing conversations.
+function setChatMode(mode, projOverride) {
+    const proj = projOverride || projectsList.find(p => p.id === activeProjectId);
+    if (!proj) return;
+    const stage = getProjectStage(proj);
+    if (mode === 'price' && STAGE_ORDER[stage] < 1) {
+        showToast('קודם מסיימים את תכנון העבודה — ואז עוברים לתמחור 🙂', 'error');
+        mode = 'plan';
+    }
+    activeChatMode = mode;
+
+    const planBtn = document.getElementById('mode-btn-plan');
+    const priceBtn = document.getElementById('mode-btn-price');
+    if (planBtn) planBtn.classList.toggle('active', mode === 'plan');
+    if (priceBtn) {
+        priceBtn.classList.toggle('active', mode === 'price');
+        priceBtn.classList.toggle('locked', STAGE_ORDER[stage] < 1);
+    }
+    const input = document.getElementById('chat-user-input');
+    if (input) input.placeholder = mode === 'plan'
+        ? 'תאר את הפרויקט לתכנון (מה מתקינים, איפה, באילו תנאים)...'
+        : 'כתוב כאן הודעה למומחה התמחור...';
+
+    renderChatHistory(mode === 'plan' ? ensurePlanHistory(proj) : proj.chatHistory);
+    updatePlanActionBar(proj);
+    updateStageHint(proj);
+}
+
+function updateStageHint(proj) {
+    const hint = document.getElementById('stage-hint');
+    if (!hint) return;
+    const stage = getProjectStage(proj);
+    const labels = { planning: 'שלב 1/3 — תכנון העבודה', pricing: 'שלב 2/3 — תמחור', draft: 'שלב 3/3 — הכנת טיוטה' };
+    hint.textContent = labels[stage] || '';
+}
+
+// The "is this everything?" bar appears after the planner produced a list.
+function updatePlanActionBar(proj) {
+    const bar = document.getElementById('plan-action-bar');
+    if (!bar) return;
+    const plan = proj && Array.isArray(proj.planChatHistory) ? proj.planChatHistory : [];
+    const hasPlanReply = activeChatMode === 'plan' && plan.some(m => m.role === 'user') && plan[plan.length - 1]?.role === 'model';
+    bar.style.display = hasPlanReply ? 'flex' : 'none';
+}
+
+// Planner persona: complete BOM builder, explicitly NO prices at this stage.
+function getPlanningSystemInstruction() {
+    const profession = (appState.settings && appState.settings.profession) || 'electrician';
+    const professionMap = {
+        electrician: 'חשמלאי מוסמך', charger_installer: 'מתקין עמדות טעינה',
+        solar_installer: 'מתקין מערכות סולאריות', renovator: 'קבלן שיפוצים', contractor: 'קבלן בנייה'
+    };
+    return `אתה מתכנן עבודות מומחה עבור ${professionMap[profession] || profession} בישראל. תפקידך הוא אך ורק תכנון — לעולם אל תציין מחירים או עלויות (זה השלב הבא).
+כשמתארים לך עבודה:
+1. אם חסר פרט קריטי לתכנון (מרחק, מיקום, סוג תשתית) — שאל עד 2 שאלות קצרות, לא יותר.
+2. כשיש מספיק מידע, החזר תמיד את המבנה הבא:
+**תיאור העבודה:** משפט-שניים.
+**רשימת מוצרים מלאה:**
+• ציוד ראשי — עם כמויות
+• אביזרים ונלווים — כל מה שמתקינים שוכחים (מהדקים, מא"זים, קופסאות, סופיות, שילוט)
+• חומרי התקנה ומתכלים — תעלות/צנרת לפי מטרים, ברגים, חבקים
+**כלי עבודה נדרשים למשימה:** רשימה קצרה.
+**נקודות שדורשות תשומת לב:** תקן, בטיחות, תיאומים.
+סיים תמיד בשאלה: "האם הרשימה מכסה הכל, או שיש עוד פריטים להוסיף?"
+ענה בעברית, תמציתי ומקצועי.`;
+}
+
+// Planning agent — same streaming plumbing as the pricing agent, separate history.
+async function runPlanningAgent(activeProject) {
+    const effectiveModel = getEffectiveModel();
+    showTypingIndicator(true);
+    const _t0 = performance.now();
+    setQuotaCharging(true);
+    try {
+        const response = await callAI(effectiveModel, {
+            messages: historyToMessages(getPlanningSystemInstruction(), activeProject.planChatHistory),
+            max_tokens: 2000,
+            stream: true
+        });
+        if (!response.ok) throw new Error(await readAIError(response));
+
+        let responseText = '';
+        const ctype = response.headers.get('content-type') || '';
+        if (response.body && ctype.includes('event-stream')) {
+            const bubble = beginStreamingBubble();
+            responseText = await consumeSSEStream(response, (full) => {
+                bubble.innerHTML = formatChatMarkdown(visibleChatText(full));
+                scrollChatToBottom();
+            });
+        } else {
+            const data = await response.json();
+            responseText = data.choices[0].message.content;
+        }
+
+        activeProject.planChatHistory.push({ role: 'model', parts: [{ text: responseText }] });
+        saveProjects();
+        renderChatHistory(activeProject.planChatHistory);
+        updatePlanActionBar(activeProject);
+        addWeightedUsage(effectiveModel, responseText.length, performance.now() - _t0);
+    } catch (e) {
+        showTypingIndicator(false);
+        showToast(e.message || 'שגיאה בשיחה עם סוכן התכנון', 'error');
+    } finally {
+        setQuotaCharging(false);
+    }
+}
+
+// "כן — אלו כל המוצרים": lock the plan, move to pricing, and hand the pricing
+// agent the complete list automatically.
+async function approvePlanAndPrice() {
+    const proj = projectsList.find(p => p.id === activeProjectId);
+    if (!proj) return;
+    const lastPlan = (proj.planChatHistory || []).filter(m => m.role === 'model').pop();
+    const planText = lastPlan ? lastPlan.parts[0].text : '';
+    proj.stage = 'pricing';
+    proj.chatHistory.push({
+        role: 'user',
+        parts: [{ text: `סיימנו את שלב התכנון. תמחר את העבודה במלואה — עבודה + חומרים — לפי הרשימה שגובשה:\n\n${planText}` }]
+    });
+    saveProjects();
+    setChatMode('price', proj);
+    filterProjectsList(); // refresh stage chain on the project card
+    showToast('עוברים לתמחור — הרשימה המלאה נשלחה לסוכן 💪');
+    await runPricingAgent(proj);
+}
+
+function continuePlanning() {
+    const input = document.getElementById('chat-user-input');
+    if (input) {
+        input.placeholder = 'מה חסר ברשימה? תאר ואשלים את התכנון...';
+        input.focus();
+    }
+    const bar = document.getElementById('plan-action-bar');
+    if (bar) bar.style.display = 'none';
+}
+
+// Stage 3: the quote editor, where the PDF draft is prepared.
+function goToDraft() {
+    const proj = projectsList.find(p => p.id === activeProjectId);
+    if (!proj) return;
+    if (STAGE_ORDER[getProjectStage(proj)] < 1) {
+        showToast('קודם תכנון ותמחור — ואז מכינים טיוטה 🙂', 'error');
+        return;
+    }
+    proj.stage = 'draft';
+    saveProjects();
+    filterProjectsList();
+    switchTab('create');
+    showToast('הכנת טיוטה — ערוך את ההצעה והפק PDF');
+}
+
+// Entry from the project card's stage chain (1.תכנון 2.תמחור 3.הכנת טיוטה).
+function openProjectStage(projectId, step, e) {
+    if (e) e.stopPropagation();
+    const proj = projectsList.find(p => p.id === projectId);
+    if (!proj) return;
+    loadProject(projectId, false);
+    const stage = getProjectStage(proj);
+    if (step === 'plan') {
+        switchTab('wizard');
+        setChatMode('plan', proj);
+    } else if (step === 'price') {
+        if (STAGE_ORDER[stage] < 1) { showToast('קודם מסיימים את התכנון 🙂', 'error'); switchTab('wizard'); setChatMode('plan', proj); return; }
+        switchTab('wizard');
+        setChatMode('price', proj);
+    } else if (step === 'draft') {
+        goToDraft();
+    }
+}
+
+// ==========================================================================
 // AI Pricing Chat (סוכן תמחור מומחה)
 // ==========================================================================
 async function sendChatMessage() {
@@ -2191,6 +2490,18 @@ async function sendChatMessage() {
 
     const activeProject = projectsList.find(p => p.id === activeProjectId);
     if (!activeProject) return;
+
+    // Planning mode feeds the planning conversation; pricing feeds the pricer.
+    if (activeChatMode === 'plan') {
+        ensurePlanHistory(activeProject).push({ role: 'user', parts: [{ text: userText }] });
+        saveProjects();
+        renderChatHistory(activeProject.planChatHistory);
+        inputArea.value = '';
+        const bar = document.getElementById('plan-action-bar');
+        if (bar) bar.style.display = 'none';
+        await runPlanningAgent(activeProject);
+        return;
+    }
 
     // Add user message to state
     activeProject.chatHistory.push({
@@ -2240,7 +2551,7 @@ async function runPricingAgent(activeProject, promptChars) {
         if (response.body && ctype.includes('event-stream')) {
             const bubble = beginStreamingBubble();
             responseText = await consumeSSEStream(response, (full) => {
-                bubble.textContent = visibleChatText(full);
+                bubble.innerHTML = formatChatMarkdown(visibleChatText(full));
                 scrollChatToBottom();
             });
         } else {

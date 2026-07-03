@@ -1896,6 +1896,106 @@ textarea#ai-input {
 }
 
 /* ==========================================================================
+   Project workflow: plan → price → draft
+   ========================================================================== */
+.chat-mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px 0;
+}
+.mode-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 16px;
+    border-radius: 50px;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-speed) ease;
+}
+.mode-pill.active {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: #fff;
+    box-shadow: 0 4px 14px var(--color-accent-glow);
+}
+.mode-pill.locked {
+    opacity: 0.45;
+}
+.mode-pill.locked::after {
+    content: '🔒';
+    font-size: 0.7rem;
+}
+.stage-hint {
+    margin-inline-start: auto;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.plan-action-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 0 12px;
+    padding: 10px 14px;
+    background: rgba(34, 201, 132, 0.08);
+    border: 1px solid rgba(34, 201, 132, 0.35);
+    border-radius: 12px;
+    animation: fadeIn 0.3s ease;
+}
+.plan-action-bar .pab-q { font-size: 0.9rem; font-weight: 700; }
+.plan-action-bar .pab-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.stage-chain {
+    grid-column: 1 / -1;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-color);
+    flex-wrap: wrap;
+}
+.stage-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-speed) ease;
+}
+.stage-step:hover { border-color: var(--color-accent); color: var(--text-primary); }
+.stage-step.current {
+    background: rgba(77, 142, 240, 0.14);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+}
+.stage-step.done {
+    background: rgba(34, 201, 132, 0.1);
+    border-color: rgba(34, 201, 132, 0.4);
+    color: var(--color-success);
+}
+.stage-step.locked { opacity: 0.4; }
+.stage-arrow { color: var(--text-muted); font-size: 0.75rem; }
+
+/* ==========================================================================
    Compact desktop density — tighter spacing so panels fit without so much
    scrolling ("leaner", less padding-heavy). Desktop only; the mobile layout
    below 861px keeps its own comfortable spacing.

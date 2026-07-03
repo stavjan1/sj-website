@@ -8,6 +8,19 @@
   // 'sale' = the in-app helper inside /sale; otherwise the public site assistant.
   var MODE = (typeof window !== 'undefined' && window.SJ_ASSISTANT_MODE === 'sale') ? 'sale' : 'public';
 
+  // ---- Microsoft Clarity (free heatmaps + session recordings) ----
+  // Paste the project ID from clarity.microsoft.com to activate. Loads only on
+  // the PUBLIC marketing pages — never inside /sale, so business/client data
+  // in the quote tool is never recorded.
+  var CLARITY_ID = ''; // e.g. 'abcdef1234'
+  if (CLARITY_ID && MODE !== 'sale' && window.location.pathname.indexOf('/sale') !== 0) {
+    (function (c, l, a, r, i, t, y) {
+      c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
+      t = l.createElement(r); t.async = 1; t.src = 'https://www.clarity.ms/tag/' + i;
+      y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
+    })(window, document, 'clarity', 'script', CLARITY_ID);
+  }
+
   var CONFIG = {
     phone: '053-530-2887',
     tel: 'tel:053-530-2887',
@@ -23,7 +36,7 @@
   var COPY = MODE === 'sale' ? {
     title: 'עוזר המערכת',
     subtitle: 'איך משתמשים בכלי?',
-    welcome: 'היי! אני העוזר של מערכת הצעות המחיר של SJ. אשמח להסביר איך לעבוד עם הכלי — ניהול פרויקטים, צ\'אט התמחור, עריכת ההצעה, ייצוא PDF, מאגר המחירים וסנכרון Drive. מה תרצה לדעת?',
+    welcome: 'היי! אני העוזר של מערכת הצעות המחיר של SJ. אשמח להסביר איך לעבוד עם הכלי — זרימת העבודה (תכנון ← תמחור ← הכנת טיוטה), ניהול פרויקטים, מאגר המחירים, ייצוא PDF וגיבוי הענן. מה תרצה לדעת?',
     suggestions: ['איך יוצרים הצעת מחיר חדשה?', 'איך מוסיפים מחירים למאגר?', 'איך מייצאים PDF?'],
     placeholder: 'שאלה על השימוש במערכת…',
     disclaimer: 'עוזר להפעלת המערכת. לשאלות חשבונאיות/משפטיות התייעצו עם איש מקצוע.',
@@ -199,9 +212,19 @@
 
   function clearSuggestions() { els.suggest.innerHTML = ''; }
 
+  // Markdown-lite for bot bubbles: escape HTML first, then **bold**, *em*, line breaks.
+  function mdLite(text) {
+    var s = String(text || '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>');
+    return s.replace(/\n/g, '<br>');
+  }
+
   function addBubble(role, text) {
     var b = el('div', 'sj-assist-bubble ' + role);
-    b.textContent = text || '';
+    if (role === 'bot') b.innerHTML = mdLite(text);
+    else b.textContent = text || '';
     els.log.appendChild(b);
     scrollDown();
     return b;
@@ -415,7 +438,7 @@
             if (d) {
               full += d;
               if (!bubble) { if (typingEl && typingEl.parentNode) typingEl.remove(); bubble = addBubble('bot', ''); }
-              bubble.textContent = liveVisibleText(full);
+              bubble.innerHTML = mdLite(liveVisibleText(full));
               scrollDown();
             }
           } catch (e) { /* ignore partial */ }
@@ -433,7 +456,7 @@
       if (bubbleOrTyping.parentNode) bubbleOrTyping.remove();
       bubbleOrTyping = addBubble('bot', reply);
     } else if (bubbleOrTyping) {
-      bubbleOrTyping.textContent = reply || bubbleOrTyping.textContent;
+      if (reply) bubbleOrTyping.innerHTML = mdLite(reply);
     }
     messages.push({ role: 'assistant', content: reply });
     saveConvo();

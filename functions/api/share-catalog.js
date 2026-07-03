@@ -30,9 +30,18 @@ export async function onRequestPost(context) {
     .filter((it) => it.name && Number.isFinite(it.price))
     .slice(0, 500);
 
-  if (items.length === 0) return json({ error: { message: 'אין פריטים תקינים במאגר לשיתוף.' } }, 400);
+  // Alternative payload: a raw price FILE from the sender's computer
+  // (CSV/TXT embedded as text; binary formats send the name only).
+  const fileName = String(body.fileName || '').trim().slice(0, 160);
+  const fileText = String(body.fileText || '').slice(0, 60000);
 
-  const lines = items.map((it) => `• ${it.name} — ${it.price}₪${it.unit ? ' / ' + it.unit : ''}`).join('\n');
+  if (items.length === 0 && !fileName) {
+    return json({ error: { message: 'אין פריטים תקינים במאגר לשיתוף.' } }, 400);
+  }
+
+  const lines = items.length
+    ? items.map((it) => `• ${it.name} — ${it.price}₪${it.unit ? ' / ' + it.unit : ''}`).join('\n')
+    : (fileText ? `קובץ מצורף (${fileName}):\n${'-'.repeat(20)}\n${fileText}` : `נשלח שם קובץ בלבד: ${fileName} — יש ליצור קשר עם השולח להעברתו.`);
   const contact = [
     `שם: ${name}`,
     email ? `אימייל: ${email}` : 'אימייל: (אורח — לא מחובר)',
@@ -46,11 +55,11 @@ export async function onRequestPost(context) {
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
         access_key: WEB3FORMS_KEY,
-        subject: `מחירון שהתקבל לשיתוף — ${name} (${items.length} פריטים)`,
+        subject: `מחירון שהתקבל לשיתוף — ${name}` + (items.length ? ` (${items.length} פריטים)` : ` (קובץ: ${fileName})`),
         from_name: 'שיתוף מאגר מחירים — SJ',
         email: email || 'info@sj-eng.co.il',
         name,
-        message: `התקבל מחירון לשיתוף עם המערכת.\n\nפרטי השולח:\n${contact}\n\n${'='.repeat(30)}\nמחירון (${items.length} פריטים):\n${lines}`,
+        message: `התקבל מחירון לשיתוף עם המערכת.\n\nפרטי השולח:\n${contact}\n\n${'='.repeat(30)}\n${items.length ? `מחירון (${items.length} פריטים):\n` : ''}${lines}`,
       }),
     });
     if (!r.ok) throw new Error('web3forms ' + r.status);
