@@ -57,6 +57,52 @@ function adminRefreshStatus() {
     if (key2Input && !key2Input.value) key2Input.value = getGeminiApiKeyBackup() || '';
 }
 
+// ===== System catalog (admin) =====
+// The admin curates prices in his own personal catalog (manual / Excel import /
+// page scan), then publishes a snapshot of it as the shared system catalog that
+// every user's pricing agent receives as the market baseline.
+async function adminPublishSystemCatalog() {
+    const status = document.getElementById('admin-syscat-status');
+    if (!isAdmin()) return;
+    if (!priceCatalog || priceCatalog.length === 0) {
+        showToast('המאגר האישי שלך ריק — אין מה לפרסם', 'error');
+        return;
+    }
+    if (!googleAccessToken) {
+        showToast('נדרשת התחברות עם Google כדי לפרסם (אימות מנהל)', 'error');
+        return;
+    }
+    if (!confirm(`לפרסם ${priceCatalog.length} פריטים כמאגר המערכת לכל המשתמשים?\n(הפעולה מחליפה את מאגר המערכת הקיים)`)) return;
+    if (status) { status.style.display = 'block'; status.style.color = ''; status.textContent = 'מפרסם…'; }
+    try {
+        const res = await fetch('/api/catalog', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({ items: priceCatalog })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+            systemCatalog = priceCatalog.slice();
+            localStorage.setItem('sj_system_catalog_cache', JSON.stringify(systemCatalog));
+            if (status) { status.style.color = 'var(--color-success)'; status.textContent = `פורסם ✓ — ${data.count} פריטים פעילים אצל כל המשתמשים.`; }
+            showToast('מאגר המערכת פורסם לכל המשתמשים');
+            adminRefreshSystemCatalogInfo();
+        } else {
+            const msg = (data && data.error && data.error.message) || `הפרסום נכשל (${res.status}).`;
+            if (status) { status.style.color = 'var(--color-danger)'; status.textContent = msg; }
+        }
+    } catch (e) {
+        if (status) { status.style.color = 'var(--color-danger)'; status.textContent = 'שגיאת רשת — נסה שוב.'; }
+    }
+}
+
+function adminRefreshSystemCatalogInfo() {
+    const el = document.getElementById('admin-syscat-count');
+    if (el) el.textContent = `${(systemCatalog || []).length} פריטים`;
+    const mine = document.getElementById('admin-syscat-mine');
+    if (mine) mine.textContent = `${(priceCatalog || []).length} פריטים`;
+}
+
 function adminRefreshUserList() {
     const container = document.getElementById('admin-users-list');
     if (!container) return;
@@ -390,7 +436,31 @@ let activeProjectId = null;
 
 // Global variables for Stern Pricing and Google OAuth
 let sternPricingDatabase = [];
-let priceCatalog = []; // user-curated supplier price catalog (scraped + manual)
+let priceCatalog = [];  // user-curated supplier price catalog (manual/import/scrape)
+let systemCatalog = []; // shared baseline published by the admin (read-only here);
+                        // a personal item with the same name OVERRIDES the system price
+
+// Load the shared system catalog (market baseline for everyone). Cached in a
+// GLOBAL localStorage key so it survives offline/local runs; refreshed from
+// /api/catalog on every session start. Personal prices always win in the merge.
+async function loadSystemCatalog() {
+    try { systemCatalog = JSON.parse(localStorage.getItem('sj_system_catalog_cache') || '[]') || []; }
+    catch (e) { systemCatalog = []; }
+    try {
+        const res = await fetch('/api/catalog');
+        if (!res.ok) return; // 404 local / 501 no KV — keep the cache
+        const data = await res.json();
+        if (data && Array.isArray(data.items)) {
+            systemCatalog = data.items;
+            localStorage.setItem('sj_system_catalog_cache', JSON.stringify(systemCatalog));
+            const note = document.getElementById('system-catalog-note');
+            if (note && systemCatalog.length) {
+                note.style.display = 'block';
+                note.innerHTML = `<i class="fa-solid fa-database" style="color:var(--color-accent);"></i> מאגר המערכת פעיל: <strong>${systemCatalog.length}</strong> מחירי בסיס רצים אוטומטית אצל כולם. מחיר אישי שתוסיף — גובר עליהם.`;
+            }
+        }
+    } catch (e) { /* offline — cache already loaded */ }
+}
 let googleTokenClient = null;
 let googleAccessToken = null;
 
@@ -685,6 +755,7 @@ function initUserSession() {
     loadHistory();
     loadProjects();
     loadPriceCatalog();
+    loadSystemCatalog(); // async, non-blocking — shared baseline prices
     loadSternPricing();
     loadUploadedImages();
     checkGoogleSession();
@@ -696,7 +767,7 @@ function initUserSession() {
     setupQuotePreviewFit();
     showAdminTabIfNeeded();
     if (isAdmin()) {
-        setTimeout(() => { adminRefreshStatus(); adminRefreshUserList(); }, 300);
+        setTimeout(() => { adminRefreshStatus(); adminRefreshUserList(); adminRefreshSystemCatalogInfo(); }, 300);
     }
 }
 
@@ -1481,8 +1552,17 @@ function savePriceCatalog(sync = true) {
 // which is what makes "resend every message" effectively free. Capped so a huge
 // catalog never blows up the prompt.
 function getPriceCatalogPromptBlock() {
-    if (!priceCatalog || priceCatalog.length === 0) return '';
-    const sorted = priceCatalog.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'he'));
+    // Merge: the shared system catalog is the baseline; a personal item with the
+    // same (case-insensitive) name overrides it. Personal-only items are added.
+    const merged = new Map();
+    (systemCatalog || []).forEach(it => {
+        if (it && it.name) merged.set(String(it.name).trim().toLowerCase(), it);
+    });
+    (priceCatalog || []).forEach(it => {
+        if (it && it.name) merged.set(String(it.name).trim().toLowerCase(), it); // personal wins
+    });
+    if (merged.size === 0) return '';
+    const sorted = [...merged.values()].sort((a, b) => String(a.name).localeCompare(String(b.name), 'he'));
     const lines = sorted.slice(0, 150).map(it => `• ${it.name}: ${it.price}${it.unit ? ' ' + it.unit : ''}`);
     return `\n\nמאגר מחירי ספקים (₪) — מקור אמת למחירי חומרים, התאם כמויות/יחידות; פריט שאינו ברשימה — אמוד כרגיל וציין שזו הערכה:\n` + lines.join('\n');
 }
@@ -1574,6 +1654,67 @@ function addManualCatalogItem() {
     document.getElementById('cat-manual-price').value = '';
     document.getElementById('cat-manual-unit').value = '';
     showToast('הפריט נוסף למאגר');
+}
+
+// ===== Excel / CSV import =====
+// Accepts pasted Excel columns (tab-separated) or CSV lines:
+//   name <sep> price <sep> unit?   where sep is TAB / comma / semicolon.
+// Header rows and junk lines are skipped; personal catalog is capped at 1,000.
+const PERSONAL_CATALOG_MAX = 1000;
+
+function parseCatalogImportText(text) {
+    const items = [];
+    for (const rawLine of String(text || '').split(/\r?\n/)) {
+        const line = rawLine.trim();
+        if (!line) continue;
+        // Prefer TAB (Excel paste); otherwise comma/semicolon CSV.
+        const parts = (line.includes('\t') ? line.split('\t') : line.split(/[;,]/)).map(p => p.trim().replace(/^"|"$/g, ''));
+        if (parts.length < 2) continue;
+        const name = parts[0];
+        const price = parseFloat(String(parts[1]).replace(/[₪,\s]/g, ''));
+        if (!name || !Number.isFinite(price)) continue; // skips header rows too
+        items.push({ name, price, unit: parts[2] || '' });
+    }
+    return items;
+}
+
+function _applyCatalogImport(items) {
+    const status = document.getElementById('catalog-import-status');
+    if (items.length === 0) {
+        if (status) { status.style.display = 'block'; status.style.color = 'var(--color-danger)'; status.textContent = 'לא זוהו שורות תקינות. ודא: שם פריט, מחיר, יחידה (מופרדים בטאב או פסיק).'; }
+        return;
+    }
+    let added = 0, skipped = 0;
+    for (const it of items) {
+        if (priceCatalog.length >= PERSONAL_CATALOG_MAX && !priceCatalog.find(x => x.name.toLowerCase() === it.name.toLowerCase())) {
+            skipped++;
+            continue;
+        }
+        if (upsertCatalogItem(it)) added++;
+    }
+    savePriceCatalog();
+    renderPriceCatalog();
+    if (status) {
+        status.style.display = 'block';
+        status.style.color = 'var(--color-success)';
+        status.textContent = `יובאו ${added} פריטים` + (skipped ? ` (${skipped} דולגו — המאגר מוגבל ל-${PERSONAL_CATALOG_MAX} פריטים)` : '') + '.';
+    }
+    showToast(`${added} פריטים יובאו למאגר`);
+}
+
+function importCatalogFromText() {
+    const ta = document.getElementById('catalog-import-text');
+    const items = parseCatalogImportText(ta ? ta.value : '');
+    _applyCatalogImport(items);
+    if (ta && items.length) ta.value = '';
+}
+
+function importCatalogFromFile(input) {
+    const file = input && input.files && input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { _applyCatalogImport(parseCatalogImportText(reader.result)); input.value = ''; };
+    reader.readAsText(file);
 }
 
 function renderPriceCatalog() {

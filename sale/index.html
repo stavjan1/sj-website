@@ -773,6 +773,7 @@
                 <div class="section-header">
                     <h2><i class="fa-solid fa-tags text-accent"></i> מאגר מחירים</h2>
                     <p class="section-subtitle">יש לכם מאגר מחירים משלכם ששונה ממחירי השוק? הוסיפו אותו כאן — והמערכת תתמחר לפי המחירים שלכם מכאן ואילך. אם לא, סוכן התמחור עובד לפי הערכות שוק.</p>
+                    <p class="input-help" id="system-catalog-note" style="display:none;margin-top:6px;"></p>
                 </div>
 
                 <div class="settings-grid">
@@ -788,6 +789,29 @@
                                     <input type="text" id="cat-manual-unit" placeholder="יחידה" style="max-width:110px;">
                                     <button class="btn btn-success btn-small" onclick="addManualCatalogItem()"><i class="fa-solid fa-plus"></i></button>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- Import from Excel / CSV (paste or file) -->
+                        <div class="section-card">
+                            <div class="card-header"><h3><i class="fa-solid fa-file-excel" style="color:var(--color-success);"></i> ייבוא מאקסל / CSV</h3></div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+                                <p class="input-help" style="line-height:1.6;">
+                                    מעתיקים מאקסל שלוש עמודות — <strong>שם פריט, מחיר, יחידה</strong> (יחידה אופציונלית) —
+                                    ומדביקים כאן, או בוחרים קובץ CSV. עד 1,000 פריטים במאגר האישי.
+                                </p>
+                                <textarea id="catalog-import-text" rows="5" placeholder="כבל XLPE 5x6	38	מטר&#10;מפסק פחת 40A	95	יח'&#10;..."></textarea>
+                                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                                    <button class="btn btn-success btn-small" onclick="importCatalogFromText()">
+                                        <i class="fa-solid fa-file-import"></i> ייבא מהטקסט
+                                    </button>
+                                    <label class="btn btn-secondary btn-small" style="cursor:pointer;">
+                                        <i class="fa-solid fa-folder-open"></i> בחר קובץ CSV
+                                        <input type="file" id="catalog-import-file" accept=".csv,.txt" style="display:none;" onchange="importCatalogFromFile(this)">
+                                    </label>
+                                </div>
+                                <div id="catalog-import-status" class="input-help" style="display:none;"></div>
+                            </div>
                         </div>
 
                         <!-- Import from a supplier page (secondary, single page) -->
@@ -1129,6 +1153,29 @@
                                     להפעלה קבועה לכל המבקרים — הגדר בשרת (Cloudflare Pages → Environment variables):
                                     <code>GEMINI_API_KEY</code> (ראשי) ו-<code>GEMINI_API_KEY_2</code> (גיבוי). המפתחות כאן משמשים כגיבוי מקומי מהדפדפן.
                                 </p>
+                            </div>
+                        </div>
+
+                        <!-- System catalog (published to all users) -->
+                        <div class="section-card" style="border-color:rgba(240,192,64,0.25);">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-database" style="color:#f0c040;"></i> מאגר המערכת — מחירים לכולם</h3>
+                            </div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+                                <p class="input-help" style="line-height:1.6;">
+                                    אתה מנהל את המחירים <strong>במאגר האישי שלך</strong> (בטאב "מאגר מחירים": ידני / אקסל / דף ספק),
+                                    ובלחיצה מפרסם אותו כמאגר הבסיס שרץ אצל <strong>כל המשתמשים</strong>.
+                                    מחיר אישי של משתמש תמיד גובר על מחיר המערכת.
+                                    מחירונים שמשתמשים שולחים לבדיקה מגיעים אליך <strong>במייל</strong> עם פרטי השולח.
+                                </p>
+                                <div style="display:flex;flex-direction:column;gap:6px;font-size:0.88rem;">
+                                    <div>מאגר המערכת הנוכחי: <span id="admin-syscat-count" style="color:var(--color-success);">—</span></div>
+                                    <div>המאגר האישי שלך: <span id="admin-syscat-mine" style="color:var(--color-accent);">—</span></div>
+                                </div>
+                                <button class="btn btn-accent" onclick="adminPublishSystemCatalog()">
+                                    <i class="fa-solid fa-upload"></i> פרסם את המאגר האישי שלי כמאגר המערכת
+                                </button>
+                                <p class="input-help" id="admin-syscat-status" style="display:none;"></p>
                             </div>
                         </div>
 
