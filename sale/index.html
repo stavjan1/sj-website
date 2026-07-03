@@ -469,10 +469,6 @@
                                     <i class="fa-solid fa-file-pdf"></i>
                                     <span>הורד PDF</span>
                                 </button>
-                                <button class="btn btn-accent" id="btn-save-drive" onclick="uploadPDFToDrive()">
-                                    <i class="fa-brands fa-google-drive"></i>
-                                    <span>שמור בדרייב</span>
-                                </button>
                                 <button class="btn btn-secondary" onclick="shareWhatsApp()">
                                     <i class="fa-solid fa-share-nodes"></i>
                                     <span>שתף בוואטסאפ</span>
@@ -661,7 +657,7 @@
             <section id="panel-settings" class="content-panel">
                 <div class="section-header">
                     <h2><i class="fa-solid fa-sliders"></i> הגדרות מערכת</h2>
-                    <p class="section-subtitle">הגדרת מפתח ה-API של ה-AI (DeepSeek), שילוב Google Drive, תמונות רקע/לוגו ומאגר ניסוחים.</p>
+                    <p class="section-subtitle">פרופיל משתמש, ערכת נושא ורקע קולנועי, ומאגר הניסוחים של הצעות המחיר. הגיבוי לענן מתבצע אוטומטית למשתמשי Google.</p>
                 </div>
                 
                 <div class="settings-grid">
@@ -684,47 +680,9 @@
                             </div>
                         </div>
 
-                        <div class="section-card">
-                            <div class="card-header">
-                                <h3><i class="fa-brands fa-google-drive text-accent"></i> חיבור ל-Google Drive</h3>
-                            </div>
-                            <div class="card-body" style="display:flex; flex-direction:column; gap:14px;">
-                                <input type="hidden" id="settings-drive-client-id">
-
-                                <!-- Drive connect row -->
-                                <div class="drive-conn-status">
-                                    <span id="drive-status" class="status-disconnected"><i class="fa-solid fa-circle-dot"></i> מנותק</span>
-                                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                                        <button class="btn btn-accent" id="btn-connect-drive" onclick="connectGoogleDrive()">
-                                            <i class="fa-brands fa-google-drive"></i> חבר Drive
-                                        </button>
-                                        <button class="btn btn-secondary" onclick="openDrivePicker()" title="בחר תיקיית יעד" style="white-space:nowrap;">
-                                            <i class="fa-solid fa-folder-open"></i> בחר תיקייה
-                                        </button>
-                                    </div>
-                                </div>
-                                <p class="input-help" id="drive-folder-path-status" style="margin-top:0; font-weight:500; line-height:1.6;">
-                                    <i class="fa-solid fa-database"></i> גיבוי וסנכרון: <strong>.sysdata</strong> (מוסתרת)
-                                </p>
-
-                                <p class="input-help" style="color:var(--color-accent); font-weight:500; font-size:0.85rem; line-height:1.6;">
-                                    <i class="fa-solid fa-shield-halved"></i>
-                                    לשמירה מקסימלית על המידע האישי שלך ושל לקוחותיך — קיימת אפשרות לשמור את הנתונים ב-Drive האישי שלך במקום בשרתי החברה.
-                                </p>
-
-                                <!-- Single smart sync button (shown when connected) -->
-                                <div id="drive-sync-section" style="display:none;">
-                                    <div style="display:flex; align-items:center; gap:10px;">
-                                        <button class="btn btn-secondary" style="flex:1;" id="btn-sync-cloud" onclick="smartSyncFromDrive()">
-                                            <i class="fa-solid fa-cloud-arrow-down"></i> סנכרן / שחזר מ-Drive
-                                        </button>
-                                        <span id="sync-spinner" style="display:none; color:var(--color-success)">
-                                            <i class="fa-solid fa-spinner fa-spin" style="font-size:1.4rem;"></i>
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <!-- Cloud backup happens automatically for Google users (Cloudflare KV) —
+                             the legacy Google Drive connection UI was removed. -->
+                        <input type="hidden" id="settings-drive-client-id">
 
                         <!-- Theme & Cinematic Background Selector -->
                         <div class="section-card" style="margin-top:20px;">
@@ -814,20 +772,33 @@
             <section id="panel-catalog" class="content-panel">
                 <div class="section-header">
                     <h2><i class="fa-solid fa-tags text-accent"></i> מאגר מחירים</h2>
-                    <p class="section-subtitle">סרוק דף ספק פעם אחת, וה-AI יחלץ ממנו את המחירים. הם נשמרים כאן ומשמשים את סוכן התמחור כמקור אמת — בלי לסרוק כל פעם מחדש.</p>
+                    <p class="section-subtitle">יש לכם מאגר מחירים משלכם ששונה ממחירי השוק? הוסיפו אותו כאן — והמערכת תתמחר לפי המחירים שלכם מכאן ואילך. אם לא, סוכן התמחור עובד לפי הערכות שוק.</p>
                 </div>
 
                 <div class="settings-grid">
-                    <!-- Scan + manual add -->
+                    <!-- manual add + share -->
                     <div style="display:flex;flex-direction:column;gap:20px;">
                         <div class="section-card">
-                            <div class="card-header"><h3><i class="fa-solid fa-robot text-accent"></i> סריקת מחירים מאתר ספק</h3></div>
+                            <div class="card-header"><h3><i class="fa-solid fa-plus text-accent"></i> הוספת מחיר ידנית</h3></div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+                                <p class="input-help">הדרך הכי מדויקת — מחירי הסחר האמיתיים שלך (שלרוב לא מופיעים בשום אתר).</p>
+                                <div class="catalog-manual-row">
+                                    <input type="text" id="cat-manual-name" placeholder="שם הפריט (למשל: כבל XLPE 5x6)">
+                                    <input type="number" id="cat-manual-price" placeholder="מחיר ₪" style="max-width:110px;">
+                                    <input type="text" id="cat-manual-unit" placeholder="יחידה" style="max-width:110px;">
+                                    <button class="btn btn-success btn-small" onclick="addManualCatalogItem()"><i class="fa-solid fa-plus"></i></button>
+                                </div>
+                        </div>
+
+                        <!-- Import from a supplier page (secondary, single page) -->
+                        <div class="section-card">
+                            <div class="card-header"><h3><i class="fa-solid fa-robot text-accent"></i> ייבוא מדף ספק (אופציונלי)</h3></div>
                             <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
-                                <p class="input-help">הדבק כתובת של דף קטגוריה/מוצרים (למשל באתר ספק חשמל). ה-AI יקרא את הדף ויחלץ את רשימת המחירים לאישורך.</p>
+                                <p class="input-help">הדבק כתובת של <strong>דף קטגוריה/מוצרים בודד</strong>. ה-AI יקרא את הדף הזה בלבד (לא את כל האתר) ויחלץ ממנו מחירים לאישורך. עובד בעיקר על דפים שהמחירים בהם כתובים כטקסט.</p>
                                 <div style="display:flex;gap:8px;">
                                     <input type="url" id="catalog-url" placeholder="https://supplier.co.il/category/..." style="flex:1;">
                                     <button class="btn btn-accent" id="btn-scan-prices" onclick="scanSupplierPrices()">
-                                        <i class="fa-solid fa-magnifying-glass"></i> סרוק
+                                        <i class="fa-solid fa-magnifying-glass"></i> ייבא
                                     </button>
                                 </div>
                                 <div id="catalog-scan-status" class="input-help" style="display:none;"></div>
@@ -835,16 +806,20 @@
                             </div>
                         </div>
 
-                        <div class="section-card">
-                            <div class="card-header"><h3><i class="fa-solid fa-plus text-accent"></i> הוספת מחיר ידנית</h3></div>
+                        <!-- Share catalog with the community (→ admin inbox by email) -->
+                        <div class="section-card" style="border-color:rgba(34,201,132,0.3);">
+                            <div class="card-header"><h3><i class="fa-solid fa-share-nodes" style="color:var(--color-success);"></i> שיתוף המאגר עם הקהילה</h3></div>
                             <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
-                                <p class="input-help">הדרך הכי מדויקת — מחירי הסחר האמיתיים שלך (שלרוב לא מופיעים באתר).</p>
-                                <div class="catalog-manual-row">
-                                    <input type="text" id="cat-manual-name" placeholder="שם הפריט (למשל: כבל XLPE 5x6)">
-                                    <input type="number" id="cat-manual-price" placeholder="מחיר ₪" style="max-width:110px;">
-                                    <input type="text" id="cat-manual-unit" placeholder="יחידה" style="max-width:110px;">
-                                    <button class="btn btn-success btn-small" onclick="addManualCatalogItem()"><i class="fa-solid fa-plus"></i></button>
-                                </div>
+                                <p class="input-help" style="line-height:1.6;">
+                                    רוצה לחלוק את המחירים שלך עם כולם? שלח את המאגר אל שרת המערכת — ואם המחירים יאומתו,
+                                    כל המשתמשים יוכלו להנות מהידע שלך בתמחור 🙂
+                                </p>
+                                <input type="tel" id="catalog-share-phone" placeholder="טלפון ליצירת קשר (אופציונלי)" style="max-width:220px;">
+                                <button class="btn btn-secondary" style="align-self:flex-start;" onclick="shareCatalogWithSystem()">
+                                    <i class="fa-solid fa-paper-plane"></i> שלח את המאגר שלי למערכת
+                                </button>
+                                <div id="catalog-share-status" class="input-help" style="display:none;"></div>
+                            </div>
                         </div>
 
                         <!-- Phrasing DB (Moved from Business Details) -->
@@ -1127,43 +1102,36 @@
                     <div style="display:flex;flex-direction:column;gap:20px;">
                         <div class="section-card" style="border-color:rgba(240,192,64,0.25);">
                             <div class="card-header">
-                                <h3><i class="fa-solid fa-key" style="color:#f0c040;"></i> מפתח DeepSeek API (גלובלי לכל המשתמשים)</h3>
+                                <h3><i class="fa-solid fa-key" style="color:#f0c040;"></i> מפתחות Gemini API</h3>
                             </div>
                             <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
-                                <p class="input-help">מפתח זה ישמש את <strong>כל המשתמשים</strong> באתר. עדיף להגדירו כ-<code>DEEPSEEK_API_KEY</code> בשרת (Cloudflare). מופק מ-<a href="https://platform.deepseek.com/api_keys" target="_blank" class="text-link">DeepSeek Platform</a>.</p>
+                                <p class="input-help">
+                                    שני מפתחות <strong>Google Gemini</strong> (AI Studio) משני חשבונות Google שלך —
+                                    <strong>ראשי</strong> ואחריו <strong>גיבוי</strong>. אם הראשי מגיע למכסה, המערכת עוברת
+                                    אוטומטית לגיבוי. מפיקים ב-<a href="https://aistudio.google.com/apikey" target="_blank" class="text-link">aistudio.google.com/apikey</a>.
+                                </p>
                                 <div class="form-group" style="margin-bottom:0;">
-                                    <input type="password" id="admin-gemini-key" placeholder="sk-... (מפתח DeepSeek)">
+                                    <label class="input-help" style="margin-bottom:4px;display:block;">מפתח ראשי</label>
+                                    <input type="password" id="admin-gemini-key" placeholder="AIza... (מפתח Gemini ראשי)">
+                                </div>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label class="input-help" style="margin-bottom:4px;display:block;">מפתח גיבוי</label>
+                                    <input type="password" id="admin-gemini-key-2" placeholder="AIza... (מפתח Gemini מחשבון שני)">
                                 </div>
                                 <button class="btn btn-accent" onclick="adminSaveGeminiKey()">
-                                    <i class="fa-solid fa-save"></i> שמור מפתח לכל המשתמשים
+                                    <i class="fa-solid fa-save"></i> שמור מפתחות
                                 </button>
                                 <p class="input-help" id="admin-key-status" style="color:var(--color-success);display:none;">
-                                    <i class="fa-solid fa-circle-check"></i> מפתח שמור ופעיל
+                                    <i class="fa-solid fa-circle-check"></i> המפתחות נשמרו
+                                </p>
+                                <p class="input-help" style="border-top:1px solid var(--border-color);padding-top:10px;line-height:1.6;">
+                                    <i class="fa-solid fa-circle-info" style="color:#f0c040;"></i>
+                                    להפעלה קבועה לכל המבקרים — הגדר בשרת (Cloudflare Pages → Environment variables):
+                                    <code>GEMINI_API_KEY</code> (ראשי) ו-<code>GEMINI_API_KEY_2</code> (גיבוי). המפתחות כאן משמשים כגיבוי מקומי מהדפדפן.
                                 </p>
                             </div>
                         </div>
 
-                        <!-- Server Drive Folder -->
-                        <div class="section-card" style="border-color:rgba(240,192,64,0.25);">
-                            <div class="card-header">
-                                <h3><i class="fa-brands fa-google-drive" style="color:#f0c040;"></i> תיקיית Drive מרכזית (שרת)</h3>
-                            </div>
-                            <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
-                                <p class="input-help">
-                                    צור תיקייה <code>SKILLS/SJ-SALE-WEBSITE</code> ב-Drive שלך, שתף אותה עם
-                                    <strong>"Anyone with link can EDIT"</strong>, הדבק כאן את ה-Folder ID.
-                                    כל משתמש יקבל תת-תיקייה בשמו שם אוטומטית.
-                                </p>
-                                <div class="form-group" style="margin-bottom:0;">
-                                    <input type="text" id="admin-server-folder-id" placeholder="1ABCdef_FolderID_fromDriveURL">
-                                    <p class="input-help" style="margin-top:4px;">ה-ID נמצא ב-URL של התיקייה: drive.google.com/drive/folders/<strong>ID_כאן</strong></p>
-                                </div>
-                                <button class="btn btn-accent" onclick="adminSaveServerFolder()">
-                                    <i class="fa-solid fa-server"></i> הגדר כתיקיית שרת
-                                </button>
-                                <p class="input-help" id="admin-folder-status" style="color:var(--color-success);display:none;"></p>
-                            </div>
-                        </div>
                     </div>
 
                     <!-- Right: Status + users -->
@@ -1187,9 +1155,9 @@
                                 <h3><i class="fa-solid fa-circle-info" style="color:#f0c040;"></i> מצב מערכת</h3>
                             </div>
                             <div class="card-body" style="display:flex;flex-direction:column;gap:8px;font-size:0.88rem;">
-                                <div>מפתח API: <span id="admin-status-key" style="color:var(--color-success);">—</span></div>
-                                <div>תיקיית שרת: <span id="admin-status-folder" style="color:var(--color-success);">—</span></div>
-                                <div>Drive: <span id="admin-status-drive">—</span></div>
+                                <div>מפתח ראשי: <span id="admin-status-key" style="color:var(--color-success);">—</span></div>
+                                <div>מפתח גיבוי: <span id="admin-status-key2" style="color:var(--color-success);">—</span></div>
+                                <div>גיבוי ענן (KV): <span id="admin-status-drive">—</span></div>
                             </div>
                         </div>
                     </div>
@@ -1247,8 +1215,7 @@
                 התנסות במערכת כאורח
             </button>
             <p style="margin-top:12px;font-size:0.85rem;color:var(--text-secondary);text-align:center;line-height:1.6;background:rgba(255,170,0,0.09);border:1px solid rgba(255,170,0,0.25);border-radius:10px;padding:10px 14px;">
-                <i class="fa-solid fa-circle-info" style="color:#ffaa00;margin-left:5px;"></i>
-                במצב אורח העבודה נשמרת <strong>רק במכשיר זה</strong>.<br>התחברות עם Google שומרת את הכל בענן.
+                שים ❤️ — במצב אורח <strong>ההיסטוריה שלך נמחקת ברגע ההתנתקות</strong>.<br>התחברות עם Google שומרת את הכל בענן.
             </p>
 
             <!-- Google OAuth client id, populated from localStorage on init -->

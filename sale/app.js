@@ -19,52 +19,42 @@ function showAdminTabIfNeeded() {
 
 function adminSaveGeminiKey() {
     const key = (document.getElementById('admin-gemini-key')?.value || '').trim();
-    if (!key) { showToast('הזן מפתח תחילה', 'error'); return; }
-    if (/googleusercontent\.com/i.test(key)) {
-        showToast('זהו מזהה OAuth (Client ID) ולא מפתח API. צור מפתח DeepSeek ב-platform.deepseek.com/api_keys.', 'error');
-        return;
+    const key2 = (document.getElementById('admin-gemini-key-2')?.value || '').trim();
+    if (!key && !key2) { showToast('הזן לפחות מפתח אחד', 'error'); return; }
+    for (const k of [key, key2]) {
+        if (k && /googleusercontent\.com/i.test(k)) {
+            showToast('אחד הערכים הוא מזהה OAuth (Client ID) ולא מפתח API. צור מפתח Gemini ב-aistudio.google.com/apikey.', 'error');
+            return;
+        }
+        if (k && k.length < 20) {
+            showToast('אחד המפתחות נראה קצר מדי — ודא שהעתקת אותו במלואו ללא רווחים.', 'error');
+            return;
+        }
     }
-    if (key.length < 20) {
-        showToast('המפתח נראה קצר מדי — ודא שהעתקת אותו במלואו ללא רווחים.', 'error');
-        return;
-    }
-    saveGlobalGeminiKey(key);
-    appState.settings.geminiApiKey = key;
+    if (key) { saveGlobalGeminiKey(key); appState.settings.geminiApiKey = key; }
+    saveGlobalGeminiKeyBackup(key2);
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
     const status = document.getElementById('admin-key-status');
     if (status) status.style.display = 'block';
-    showToast('מפתח API נשמר לכל המשתמשים');
-    adminRefreshStatus();
-}
-
-function adminSaveServerFolder() {
-    const id = (document.getElementById('admin-server-folder-id')?.value || '').trim();
-    if (!id) { showToast('הזן Folder ID תחילה', 'error'); return; }
-    localStorage.setItem('sj_server_folder_id', id);
-    // Clear cached folder IDs so next sync uses the new server folder
-    localStorage.removeItem(getStorageKey('sj_sync_folder_id'));
-    localStorage.removeItem(getStorageKey('sj_folder_quotes_id'));
-    const status = document.getElementById('admin-folder-status');
-    if (status) { status.style.display = 'block'; status.textContent = `תיקיית שרת הוגדרה: ${id}`; }
-    showToast('תיקיית שרת Drive הוגדרה בהצלחה');
+    showToast('מפתחות Gemini נשמרו');
     adminRefreshStatus();
 }
 
 function adminRefreshStatus() {
     const keyEl = document.getElementById('admin-status-key');
-    const folderEl = document.getElementById('admin-status-folder');
-    const driveEl = document.getElementById('admin-status-drive');
+    const key2El = document.getElementById('admin-status-key2');
+    const cloudEl = document.getElementById('admin-status-drive');
     const hasKey = !!getGeminiApiKey();
-    const serverFolder = localStorage.getItem('sj_server_folder_id');
+    const hasKey2 = !!getGeminiApiKeyBackup();
     if (keyEl) { keyEl.textContent = hasKey ? 'מוגדר ✓' : 'לא מוגדר'; keyEl.style.color = hasKey ? 'var(--color-success)' : 'var(--color-danger)'; }
-    if (folderEl) { folderEl.textContent = serverFolder ? serverFolder.slice(0,20)+'…' : 'לא מוגדר'; folderEl.style.color = serverFolder ? 'var(--color-success)' : '#f0c040'; }
-    if (driveEl) { driveEl.textContent = googleAccessToken ? 'מחובר ✓' : 'מנותק'; driveEl.style.color = googleAccessToken ? 'var(--color-success)' : 'var(--color-danger)'; }
+    if (key2El) { key2El.textContent = hasKey2 ? 'מוגדר ✓' : 'לא מוגדר'; key2El.style.color = hasKey2 ? 'var(--color-success)' : '#f0c040'; }
+    if (cloudEl) { cloudEl.textContent = googleAccessToken ? 'פעיל ✓' : 'לא מחובר'; cloudEl.style.color = googleAccessToken ? 'var(--color-success)' : '#f0c040'; }
 
     // Pre-fill existing values
     const keyInput = document.getElementById('admin-gemini-key');
     if (keyInput && !keyInput.value) keyInput.value = getGeminiApiKey() || '';
-    const folderInput = document.getElementById('admin-server-folder-id');
-    if (folderInput && !folderInput.value) folderInput.value = serverFolder || '';
+    const key2Input = document.getElementById('admin-gemini-key-2');
+    if (key2Input && !key2Input.value) key2Input.value = getGeminiApiKeyBackup() || '';
 }
 
 function adminRefreshUserList() {
@@ -178,20 +168,66 @@ function setQuotaCharging(on) {
     if (ring) ring.classList.toggle('charging', !!on);
 }
 
-// Personal DeepSeek API key (sk-...), used only as a fallback when the server
-// proxy isn't deployed (e.g. local file testing). The shared key normally lives
-// server-side and the browser never sees it.
-const DEEPSEEK_DIRECT_URL = 'https://api.deepseek.com/chat/completions';
+// Personal Gemini API key(s), used only as a fallback when the server proxy
+// isn't deployed (e.g. local file testing). In production the real keys live
+// server-side (GEMINI_API_KEY / GEMINI_API_KEY_2) and the browser never sees
+// them. Two keys — primary + backup from a second Google account — mirror the
+// server's per-request failover.
+function _validKey(key) {
+    return key && key.length > 15 && key !== 'null' && key !== 'undefined'
+        && !/googleusercontent\.com/i.test(key) ? key : ''; // ignore an OAuth client-id stored by mistake
+}
 function getGeminiApiKey() {
-    const key = appState.settings.geminiApiKey
-        || localStorage.getItem('sj_gemini_key_global')
-        || '';
-    const valid = key && key.length > 15 && key !== 'null' && key !== 'undefined'
-        && !/googleusercontent\.com/i.test(key); // ignore an OAuth client-id mistakenly stored as a key
-    return valid ? key : '';
+    return _validKey(appState.settings.geminiApiKey || localStorage.getItem('sj_gemini_key_global') || '');
+}
+function getGeminiApiKeyBackup() {
+    return _validKey(localStorage.getItem('sj_gemini_key_global_2') || '');
 }
 function saveGlobalGeminiKey(key) {
     localStorage.setItem('sj_gemini_key_global', key);
+}
+function saveGlobalGeminiKeyBackup(key) {
+    if (key) localStorage.setItem('sj_gemini_key_global_2', key);
+    else localStorage.removeItem('sj_gemini_key_global_2');
+}
+
+// Statuses that mean "this key can't serve right now — try the backup":
+// 429 quota/rate, 401/403 bad/expired key, 5xx upstream.
+const GEMINI_RETRIABLE = [429, 401, 403, 500, 502, 503];
+
+// Browser-side direct Gemini call (local/dev fallback only). Converts the
+// OpenAI-style messages the app speaks into Gemini's request shape.
+function _messagesToGemini(payload) {
+    const contents = [];
+    let system = '';
+    for (const m of payload.messages || []) {
+        if (!m || typeof m.content !== 'string') continue;
+        if (m.role === 'system') { system += (system ? '\n' : '') + m.content; continue; }
+        contents.push({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] });
+    }
+    const body = { contents };
+    if (system) body.systemInstruction = { parts: [{ text: system }] };
+    const gc = {};
+    if (payload.response_format && payload.response_format.type === 'json_object') gc.responseMimeType = 'application/json';
+    if (typeof payload.temperature === 'number') gc.temperature = payload.temperature;
+    if (payload.max_tokens) gc.maxOutputTokens = payload.max_tokens;
+    if (Object.keys(gc).length) body.generationConfig = gc;
+    return body;
+}
+async function callGeminiDirect(key, payload) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+    const upstream = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(_messagesToGemini(payload))
+    });
+    if (!upstream.ok) return upstream; // caller inspects status for failover
+    // Normalize Gemini → the OpenAI shape the app's readers expect.
+    const data = await upstream.json();
+    let text = '';
+    try { text = (data.candidates[0].content.parts || []).map(p => p.text || '').join(''); } catch (e) {}
+    return new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content: text } }] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } });
 }
 
 // Single entry point for every AI call. `value` is a "provider|model" string
@@ -220,22 +256,24 @@ async function callAI(value, payload) {
         return proxyRes;
     }
 
-    const personalKey = getGeminiApiKey();
-    if (personalKey) {
-        // Local-testing fallback only: hit DeepSeek directly with a personal key.
-        return fetch(DEEPSEEK_DIRECT_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${personalKey}`
-            },
-            body: JSON.stringify({ model: 'deepseek-chat', stream: false, ...payload })
-        });
+    // Local-testing fallback only: hit Gemini directly with the admin key(s),
+    // primary then backup — the same failover the server does with
+    // GEMINI_API_KEY / GEMINI_API_KEY_2.
+    const primaryKey = getGeminiApiKey();
+    const backupKey = getGeminiApiKeyBackup();
+    if (primaryKey) {
+        try {
+            const first = await callGeminiDirect(primaryKey, payload);
+            if (!(GEMINI_RETRIABLE.includes(first.status) && backupKey)) return first;
+            try { await first.text(); } catch (e) {} // drain the failed attempt
+        } catch (e) { if (!backupKey) throw e; }
+        return callGeminiDirect(backupKey, payload); // primary hit quota/auth → backup account
     }
+    if (backupKey) return callGeminiDirect(backupKey, payload);
 
     // Neither a server key nor a personal key is configured.
     return new Response(JSON.stringify({
-        error: { message: 'שירות ה-AI אינו מוגדר עדיין. הגדירו GEMINI_API_KEY ו/או DEEPSEEK_API_KEY בשרת (Cloudflare Pages).' }
+        error: { message: 'שירות ה-AI אינו מוגדר עדיין. הגדירו GEMINI_API_KEY (ו-GEMINI_API_KEY_2 לגיבוי) בשרת (Cloudflare Pages), או מפתחות Gemini בפאנל האדמין.' }
     }), { status: 503, headers: { 'Content-Type': 'application/json' } });
 }
 
@@ -1574,6 +1612,46 @@ function clearPriceCatalog() {
     savePriceCatalog();
     renderPriceCatalog();
     showToast('המאגר רוקן');
+}
+
+// Send this user's price catalog to the SJ inbox for review. If verified, it can
+// be promoted into the shared system catalog. Google gives us the sender's name
+// and email (never a phone — that scope doesn't exist), so we ask for a phone
+// optionally. Delivered by email server-side (/api/share-catalog), which works
+// across devices immediately without extra infrastructure.
+async function shareCatalogWithSystem() {
+    if (!priceCatalog || priceCatalog.length === 0) {
+        showToast('אין פריטים במאגר לשיתוף', 'error');
+        return;
+    }
+    const statusEl = document.getElementById('catalog-share-status');
+    const phone = (document.getElementById('catalog-share-phone')?.value || '').trim();
+    const activeUser = getActiveUser() || '';
+    const senderEmail = isGuestUser() ? '' : (activeUser.includes('@') ? activeUser : '');
+    const senderName = isGuestUser() ? 'אורח' : (localStorage.getItem('gsi_name') || senderEmail.split('@')[0] || 'משתמש');
+    const profession = (appState.settings && appState.settings.profession) || '';
+
+    if (statusEl) { statusEl.style.display = 'block'; statusEl.style.color = ''; statusEl.textContent = 'שולח…'; }
+    try {
+        const res = await fetch('/api/share-catalog', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: senderName, email: senderEmail, phone, profession,
+                catalog: priceCatalog.slice(0, 500)
+            })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+            if (statusEl) { statusEl.style.color = 'var(--color-success)'; statusEl.textContent = 'תודה! המאגר נשלח לבדיקה 🙂'; }
+            showToast('המאגר נשלח לבדיקה — תודה על השיתוף!');
+        } else {
+            const msg = (data && data.error && data.error.message) || 'השליחה נכשלה. נסה שוב מאוחר יותר.';
+            if (statusEl) { statusEl.style.color = 'var(--color-danger)'; statusEl.textContent = msg; }
+        }
+    } catch (e) {
+        if (statusEl) { statusEl.style.color = 'var(--color-danger)'; statusEl.textContent = 'שגיאת רשת — נסה שוב.'; }
+    }
 }
 
 function getNextQuoteNumber() {
@@ -4024,6 +4102,15 @@ function handleUserLogout() {
     // session identity below is gone (or worse, after the next user logs in).
     if (_cloudSaveTimer) { clearTimeout(_cloudSaveTimer); _cloudSaveTimer = null; }
 
+    // Guest history is device-only and ends with the session — exactly as the
+    // lock screen promises. Wipe the guest namespace on logout.
+    if (isGuestUser()) {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('sj_user_guest_')) localStorage.removeItem(k);
+        }
+    }
+
     // Clear the session identity. The per-user token key must be computed
     // BEFORE removing sj_logged_in_user (getStorageKey depends on it).
     localStorage.removeItem(getStorageKey('sj_drive_access_token'));
@@ -4068,33 +4155,37 @@ function updateUserProfileUI() {
     const professionName = professionMap[professionKey] || professionKey;
     
     // Update UI elements
-    // Sidebar user chip (name, role, avatar — Google photo if available)
+    // Sidebar user chip (name, role, avatar — Google photo if available).
+    // A guest session ALWAYS displays as "אורח" — never a leftover Google
+    // identity from a previous session on this browser.
+    const isGuest = isGuestUser();
     const chipName = document.getElementById('user-chip-name');
     // Repair any mojibake left by an old atob()-based login, and persist the fix.
-    const gsiName = repairMojibake(localStorage.getItem('gsi_name'));
+    const gsiName = isGuest ? null : repairMojibake(localStorage.getItem('gsi_name'));
     if (gsiName && gsiName !== localStorage.getItem('gsi_name')) localStorage.setItem('gsi_name', gsiName);
-    if (chipName) chipName.textContent = (gsiName || displayName.split('@')[0]);
+    const shownName = isGuest ? 'אורח' : (gsiName || displayName.split('@')[0]);
+    if (chipName) chipName.textContent = shownName;
     const chipRole = document.getElementById('user-chip-role');
-    if (chipRole) chipRole.textContent = professionName;
+    if (chipRole) chipRole.textContent = isGuest ? 'מצב התנסות' : professionName;
     const chipAvatar = document.getElementById('user-chip-avatar');
     if (chipAvatar) {
-        const pic = localStorage.getItem('gsi_picture');
+        const pic = isGuest ? null : localStorage.getItem('gsi_picture');
         if (pic) {
             chipAvatar.style.backgroundImage = `url("${pic}")`;
             chipAvatar.textContent = '';
             chipAvatar.classList.add('has-photo');
         } else {
             chipAvatar.style.backgroundImage = '';
-            chipAvatar.textContent = (chipName ? chipName.textContent : displayName).trim().charAt(0).toUpperCase();
+            chipAvatar.textContent = shownName.trim().charAt(0).toUpperCase();
             chipAvatar.classList.remove('has-photo');
         }
     }
 
     const profileNameDisplay = document.getElementById('profile-username-display');
-    if (profileNameDisplay) profileNameDisplay.textContent = displayName;
-    
+    if (profileNameDisplay) profileNameDisplay.textContent = isGuest ? 'אורח' : displayName;
+
     const profileFieldUser = document.getElementById('profile-field-username');
-    if (profileFieldUser) profileFieldUser.textContent = displayName;
+    if (profileFieldUser) profileFieldUser.textContent = isGuest ? 'אורח' : displayName;
     
     const profileFieldProf = document.getElementById('profile-field-profession');
     if (profileFieldProf) profileFieldProf.textContent = professionName;
