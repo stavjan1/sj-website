@@ -16,3 +16,6 @@ UPGRADE_PLAN.md
 # original uploads in sale/backgrounds/ are kept local only.
 sale/backgrounds/*
 !sale/backgrounds/bg-*.jpeg
+
+# Claude Code local dev config
+.claude/

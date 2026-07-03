@@ -19,52 +19,88 @@ function showAdminTabIfNeeded() {
 
 function adminSaveGeminiKey() {
     const key = (document.getElementById('admin-gemini-key')?.value || '').trim();
-    if (!key) { showToast('הזן מפתח תחילה', 'error'); return; }
-    if (/googleusercontent\.com/i.test(key)) {
-        showToast('זהו מזהה OAuth (Client ID) ולא מפתח API. צור מפתח DeepSeek ב-platform.deepseek.com/api_keys.', 'error');
-        return;
+    const key2 = (document.getElementById('admin-gemini-key-2')?.value || '').trim();
+    if (!key && !key2) { showToast('הזן לפחות מפתח אחד', 'error'); return; }
+    for (const k of [key, key2]) {
+        if (k && /googleusercontent\.com/i.test(k)) {
+            showToast('אחד הערכים הוא מזהה OAuth (Client ID) ולא מפתח API. צור מפתח Gemini ב-aistudio.google.com/apikey.', 'error');
+            return;
+        }
+        if (k && k.length < 20) {
+            showToast('אחד המפתחות נראה קצר מדי — ודא שהעתקת אותו במלואו ללא רווחים.', 'error');
+            return;
+        }
     }
-    if (key.length < 20) {
-        showToast('המפתח נראה קצר מדי — ודא שהעתקת אותו במלואו ללא רווחים.', 'error');
-        return;
-    }
-    saveGlobalGeminiKey(key);
-    appState.settings.geminiApiKey = key;
+    if (key) { saveGlobalGeminiKey(key); appState.settings.geminiApiKey = key; }
+    saveGlobalGeminiKeyBackup(key2);
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
     const status = document.getElementById('admin-key-status');
     if (status) status.style.display = 'block';
-    showToast('מפתח API נשמר לכל המשתמשים');
-    adminRefreshStatus();
-}
-
-function adminSaveServerFolder() {
-    const id = (document.getElementById('admin-server-folder-id')?.value || '').trim();
-    if (!id) { showToast('הזן Folder ID תחילה', 'error'); return; }
-    localStorage.setItem('sj_server_folder_id', id);
-    // Clear cached folder IDs so next sync uses the new server folder
-    localStorage.removeItem(getStorageKey('sj_sync_folder_id'));
-    localStorage.removeItem(getStorageKey('sj_folder_quotes_id'));
-    const status = document.getElementById('admin-folder-status');
-    if (status) { status.style.display = 'block'; status.textContent = `תיקיית שרת הוגדרה: ${id}`; }
-    showToast('תיקיית שרת Drive הוגדרה בהצלחה');
+    showToast('מפתחות Gemini נשמרו');
     adminRefreshStatus();
 }
 
 function adminRefreshStatus() {
     const keyEl = document.getElementById('admin-status-key');
-    const folderEl = document.getElementById('admin-status-folder');
-    const driveEl = document.getElementById('admin-status-drive');
+    const key2El = document.getElementById('admin-status-key2');
+    const cloudEl = document.getElementById('admin-status-drive');
     const hasKey = !!getGeminiApiKey();
-    const serverFolder = localStorage.getItem('sj_server_folder_id');
+    const hasKey2 = !!getGeminiApiKeyBackup();
     if (keyEl) { keyEl.textContent = hasKey ? 'מוגדר ✓' : 'לא מוגדר'; keyEl.style.color = hasKey ? 'var(--color-success)' : 'var(--color-danger)'; }
-    if (folderEl) { folderEl.textContent = serverFolder ? serverFolder.slice(0,20)+'…' : 'לא מוגדר'; folderEl.style.color = serverFolder ? 'var(--color-success)' : '#f0c040'; }
-    if (driveEl) { driveEl.textContent = googleAccessToken ? 'מחובר ✓' : 'מנותק'; driveEl.style.color = googleAccessToken ? 'var(--color-success)' : 'var(--color-danger)'; }
+    if (key2El) { key2El.textContent = hasKey2 ? 'מוגדר ✓' : 'לא מוגדר'; key2El.style.color = hasKey2 ? 'var(--color-success)' : '#f0c040'; }
+    if (cloudEl) { cloudEl.textContent = googleAccessToken ? 'פעיל ✓' : 'לא מחובר'; cloudEl.style.color = googleAccessToken ? 'var(--color-success)' : '#f0c040'; }
 
     // Pre-fill existing values
     const keyInput = document.getElementById('admin-gemini-key');
     if (keyInput && !keyInput.value) keyInput.value = getGeminiApiKey() || '';
-    const folderInput = document.getElementById('admin-server-folder-id');
-    if (folderInput && !folderInput.value) folderInput.value = serverFolder || '';
+    const key2Input = document.getElementById('admin-gemini-key-2');
+    if (key2Input && !key2Input.value) key2Input.value = getGeminiApiKeyBackup() || '';
+}
+
+// ===== System catalog (admin) =====
+// The admin curates prices in his own personal catalog (manual / Excel import /
+// page scan), then publishes a snapshot of it as the shared system catalog that
+// every user's pricing agent receives as the market baseline.
+async function adminPublishSystemCatalog() {
+    const status = document.getElementById('admin-syscat-status');
+    if (!isAdmin()) return;
+    if (!priceCatalog || priceCatalog.length === 0) {
+        showToast('המאגר האישי שלך ריק — אין מה לפרסם', 'error');
+        return;
+    }
+    if (!googleAccessToken) {
+        showToast('נדרשת התחברות עם Google כדי לפרסם (אימות מנהל)', 'error');
+        return;
+    }
+    if (!confirm(`לפרסם ${priceCatalog.length} פריטים כמאגר המערכת לכל המשתמשים?\n(הפעולה מחליפה את מאגר המערכת הקיים)`)) return;
+    if (status) { status.style.display = 'block'; status.style.color = ''; status.textContent = 'מפרסם…'; }
+    try {
+        const res = await fetch('/api/catalog', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({ items: priceCatalog })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+            systemCatalog = priceCatalog.slice();
+            localStorage.setItem('sj_system_catalog_cache', JSON.stringify(systemCatalog));
+            if (status) { status.style.color = 'var(--color-success)'; status.textContent = `פורסם ✓ — ${data.count} פריטים פעילים אצל כל המשתמשים.`; }
+            showToast('מאגר המערכת פורסם לכל המשתמשים');
+            adminRefreshSystemCatalogInfo();
+        } else {
+            const msg = (data && data.error && data.error.message) || `הפרסום נכשל (${res.status}).`;
+            if (status) { status.style.color = 'var(--color-danger)'; status.textContent = msg; }
+        }
+    } catch (e) {
+        if (status) { status.style.color = 'var(--color-danger)'; status.textContent = 'שגיאת רשת — נסה שוב.'; }
+    }
+}
+
+function adminRefreshSystemCatalogInfo() {
+    const el = document.getElementById('admin-syscat-count');
+    if (el) el.textContent = `${(systemCatalog || []).length} פריטים`;
+    const mine = document.getElementById('admin-syscat-mine');
+    if (mine) mine.textContent = `${(priceCatalog || []).length} פריטים`;
 }
 
 function adminRefreshUserList() {
@@ -178,20 +214,66 @@ function setQuotaCharging(on) {
     if (ring) ring.classList.toggle('charging', !!on);
 }
 
-// Personal DeepSeek API key (sk-...), used only as a fallback when the server
-// proxy isn't deployed (e.g. local file testing). The shared key normally lives
-// server-side and the browser never sees it.
-const DEEPSEEK_DIRECT_URL = 'https://api.deepseek.com/chat/completions';
+// Personal Gemini API key(s), used only as a fallback when the server proxy
+// isn't deployed (e.g. local file testing). In production the real keys live
+// server-side (GEMINI_API_KEY / GEMINI_API_KEY_2) and the browser never sees
+// them. Two keys — primary + backup from a second Google account — mirror the
+// server's per-request failover.
+function _validKey(key) {
+    return key && key.length > 15 && key !== 'null' && key !== 'undefined'
+        && !/googleusercontent\.com/i.test(key) ? key : ''; // ignore an OAuth client-id stored by mistake
+}
 function getGeminiApiKey() {
-    const key = appState.settings.geminiApiKey
-        || localStorage.getItem('sj_gemini_key_global')
-        || '';
-    const valid = key && key.length > 15 && key !== 'null' && key !== 'undefined'
-        && !/googleusercontent\.com/i.test(key); // ignore an OAuth client-id mistakenly stored as a key
-    return valid ? key : '';
+    return _validKey(appState.settings.geminiApiKey || localStorage.getItem('sj_gemini_key_global') || '');
+}
+function getGeminiApiKeyBackup() {
+    return _validKey(localStorage.getItem('sj_gemini_key_global_2') || '');
 }
 function saveGlobalGeminiKey(key) {
     localStorage.setItem('sj_gemini_key_global', key);
+}
+function saveGlobalGeminiKeyBackup(key) {
+    if (key) localStorage.setItem('sj_gemini_key_global_2', key);
+    else localStorage.removeItem('sj_gemini_key_global_2');
+}
+
+// Statuses that mean "this key can't serve right now — try the backup":
+// 429 quota/rate, 401/403 bad/expired key, 5xx upstream.
+const GEMINI_RETRIABLE = [429, 401, 403, 500, 502, 503];
+
+// Browser-side direct Gemini call (local/dev fallback only). Converts the
+// OpenAI-style messages the app speaks into Gemini's request shape.
+function _messagesToGemini(payload) {
+    const contents = [];
+    let system = '';
+    for (const m of payload.messages || []) {
+        if (!m || typeof m.content !== 'string') continue;
+        if (m.role === 'system') { system += (system ? '\n' : '') + m.content; continue; }
+        contents.push({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] });
+    }
+    const body = { contents };
+    if (system) body.systemInstruction = { parts: [{ text: system }] };
+    const gc = {};
+    if (payload.response_format && payload.response_format.type === 'json_object') gc.responseMimeType = 'application/json';
+    if (typeof payload.temperature === 'number') gc.temperature = payload.temperature;
+    if (payload.max_tokens) gc.maxOutputTokens = payload.max_tokens;
+    if (Object.keys(gc).length) body.generationConfig = gc;
+    return body;
+}
+async function callGeminiDirect(key, payload) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+    const upstream = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(_messagesToGemini(payload))
+    });
+    if (!upstream.ok) return upstream; // caller inspects status for failover
+    // Normalize Gemini → the OpenAI shape the app's readers expect.
+    const data = await upstream.json();
+    let text = '';
+    try { text = (data.candidates[0].content.parts || []).map(p => p.text || '').join(''); } catch (e) {}
+    return new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content: text } }] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } });
 }
 
 // Single entry point for every AI call. `value` is a "provider|model" string
@@ -220,22 +302,24 @@ async function callAI(value, payload) {
         return proxyRes;
     }
 
-    const personalKey = getGeminiApiKey();
-    if (personalKey) {
-        // Local-testing fallback only: hit DeepSeek directly with a personal key.
-        return fetch(DEEPSEEK_DIRECT_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${personalKey}`
-            },
-            body: JSON.stringify({ model: 'deepseek-chat', stream: false, ...payload })
-        });
+    // Local-testing fallback only: hit Gemini directly with the admin key(s),
+    // primary then backup — the same failover the server does with
+    // GEMINI_API_KEY / GEMINI_API_KEY_2.
+    const primaryKey = getGeminiApiKey();
+    const backupKey = getGeminiApiKeyBackup();
+    if (primaryKey) {
+        try {
+            const first = await callGeminiDirect(primaryKey, payload);
+            if (!(GEMINI_RETRIABLE.includes(first.status) && backupKey)) return first;
+            try { await first.text(); } catch (e) {} // drain the failed attempt
+        } catch (e) { if (!backupKey) throw e; }
+        return callGeminiDirect(backupKey, payload); // primary hit quota/auth → backup account
     }
+    if (backupKey) return callGeminiDirect(backupKey, payload);
 
     // Neither a server key nor a personal key is configured.
     return new Response(JSON.stringify({
-        error: { message: 'שירות ה-AI אינו מוגדר עדיין. הגדירו GEMINI_API_KEY ו/או DEEPSEEK_API_KEY בשרת (Cloudflare Pages).' }
+        error: { message: 'שירות ה-AI אינו מוגדר עדיין. הגדירו GEMINI_API_KEY (ו-GEMINI_API_KEY_2 לגיבוי) בשרת (Cloudflare Pages), או מפתחות Gemini בפאנל האדמין.' }
     }), { status: 503, headers: { 'Content-Type': 'application/json' } });
 }
 
@@ -352,7 +436,31 @@ let activeProjectId = null;
 
 // Global variables for Stern Pricing and Google OAuth
 let sternPricingDatabase = [];
-let priceCatalog = []; // user-curated supplier price catalog (scraped + manual)
+let priceCatalog = [];  // user-curated supplier price catalog (manual/import/scrape)
+let systemCatalog = []; // shared baseline published by the admin (read-only here);
+                        // a personal item with the same name OVERRIDES the system price
+
+// Load the shared system catalog (market baseline for everyone). Cached in a
+// GLOBAL localStorage key so it survives offline/local runs; refreshed from
+// /api/catalog on every session start. Personal prices always win in the merge.
+async function loadSystemCatalog() {
+    try { systemCatalog = JSON.parse(localStorage.getItem('sj_system_catalog_cache') || '[]') || []; }
+    catch (e) { systemCatalog = []; }
+    try {
+        const res = await fetch('/api/catalog');
+        if (!res.ok) return; // 404 local / 501 no KV — keep the cache
+        const data = await res.json();
+        if (data && Array.isArray(data.items)) {
+            systemCatalog = data.items;
+            localStorage.setItem('sj_system_catalog_cache', JSON.stringify(systemCatalog));
+            const note = document.getElementById('system-catalog-note');
+            if (note && systemCatalog.length) {
+                note.style.display = 'block';
+                note.innerHTML = `<i class="fa-solid fa-database" style="color:var(--color-accent);"></i> מאגר המערכת פעיל: <strong>${systemCatalog.length}</strong> מחירי בסיס רצים אוטומטית אצל כולם. מחיר אישי שתוסיף — גובר עליהם.`;
+            }
+        }
+    } catch (e) { /* offline — cache already loaded */ }
+}
 let googleTokenClient = null;
 let googleAccessToken = null;
 
@@ -387,13 +495,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!activeUser) {
         document.getElementById('lock-screen').style.display = 'flex';
         document.querySelector('.app-container').style.display = 'none';
-        toggleLockForm('login');
+        // Post-logout reload lands here — greet the goodbye once.
+        if (sessionStorage.getItem('sj_just_logged_out')) {
+            sessionStorage.removeItem('sj_just_logged_out');
+            showToast('התנתקת מהמערכת בהצלחה');
+        }
     } else {
         document.getElementById('lock-screen').style.display = 'none';
         document.querySelector('.app-container').style.display = 'flex';
         initUserSession();
+        updateQuotaUI(); // initialize the quota ring (app UI only)
     }
-    updateQuotaUI(); // initialize the quota ring on page load
     hideAppSplash();
 });
 
@@ -461,6 +573,18 @@ function applyDatabaseObject(cloudData) {
     if (cloudData.projects) { projectsList = cloudData.projects; localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList)); }
     if (cloudData.trash) { trashedProjectsList = cloudData.trash; localStorage.setItem(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList)); }
     if (cloudData.catalog) { priceCatalog = cloudData.catalog; localStorage.setItem(getStorageKey('sj_price_catalog'), JSON.stringify(priceCatalog)); }
+    // Merge cloud account records into the local list (union by username) —
+    // the same behavior as the legacy Drive-file sync — so profession/display
+    // lookups work on a device that has only ever synced through KV.
+    if (Array.isArray(cloudData.users) && cloudData.users.length) {
+        let localUsers = [];
+        try { localUsers = JSON.parse(localStorage.getItem('sj_app_users') || '[]'); } catch (e) {}
+        const have = new Set(localUsers.filter(u => u && u.username).map(u => u.username.toLowerCase()));
+        cloudData.users.forEach(u => {
+            if (u && u.username && !have.has(u.username.toLowerCase())) localUsers.push(u);
+        });
+        localStorage.setItem('sj_app_users', JSON.stringify(localUsers));
+    }
     if (cloudData.lastUpdated) localStorage.setItem(getStorageKey('sj_db_last_updated'), String(cloudData.lastUpdated));
 }
 
@@ -470,6 +594,15 @@ function scheduleCloudSync() {
     if (!isCloudUser()) return; // guests are local-only by design
     if (_cloudSaveTimer) clearTimeout(_cloudSaveTimer);
     _cloudSaveTimer = setTimeout(cloudSaveNow, 1500);
+}
+
+// An expired/revoked Google token: stop resurrecting it on every load and let
+// the UI show "disconnected" so the user knows to sign in again.
+function handleExpiredCloudToken() {
+    googleAccessToken = null;
+    localStorage.removeItem(getStorageKey('sj_drive_access_token'));
+    sessionStorage.removeItem(getStorageKey('sj_drive_access_token'));
+    updateDriveStatus(false);
 }
 
 async function cloudSaveNow() {
@@ -482,6 +615,7 @@ async function cloudSaveNow() {
         });
         // 501 = KV binding not configured yet → stay local-only, silently.
         if (res.status === 501) return false;
+        if (res.status === 401) { handleExpiredCloudToken(); return false; }
         return res.ok;
     } catch (e) {
         // Offline / transient — local copy stays authoritative until reconnect.
@@ -499,6 +633,7 @@ async function cloudLoadAndMerge(silent) {
             if (!silent) showToast('אחסון הענן (KV) עדיין לא הוגדר — נשמר מקומית בינתיים');
             return;
         }
+        if (res.status === 401) { handleExpiredCloudToken(); return; }
         if (!res.ok) return;
         const body = await res.json();
         const cloud = body && body.data;
@@ -590,6 +725,9 @@ function proceedAsGuest() {
     closeGuestWarning();
     showAuthLoading();
     localStorage.setItem('sj_logged_in_user', 'guest');
+    // A guest session must not inherit a previous Google user's chip identity.
+    localStorage.removeItem('gsi_name');
+    localStorage.removeItem('gsi_picture');
     googleAccessToken = null;
     document.getElementById('lock-screen').style.display = 'none';
     document.querySelector('.app-container').style.display = 'flex';
@@ -617,6 +755,7 @@ function initUserSession() {
     loadHistory();
     loadProjects();
     loadPriceCatalog();
+    loadSystemCatalog(); // async, non-blocking — shared baseline prices
     loadSternPricing();
     loadUploadedImages();
     checkGoogleSession();
@@ -628,7 +767,7 @@ function initUserSession() {
     setupQuotePreviewFit();
     showAdminTabIfNeeded();
     if (isAdmin()) {
-        setTimeout(() => { adminRefreshStatus(); adminRefreshUserList(); }, 300);
+        setTimeout(() => { adminRefreshStatus(); adminRefreshUserList(); adminRefreshSystemCatalogInfo(); }, 300);
     }
 }
 
@@ -1413,8 +1552,17 @@ function savePriceCatalog(sync = true) {
 // which is what makes "resend every message" effectively free. Capped so a huge
 // catalog never blows up the prompt.
 function getPriceCatalogPromptBlock() {
-    if (!priceCatalog || priceCatalog.length === 0) return '';
-    const sorted = priceCatalog.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'he'));
+    // Merge: the shared system catalog is the baseline; a personal item with the
+    // same (case-insensitive) name overrides it. Personal-only items are added.
+    const merged = new Map();
+    (systemCatalog || []).forEach(it => {
+        if (it && it.name) merged.set(String(it.name).trim().toLowerCase(), it);
+    });
+    (priceCatalog || []).forEach(it => {
+        if (it && it.name) merged.set(String(it.name).trim().toLowerCase(), it); // personal wins
+    });
+    if (merged.size === 0) return '';
+    const sorted = [...merged.values()].sort((a, b) => String(a.name).localeCompare(String(b.name), 'he'));
     const lines = sorted.slice(0, 150).map(it => `• ${it.name}: ${it.price}${it.unit ? ' ' + it.unit : ''}`);
     return `\n\nמאגר מחירי ספקים (₪) — מקור אמת למחירי חומרים, התאם כמויות/יחידות; פריט שאינו ברשימה — אמוד כרגיל וציין שזו הערכה:\n` + lines.join('\n');
 }
@@ -1508,6 +1656,67 @@ function addManualCatalogItem() {
     showToast('הפריט נוסף למאגר');
 }
 
+// ===== Excel / CSV import =====
+// Accepts pasted Excel columns (tab-separated) or CSV lines:
+//   name <sep> price <sep> unit?   where sep is TAB / comma / semicolon.
+// Header rows and junk lines are skipped; personal catalog is capped at 1,000.
+const PERSONAL_CATALOG_MAX = 1000;
+
+function parseCatalogImportText(text) {
+    const items = [];
+    for (const rawLine of String(text || '').split(/\r?\n/)) {
+        const line = rawLine.trim();
+        if (!line) continue;
+        // Prefer TAB (Excel paste); otherwise comma/semicolon CSV.
+        const parts = (line.includes('\t') ? line.split('\t') : line.split(/[;,]/)).map(p => p.trim().replace(/^"|"$/g, ''));
+        if (parts.length < 2) continue;
+        const name = parts[0];
+        const price = parseFloat(String(parts[1]).replace(/[₪,\s]/g, ''));
+        if (!name || !Number.isFinite(price)) continue; // skips header rows too
+        items.push({ name, price, unit: parts[2] || '' });
+    }
+    return items;
+}
+
+function _applyCatalogImport(items) {
+    const status = document.getElementById('catalog-import-status');
+    if (items.length === 0) {
+        if (status) { status.style.display = 'block'; status.style.color = 'var(--color-danger)'; status.textContent = 'לא זוהו שורות תקינות. ודא: שם פריט, מחיר, יחידה (מופרדים בטאב או פסיק).'; }
+        return;
+    }
+    let added = 0, skipped = 0;
+    for (const it of items) {
+        if (priceCatalog.length >= PERSONAL_CATALOG_MAX && !priceCatalog.find(x => x.name.toLowerCase() === it.name.toLowerCase())) {
+            skipped++;
+            continue;
+        }
+        if (upsertCatalogItem(it)) added++;
+    }
+    savePriceCatalog();
+    renderPriceCatalog();
+    if (status) {
+        status.style.display = 'block';
+        status.style.color = 'var(--color-success)';
+        status.textContent = `יובאו ${added} פריטים` + (skipped ? ` (${skipped} דולגו — המאגר מוגבל ל-${PERSONAL_CATALOG_MAX} פריטים)` : '') + '.';
+    }
+    showToast(`${added} פריטים יובאו למאגר`);
+}
+
+function importCatalogFromText() {
+    const ta = document.getElementById('catalog-import-text');
+    const items = parseCatalogImportText(ta ? ta.value : '');
+    _applyCatalogImport(items);
+    if (ta && items.length) ta.value = '';
+}
+
+function importCatalogFromFile(input) {
+    const file = input && input.files && input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { _applyCatalogImport(parseCatalogImportText(reader.result)); input.value = ''; };
+    reader.readAsText(file);
+}
+
 function renderPriceCatalog() {
     const list = document.getElementById('catalog-list');
     const countEl = document.getElementById('catalog-count');
@@ -1544,6 +1753,46 @@ function clearPriceCatalog() {
     savePriceCatalog();
     renderPriceCatalog();
     showToast('המאגר רוקן');
+}
+
+// Send this user's price catalog to the SJ inbox for review. If verified, it can
+// be promoted into the shared system catalog. Google gives us the sender's name
+// and email (never a phone — that scope doesn't exist), so we ask for a phone
+// optionally. Delivered by email server-side (/api/share-catalog), which works
+// across devices immediately without extra infrastructure.
+async function shareCatalogWithSystem() {
+    if (!priceCatalog || priceCatalog.length === 0) {
+        showToast('אין פריטים במאגר לשיתוף', 'error');
+        return;
+    }
+    const statusEl = document.getElementById('catalog-share-status');
+    const phone = (document.getElementById('catalog-share-phone')?.value || '').trim();
+    const activeUser = getActiveUser() || '';
+    const senderEmail = isGuestUser() ? '' : (activeUser.includes('@') ? activeUser : '');
+    const senderName = isGuestUser() ? 'אורח' : (localStorage.getItem('gsi_name') || senderEmail.split('@')[0] || 'משתמש');
+    const profession = (appState.settings && appState.settings.profession) || '';
+
+    if (statusEl) { statusEl.style.display = 'block'; statusEl.style.color = ''; statusEl.textContent = 'שולח…'; }
+    try {
+        const res = await fetch('/api/share-catalog', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: senderName, email: senderEmail, phone, profession,
+                catalog: priceCatalog.slice(0, 500)
+            })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.ok) {
+            if (statusEl) { statusEl.style.color = 'var(--color-success)'; statusEl.textContent = 'תודה! המאגר נשלח לבדיקה 🙂'; }
+            showToast('המאגר נשלח לבדיקה — תודה על השיתוף!');
+        } else {
+            const msg = (data && data.error && data.error.message) || 'השליחה נכשלה. נסה שוב מאוחר יותר.';
+            if (statusEl) { statusEl.style.color = 'var(--color-danger)'; statusEl.textContent = msg; }
+        }
+    } catch (e) {
+        if (statusEl) { statusEl.style.color = 'var(--color-danger)'; statusEl.textContent = 'שגיאת רשת — נסה שוב.'; }
+    }
 }
 
 function getNextQuoteNumber() {
@@ -3984,232 +4233,42 @@ function getProfessionSystemInstruction() {
 }
 
 // ==========================================================================
-// Lock Screen (Login / Register) Authentication Handlers
+// Session logout — the only auth entry points are the lock screen's Google
+// and guest buttons (the legacy manual login/register flow was removed).
 // ==========================================================================
-function toggleLockForm(mode) {
-    const tabLogin = document.getElementById('tab-login');
-    const tabRegister = document.getElementById('tab-register');
-    const formLogin = document.getElementById('form-login-user');
-    const formRegister = document.getElementById('form-register-user');
-    
-    if (mode === 'login') {
-        if (tabLogin) tabLogin.classList.add('active');
-        if (tabRegister) tabRegister.classList.remove('active');
-        if (formLogin) formLogin.classList.add('active');
-        if (formRegister) formRegister.classList.remove('active');
-    } else {
-        if (tabLogin) tabLogin.classList.remove('active');
-        if (tabRegister) tabRegister.classList.add('active');
-        if (formLogin) formLogin.classList.remove('active');
-        if (formRegister) formRegister.classList.add('active');
-    }
-}
-
-function handleUserRegister(event) {
-    if (event) event.preventDefault();
-    
-    const usernameInput = document.getElementById('reg-username');
-    const passwordInput = document.getElementById('reg-password');
-    const professionSelect = document.getElementById('reg-profession');
-    
-    if (!usernameInput || !passwordInput || !professionSelect) return;
-    
-    const username = usernameInput.value.trim();
-    const password = passwordInput.value;
-    const profession = professionSelect.value;
-    
-    if (!username || !password) {
-        showToast('אנא מלא את כל השדות', 'error');
-        return;
-    }
-    
-    // Load existing users
-    const usersStr = localStorage.getItem('sj_app_users');
-    let users = [];
-    if (usersStr) {
-        try {
-            users = JSON.parse(usersStr);
-        } catch (e) {
-            console.error('Error parsing users list', e);
-        }
-    }
-    
-    // Check if user already exists
-    const exists = users.some(u => u.username.toLowerCase() === username.toLowerCase());
-    if (exists) {
-        showToast('שם המשתמש כבר קיים במערכת', 'error');
-        return;
-    }
-    
-    // Create new user
-    const newUser = {
-        username: username,
-        password: password, // basic client-side check
-        profession: profession,
-        created: getTodayDateString()
-    };
-    
-    users.push(newUser);
-    localStorage.setItem('sj_app_users', JSON.stringify(users));
-    
-    // Set active user
-    localStorage.setItem('sj_logged_in_user', username);
-    
-    // Set user-specific settings profession default
-    appState.settings.profession = profession;
-    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
-    
-    // Transition UI
-    document.getElementById('lock-screen').style.display = 'none';
-    document.querySelector('.app-container').style.display = 'flex';
-    
-    // Clear inputs
-    usernameInput.value = '';
-    passwordInput.value = '';
-    
-    initUserSession();
-    showToast(`ברוך הבא למערכת, ${username}!`);
-}
-
-// Reveal/hide the first-time-login confirmation block (confirm password + profession).
-function setFirstLoginMode(on) {
-    const extra = document.getElementById('first-login-extra');
-    const btn = document.getElementById('manual-login-btn');
-    if (extra) extra.style.display = on ? 'flex' : 'none';
-    if (btn) btn.textContent = on ? 'הרשמה וכניסה' : 'כניסה';
-    if (!on) {
-        const c = document.getElementById('login-password-confirm');
-        const p = document.getElementById('login-profession');
-        if (c) c.value = '';
-        if (p) p.value = '';
-    }
-}
-
-// Single smart entry point for manual auth: logs in an existing user, or — on a
-// first-time username — switches to a registration step that requires confirming
-// the password, so a typo can never silently lock the account.
-function handleUserLogin(event) {
-    if (event) event.preventDefault();
-
-    const usernameInput = document.getElementById('login-username');
-    const passwordInput = document.getElementById('login-password');
-
-    if (!usernameInput || !passwordInput) return;
-
-    const username = usernameInput.value.trim();
-    const password = passwordInput.value;
-
-    if (!username || !password) {
-        showToast('אנא מלא את כל השדות', 'error');
-        return;
-    }
-
-    // Load existing users
-    const usersStr = localStorage.getItem('sj_app_users');
-    let users = [];
-    if (usersStr) {
-        try {
-            users = JSON.parse(usersStr);
-        } catch (e) {
-            console.error('Error parsing users list', e);
-        }
-    }
-
-    // Find user (case-insensitive — the storage namespace is lowercased too)
-    const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
-
-    if (user) {
-        // Existing account → straightforward login.
-        if (user.isGoogleUser && !user.password) {
-            showToast('המשתמש הזה נרשם דרך Google. אנא היכנס בכפתור "כניסה עם חשבון Google".', 'error');
-            return;
-        }
-        if (user.password !== password) {
-            showToast('שם משתמש או סיסמה שגויים', 'error');
-            return;
-        }
-        finishManualLogin(user.username, `שלום, ${user.username}!`);
-        return;
-    }
-
-    // First-time username → register, but require password confirmation first.
-    const extra = document.getElementById('first-login-extra');
-    const inRegisterMode = extra && extra.style.display !== 'none';
-
-    if (!inRegisterMode) {
-        // Reveal the confirmation step instead of silently creating the account.
-        setFirstLoginMode(true);
-        const c = document.getElementById('login-password-confirm');
-        if (c) c.focus();
-        showToast('זו התחברותך הראשונה — אנא אמת את הסיסמה כדי להשלים הרשמה');
-        return;
-    }
-
-    // We're in register mode: validate the confirmation.
-    const confirmInput = document.getElementById('login-password-confirm');
-    const professionInput = document.getElementById('login-profession');
-    const confirmPassword = confirmInput ? confirmInput.value : '';
-    const profession = professionInput ? professionInput.value.trim() : '';
-
-    if (password !== confirmPassword) {
-        showToast('הסיסמאות אינן תואמות — אנא הקלד שוב בזהירות', 'error');
-        if (confirmInput) { confirmInput.value = ''; confirmInput.focus(); }
-        return;
-    }
-
-    // Create the new account.
-    const newUser = {
-        username: username,
-        password: password,
-        profession: profession,
-        created: getTodayDateString()
-    };
-    users.push(newUser);
-    localStorage.setItem('sj_app_users', JSON.stringify(users));
-
-    // Seed the per-user profession setting so the AI tunes itself.
-    localStorage.setItem('sj_logged_in_user', username);
-    if (profession) {
-        appState.settings.profession = profession;
-        localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
-    }
-
-    setFirstLoginMode(false);
-    finishManualLogin(username, `ברוך הבא למערכת, ${username}!`);
-}
-
-// Shared tail for a successful manual login/registration.
-function finishManualLogin(canonicalUsername, toastMsg) {
-    localStorage.setItem('sj_logged_in_user', canonicalUsername);
-
-    document.getElementById('lock-screen').style.display = 'none';
-    document.querySelector('.app-container').style.display = 'flex';
-
-    const u = document.getElementById('login-username');
-    const p = document.getElementById('login-password');
-    if (u) u.value = '';
-    if (p) p.value = '';
-
-    initUserSession();
-    showToast(toastMsg);
-}
-
 function handleUserLogout() {
     if (!confirm('האם אתה בטוח שברצונך להתנתק ולנעול את המערכת?')) return;
-    
-    // Remove active user from both local and session storage
+
+    // Cancel any pending debounced cloud save so it can't fire after the
+    // session identity below is gone (or worse, after the next user logs in).
+    if (_cloudSaveTimer) { clearTimeout(_cloudSaveTimer); _cloudSaveTimer = null; }
+
+    // Guest history is device-only and ends with the session — exactly as the
+    // lock screen promises. Wipe the guest namespace on logout.
+    if (isGuestUser()) {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('sj_user_guest_')) localStorage.removeItem(k);
+        }
+    }
+
+    // Clear the session identity. The per-user token key must be computed
+    // BEFORE removing sj_logged_in_user (getStorageKey depends on it).
+    localStorage.removeItem(getStorageKey('sj_drive_access_token'));
+    sessionStorage.removeItem(getStorageKey('sj_drive_access_token'));
+    localStorage.removeItem('gsi_name');
+    localStorage.removeItem('gsi_picture');
     localStorage.removeItem('sj_logged_in_user');
     sessionStorage.removeItem('sj_logged_in_user');
-    
-    // Transition UI
-    document.getElementById('lock-screen').style.display = 'flex';
-    document.querySelector('.app-container').style.display = 'none';
-    toggleLockForm('login');
-    
-    // Reset internal state
-    resetAppState();
-    
-    showToast('התנתקת מהמערכת בהצלחה');
+    googleAccessToken = null;
+
+    // Show the goodbye toast after the reload (picked up in DOMContentLoaded).
+    sessionStorage.setItem('sj_just_logged_out', '1');
+
+    // Full reload: guarantees the lock screen is identical to a fresh visit —
+    // no leftover theme/body classes, open modals, admin tab, guest banner or
+    // any other per-session UI state to reset piecemeal.
+    window.location.reload();
 }
 
 function updateUserProfileUI() {
@@ -4222,8 +4281,8 @@ function updateUserProfileUI() {
     if (usersStr) {
         try { users = JSON.parse(usersStr); } catch(e) {}
     }
-    const user = users.find(u => u.username.toLowerCase() === activeUser.toLowerCase());
-    
+    const user = users.find(u => u && u.username && u.username.toLowerCase() === activeUser.toLowerCase());
+
     const professionMap = {
         'electrician': 'חשמלאי מוסמך',
         'charger_installer': 'מתקין עמדות טעינה',
@@ -4237,33 +4296,37 @@ function updateUserProfileUI() {
     const professionName = professionMap[professionKey] || professionKey;
     
     // Update UI elements
-    // Sidebar user chip (name, role, avatar — Google photo if available)
+    // Sidebar user chip (name, role, avatar — Google photo if available).
+    // A guest session ALWAYS displays as "אורח" — never a leftover Google
+    // identity from a previous session on this browser.
+    const isGuest = isGuestUser();
     const chipName = document.getElementById('user-chip-name');
     // Repair any mojibake left by an old atob()-based login, and persist the fix.
-    const gsiName = repairMojibake(localStorage.getItem('gsi_name'));
+    const gsiName = isGuest ? null : repairMojibake(localStorage.getItem('gsi_name'));
     if (gsiName && gsiName !== localStorage.getItem('gsi_name')) localStorage.setItem('gsi_name', gsiName);
-    if (chipName) chipName.textContent = (gsiName || displayName.split('@')[0]);
+    const shownName = isGuest ? 'אורח' : (gsiName || displayName.split('@')[0]);
+    if (chipName) chipName.textContent = shownName;
     const chipRole = document.getElementById('user-chip-role');
-    if (chipRole) chipRole.textContent = professionName;
+    if (chipRole) chipRole.textContent = isGuest ? 'מצב התנסות' : professionName;
     const chipAvatar = document.getElementById('user-chip-avatar');
     if (chipAvatar) {
-        const pic = localStorage.getItem('gsi_picture');
+        const pic = isGuest ? null : localStorage.getItem('gsi_picture');
         if (pic) {
             chipAvatar.style.backgroundImage = `url("${pic}")`;
             chipAvatar.textContent = '';
             chipAvatar.classList.add('has-photo');
         } else {
             chipAvatar.style.backgroundImage = '';
-            chipAvatar.textContent = (chipName ? chipName.textContent : displayName).trim().charAt(0).toUpperCase();
+            chipAvatar.textContent = shownName.trim().charAt(0).toUpperCase();
             chipAvatar.classList.remove('has-photo');
         }
     }
 
     const profileNameDisplay = document.getElementById('profile-username-display');
-    if (profileNameDisplay) profileNameDisplay.textContent = displayName;
-    
+    if (profileNameDisplay) profileNameDisplay.textContent = isGuest ? 'אורח' : displayName;
+
     const profileFieldUser = document.getElementById('profile-field-username');
-    if (profileFieldUser) profileFieldUser.textContent = displayName;
+    if (profileFieldUser) profileFieldUser.textContent = isGuest ? 'אורח' : displayName;
     
     const profileFieldProf = document.getElementById('profile-field-profession');
     if (profileFieldProf) profileFieldProf.textContent = professionName;
@@ -4410,120 +4473,6 @@ function handleUpdateCredentials(event) {
     syncDatabaseToDrive(true);
 }
 
-function resetAppState() {
-    appState = {
-        settings: {
-            geminiApiKey: '',
-            googleClientId: '',
-            googleFolderId: '1FHfFPd5S9EtphEcGxKqw9oAZstKyQbjv',
-            phrasingDb: '',
-            logoStyle: { align: 'center', width: '75', marginTop: '0', marginBottom: '10' },
-            profession: 'electrician',
-            businessDetails: {
-                name: 'SJ הנדסת חשמל',
-                owner: "סתיו ג'אן",
-                id: 'עוסק פטור: 207382920',
-                phone: '053-530-2887',
-                email: 'info@sj-eng.co.il',
-                web: 'www.sj-eng.co.il',
-                address: 'דרך בן גוריון 138, בת ים, יחידה 1304',
-                terms: `תנאי תשלום:
-• 50% מקדמה עם אישור הצעת המחיר ותחילת העבודה.
-• 50% הנותרים עם מסירת התוכניות הסופיות.
-
-הערות נוספות:
-• כל שינוי בתוכניות לאחר שלב האישור הראשוני עשוי לגרור תוספת תשלום.
-• ליווי מול חברת החשמל אינו כולל את אגרות הבדיקה של חברת החשמל.`
-            }
-        },
-        currentQuote: {
-            id: null,
-            clientName: '',
-            clientSub: '',
-            quoteNumber: '',
-            date: '',
-            subject: '',
-            items: [],
-            basePrice: 0,
-            vatType: 'exempt',
-            finalPrice: 0,
-            summary: '',
-            showItemizedPrices: false
-        },
-        history: []
-    };
-    projectsList = [];
-    activeProjectId = null;
-    googleAccessToken = null;
-    googleTokenClient = null;
-
-    // Reset settings input fields
-    const keyInput = document.getElementById('settings-gemini-key');
-    if (keyInput) keyInput.value = '';
-    const clientIdInput = document.getElementById('settings-drive-client-id');
-    if (clientIdInput) clientIdInput.value = '';
-    const folderIdInput = document.getElementById('settings-drive-folder-id');
-    if (folderIdInput) folderIdInput.value = '1FHfFPd5S9EtphEcGxKqw9oAZstKyQbjv';
-    const phrasingInput = document.getElementById('set-phrasing-db');
-    if (phrasingInput) phrasingInput.value = '';
-    
-    const bizName = document.getElementById('set-biz-name');
-    if (bizName) bizName.value = 'SJ הנדסת חשמל';
-    const bizOwner = document.getElementById('set-biz-owner');
-    if (bizOwner) bizOwner.value = "סתיו ג'אן";
-    const bizId = document.getElementById('set-biz-id');
-    if (bizId) bizId.value = 'עוסק פטור: 207382920';
-    const bizPhone = document.getElementById('set-biz-phone');
-    if (bizPhone) bizPhone.value = '053-530-2887';
-    const bizEmail = document.getElementById('set-biz-email');
-    if (bizEmail) bizEmail.value = 'info@sj-eng.co.il';
-    const bizWeb = document.getElementById('set-biz-web');
-    if (bizWeb) bizWeb.value = 'www.sj-eng.co.il';
-    const bizAddress = document.getElementById('set-biz-address');
-    if (bizAddress) bizAddress.value = 'דרך בן גוריון 138, בת ים, יחידה 1304';
-    const bizTerms = document.getElementById('set-biz-terms');
-    if (bizTerms) bizTerms.value = `תנאי תשלום:
-• 50% מקדמה עם אישור הצעת המחיר ותחילת העבודה.
-• 50% הנותרים עם מסירת התוכניות הסופיות.
-
-הערות נוספות:
-• כל שינוי בתוכניות לאחר שלב האישור הראשוני עשוי לגרור תוספת תשלום.
-• ליווי מול חברת החשמל אינו כולל את אגרות הבדיקה של חברת החשמל.`;
-
-    const logoAlign = document.getElementById('set-logo-align');
-    if (logoAlign) logoAlign.value = 'center';
-    const logoWidth = document.getElementById('set-logo-width');
-    if (logoWidth) logoWidth.value = '75';
-    const logoMarginTop = document.getElementById('set-logo-margin-top');
-    if (logoMarginTop) logoMarginTop.value = '0';
-    const logoMarginBottom = document.getElementById('set-logo-margin-bottom');
-    if (logoMarginBottom) logoMarginBottom.value = '10';
-
-    // Clear active project banner
-    updateActiveProjectBanner(null);
-
-    // Clear quote forms
-    const clientNameInput = document.getElementById('form-client-name');
-    if (clientNameInput) clientNameInput.value = '';
-    const clientSubInput = document.getElementById('form-client-sub');
-    if (clientSubInput) clientSubInput.value = '';
-    const quoteSubjectInput = document.getElementById('form-quote-subject');
-    if (quoteSubjectInput) quoteSubjectInput.value = '';
-    const quoteSummaryInput = document.getElementById('form-summary');
-    if (quoteSummaryInput) quoteSummaryInput.value = '';
-    
-    // Clear chat display
-    const chatContainer = document.getElementById('chat-messages-container');
-    if (chatContainer) chatContainer.innerHTML = '';
-    
-    // Clear materials display
-    const materialsContainer = document.getElementById('materials-checklist-container');
-    if (materialsContainer) materialsContainer.innerHTML = '';
-    
-    // Reset default watermark/logo views
-    renderLogo(null);
-    renderWatermark(null);
-}
 
 // ==========================================================================
 // Google OAuth Sign-In & Session Persistence
@@ -4585,6 +4534,7 @@ function handleGoogleLogin() {
                     if (userInfo.name) localStorage.setItem('gsi_name', userInfo.name);
                     else localStorage.removeItem('gsi_name');
                     if (userInfo.picture) localStorage.setItem('gsi_picture', userInfo.picture);
+                    else localStorage.removeItem('gsi_picture');
 
                     if (!email) {
                         showToast('שגיאה בקבלת כתובת האימייל מחשבון גוגל', 'error');
@@ -4600,7 +4550,7 @@ function handleGoogleLogin() {
                     }
                     
                     const rememberMe = true; // always localStorage
-                    const existingUser = users.find(u => u.username.toLowerCase() === email.toLowerCase());
+                    const existingUser = users.find(u => u && u.username && u.username.toLowerCase() === email.toLowerCase());
                     
                     if (existingUser) {
                         completeGoogleLogin(email, existingUser.profession, token, rememberMe);
@@ -4653,7 +4603,7 @@ function saveGoogleUserProfession(event) {
     
     // Reuse an existing record for this email (consistent storage namespace),
     // otherwise create it. Never create a duplicate username.
-    const existing = users.find(u => u.username.toLowerCase() === email.toLowerCase());
+    const existing = users.find(u => u && u.username && u.username.toLowerCase() === email.toLowerCase());
     if (existing) {
         existing.profession = profession;
         existing.isGoogleUser = true;

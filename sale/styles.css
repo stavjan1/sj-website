@@ -1896,6 +1896,36 @@ textarea#ai-input {
 }
 
 /* ==========================================================================
+   Compact desktop density — tighter spacing so panels fit without so much
+   scrolling ("leaner", less padding-heavy). Desktop only; the mobile layout
+   below 861px keeps its own comfortable spacing.
+   ========================================================================== */
+@media (min-width: 861px) {
+    .content-panel { padding: 22px 30px; }
+    .section-header { margin-bottom: 16px; }
+    .section-header h2 { font-size: 1.4rem; margin-bottom: 3px; }
+    .section-subtitle { font-size: 0.88rem; }
+
+    .section-card { margin-bottom: 14px; border-radius: 11px; }
+    .card-header { padding: 10px 16px; }
+    .card-header h3 { font-size: 1rem; }
+    .card-body { padding: 15px 16px; }
+
+    .form-group { margin-bottom: 12px; gap: 6px; }
+    input[type="text"], input[type="number"], input[type="date"],
+    input[type="email"], input[type="password"], select, textarea {
+        padding: 8px 12px; font-size: 0.9rem;
+    }
+    .btn { padding: 8px 14px; font-size: 0.9rem; }
+
+    /* Dashboard KPI cards + wizard toolbox breathe less */
+    .stat-card { padding: 16px 18px; }
+    .wizard-dash-card, .wizard-toolbox { padding: 16px; }
+
+    .settings-grid { gap: 16px; }
+}
+
+/* ==========================================================================
    Print Styles for html2pdf.js
    ========================================================================== */
 @media print {
