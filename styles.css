@@ -1391,6 +1391,35 @@ img {
     text-decoration: underline;
 }
 
+.g-badge-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+/* "Write us a review" — official-Google-style white pill */
+.g-review-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: #ffffff;
+    color: #1f2937;
+    font-size: 0.95rem;
+    font-weight: 700;
+    padding: 11px 26px;
+    border-radius: 50px;
+    white-space: nowrap;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+    transition: var(--transition-smooth);
+}
+
+.g-review-cta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 26px rgba(66, 133, 244, 0.35);
+}
+
 /* Interactive FAQ Accordion */
 .faq-section {
     background-color: var(--color-dark-bg);
@@ -1976,6 +2005,19 @@ img {
 
 .widget-btn.phone-btn:hover {
     box-shadow: 0 10px 30px rgba(43, 116, 219, 0.6);
+}
+
+/* Rate-us button: quiet dark glass so it reads as secondary next to the
+   WhatsApp/phone actions; gold ring on hover echoes the brand accent */
+.widget-btn.review-btn {
+    background: rgba(13, 20, 40, 0.88);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.widget-btn.review-btn:hover {
+    border-color: rgba(240, 192, 64, 0.6);
+    box-shadow: 0 10px 30px rgba(240, 192, 64, 0.28);
 }
 
 /* Tooltips */
