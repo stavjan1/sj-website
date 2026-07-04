@@ -3636,3 +3636,7 @@ body:not(.in-project) .proj-tab { display: none !important; }
 .panel-split-header i { font-size: 1.3rem; }
 .panel-split-header h3 { margin: 0; font-size: 1.05rem; }
 .panel-split-header span { font-size: 0.8rem; color: var(--text-muted); }
+
+/* About/legal/credit links row (settings) */
+.about-links { display: flex; flex-wrap: wrap; gap: 10px; }
+.about-links .btn { min-height: 42px; }
