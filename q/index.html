@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>הצעת מחיר</title>
+    <meta name="robots" content="noindex">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='none' stroke='%232b74db' stroke-width='6'/%3E%3Cpath d='M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z' fill='%23ffaa00'/%3E%3C/svg%3E">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Heebo', 'Segoe UI', sans-serif; background: #eef2f8; color: #0f172a; line-height: 1.65; padding: 18px 12px 40px; }
+        .sheet {
+            max-width: 760px; margin: 0 auto; background: #fff;
+            border-radius: 14px; box-shadow: 0 6px 30px rgba(15, 23, 42, 0.12);
+            padding: 30px 28px;
+        }
+        .qs-loading, .qs-error { text-align: center; padding: 60px 20px; color: #475569; }
+        .qs-error { color: #b91c1c; }
+        .qs-header { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+        .qs-to .lbl { color: #64748b; font-size: 0.85rem; }
+        .qs-to .name { font-weight: 800; font-size: 1.1rem; }
+        .qs-to .sub { color: #64748b; font-size: 0.85rem; }
+        .qs-biz { text-align: center; }
+        .qs-biz img { max-height: 64px; max-width: 190px; object-fit: contain; }
+        .qs-biz .bn { font-weight: 900; color: #1e3a8a; font-size: 1.15rem; }
+        .qs-biz .bo { color: #475569; font-size: 0.85rem; }
+        .qs-meta { text-align: left; color: #475569; font-size: 0.85rem; }
+        .qs-divider { height: 2px; background: #1e3a8a; margin: 16px 0 20px; }
+        h1 { text-align: center; color: #1e3a8a; font-size: 1.35rem; margin-bottom: 20px; text-decoration: underline; }
+        .qs-item { border-bottom: 1px dashed #cbd5e1; padding: 12px 0; }
+        .qs-item .t { font-weight: 700; display: flex; justify-content: space-between; gap: 10px; }
+        .qs-item .t .p { color: #1e3a8a; white-space: nowrap; }
+        .qs-item .d { color: #475569; font-size: 0.92rem; white-space: pre-wrap; }
+        .qs-total {
+            display: flex; justify-content: space-between; align-items: baseline;
+            background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px;
+            padding: 14px 18px; margin: 22px 0 6px; font-weight: 900; font-size: 1.15rem; color: #1e3a8a;
+        }
+        .qs-vat { color: #64748b; font-size: 0.82rem; margin-bottom: 18px; }
+        .qs-summary { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; white-space: pre-wrap; margin-bottom: 16px; }
+        .qs-signed {
+            display: flex; align-items: center; gap: 12px;
+            background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px;
+            padding: 10px 16px; margin-bottom: 16px; font-size: 0.9rem;
+        }
+        .qs-signed img { height: 44px; }
+        .qs-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 22px; }
+        .qs-btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 12px 26px; border-radius: 50px; font-weight: 700; text-decoration: none;
+            font-size: 0.98rem;
+        }
+        .qs-btn.call { background: #1e3a8a; color: #fff; }
+        .qs-btn.wa { background: #25d366; color: #fff; }
+        .qs-foot { text-align: center; color: #94a3b8; font-size: 0.78rem; margin-top: 22px; }
+        .qs-foot a { color: #64748b; }
+    </style>
+</head>
+<body>
+    <div class="sheet" id="sheet">
+        <div class="qs-loading" id="qs-loading">טוען את ההצעה…</div>
+    </div>
+
+    <script>
+        const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        const fmt = (n) => (Number(n) || 0).toLocaleString('he-IL');
+
+        async function load() {
+            const t = new URLSearchParams(location.search).get('t') || '';
+            const sheet = document.getElementById('sheet');
+            try {
+                const res = await fetch('/api/quote-share?t=' + encodeURIComponent(t));
+                const body = await res.json().catch(() => ({}));
+                if (!res.ok || !body.data) throw new Error((body.error && body.error.message) || 'ההצעה לא נמצאה.');
+                render(body.data, sheet);
+            } catch (e) {
+                sheet.innerHTML = '<div class="qs-error">⚠️ ' + esc(e.message) + '</div>';
+            }
+        }
+
+        function render(q, sheet) {
+            const biz = q.business || {};
+            document.title = 'הצעת מחיר ' + (q.quoteNumber || '') + (biz.name ? ' — ' + biz.name : '');
+            const phoneDigits = String(biz.phone || '').replace(/[^\d]/g, '');
+            const waPhone = phoneDigits.startsWith('0') ? '972' + phoneDigits.slice(1) : phoneDigits;
+            const items = (q.items || []).map(it => `
+                <div class="qs-item">
+                    <div class="t"><span>${esc(it.title)}</span>${q.showItemizedPrices && it.price ? `<span class="p">${fmt(it.price)} ₪</span>` : ''}</div>
+                    ${it.description ? `<div class="d">${esc(it.description)}</div>` : ''}
+                </div>`).join('');
+            sheet.innerHTML = `
+                <div class="qs-header">
+                    <div class="qs-to">
+                        <div class="lbl">לכבוד:</div>
+                        <div class="name">${esc(q.clientName || '')}</div>
+                        <div class="sub">${esc(q.clientSub || '')}</div>
+                    </div>
+                    <div class="qs-biz">
+                        ${q.logo ? `<img src="${q.logo}" alt="">` : ''}
+                        <div class="bn">${esc(biz.name || '')}</div>
+                        <div class="bo">${esc(biz.owner || '')}</div>
+                    </div>
+                    <div class="qs-meta">
+                        <div>${esc(q.date || '')}</div>
+                        <div>הצעת מחיר מס': ${esc(q.quoteNumber || '')}</div>
+                    </div>
+                </div>
+                <div class="qs-divider"></div>
+                <h1>הצעת מחיר ל${esc(q.subject || '')}</h1>
+                ${items}
+                <div class="qs-total"><span>סה"כ לתשלום:</span><span>${fmt(q.finalPrice)} ₪</span></div>
+                <div class="qs-vat">${esc(q.vatLabel || '')}</div>
+                ${q.summary ? `<div class="qs-summary"><strong>פירוט תנאים נוספים:</strong>\n${esc(q.summary)}</div>` : ''}
+                ${q.signature && q.signature.img ? `
+                    <div class="qs-signed">
+                        <img src="${q.signature.img}" alt="חתימה">
+                        <span>✓ ההצעה אושרה ונחתמה על ידי <strong>${esc(q.signature.name)}</strong> בתאריך ${esc(q.signature.date)}</span>
+                    </div>` : ''}
+                <div class="qs-actions">
+                    ${biz.phone ? `<a class="qs-btn call" href="tel:${esc(biz.phone)}">📞 ${esc(biz.phone)}</a>` : ''}
+                    ${waPhone ? `<a class="qs-btn wa" target="_blank" rel="noopener" href="https://wa.me/${waPhone}?text=${encodeURIComponent('היי, בקשר להצעת מחיר ' + (q.quoteNumber || ''))}">וואטסאפ</a>` : ''}
+                </div>
+                <div class="qs-foot">הופק באמצעות <a href="/zerem/">זרם — תוכנת הצעות המחיר</a> ⚡</div>
+            `;
+        }
+
+        load();
+    </script>
+</body>
+</html>

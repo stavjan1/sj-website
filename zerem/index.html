@@ -212,6 +212,26 @@
         }
         .z-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--z-grad); }
 
+        /* Suppliers */
+        .z-supplier-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 18px; max-width: 860px; margin: 0 auto;
+        }
+        .z-supplier-card {
+            background: var(--z-card); border: 1px solid var(--z-line);
+            border-radius: var(--z-radius); padding: 26px 24px; text-align: right;
+        }
+        .z-supplier-card h3 { font-size: 1.1rem; font-weight: 800; margin-bottom: 8px; }
+        .z-supplier-card p { color: var(--z-dim); font-size: 0.95rem; margin-bottom: 14px; }
+        .z-supplier-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        #z-supplier-form { display: flex; gap: 8px; flex-wrap: wrap; }
+        #z-supplier-form input {
+            flex: 1; min-width: 120px;
+            background: var(--z-bg2); border: 1px solid var(--z-line); border-radius: 10px;
+            color: var(--z-text); padding: 10px 14px; font-family: inherit; font-size: 0.95rem;
+        }
+        #z-supplier-form input:focus { outline: none; border-color: var(--z-cyan); }
+
         /* Pricing */
         .z-price-card {
             max-width: 460px; margin: 0 auto;
@@ -406,6 +426,33 @@
         </div>
     </section>
 
+    <section class="z-section" style="padding-top:0;">
+        <div class="wrap">
+            <h2 class="rv">ספקים — בואו נעבוד ביחד</h2>
+            <p class="lead rv">המחירים במערכת מגיעים מהשטח. ספקים שמצטרפים — המוצרים שלהם מול העיניים של כל איש מקצוע שמתמחר.</p>
+            <div class="z-supplier-grid rv">
+                <div class="z-supplier-card">
+                    <h3>🏪 אתה ספק חומרי חשמל?</h3>
+                    <p>שלח לנו את המחירון שלך והצטרף למהפכה — בלי עלות, בלי התחייבות.</p>
+                    <div class="z-supplier-actions">
+                        <a class="z-btn" style="padding:10px 20px; font-size:0.95rem;" target="_blank" rel="noopener noreferrer" href="https://wa.me/972535302887?text=%D7%94%D7%99%D7%99%2C%20%D7%90%D7%A0%D7%99%20%D7%A1%D7%A4%D7%A7%20%D7%97%D7%95%D7%9E%D7%A8%D7%99%20%D7%97%D7%A9%D7%9E%D7%9C%20%D7%95%D7%90%D7%A9%D7%9E%D7%97%20%D7%9C%D7%94%D7%A6%D7%98%D7%A8%D7%A3%20%D7%9C%D7%96%D7%A8%D7%9D">דברו איתנו בוואטסאפ</a>
+                        <a class="z-btn ghost" style="padding:10px 20px; font-size:0.95rem;" href="mailto:info@sj-eng.co.il?subject=%D7%A1%D7%A4%D7%A7%20%D7%9E%D7%A6%D7%98%D7%A8%D7%A3%20%D7%9C%D7%96%D7%A8%D7%9D">שלחו מייל</a>
+                    </div>
+                </div>
+                <div class="z-supplier-card">
+                    <h3>🤝 מכיר ספק שישמח להצטרף?</h3>
+                    <p>זרוק לנו שם ועיר — אנחנו כבר נגיע אליו.</p>
+                    <form id="z-supplier-form" onsubmit="return zSuggestSupplier(event)">
+                        <input type="text" id="z-sup-name" placeholder="שם הספק" required>
+                        <input type="text" id="z-sup-city" placeholder="עיר" required>
+                        <button type="submit" class="z-btn" style="padding:10px 20px; font-size:0.95rem;">שלח</button>
+                    </form>
+                    <p id="z-sup-status" style="display:none; font-size:0.85rem; margin-top:8px;"></p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <section class="z-section" style="padding-top:20px;">
         <div class="wrap">
             <div class="z-price-card rv">
@@ -446,6 +493,37 @@
             entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add('on'); o.unobserve(en.target); } });
         }, { threshold: 0.12 });
         document.querySelectorAll('.rv').forEach(el => obs.observe(el));
+
+        // "מכיר ספק?" — sends the tip to SJ's inbox via web3forms.
+        function zSuggestSupplier(e) {
+            e.preventDefault();
+            const name = document.getElementById('z-sup-name').value.trim();
+            const city = document.getElementById('z-sup-city').value.trim();
+            const status = document.getElementById('z-sup-status');
+            status.style.display = 'block';
+            status.style.color = 'var(--z-dim)';
+            status.textContent = 'שולח…';
+            fetch('https://api.web3forms.com/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                body: JSON.stringify({
+                    access_key: 'da99a67b-ae1d-40b1-9354-74af5ee6d62d',
+                    subject: 'המלצת ספק חדש לזרם — ' + name,
+                    from_name: 'זרם — טופס המלצת ספק',
+                    message: 'ספק מומלץ: ' + name + '\nעיר: ' + city
+                })
+            }).then(r => r.json()).then(d => {
+                if (d.success) {
+                    status.style.color = 'var(--z-cyan)';
+                    status.textContent = 'תודה! נגיע אליו 🙂';
+                    document.getElementById('z-supplier-form').reset();
+                } else { throw new Error(); }
+            }).catch(() => {
+                status.style.color = '#f05252';
+                status.textContent = 'השליחה נכשלה — נסו שוב או כתבו לנו בוואטסאפ.';
+            });
+            return false;
+        }
     </script>
 </body>
 </html>

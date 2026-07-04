@@ -1987,6 +1987,30 @@ textarea#ai-input {
 #report-pdf-sheet .rpt-footer { border-top: 1px solid #cbd5e1; padding-top: 10px; }
 
 /* ==========================================================================
+   Admin catalog workspace (upload → analyze → everyone's catalog)
+   ========================================================================== */
+.syscat-step {
+    border: 1px dashed var(--border-color);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 10px;
+}
+.syscat-step-title { font-weight: 700; font-size: 0.92rem; color: #f0c040; }
+.admin-syscat-list {
+    max-height: 260px; overflow-y: auto;
+    border: 1px solid var(--border-color); border-radius: 8px;
+    padding: 6px 10px; background: var(--bg-main);
+}
+.asc-row {
+    display: flex; justify-content: space-between; gap: 10px;
+    padding: 5px 0; border-bottom: 1px dashed rgba(255,255,255,0.05);
+    font-size: 0.85rem;
+}
+.asc-row:last-child { border-bottom: none; }
+.asc-row .asc-name { color: var(--text-primary); }
+.asc-row .asc-price { color: var(--color-success); white-space: nowrap; }
+
+/* ==========================================================================
    Follow-up reminders (sent quotes waiting 3+ days)
    ========================================================================== */
 .followup-card {

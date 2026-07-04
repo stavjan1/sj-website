@@ -101,6 +101,66 @@ function adminRefreshSystemCatalogInfo() {
     if (el) el.textContent = `${(systemCatalog || []).length} פריטים`;
     const mine = document.getElementById('admin-syscat-mine');
     if (mine) mine.textContent = `${(priceCatalog || []).length} פריטים`;
+
+    // Change detection: personal (candidate) differs from the published set →
+    // nudge the admin to analyze + publish.
+    const note = document.getElementById('admin-cat-diff-note');
+    if (note) {
+        const differs = JSON.stringify(priceCatalog || []) !== JSON.stringify(systemCatalog || []);
+        note.style.display = differs && (priceCatalog || []).length ? 'block' : 'none';
+        note.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> זוהה שינוי — המאגר האישי שונה מהמפורסם. מומלץ לנתח ואז לפרסם.';
+    }
+
+    // "המאגר של כולם" — the currently-published list, search-free compact view.
+    const list = document.getElementById('admin-syscat-list');
+    if (list) {
+        const items = systemCatalog || [];
+        list.innerHTML = items.length
+            ? items.slice(0, 400).map(it =>
+                `<div class="asc-row"><span class="asc-name">${escapeHtml(it.name)}</span><span class="asc-price">${it.price} ₪${it.unit ? ` <em>(${escapeHtml(it.unit)})</em>` : ''}</span></div>`).join('')
+              + (items.length > 400 ? `<div class="asc-row" style="justify-content:center;color:var(--text-muted);">…ועוד ${items.length - 400}</div>` : '')
+            : '<p class="input-help">עדיין לא פורסם מאגר מערכת.</p>';
+    }
+}
+
+// Admin workspace import — feeds the personal catalog using the same
+// validated parser as the catalog tab, then refreshes the workspace view.
+function adminImportPaste() {
+    const ta = document.getElementById('admin-cat-paste');
+    const report = parseCatalogImportText(ta ? ta.value : '');
+    _applyAdminImport(report);
+    if (ta && report.items.length) ta.value = '';
+}
+
+function adminImportFile(input) {
+    const file = input && input.files && input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { _applyAdminImport(parseCatalogImportText(reader.result)); input.value = ''; };
+    reader.readAsText(file);
+}
+
+function _applyAdminImport(report) {
+    const status = document.getElementById('admin-cat-import-status');
+    const { items, problems, headerSkipped } = report;
+    if (items.length === 0) {
+        if (status) {
+            status.style.display = 'block'; status.style.color = 'var(--color-danger)';
+            status.innerHTML = 'לא נמצאו שורות תקינות.' + (problems.length ? '<br>' + problems.slice(0, 4).map(p => `• שורה ${p.line}: ${p.reason}`).join('<br>') : '');
+        }
+        return;
+    }
+    let added = 0;
+    items.forEach(it => { if (upsertCatalogItem(it)) added++; });
+    savePriceCatalog();
+    if (status) {
+        status.style.display = 'block'; status.style.color = problems.length ? '#f0c040' : 'var(--color-success)';
+        status.innerHTML = `✓ נוספו ${added} פריטים למאגר האישי.` +
+            (headerSkipped ? ' שורת כותרת דולגה.' : '') +
+            (problems.length ? `<br>${problems.length} שורות בפורמט לא מתאים.` : '');
+    }
+    adminRefreshSystemCatalogInfo();
+    showToast(`${added} פריטים נוספו — עכשיו נתח ופרסם`);
 }
 
 function adminRefreshUserList() {
@@ -2725,6 +2785,56 @@ async function adminAnalyzeCatalog() {
         showToast('המאגר נותח ונוקה — בדוק ופרסם');
     } catch (e) {
         if (status) { status.style.color = 'var(--color-danger)'; status.textContent = 'הניתוח נכשל: ' + e.message; }
+    }
+}
+
+// ==========================================================================
+// Shareable quote link — the client opens a permanent web link instead of a
+// file. Seed of the per-client archive (every share gets a lasting token).
+// ==========================================================================
+async function shareQuoteLink() {
+    if (!activeProjectId) { showToast('בחר פרויקט תחילה', 'error'); return; }
+    if (isGuestUser() || !googleAccessToken) {
+        showToast('קישור ללקוח זמין למשתמשי Google (נדרש אימות מול השרת)', 'error');
+        return;
+    }
+    updatePreviewFromForm();
+    syncCurrentQuoteToProject();
+    const proj = projectsList.find(p => p.id === activeProjectId);
+    if (!proj) return;
+    const q = proj.quoteData || {};
+    const biz = appState.settings.businessDetails || {};
+    const logoImg = document.querySelector('#pdf-logo-container img');
+    const logo = (logoImg && logoImg.src && logoImg.src.startsWith('data:') && logoImg.src.length < 80000) ? logoImg.src : '';
+    const payload = {
+        clientName: q.clientName, clientSub: q.clientSub, quoteNumber: q.quoteNumber,
+        date: q.date, subject: q.subject, items: q.items || [],
+        finalPrice: q.finalPrice, showItemizedPrices: q.showItemizedPrices,
+        summary: q.summary, signature: q.signature || null,
+        vatLabel: (document.getElementById('pdf-vat-label') || {}).textContent || '',
+        business: { name: biz.name, owner: biz.owner, phone: biz.phone, email: biz.email },
+        logo
+    };
+    showToast('יוצר קישור ללקוח…');
+    try {
+        const res = await fetch('/api/quote-share', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({ data: payload })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.token) throw new Error((data.error && data.error.message) || 'יצירת הקישור נכשלה');
+        const link = `${location.origin}/q/?t=${data.token}`;
+        proj.shareLink = link; // kept on the project — the archive seed
+        saveProjects();
+        try {
+            await navigator.clipboard.writeText(link);
+            showToast('הקישור הועתק 📋 — שלח ללקוח בוואטסאפ');
+        } catch (e) {
+            prompt('העתק את הקישור ושלח ללקוח:', link);
+        }
+    } catch (e) {
+        showToast(e.message || 'יצירת הקישור נכשלה', 'error');
     }
 }
 

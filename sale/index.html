@@ -502,6 +502,10 @@
                                     <i class="fa-solid fa-signature"></i>
                                     <span>החתמת לקוח</span>
                                 </button>
+                                <button class="btn btn-secondary" id="btn-share-link" onclick="shareQuoteLink()" title="קישור קבוע שהלקוח פותח בדפדפן — בלי קובץ">
+                                    <i class="fa-solid fa-link"></i>
+                                    <span>קישור ללקוח</span>
+                                </button>
                                 <button class="btn btn-secondary" onclick="shareWhatsApp()">
                                     <i class="fa-solid fa-share-nodes"></i>
                                     <span>שתף בוואטסאפ</span>
@@ -1282,29 +1286,47 @@
                             </div>
                         </div>
 
-                        <!-- System catalog (published to all users) -->
+                        <!-- System catalog workspace: upload → analyze → everyone's catalog -->
                         <div class="section-card" style="border-color:rgba(240,192,64,0.25);">
                             <div class="card-header">
-                                <h3><i class="fa-solid fa-database" style="color:#f0c040;"></i> מאגר המערכת — מחירים לכולם</h3>
+                                <h3><i class="fa-solid fa-database" style="color:#f0c040;"></i> ניהול מאגרים — המאגר של כולם</h3>
                             </div>
-                            <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
-                                <p class="input-help" style="line-height:1.6;">
-                                    אתה מנהל את המחירים <strong>במאגר האישי שלך</strong> (בטאב "מאגר מחירים": ידני / אקסל / דף ספק),
-                                    ובלחיצה מפרסם אותו כמאגר הבסיס שרץ אצל <strong>כל המשתמשים</strong>.
-                                    מחיר אישי של משתמש תמיד גובר על מחיר המערכת.
-                                    מחירונים שמשתמשים שולחים לבדיקה מגיעים אליך <strong>במייל</strong> עם פרטי השולח.
-                                </p>
-                                <div style="display:flex;flex-direction:column;gap:6px;font-size:0.88rem;">
-                                    <div>מאגר המערכת הנוכחי: <span id="admin-syscat-count" style="color:var(--color-success);">—</span></div>
-                                    <div>המאגר האישי שלך: <span id="admin-syscat-mine" style="color:var(--color-accent);">—</span></div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+
+                                <div class="syscat-step">
+                                    <div class="syscat-step-title">1️⃣ העלאת מחירון (מתווסף למאגר האישי שלך)</div>
+                                    <textarea id="admin-cat-paste" rows="3" placeholder="הדבק מאקסל: שם , מחיר , יחידה — או בחר קובץ CSV"></textarea>
+                                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                        <button class="btn btn-secondary btn-small" onclick="adminImportPaste()"><i class="fa-solid fa-file-import"></i> ייבא מהטקסט</button>
+                                        <label class="btn btn-secondary btn-small" style="cursor:pointer;">
+                                            <i class="fa-solid fa-folder-open"></i> קובץ CSV
+                                            <input type="file" accept=".csv,.txt" style="display:none;" onchange="adminImportFile(this)">
+                                        </label>
+                                    </div>
+                                    <p class="input-help" id="admin-cat-import-status" style="display:none;"></p>
                                 </div>
-                                <button class="btn btn-secondary" onclick="adminAnalyzeCatalog()" title="מאחד וריאציות זניחות (וו פתוח/סגור), שומר וריאציות הנדסיות (לוח 12/18/24), מסיר זבל">
-                                    <i class="fa-solid fa-wand-magic-sparkles"></i> נתח וסדר את המאגר עם AI
-                                </button>
-                                <button class="btn btn-accent" onclick="adminPublishSystemCatalog()">
-                                    <i class="fa-solid fa-upload"></i> פרסם את המאגר האישי שלי כמאגר המערכת
-                                </button>
-                                <p class="input-help" id="admin-syscat-status" style="display:none;"></p>
+
+                                <div class="syscat-step">
+                                    <div class="syscat-step-title">2️⃣ ניתוח וסידור</div>
+                                    <div id="admin-cat-diff-note" class="input-help" style="display:none;color:#f0c040;"></div>
+                                    <button class="btn btn-secondary" onclick="adminAnalyzeCatalog()" title="מאחד וריאציות זניחות (וו פתוח/סגור), שומר וריאציות הנדסיות (לוח 12/18/24), מסיר זבל">
+                                        <i class="fa-solid fa-wand-magic-sparkles"></i> נתח את המאגר
+                                    </button>
+                                    <p class="input-help" id="admin-syscat-status" style="display:none;"></p>
+                                </div>
+
+                                <div class="syscat-step">
+                                    <div class="syscat-step-title">3️⃣ המאגר של כולם</div>
+                                    <div style="display:flex;flex-direction:column;gap:6px;font-size:0.88rem;">
+                                        <div>מפורסם כרגע: <span id="admin-syscat-count" style="color:var(--color-success);">—</span></div>
+                                        <div>המאגר האישי שלך (המועמד לפרסום): <span id="admin-syscat-mine" style="color:var(--color-accent);">—</span></div>
+                                    </div>
+                                    <div id="admin-syscat-list" class="admin-syscat-list"></div>
+                                    <button class="btn btn-accent" onclick="adminPublishSystemCatalog()">
+                                        <i class="fa-solid fa-upload"></i> פרסם את המאגר האישי כמאגר של כולם
+                                    </button>
+                                    <p class="input-help">מחיר אישי של משתמש תמיד גובר על מחיר המערכת. מחירונים שמשתמשים משתפים מגיעים אליך במייל.</p>
+                                </div>
                             </div>
                         </div>
 
