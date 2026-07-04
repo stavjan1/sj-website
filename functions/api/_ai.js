@@ -280,7 +280,12 @@ export async function generate(env, opts) {
 
   for (let i = 0; i < order.length; i++) {
     const name = order[i];
-    const key = keyFor(env, name);
+    // Cost isolation: paying customers (pro/business/admin) run on a separate
+    // Gemini key when GEMINI_API_KEY_PAID is set, so free-tier usage never
+    // eats the paid pool — and Stav can read each pool's cost separately.
+    const key = (name === 'gemini' && opts.paidTier && env.GEMINI_API_KEY_PAID)
+      ? env.GEMINI_API_KEY_PAID
+      : keyFor(env, name);
 
     // Workers AI: called via runtime binding, not fetch — handle separately.
     if (PROVIDERS[name].kind === 'cloudflare') {

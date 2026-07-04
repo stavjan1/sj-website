@@ -78,6 +78,9 @@ export async function onRequestPost(context) {
   return generate(env, {
     provider,
     model,
+    // Paying plans draw from the separate paid Gemini key when configured
+    // (GEMINI_API_KEY_PAID) — free users can't drain the paid pool.
+    paidTier: isAdmin || tier === 'pro' || tier === 'business',
     messages: body.messages,
     response_format: body.response_format,
     temperature: body.temperature,

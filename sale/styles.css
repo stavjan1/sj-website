@@ -3820,3 +3820,71 @@ body:not(.in-project) .proj-tab { display: none !important; }
     .project-search-input-wrap { flex: 1 1 auto; }
     .project-filter-select { flex-shrink: 0; }
 }
+
+/* ==========================================================================
+   v4.13 — dead-space diet (projects), design templates, onboarding
+   ========================================================================== */
+
+/* Project rows: tighter — less padding, smaller gaps, slimmer stage chain */
+.project-card { padding: 9px 14px; }
+.project-info { gap: 2px; }
+.project-title { font-size: 0.98rem; }
+.project-meta { font-size: 0.75rem; gap: 8px; }
+.stage-chain { margin-top: 4px; gap: 4px; }
+.stage-chain .btn, .stage-chain button { padding: 4px 10px; font-size: 0.75rem; }
+.projects-list { gap: 8px; }
+.projects-list > * + * { margin-top: 0; }
+
+@media (min-width: 861px) {
+    /* The box hugs its content — no dead area under the last project.
+       With many projects it caps at the column height and the list scrolls. */
+    #panel-projects .projects-layout { align-items: start; }
+    .projects-main { height: auto; max-height: 100%; }
+    .projects-main .create-project-inline { margin-bottom: 10px; }
+    .projects-main .project-search-row { margin-bottom: 10px; }
+}
+
+/* Design template pills (quote editor) */
+.pdf-template-row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 8px 12px; margin-bottom: 12px;
+    background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px;
+}
+.tpl-label { font-size: 0.82rem; font-weight: 700; display: flex; gap: 6px; align-items: center; }
+.tpl-btn {
+    padding: 5px 14px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--border-color); background: var(--bg-input);
+    color: var(--text-secondary); font-family: inherit; font-size: 0.8rem; font-weight: 600;
+    transition: all 0.2s ease;
+}
+.tpl-btn:hover { border-color: var(--color-accent); }
+.tpl-btn.active { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
+.tpl-hint { margin: 0 auto 0 0; }
+@media (max-width: 768px) { .tpl-hint { display: none; } }
+
+/* Onboarding + soft business gate */
+.onboard-box {
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: 18px; padding: 30px 28px; max-width: 520px; width: 100%;
+    text-align: center; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+.ob-bolt { font-size: 2.2rem; margin-bottom: 6px; }
+.onboard-box h2 { margin: 0 0 8px; font-size: 1.35rem; }
+.ob-sub { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7; margin: 0 0 16px; }
+.ob-steps {
+    text-align: right; margin: 0 0 20px; padding: 0 18px 0 0;
+    display: flex; flex-direction: column; gap: 10px;
+    font-size: 0.9rem; line-height: 1.6;
+}
+.ob-steps li::marker { color: var(--color-accent); font-weight: 800; }
+.ob-go { width: 100%; min-height: 46px; font-size: 1rem; }
+.ob-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+/* Project card, second diet round (desktop): the status badge joins the title
+   row instead of owning a full-width line, and the stage chain slims down. */
+@media (min-width: 861px) {
+    .project-badge-row { flex-basis: auto; flex: 1; margin-top: 0; }
+    .stage-chain { margin-top: 2px; }
+    .stage-chain .btn, .stage-chain button { padding: 3px 9px; font-size: 0.72rem; }
+    .project-actions .btn, .project-actions button { padding: 5px 9px; }
+}

@@ -944,6 +944,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // toggleItemizedPrices).
         const vatSel = document.getElementById('form-vat-type');
         if (vatSel) vatSel.addEventListener('change', () => rememberQuotePref('vatType', vatSel.value));
+        markActivePdfTemplate(); // highlight the saved design template pill
+        setTimeout(showWelcomeOnboarding, 900); // first-run walkthrough (once)
     }
     hideAppSplash();
 });
@@ -1540,6 +1542,8 @@ function createNewProject() {
     loadProject(newProj.id);
     showToast(`פרויקט "${name}" נוצר בהצלחה`);
     switchTab('wizard'); // Auto switch to pricing chat
+    // First project ever → one soft, skippable nudge to fill business details.
+    if (projectsList.length === 1) setTimeout(maybeShowBizGate, 1200);
 }
 
 function loadProject(id, navigate = true) {
@@ -2028,8 +2032,15 @@ function applyDisplayZoomFix(forceDpr) {
         // Inside zoomed content 100vh/100vw no longer reach the real viewport
         // edges (the app rendered 'out of frame' at 80%) — expose the true
         // usable size; body/.app-container/.main-content are sized by these.
-        document.documentElement.style.setProperty('--appvh', Math.round(window.innerHeight / z) + 'px');
-        document.documentElement.style.setProperty('--appvw', Math.round(window.innerWidth / z) + 'px');
+        // When NOT zooming, REMOVE the vars so plain 100vw/100vh rule — a
+        // stale px value from a previous window size broke mobile otherwise.
+        if (z === 1) {
+            document.documentElement.style.removeProperty('--appvh');
+            document.documentElement.style.removeProperty('--appvw');
+        } else {
+            document.documentElement.style.setProperty('--appvh', Math.round(window.innerHeight / z) + 'px');
+            document.documentElement.style.setProperty('--appvw', Math.round(window.innerWidth / z) + 'px');
+        }
     } catch (e) { /* non-fatal */ }
 }
 window.addEventListener('resize', () => {
@@ -2234,6 +2245,128 @@ function updatePdfCustomStyles() {
             sigRow.style.display = showSignature ? 'flex' : 'none';
         }
     }
+}
+
+// ==========================================================================
+// PDF design templates (Move 3) — one-click presets over the design system.
+// Fine-tuning stays available in פרטי עסק → עיצוב; a preset just sets the
+// same knobs (font, sizes, colors, watermark) and saves them.
+// ==========================================================================
+const PDF_TEMPLATES = {
+    classic: {
+        label: 'קלאסית',
+        font: "'David Libre', serif", size: '12', lh: '1.4',
+        primary: '#1e3a8a', secondary: '#3b82f6', watermark: true,
+    },
+    modern: {
+        label: 'מודרנית',
+        font: "'Heebo', sans-serif", size: '12', lh: '1.5',
+        primary: '#0e7490', secondary: '#22d3ee', watermark: false,
+    },
+    minimal: {
+        label: 'מינימלית',
+        font: "'Rubik', sans-serif", size: '11', lh: '1.45',
+        primary: '#111827', secondary: '#6b7280', watermark: false,
+    },
+};
+
+function applyPdfTemplate(key, silent) {
+    const t = PDF_TEMPLATES[key];
+    if (!t) return;
+    // Drive the SAME inputs the design card uses, so both UIs stay in sync.
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    set('pdf-font-family', t.font);
+    set('pdf-font-size-body', t.size);
+    set('pdf-line-height', t.lh);
+    set('pdf-primary-color', t.primary);
+    set('pdf-secondary-color', t.secondary);
+    const wm = document.getElementById('pdf-show-watermark');
+    if (wm) wm.checked = t.watermark;
+
+    appState.settings.pdfTemplate = key;
+    appState.settings.pdfFontFamily = t.font;
+    appState.settings.pdfFontSizeBody = t.size;
+    appState.settings.pdfLineHeight = t.lh;
+    appState.settings.pdfPrimaryColor = t.primary;
+    appState.settings.pdfSecondaryColor = t.secondary;
+    appState.settings.pdfShowWatermark = t.watermark;
+    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
+
+    updatePdfCustomStyles();
+    try { updatePreviewFromForm(); } catch (e) {}
+    markActivePdfTemplate();
+    scheduleCloudSync();
+    if (!silent) showToast(`תבנית "${t.label}" הוחלה על ההצעה`);
+}
+
+function markActivePdfTemplate() {
+    const cur = appState.settings.pdfTemplate || 'classic';
+    document.querySelectorAll('.tpl-btn').forEach((b) => {
+        b.classList.toggle('active', b.dataset.tpl === cur);
+    });
+}
+
+// ==========================================================================
+// Onboarding (Move 3) — a friendly first-run walkthrough + a SOFT nudge to
+// fill business details after the first project. Both skippable, never block.
+// ==========================================================================
+function showWelcomeOnboarding() {
+    if (localStorage.getItem(getStorageKey('sj_onboarded_v1'))) return;
+    if ((projectsList || []).length > 0) { // veteran user — don't lecture
+        localStorage.setItem(getStorageKey('sj_onboarded_v1'), '1');
+        return;
+    }
+    const m = document.createElement('div');
+    m.id = 'onboarding-modal';
+    m.className = 'upgrade-modal-backdrop';
+    m.innerHTML = `
+        <div class="onboard-box" role="dialog" aria-modal="true">
+            <div class="ob-bolt">⚡</div>
+            <h2>ברוך הבא לזרם</h2>
+            <p class="ob-sub">מהתיאור של העבודה ועד הצעת מחיר חתומה — ככה זה עובד:</p>
+            <ol class="ob-steps">
+                <li><b>צור פרויקט</b> — שם הלקוח או העבודה, וזהו.</li>
+                <li><b>תכנון בצ'אט</b> — מתארים את העבודה במילים, וה-AI בונה רשימת מוצרים מלאה (כולל מה ששוכחים).</li>
+                <li><b>תמחור</b> — בלחיצה אחת הרשימה מתומחרת: חומרים + עבודה + סה"כ.</li>
+                <li><b>הצעה ללקוח</b> — עורכים, מורידים PDF ממותג או שולחים בוואטסאפ.</li>
+            </ol>
+            <button class="btn btn-accent ob-go" onclick="closeOnboarding()">יאללה, מתחילים ⚡</button>
+        </div>`;
+    m.addEventListener('click', (e) => { if (e.target === m) closeOnboarding(); });
+    document.body.appendChild(m);
+}
+function closeOnboarding() {
+    localStorage.setItem(getStorageKey('sj_onboarded_v1'), '1');
+    const m = document.getElementById('onboarding-modal');
+    if (m) m.remove();
+}
+
+// Soft business-details gate: fired once, right after the FIRST project is
+// created. Skipping is a first-class choice — nothing is ever forced (no ח.פ).
+function maybeShowBizGate() {
+    if (localStorage.getItem(getStorageKey('sj_bizgate_shown'))) return;
+    localStorage.setItem(getStorageKey('sj_bizgate_shown'), '1');
+    const biz = (appState.settings && appState.settings.businessDetails) || {};
+    const looksFilled = biz.name && biz.phone && biz.name !== 'SJ הנדסת חשמל';
+    if (looksFilled) return;
+    const m = document.createElement('div');
+    m.id = 'bizgate-modal';
+    m.className = 'upgrade-modal-backdrop';
+    m.innerHTML = `
+        <div class="onboard-box" role="dialog" aria-modal="true">
+            <div class="ob-bolt">💼</div>
+            <h2>שההצעות יישאו את השם שלך?</h2>
+            <p class="ob-sub">שם העסק, טלפון ולוגו יופיעו על כל הצעה ודוח שתפיק — ממלאים פעם אחת וזהו.
+            אפשר גם לדלג ולמלא מתי שבא לך, שום דבר לא נחסם.</p>
+            <div class="ob-actions">
+                <button class="btn btn-accent" onclick="document.getElementById('bizgate-modal').remove(); switchTab('business');">
+                    <i class="fa-solid fa-briefcase"></i> מלא פרטי עסק (דקה)
+                </button>
+                <button class="btn btn-secondary" onclick="document.getElementById('bizgate-modal').remove();">דלג בינתיים</button>
+            </div>
+        </div>`;
+    m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+    document.body.appendChild(m);
 }
 
 function saveBusinessSettings() {
