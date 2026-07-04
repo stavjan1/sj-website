@@ -1336,17 +1336,14 @@ function loadProjects() {
         try { trashedProjectsList = JSON.parse(savedTrash); } catch (e) { trashedProjectsList = []; }
     } else { trashedProjectsList = []; }
     filterProjectsList();
-    
-    // Auto load last active or first project
-    const savedActiveId = localStorage.getItem(getStorageKey('sj_active_project_id'));
-    if (savedActiveId && projectsList.some(p => p.id === savedActiveId)) {
-        loadProject(savedActiveId, false);
-    } else if (projectsList.length > 0) {
-        loadProject(projectsList[0].id, false);
-    } else {
-        updateActiveProjectBanner(null);
-        switchTab('projects');
-    }
+
+    // Always land on the projects list. The wizard (planning/pricing) and the
+    // quote editor exist ONLY inside an open project, so we never auto-enter a
+    // project on startup — the user picks one, or creates one, first.
+    activeProjectId = null;
+    localStorage.removeItem(getStorageKey('sj_active_project_id'));
+    updateActiveProjectBanner(null);
+    switchTab('projects');
 }
 
 function saveProjects() {
@@ -3556,14 +3553,36 @@ function updatePlanActionBar(proj) {
     bar.style.display = show ? 'flex' : 'none';
 }
 
+// Single source of truth for trade/profession options — a CLOSED list keeps the
+// AI agent's expertise selectable and easy to manage. `ai` is the Hebrew role
+// the agent prompts address themselves as.
+const PROFESSIONS = [
+    { key: 'electrician',       label: 'חשמל',                   ai: 'חשמלאי מוסמך' },
+    { key: 'plumber',           label: 'אינסטלציה',              ai: 'אינסטלטור מוסמך' },
+    { key: 'hvac',              label: 'מיזוג אוויר וקירור',      ai: 'טכנאי מיזוג אוויר' },
+    { key: 'contractor',        label: 'בנייה, בטון ושלד',        ai: 'קבלן בנייה ושלד' },
+    { key: 'renovator',         label: 'שיפוצים וגמר פנים',        ai: 'קבלן שיפוצים' },
+    { key: 'solar_installer',   label: 'מערכות סולאריות (PV)',     ai: 'מתקין מערכות סולאריות' },
+    { key: 'charger_installer', label: 'עמדות טעינה לרכב חשמלי',   ai: 'מתקין עמדות טעינה' },
+    { key: 'general',           label: 'כללי / תחום אחר',          ai: 'איש מקצוע מנוסה' },
+];
+function professionLabel(key) { const p = PROFESSIONS.find((x) => x.key === key); return p ? p.label : (key || ''); }
+function professionAiRole(key) { const p = PROFESSIONS.find((x) => x.key === key); return p ? p.ai : (key || 'איש מקצוע'); }
+// Populate every profession <select> from the one list, so options never drift.
+function fillProfessionOptions() {
+    ['settings-profession-input', 'google-reg-profession'].forEach((id) => {
+        const sel = document.getElementById(id);
+        if (!sel || sel.tagName !== 'SELECT') return;
+        const cur = sel.value;
+        sel.innerHTML = PROFESSIONS.map((p) => `<option value="${p.key}">${p.label}</option>`).join('');
+        if (cur && PROFESSIONS.some((p) => p.key === cur)) sel.value = cur;
+    });
+}
+
 // Planner persona: complete BOM builder, explicitly NO prices at this stage.
 function getPlanningSystemInstruction() {
     const profession = (appState.settings && appState.settings.profession) || 'electrician';
-    const professionMap = {
-        electrician: 'חשמלאי מוסמך', charger_installer: 'מתקין עמדות טעינה',
-        solar_installer: 'מתקין מערכות סולאריות', renovator: 'קבלן שיפוצים', contractor: 'קבלן בנייה'
-    };
-    return `אתה מתכנן עבודות מומחה עבור ${professionMap[profession] || profession} בישראל. תפקידך הוא אך ורק תכנון — לעולם אל תציין מחירים או עלויות (זה השלב הבא).
+    return `אתה מתכנן עבודות מומחה עבור ${professionAiRole(profession)} בישראל. תפקידך הוא אך ורק תכנון — לעולם אל תציין מחירים או עלויות (זה השלב הבא).
 המטרה שלך: לגלות את כל — אבל כל — מה שנדרש לעבודה הזאת. פריט שלא ברשימה = פריט שהמתקין ישכח לקנות.
 
 כשמתארים לך עבודה:
@@ -5566,7 +5585,43 @@ function getProfessionSystemInstruction() {
 4. בצע "בדיקת מחירים באינטרנט" - ספק הערכת מחיר רכש משוערת לחומרים ופרט את מחירי החומרים בשקלים.
 5. ספק אומדן עלות עבודה (עבודה בלבד, ללא חומרים) משוערת בשקלים חדשים (בהתבסס על מחירונים מקובלים בשוק לעבודות שלד וגמר).`;
             break;
-            
+
+        case 'plumber':
+            specificContent = `אתה מומחה תמחור, חישוב חומרים וניהול עבודות אינסטלציה ומערכות מים וביוב בישראל (עבור סתיו ג'אן - SJ הנדסת חשמל).
+תפקידך לנהל שיחה מקצועית, ממוקדת ומסייעת כדי לעזור לסתיו לתמחר עבודות אינסטלציה.
+
+הידע המקצועי שלך — שלוף ממנו לפי שלב השיחה (אל תשפוך את הכול בהודעה אחת):
+1. נתח את עבודת האינסטלציה שסתיו מתאר.
+2. זהה נקודות עיוורון (Blind spots) ודרישות קריטיות - דברים שצריך לקחת בחשבון (למשל: לחץ מים ומפחית לחץ, קווי מים חמים/קרים והחזר חם, שיפועי ניקוז וקוטר קווי דלוחין/ביוב, אוורור קולטנים, איטום חדרים רטובים ובדיקת הצפה, קיבוע צנרת וסקלות, מניעת קורוזיה וחיבורי דיאלקטרי, ברזי ניתוק וניקוזים, בדיקת לחץ ואטימות, תיאום מול קבלן ראשי/חשמל למיקום דודים ומשאבות וכו').
+3. הצע רשימת חומרים נלווים ואביזרים (כגון צנרת פקסגול/מולטיגול/PP, מחברים וזוויות, ברזים ומפרידים, סוללות ומיקסרים, חומרי איטום ופשתן/טפלון, מחזיקי צנרת, שרוולים, ריתוך אלקטרופיוז'ן וכו').
+4. בצע "בדיקת מחירים באינטרנט" - ספק הערכת מחיר רכש משוערת לחומרים ופרט מחירים בשקלים.
+5. ספק אומדן עלות עבודה (עבודה בלבד) משוערת בשקלים חדשים.`;
+            break;
+
+        case 'hvac':
+            specificContent = `אתה מומחה תמחור, חישוב חומרים וניהול עבודות מיזוג אוויר וקירור בישראל (עבור סתיו ג'אן - SJ הנדסת חשמל).
+תפקידך לנהל שיחה מקצועית, ממוקדת ומסייעת כדי לעזור לסתיו לתמחר התקנות ותחזוקת מיזוג.
+
+הידע המקצועי שלך — שלוף ממנו לפי שלב השיחה (אל תשפוך את הכול בהודעה אחת):
+1. נתח את עבודת המיזוג שסתיו מתאר (עילי/מיני-מרכזי/מרכזי/VRF, תפוקה נדרשת).
+2. זהה נקודות עיוורון (Blind spots) ודרישות קריטיות - דברים שצריך לקחת בחשבון (למשל: חישוב עומס קירור/חימום BTU, אורך ומהלך צנרת הגז ומגבלות היצרן, ואקום ובדיקת דליפות, קו ניקוז מי עיבוי ושיפוע/משאבת ניקוז, הזנת חשמל ייעודית וגודל מא"ז/פחת, קונסטרוקציה וסינרים למעבה, בידוד צנרת, קידוחי קיר, גובה עבודה ופיגום, תיאום עם החשמלאי להזנה וכו').
+3. הצע רשימת חומרים נלווים ואביזרים (כגון צנרת נחושת מבודדת, כבל תקשורת/פיקוד, תעלת PVC דקורטיבית, קונזולות ומסבכים, סרט בידוד, גז R32/R410, קו ניקוז וסיפון, ברגים ודיבלים וכו').
+4. בצע "בדיקת מחירים באינטרנט" - ספק הערכת מחיר רכש משוערת לחומרים ופרט מחירים בשקלים.
+5. ספק אומדן עלות עבודה (עבודה בלבד) משוערת בשקלים חדשים.`;
+            break;
+
+        case 'general':
+            specificContent = `אתה מומחה תמחור, חישוב חומרים וניהול עבודות עבור איש מקצוע מנוסה בתחומו בישראל (עבור סתיו ג'אן - SJ הנדסת חשמל).
+תפקידך לנהל שיחה מקצועית, ממוקדת ומסייעת כדי לעזור לסתיו לתמחר את העבודה שהוא מתאר, יהיה תחומה אשר יהיה.
+
+הידע המקצועי שלך — שלוף ממנו לפי שלב השיחה (אל תשפוך את הכול בהודעה אחת):
+1. נתח את העבודה שסתיו מתאר וזהה את תחום המקצוע ממנה.
+2. זהה נקודות עיוורון (Blind spots) ודרישות קריטיות רלוונטיות לאותו תחום (בטיחות, תקנים, אישורים, גישה לשטח, עבודה בגובה, תיאומים מול בעלי מקצוע אחרים וכו').
+3. הצע רשימת חומרים נלווים ואביזרים שדרושים כדי להשלים את העבודה קומפלט.
+4. בצע "בדיקת מחירים באינטרנט" - ספק הערכת מחיר רכש משוערת לחומרים ופרט מחירים בשקלים.
+5. ספק אומדן עלות עבודה (עבודה בלבד) משוערת בשקלים חדשים.`;
+            break;
+
         case 'electrician':
         default:
             specificContent = `אתה מומחה תמחור, חישוב חומרים וניהול עבודות חשמל עבור חשמלאי מוסמך בישראל (סתיו ג'אן - SJ הנדסת חשמל).
@@ -5682,17 +5737,9 @@ function updateUserProfileUI() {
     }
     const user = users.find(u => u && u.username && u.username.toLowerCase() === activeUser.toLowerCase());
 
-    const professionMap = {
-        'electrician': 'חשמלאי מוסמך',
-        'charger_installer': 'מתקין עמדות טעינה',
-        'solar_installer': 'מתקין מערכות סולאריות',
-        'renovator': 'קבלן שיפוצים',
-        'contractor': 'קבלן עבודות בנייה וגמר'
-    };
-    
     const displayName = user ? user.username : activeUser;
     const professionKey = user ? (user.profession || 'electrician') : 'electrician';
-    const professionName = professionMap[professionKey] || professionKey;
+    const professionName = professionAiRole(professionKey);
     
     // Update UI elements
     // Sidebar user chip (name, role, avatar — Google photo if available).
@@ -5961,6 +6008,7 @@ function handleGoogleLogin() {
                         };
                         const modal = document.getElementById('google-profession-modal');
                         if (modal) {
+                            fillProfessionOptions();
                             modal.style.display = 'flex';
                             const modalInput = document.getElementById('google-reg-profession');
                             if (modalInput) modalInput.focus();

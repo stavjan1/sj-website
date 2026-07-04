@@ -141,7 +141,7 @@
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
                 </div>
-                <span class="version">v4.6</span>
+                <span class="version">v4.7</span>
             </div>
         </aside>
         
@@ -841,11 +841,15 @@
                                     <label for="settings-profession-input" style="font-size:.85rem;color:var(--text-muted);">תחום עיסוק (קובע את התמחות סוכן ה-AI)</label>
                                     <div style="display:flex;gap:8px;margin-top:6px;">
                                         <select id="settings-profession-input" style="flex-grow:1;background:rgba(255,255,255,0.05);border:1px solid var(--border-color);color:#fff;padding:8px 12px;border-radius:8px;font-family:inherit;cursor:pointer;">
-                                            <option value="electrician">חשמלאי / מהנדס חשמל</option>
-                                            <option value="charger_installer">מתקין עמדות טעינה לרכב חשמלי</option>
-                                            <option value="solar_installer">מתקין מערכות סולאריות (PV)</option>
-                                            <option value="renovator">קבלן שיפוצים וגמר פנים</option>
-                                            <option value="contractor">קבלן עבודות בנייה ושלד</option>
+                                            <!-- options populated from PROFESSIONS via fillProfessionOptions() -->
+                                            <option value="electrician">חשמל</option>
+                                            <option value="plumber">אינסטלציה</option>
+                                            <option value="hvac">מיזוג אוויר וקירור</option>
+                                            <option value="contractor">בנייה, בטון ושלד</option>
+                                            <option value="renovator">שיפוצים וגמר פנים</option>
+                                            <option value="solar_installer">מערכות סולאריות (PV)</option>
+                                            <option value="charger_installer">עמדות טעינה לרכב חשמלי</option>
+                                            <option value="general">כללי / תחום אחר</option>
                                         </select>
                                         <button type="button" class="btn btn-accent" onclick="updateUserProfileProfession()" style="padding:8px 14px;font-size:.9rem;white-space:nowrap;">עדכן</button>
                                     </div>
@@ -1069,10 +1073,10 @@
             <!-- Business Panel -->
             <section id="panel-business" class="content-panel">
                 <div class="section-header">
-                    <h2><i class="fa-solid fa-briefcase"></i> פרטי העסק והצעת המחיר</h2>
-                    <p class="section-subtitle">פרטי החברה, לוגו, רקע ותנאי תשלום שיופיעו בכל הצעת מחיר שתייצא.</p>
+                    <h2><i class="fa-solid fa-briefcase"></i> פרטי העסק</h2>
+                    <p class="section-subtitle">הפרטים שמוטבעים בכל הצעה — ממלאים פעם אחת. עיצוב ההצעה נמצא בנפרד למטה.</p>
                 </div>
-                <div class="settings-grid">
+                <div class="settings-grid settings-stack">
                     <div class="section-card">
                         <div class="card-header"><h3><i class="fa-solid fa-building"></i> פרטי החברה</h3></div>
                         <div class="card-body">
@@ -1125,10 +1129,18 @@
                         </div>
                     </div>
 
+                    <!-- Visual break: business identity (fill once) ends, design (tweak often) begins -->
+                    <div class="panel-split-header">
+                        <i class="fa-solid fa-palette text-accent"></i>
+                        <div>
+                            <h3>עיצוב הצעת המחיר</h3>
+                            <span>לוגו, רקע ותבנית ה-PDF — אפשר לשנות בכל עת. (עורך גרירת בלוקים מלא בדרך 🚧)</span>
+                        </div>
+                    </div>
                     <div style="display:flex;flex-direction:column;gap:20px;">
                         <!-- Logo & BG -->
                         <div class="section-card">
-                            <div class="card-header"><h3><i class="fa-solid fa-image"></i> עיצוב הצעת מחיר</h3></div>
+                            <div class="card-header"><h3><i class="fa-solid fa-image"></i> לוגו ורקע</h3></div>
                             <div class="card-body">
                                 <div class="form-grid-2">
                                     <div class="form-group">
@@ -1529,7 +1541,10 @@
             <form onsubmit="saveGoogleUserProfession(event)" style="text-align: right; display: flex; flex-direction: column; gap: 16px;">
                 <div class="form-group" style="margin-bottom: 0;">
                     <label for="google-reg-profession">תחום עיסוק / התמחות</label>
-                    <input type="text" id="google-reg-profession" required placeholder="למשל: חשמלאי מוסמך, גנן, שף, מתקין עמדות טעינה" style="width: 100%; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(15, 23, 42, 0.5); padding: 12px 16px; color: #fff; font-family: inherit; font-size: 0.95rem;">
+                    <select id="google-reg-profession" required style="width: 100%; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(15, 23, 42, 0.5); padding: 12px 16px; color: #fff; font-family: inherit; font-size: 0.95rem; cursor: pointer;">
+                        <!-- options populated from PROFESSIONS via fillProfessionOptions() -->
+                    </select>
+                    <p style="font-size:.78rem;color:var(--text-muted);margin:8px 2px 0;line-height:1.5;">אפשר לשנות בכל רגע בהגדרות. הבחירה מכוונת את סוכן ה-AI לתחום שלך.</p>
                 </div>
                 <button type="submit" class="btn btn-accent btn-full" style="margin-top: 10px;">סיום והמשך לאפליקציה</button>
             </form>
