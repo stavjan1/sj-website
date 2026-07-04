@@ -911,6 +911,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // loadSettings right after, so dark users never flash light for long.
     applySystemTheme('light');
 
+    // 125%-scaling laptops: shrink the whole app to fit (see applyDisplayZoomFix).
+    applyDisplayZoomFix();
+
     // PWA: register the service worker (installable app + offline shell).
     if ('serviceWorker' in navigator && location.protocol === 'https:') {
         navigator.serviceWorker.register('sw.js').catch(() => { /* non-fatal */ });
@@ -935,6 +938,7 @@ document.addEventListener('DOMContentLoaded', () => {
         initUserSession();
         updateQuotaUI(); // initialize the quota ring (app UI only)
         refreshTierInfo(); // plan + limits from the server (Move 2 gates)
+        fillProfessionOptions(); // closed trade list — one source of truth
     }
     hideAppSplash();
 });
@@ -1088,11 +1092,21 @@ function mergeCloudIntoLocal(cloud) {
     const cloudTs = (cloud && cloud.lastUpdated) || 0;
     const localTs = parseInt(localStorage.getItem(getStorageKey('sj_db_last_updated')) || '0', 10);
     const preferCloud = cloudTs >= localTs; // newer side wins per-item conflicts
+
+    // Tombstones: a project that sits in EITHER side's trash was deleted on
+    // purpose — the union must not resurrect it (e.g. deleted offline on this
+    // device while the cloud copy still lists it). It stays in the trash,
+    // recoverable, instead of silently reappearing as active.
+    const mergedTrash = _mergeListById(local.trash, cloud.trash, preferCloud);
+    const trashedIds = new Set(mergedTrash.map((t) => t && t.id).filter(Boolean));
+    const mergedProjects = _mergeListById(local.projects, cloud.projects, preferCloud)
+        .filter((p) => !trashedIds.has(p.id));
+
     applyDatabaseObject({
         settings: preferCloud ? (cloud.settings || local.settings) : (local.settings || cloud.settings),
         history: _mergeListById(local.history, cloud.history, preferCloud),
-        projects: _mergeListById(local.projects, cloud.projects, preferCloud),
-        trash: _mergeListById(local.trash, cloud.trash, preferCloud),
+        projects: mergedProjects,
+        trash: mergedTrash,
         catalog: _mergeListById(local.catalog, cloud.catalog, preferCloud),
         users: _mergeListById(local.users, cloud.users, preferCloud),
         lastUpdated: Math.max(cloudTs, localTs) || Date.now(),
@@ -1972,6 +1986,31 @@ function loadSettings() {
         updatePdfCustomStyles();
     }
 }
+
+// ===== Display-scaling compensation =====
+// Windows laptops commonly run 125% display scaling, which eats ~20% of the
+// workspace (Stav: "שיזהה לבד שהמחשב על 125% ויקטין את הכל ב-80%"). On desktop
+// we counter-zoom the whole app by 1/devicePixelRatio so those users see the
+// full layout. Browser zoom changes DPR too, so a user who zooms manually
+// self-corrects. Phones are untouched (their DPR is naturally 2-3).
+function applyDisplayZoomFix(forceDpr) {
+    try {
+        const desktop = window.matchMedia('(min-width: 861px) and (pointer: fine)').matches;
+        const dpr = forceDpr || window.devicePixelRatio || 1;
+        let z = 1;
+        if (desktop && dpr > 1.05 && dpr < 1.75) {
+            z = Math.max(0.75, Math.min(1, Math.round((1 / dpr) * 100) / 100)); // 125% → 0.8
+        }
+        document.body.style.zoom = z === 1 ? '' : String(z);
+        // Inside zoomed content 100vh no longer reaches the real viewport
+        // bottom — expose the true usable height for the fixed-screen layouts.
+        document.documentElement.style.setProperty('--appvh', Math.round(window.innerHeight / z) + 'px');
+    } catch (e) { /* non-fatal */ }
+}
+window.addEventListener('resize', () => {
+    clearTimeout(window._zoomFixT);
+    window._zoomFixT = setTimeout(() => applyDisplayZoomFix(), 150);
+});
 
 // ===== Theme & Custom Background Handlers =====
 // Product decision (Stav, 04/07): LIGHT is the default for everyone; a manual
@@ -3752,14 +3791,16 @@ function updatePlanActionBar(proj) {
 // AI agent's expertise selectable and easy to manage. `ai` is the Hebrew role
 // the agent prompts address themselves as.
 const PROFESSIONS = [
-    { key: 'electrician',       label: 'חשמל',                   ai: 'חשמלאי מוסמך' },
+    { key: 'electrician',       label: 'חשמל (כולל עמדות טעינה וסולארי)', ai: 'חשמלאי מוסמך' },
     { key: 'plumber',           label: 'אינסטלציה',              ai: 'אינסטלטור מוסמך' },
     { key: 'hvac',              label: 'מיזוג אוויר וקירור',      ai: 'טכנאי מיזוג אוויר' },
     { key: 'contractor',        label: 'בנייה, בטון ושלד',        ai: 'קבלן בנייה ושלד' },
     { key: 'renovator',         label: 'שיפוצים וגמר פנים',        ai: 'קבלן שיפוצים' },
-    { key: 'solar_installer',   label: 'מערכות סולאריות (PV)',     ai: 'מתקין מערכות סולאריות' },
-    { key: 'charger_installer', label: 'עמדות טעינה לרכב חשמלי',   ai: 'מתקין עמדות טעינה' },
     { key: 'general',           label: 'כללי / תחום אחר',          ai: 'איש מקצוע מנוסה' },
+    // Folded into "חשמל" (Stav, 04/07): kept ONLY so accounts that picked them
+    // before keep their prompts working; hidden from the selection lists.
+    { key: 'solar_installer',   label: 'מערכות סולאריות (PV)',     ai: 'מתקין מערכות סולאריות', hidden: true },
+    { key: 'charger_installer', label: 'עמדות טעינה לרכב חשמלי',   ai: 'מתקין עמדות טעינה', hidden: true },
 ];
 function professionLabel(key) { const p = PROFESSIONS.find((x) => x.key === key); return p ? p.label : (key || ''); }
 function professionAiRole(key) { const p = PROFESSIONS.find((x) => x.key === key); return p ? p.ai : (key || 'איש מקצוע'); }
@@ -3769,8 +3810,11 @@ function fillProfessionOptions() {
         const sel = document.getElementById(id);
         if (!sel || sel.tagName !== 'SELECT') return;
         const cur = sel.value;
-        sel.innerHTML = PROFESSIONS.map((p) => `<option value="${p.key}">${p.label}</option>`).join('');
-        if (cur && PROFESSIONS.some((p) => p.key === cur)) sel.value = cur;
+        sel.innerHTML = PROFESSIONS.filter((p) => !p.hidden)
+            .map((p) => `<option value="${p.key}">${p.label}</option>`).join('');
+        // A legacy choice (solar/charger) falls back to electrician in the UI.
+        if (cur && PROFESSIONS.some((p) => p.key === cur && !p.hidden)) sel.value = cur;
+        else if (cur === 'solar_installer' || cur === 'charger_installer') sel.value = 'electrician';
     });
 }
 
@@ -3918,9 +3962,15 @@ async function sendChatMessage() {
     const activeProject = projectsList.find(p => p.id === activeProjectId);
     if (!activeProject) return;
 
+    // Behind-the-scenes instruction? consume the one-shot flag now.
+    const isHidden = _nextUserMsgHidden;
+    _nextUserMsgHidden = false;
+
     // Planning mode feeds the planning conversation; pricing feeds the pricer.
     if (activeChatMode === 'plan') {
-        ensurePlanHistory(activeProject).push({ role: 'user', parts: [{ text: userText }] });
+        const planMsg = { role: 'user', parts: [{ text: userText }] };
+        if (isHidden) planMsg.hidden = true;
+        ensurePlanHistory(activeProject).push(planMsg);
         saveProjects();
         renderChatHistory(activeProject.planChatHistory);
         inputArea.value = '';
@@ -3931,10 +3981,12 @@ async function sendChatMessage() {
     }
 
     // Add user message to state
-    activeProject.chatHistory.push({
+    const userMsg = {
         role: 'user',
         parts: [{ text: userText }]
-    });
+    };
+    if (isHidden) userMsg.hidden = true;
+    activeProject.chatHistory.push(userMsg);
     saveProjects();
 
     // Render and scroll to bottom
@@ -4221,10 +4273,15 @@ function applyChatSearch() {
     });
 }
 
-function sendSuggestedChatPrompt(text) {
+// When true, the NEXT user message pushed by sendChatMessage is a behind-the-
+// scenes instruction: the AI receives it but it never appears in the chat UI.
+let _nextUserMsgHidden = false;
+
+function sendSuggestedChatPrompt(text, hidden) {
     const input = document.getElementById('chat-user-input');
     if (input) {
         input.value = text;
+        _nextUserMsgHidden = !!hidden;
         sendChatMessage();
     }
 }
@@ -4244,7 +4301,8 @@ function generateMaterialsList() {
         return;
     }
     const prompt = 'בהתבסס על כל מה שתואר עד כה בשיחה, צור עכשיו רשימת חומרים ואביזרים מלאה ומפורטת לפרויקט הזה — כולל כל הפריטים הקטנים שקל לשכוח (דיבלים, ברגים, מהדקים, סופיות כבל, שרוולים, סרט בידוד, קופסאות הסתעפות, מובילים ותעלות, נעלי כבל, מפסקים אוטומטיים זעירים, צינורות הגנה ועוד). לכל פריט ציין שם, כמות או פירוט, ומחיר רכש משוער בשקלים. אל תשמיט פריטים — עדיף לכלול יותר מדי מאשר לפספס אביזר. סיים בגוש JSON מעודכן כרגיל כדי שרשימת החומרים תתעדכן אוטומטית.';
-    sendSuggestedChatPrompt(prompt);
+    showToast('בונה רשימת חומרים מלאה… ההנחיה נשלחה לסוכן מאחורי הקלעים');
+    sendSuggestedChatPrompt(prompt, true); // hidden: the user sees only the answer
 }
 
 function handleChatKeyDown(event) {
@@ -4264,8 +4322,9 @@ function renderChatHistory(chatHistory) {
     if (sugg) sugg.style.display = (chatHistory || []).some(m => m.role === 'user') ? 'none' : 'flex';
 
     log.innerHTML = '';
-    
+
     chatHistory.forEach(msg => {
+        if (msg.hidden) return; // behind-the-scenes instruction — AI-only, never shown
         const bubble = document.createElement('div');
         const role = msg.role === 'user' ? 'user' : 'model';
         bubble.className = `chat-bubble ${role}`;
@@ -4789,12 +4848,18 @@ function downloadPDF() {
 // scaled state as-is — which used to produce a small, off-center PDF. Undo the
 // fit for the capture and restore it right after.
 function _unscaleSheetForCapture(sheet) {
-    const saved = { transform: sheet.style.transform, marginBottom: sheet.style.marginBottom };
+    const saved = {
+        transform: sheet.style.transform,
+        marginBottom: sheet.style.marginBottom,
+        bodyZoom: document.body.style.zoom, // 125%-scaling counter-zoom must not leak into the PDF
+    };
     sheet.style.transform = 'none';
     sheet.style.marginBottom = '0';
+    document.body.style.zoom = '';
     return () => {
         sheet.style.transform = saved.transform;
         sheet.style.marginBottom = saved.marginBottom;
+        document.body.style.zoom = saved.bodyZoom;
         try { fitQuotePreview(); } catch (e) {}
     };
 }
@@ -5820,12 +5885,12 @@ function getProfessionSystemInstruction() {
         case 'electrician':
         default:
             specificContent = `אתה מומחה תמחור, חישוב חומרים וניהול עבודות חשמל עבור חשמלאי מוסמך בישראל (סתיו ג'אן - SJ הנדסת חשמל).
-תפקידך לנהל שיחה מקצועית, ממוקדת ומסייעת כדי לעזור לסתיו לתמחר עבודות חשמל.
+תפקידך לנהל שיחה מקצועית, ממוקדת ומסייעת כדי לעזור לסתיו לתמחר עבודות חשמל — כולל התקנת עמדות טעינה לרכב חשמלי ומערכות סולאריות (PV), שהן חלק מהתחום שלך.
 
 הידע המקצועי שלך — שלוף ממנו לפי שלב השיחה (אל תשפוך את הכול בהודעה אחת):
 1. נתח את העבודה שסתיו מתאר.
-2. זהה נקודות עיוורון (Blind spots) - דברים שצריך לקחת בחשבון (למשל: סוג הלוח, מרחק בפועל, חציבות בבטון/בלוק, הארקה, מפסקי מגן, אישורים, הגדלת חיבור, עבודה בגובה, הפרעות בשטח וכו').
-3. הצע רשימת חומרים נלווים ואביזרים שסתיו צריך לקנות כדי להשלים את העבודה קומפלט פרפקט (כגון דיבלים, ברגים, כבלים, תעלות, קופסאות חיבור, עמדת טעינה, צינורות וכו').
+2. זהה נקודות עיוורון (Blind spots) - דברים שצריך לקחת בחשבון (למשל: סוג הלוח, מרחק בפועל, חציבות בבטון/בלוק, הארקה, מפסקי מגן, אישורים, הגדלת חיבור, עבודה בגובה, הפרעות בשטח; בעמדות טעינה — מגן זליגה 6mA DC או Type B, חתך מוליכים 5x6/5x10, תיאום חברת חשמל; בסולארי — סוג גג, קונסטרוקציה ועיגונים, כבילת DC עמידת UV, ממיר, מונה נטו ואישורים וכו').
+3. הצע רשימת חומרים נלווים ואביזרים שסתיו צריך לקנות כדי להשלים את העבודה קומפלט פרפקט (כגון דיבלים, ברגים, כבלים, תעלות, קופסאות חיבור, עמדת טעינה, פנלים וממיר בסולארי, צינורות וכו').
 4. בצע "בדיקת מחירים באינטרנט" - ספק הערכת מחיר רכש משוערת לחומרים (כאילו חיפשת באתרים כמו ארכה) ופרט את מחירי החומרים בשקלים.
 5. ספק אומדן עלות עבודה (עבודה בלבד, ללא חומרים) משוערת בשקלים חדשים (ניתן להסתמך על מחירונים מקובלים כמו מחירון שטרן).`;
             break;

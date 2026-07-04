@@ -2235,8 +2235,19 @@ textarea#ai-input {
     .section-header h2 { font-size: 1.15rem; margin-bottom: 2px; }
     .section-subtitle { font-size: 0.82rem; }
 
-    /* Chat gets the full window height: slim every bar around it */
-    #panel-wizard .control-side { height: calc(100vh - 106px) !important; }
+    /* Chat gets the full window height: slim every bar around it.
+       --appvh = the REAL usable viewport height (compensates the 125%-scaling
+       counter-zoom, where plain 100vh falls short — set by applyDisplayZoomFix). */
+    #panel-wizard .control-side { height: calc(var(--appvh, 100vh) - 106px) !important; }
+    /* The estimate panel matches the chat height; ONE scroll for all its content */
+    #panel-wizard .preview-side {
+        height: calc(var(--appvh, 100vh) - 106px);
+        display: flex; flex-direction: column; overflow: hidden;
+    }
+    #panel-wizard .preview-side .card-body { flex: 1; min-height: 0; overflow-y: auto; }
+    /* The materials checklist was capped at 250px → a sliver needing its own
+       scrollbar. Let it grow naturally; the panel's single scrollbar handles it. */
+    #panel-wizard .helper-materials-checklist { max-height: none; overflow-y: visible; }
     #panel-wizard .section-header { margin-bottom: 4px; }
     #panel-wizard .section-subtitle { display: none; }   /* the chat explains itself */
     .chat-mode-toggle { padding: 5px 10px 0; gap: 6px; }
@@ -3709,8 +3720,10 @@ body:not(.light-theme) .tf-moon { transform: translateY(0) rotate(0deg); transit
 
 @media (min-width: 861px) {
     /* The whole projects screen is FIXED — only the list scrolls.
-       min-height:0 overrides .content-panel's min-height:100%. */
-    #panel-projects { height: calc(100vh - 92px); min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+       min-height:0 overrides .content-panel's min-height:100%.
+       .active is REQUIRED: a bare #panel-projects{display:flex} out-specifies
+       .content-panel{display:none} and leaks the panel into every other tab. */
+    #panel-projects.active { height: calc(var(--appvh, 100vh) - 92px); min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
     #panel-projects .section-header { flex-shrink: 0; margin-bottom: 8px; }
     #panel-projects .projects-layout { flex: 1; min-height: 0; }
     #panel-projects .projects-stats .metric-card { padding: 12px 14px; }
