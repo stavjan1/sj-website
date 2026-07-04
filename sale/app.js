@@ -939,6 +939,11 @@ document.addEventListener('DOMContentLoaded', () => {
         updateQuotaUI(); // initialize the quota ring (app UI only)
         refreshTierInfo(); // plan + limits from the server (Move 2 gates)
         fillProfessionOptions(); // closed trade list — one source of truth
+        // Sticky editor preference: the last VAT mode chosen becomes the
+        // default for the next new quote (itemized-prices is handled in
+        // toggleItemizedPrices).
+        const vatSel = document.getElementById('form-vat-type');
+        if (vatSel) vatSel.addEventListener('change', () => rememberQuotePref('vatType', vatSel.value));
     }
     hideAppSplash();
 });
@@ -1299,6 +1304,16 @@ function switchTab(tabId) {
         return;
     }
 
+    // Returning to the projects list CLOSES the open project (Stav: the
+    // project tabs should exist only while you're inside a specific project).
+    // Everything is already saved; picking a card re-opens instantly.
+    if (tabId === 'projects' && activeProjectId) {
+        activeProjectId = null;
+        localStorage.removeItem(getStorageKey('sj_active_project_id'));
+        updateActiveProjectBanner(null);
+        filterProjectsList(); // clear the active highlight on the cards
+    }
+
     // Update nav buttons classes
     document.querySelectorAll('.nav-menu .nav-btn').forEach(btn => {
         btn.classList.remove('active');
@@ -1502,10 +1517,11 @@ function createNewProject() {
                 { title: 'פרק א\': עבודות הכנה', description: 'ביצוע עבודות הכנה והתארגנות בשטח.', price: 0 }
             ],
             basePrice: 0,
-            vatType: 'exempt',
+            // New quotes inherit the user's LAST choices (sticky preferences).
+            vatType: lastQuotePref('vatType', 'exempt'),
             finalPrice: 0,
             summary: appState.settings.businessDetails.terms,
-            showItemizedPrices: false
+            showItemizedPrices: lastQuotePref('showItemizedPrices', false)
         }
     };
     
@@ -2060,15 +2076,19 @@ function applySystemTheme(theme) {
         }
     }
 
-    // Top-bar flip button: the sun/moon faces animate via CSS transitions
-    // driven by body.light-theme, so here we only keep aria state fresh.
+    // Top-bar toggle: shows the CURRENT mode (icon + label swap on switch).
+    const flipIcon = document.getElementById('theme-flip-icon');
+    const flipLabel = document.getElementById('theme-flip-label');
     const flip = document.getElementById('theme-flip');
-    if (flip) flip.setAttribute('aria-label', theme === 'light' ? 'עבור למצב כהה (DARK MODE)' : 'עבור למצב בהיר (LIGHT MODE)');
+    if (flipIcon) flipIcon.className = theme === 'light' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+    if (flipLabel) flipLabel.textContent = theme === 'light' ? 'LIGHT MODE' : 'DARK MODE';
+    if (flip) {
+        flip.classList.toggle('is-dark', theme !== 'light');
+        flip.setAttribute('aria-label', theme === 'light' ? 'עבור למצב כהה (DARK MODE)' : 'עבור למצב בהיר (LIGHT MODE)');
+    }
 }
 
-// The top-bar sun/moon flip: light→dark = the moon drops in from above while
-// the sun sets; dark→light = the sun rises and "punches" the moon away up.
-// The choreography lives in CSS (.tf-face transitions); this just toggles.
+// Top-bar theme toggle (kept simple per Stav — label swaps between modes).
 function flipTheme() {
     toggleSystemTheme();
 }
@@ -2970,13 +2990,29 @@ function updatePreviewFromForm() {
     syncCurrentQuoteToProject();
 }
 
+// The user's LAST choice in the editor becomes the default for the next new
+// quote/project (Stav: "יזכור את השינויים ויעשה כמו המצב האחרון שבחרתי").
+function rememberQuotePref(key, value) {
+    if (!appState.settings) appState.settings = {};
+    if (!appState.settings.lastQuotePrefs) appState.settings.lastQuotePrefs = {};
+    appState.settings.lastQuotePrefs[key] = value;
+    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
+}
+function lastQuotePref(key, fallback) {
+    const p = appState.settings && appState.settings.lastQuotePrefs;
+    return p && key in p ? p[key] : fallback;
+}
+
 function toggleItemizedPrices(checked, syncProject = true) {
     appState.currentQuote.showItemizedPrices = checked;
-    
+    // Only a real user action updates the sticky default (loading a project
+    // passes syncProject=false and must not overwrite the preference).
+    if (syncProject) rememberQuotePref('showItemizedPrices', checked);
+
     // Sync checkmarks
     const editToggle = document.getElementById('form-itemized-prices-toggle');
     if (editToggle) editToggle.checked = checked;
-    
+
     const settingsToggle = document.getElementById('set-show-itemized-prices');
     if (settingsToggle) settingsToggle.checked = checked;
     
@@ -3089,6 +3125,107 @@ function setReportTableCell(i, r, c, v) {
     if (t && t.type === 'table' && t.rows[r]) t.rows[r][c] = v;
 }
 
+// A table cell holds TEXT or an IMAGE — not both (Stav). Images are compressed
+// like the field photos and can be annotated (drawn on) before printing.
+function reportTableCellPhoto(i, r, c, input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    _compressImageFile(file, (dataUrl) => {
+        const t = reportBlocks[i];
+        if (t && t.type === 'table' && t.rows[r]) t.rows[r][c] = { img: dataUrl };
+        renderReportBlocks();
+        scheduleReportPreview();
+    });
+    input.value = '';
+}
+function reportTableCellClear(i, r, c) {
+    const t = reportBlocks[i];
+    if (t && t.type === 'table' && t.rows[r]) t.rows[r][c] = '';
+    renderReportBlocks();
+    scheduleReportPreview();
+}
+function annotateTableCell(i, r, c) {
+    const t = reportBlocks[i];
+    const cell = t && t.rows[r] && t.rows[r][c];
+    if (!cell || !cell.img) return;
+    openImageAnnotator(cell.img, (d) => {
+        t.rows[r][c] = { img: d };
+        renderReportBlocks();
+        scheduleReportPreview();
+    });
+}
+
+// ---- Image annotator ("סמן") — draw freehand on a photo before printing ----
+let _annSaveCb = null;
+function openImageAnnotator(dataUrl, onSave) {
+    closeImageAnnotator();
+    _annSaveCb = onSave;
+    const wrap = document.createElement('div');
+    wrap.id = 'img-annotator';
+    wrap.className = 'upgrade-modal-backdrop';
+    wrap.innerHTML = `
+        <div class="annotator-box">
+            <div class="ann-head">
+                <b><i class="fa-solid fa-pen"></i> סימון על התמונה</b>
+                <span>צייר עם העכבר או האצבע — עיגולים, חיצים, הדגשות</span>
+            </div>
+            <canvas id="ann-canvas"></canvas>
+            <div class="ann-actions">
+                <button class="btn btn-secondary" onclick="closeImageAnnotator()">ביטול</button>
+                <button class="btn btn-secondary" id="ann-clear"><i class="fa-solid fa-eraser"></i> נקה סימונים</button>
+                <button class="btn btn-accent" id="ann-save"><i class="fa-solid fa-check"></i> שמור</button>
+            </div>
+        </div>`;
+    document.body.appendChild(wrap);
+    wrap.addEventListener('click', (e) => { if (e.target === wrap) closeImageAnnotator(); });
+
+    const canvas = document.getElementById('ann-canvas');
+    const ctx = canvas.getContext('2d');
+    const base = new Image();
+    base.onload = () => {
+        const maxW = Math.min(860, window.innerWidth - 60);
+        const s = Math.min(1, maxW / base.width);
+        canvas.width = Math.round(base.width * s);
+        canvas.height = Math.round(base.height * s);
+        const paintBase = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(base, 0, 0, canvas.width, canvas.height); };
+        paintBase();
+        ctx.strokeStyle = '#e11d48';
+        ctx.lineWidth = Math.max(3, Math.round(canvas.width / 220));
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        let drawing = false;
+        const pos = (e) => {
+            const rc = canvas.getBoundingClientRect();
+            return { x: (e.clientX - rc.left) * canvas.width / rc.width, y: (e.clientY - rc.top) * canvas.height / rc.height };
+        };
+        canvas.addEventListener('pointerdown', (e) => { drawing = true; try { canvas.setPointerCapture(e.pointerId); } catch (err) {} const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); e.preventDefault(); });
+        canvas.addEventListener('pointermove', (e) => { if (!drawing) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); e.preventDefault(); });
+        canvas.addEventListener('pointerup', () => { drawing = false; });
+        document.getElementById('ann-clear').onclick = paintBase;
+        document.getElementById('ann-save').onclick = () => {
+            const d = canvas.toDataURL('image/jpeg', 0.8);
+            const cb = _annSaveCb;
+            closeImageAnnotator();
+            if (cb) cb(d);
+        };
+    };
+    base.src = dataUrl;
+}
+function closeImageAnnotator() {
+    const m = document.getElementById('img-annotator');
+    if (m) m.remove();
+    _annSaveCb = null;
+}
+function annotateFinding(i) {
+    const f = reportFindings[i];
+    if (!f || !f.img) return;
+    openImageAnnotator(f.img, (d) => {
+        f.img = d;
+        renderReportFindings();
+        scheduleReportPreview();
+    });
+}
+
 function renderReportBlocks() {
     const box = document.getElementById('report-blocks');
     if (!box) return;
@@ -3110,10 +3247,25 @@ function renderReportBlocks() {
             </div>`;
         }
         const cols = b.rows[0].length;
-        const grid = b.rows.map((row, r) => row.map((cell, c) =>
-            `<input type="text" class="rb-cell${r === 0 ? ' rb-head' : ''}" value="${escapeHtml(cell)}"
-                placeholder="${r === 0 ? 'כותרת' : ''}" oninput="setReportTableCell(${i},${r},${c},this.value)">`
-        ).join('')).join('');
+        const grid = b.rows.map((row, r) => row.map((cell, c) => {
+            // Image cell: thumbnail (click = annotate) + remove button.
+            if (cell && typeof cell === 'object' && cell.img) {
+                return `<span class="rb-cellwrap rb-has-img">
+                    <img src="${cell.img}" class="rb-cell-img" onclick="annotateTableCell(${i},${r},${c})" title="לחץ כדי לסמן על התמונה">
+                    <button type="button" class="rb-imgdel" onclick="reportTableCellClear(${i},${r},${c})" title="הסר תמונה">✕</button>
+                </span>`;
+            }
+            // Header row = text only; body cells offer a small camera (text OR image).
+            const camera = r === 0 ? '' : `<label class="rb-cam" title="תמונה במקום טקסט">
+                <i class="fa-solid fa-camera"></i>
+                <input type="file" accept="image/*" style="display:none" onchange="reportTableCellPhoto(${i},${r},${c},this)">
+            </label>`;
+            return `<span class="rb-cellwrap">
+                <input type="text" class="rb-cell${r === 0 ? ' rb-head' : ''}" value="${escapeHtml(cell)}"
+                    placeholder="${r === 0 ? 'כותרת' : ''}" oninput="setReportTableCell(${i},${r},${c},this.value)">
+                ${camera}
+            </span>`;
+        }).join('')).join('');
         return `<div class="rb-block">${controls}
             <div class="rb-table" style="grid-template-columns:repeat(${cols},1fr);">${grid}</div>
             <div class="rb-table-actions">
@@ -3176,7 +3328,7 @@ function importReportTemplate(idx, e) {
     document.getElementById('report-date').value = getTodayDateString();
     document.getElementById('report-number').value = nextReportNumber();
     reportBlocks = (r.blocks || []).map(b => b.type === 'table'
-        ? { type: 'table', rows: b.rows.map((row, ri) => ri === 0 ? [...row] : row.map(() => '')) }
+        ? { type: 'table', rows: b.rows.map((row, ri) => ri === 0 ? row.map((c) => (typeof c === 'string' ? c : '')) : row.map(() => '')) }
         : { type: 'text', text: '' });
     reportFindings = [{ location: '', desc: '', img: '' }];
     renderReportBlocks();
@@ -3252,8 +3404,8 @@ function renderReportFindings() {
             <span class="rf-num">${i + 1}</span>
             <input type="text" class="rf-loc" value="${escapeHtml(f.location)}" placeholder="מיקום (למשל: מטבח)" oninput="reportFindings[${i}].location=this.value">
             <textarea class="rf-desc" rows="2" placeholder="תיאור הממצא וההמלצה" oninput="reportFindings[${i}].desc=this.value">${escapeHtml(f.desc)}</textarea>
-            <label class="rf-photo${f.img ? ' has' : ''}" title="${f.img ? 'החלף תמונה' : 'צרף תמונה מהשטח'}">
-                ${f.img ? `<img src="${f.img}" alt="">` : '<i class="fa-solid fa-camera"></i>'}
+            <label class="rf-photo${f.img ? ' has' : ''}" title="${f.img ? 'לחץ על התמונה לסימון; על הרקע — החלפה' : 'צרף תמונה מהשטח'}">
+                ${f.img ? `<img src="${f.img}" alt="" onclick="event.preventDefault(); event.stopPropagation(); annotateFinding(${i})" title="לחץ כדי לסמן על התמונה">` : '<i class="fa-solid fa-camera"></i>'}
                 <input type="file" accept="image/*" style="display:none" onchange="onReportPhoto(${i}, this)">
             </label>
             <button class="cr-del" onclick="removeReportFinding(${i})" title="מחק ממצא"><i class="fa-solid fa-xmark"></i></button>
@@ -3262,9 +3414,7 @@ function renderReportFindings() {
 
 // Compress site photos (phone camera shots are 3-8MB) to a small JPEG so a
 // full report stays well inside the localStorage budget.
-function onReportPhoto(i, input) {
-    const file = input.files && input.files[0];
-    if (!file) return;
+function _compressImageFile(file, cb) {
     const img = new Image();
     img.onload = () => {
         const MAX = 700;
@@ -3273,11 +3423,20 @@ function onReportPhoto(i, input) {
         c.width = Math.round(img.width * scale);
         c.height = Math.round(img.height * scale);
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        reportFindings[i].img = c.toDataURL('image/jpeg', 0.72);
         URL.revokeObjectURL(img.src);
-        renderReportFindings();
+        cb(c.toDataURL('image/jpeg', 0.72));
     };
     img.src = URL.createObjectURL(file);
+}
+
+function onReportPhoto(i, input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    _compressImageFile(file, (dataUrl) => {
+        reportFindings[i].img = dataUrl;
+        renderReportFindings();
+        scheduleReportPreview();
+    });
     input.value = '';
 }
 
@@ -3296,7 +3455,7 @@ function collectReport() {
         warning: (document.getElementById('report-warning')?.value || '').trim(),
         summary: (document.getElementById('report-summary')?.value || '').trim(),
         blocks: reportBlocks.filter(b => b.type === 'table'
-            ? b.rows.some(row => row.some(c => c && c.trim()))
+            ? b.rows.some(row => row.some(c => (typeof c === 'string' ? c.trim() : c && c.img)))
             : (b.text && b.text.trim())),
         findings: reportFindings.filter(f => f.location || f.desc || f.img),
         savedAt: Date.now()
@@ -3316,10 +3475,13 @@ function buildReportSheet(r) {
     // Free-form blocks (text + tables) render between the intro and the findings.
     const blocksBox = document.getElementById('rpt-blocks');
     if (blocksBox) {
+        const cellHtml = (c) => (c && typeof c === 'object' && c.img)
+            ? `<img src="${c.img}" class="rpt-cell-img" alt="">`
+            : escapeHtml(c || '');
         blocksBox.innerHTML = (r.blocks || []).map(b => {
             if (b.type === 'text') return `<div class="rpt-free-text">${escapeHtml(b.text)}</div>`;
-            const head = `<tr>${b.rows[0].map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr>`;
-            const body = b.rows.slice(1).map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('');
+            const head = `<tr>${b.rows[0].map(c => `<th>${escapeHtml(typeof c === 'string' ? c : '')}</th>`).join('')}</tr>`;
+            const body = b.rows.slice(1).map(row => `<tr>${row.map(c => `<td>${cellHtml(c)}</td>`).join('')}</tr>`).join('');
             return `<table class="rpt-free-table"><thead>${head}</thead><tbody>${body}</tbody></table>`;
         }).join('');
     }
@@ -3662,8 +3824,10 @@ function renderQuoteSignature() {
 }
 
 function updatePriceDisplayMode() {
-    const showItemized = document.getElementById('set-show-itemized-prices').checked;
-    toggleItemizedPrices(showItemized);
+    // Legacy hook (the business-panel duplicate toggle was removed) — the
+    // editor's own checkbox drives toggleItemizedPrices directly now.
+    const el = document.getElementById('set-show-itemized-prices');
+    if (el) toggleItemizedPrices(el.checked);
 }
 
 // ==========================================================================

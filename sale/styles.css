@@ -3656,47 +3656,20 @@ body:not(.in-project) .proj-tab { display: none !important; }
    v4.9 — sun/moon theme flip, fixed projects screen, report block editor
    ========================================================================== */
 
-/* --- Theme flip button (top bar, far left) ------------------------------ */
+/* --- Theme toggle (top bar, far left): shows the CURRENT mode ----------- */
 .theme-flip {
-    position: relative; overflow: hidden;
-    width: 128px; height: 34px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 34px; padding: 0 16px; flex-shrink: 0;
     margin-right: auto; /* RTL flex: auto right-margin pushes it to the LEFT end */
     border: 1px solid var(--border-color); border-radius: 999px;
-    background: var(--bg-input); cursor: pointer; padding: 0;
+    background: var(--bg-input); cursor: pointer;
+    font-size: 0.66rem; font-weight: 800; letter-spacing: 0.6px;
+    color: #b45309; transition: background 0.25s, color 0.25s, border-color 0.25s;
 }
-.tf-face {
-    position: absolute; inset: 0;
-    display: flex; align-items: center; justify-content: center; gap: 7px;
-    font-size: 0.62rem; font-weight: 800; letter-spacing: 0.6px;
-    will-change: transform;
-}
-.tf-face i { font-size: 0.85rem; }
-.tf-sun { color: #b45309; } .tf-sun i { color: #f59e0b; }
-.tf-moon { color: #93c5fd; } .tf-moon i { color: #bfdbfe; }
-body:not(.light-theme) .theme-flip { background: #0b1222; }
-
-/* Choreography — light→dark: the moon DROPS IN from above while the sun SETS
-   below; dark→light: the sun RISES with a punchy overshoot and the moon gets
-   KNOCKED up and away (slight delay + rotation = the "hit"). */
-.tf-sun {
-    transform: translateY(140%);
-    transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.4, 1); /* rise = punch */
-}
-.tf-moon {
-    transform: translateY(-140%) rotate(18deg);
-    transition: transform 0.5s cubic-bezier(0.22, 0.9, 0.36, 1);
-}
-body.light-theme .tf-sun { transform: translateY(0); }
-body.light-theme .tf-moon {
-    transform: translateY(-150%) rotate(24deg);
-    transition-delay: 0.10s;                     /* the sun hits first… */
-    transition-timing-function: cubic-bezier(0.5, -0.3, 0.75, 0.6); /* …moon flies */
-}
-body:not(.light-theme) .tf-sun {
-    transform: translateY(150%);
-    transition-timing-function: ease-in;         /* sunset — sinks away */
-}
-body:not(.light-theme) .tf-moon { transform: translateY(0) rotate(0deg); transition-delay: 0.05s; }
+.theme-flip i { font-size: 0.85rem; color: #f59e0b; transition: color 0.25s, transform 0.35s ease; }
+.theme-flip:hover { border-color: var(--color-accent); }
+.theme-flip.is-dark { background: #0b1222; color: #93c5fd; }
+.theme-flip.is-dark i { color: #bfdbfe; transform: rotate(-20deg); }
 
 /* --- Projects: fixed screen, stats column on the LEFT ------------------- */
 .projects-layout { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 16px; }
@@ -3776,3 +3749,66 @@ body:not(.light-theme) .tf-moon { transform: translateY(0) rotate(0deg); transit
     padding: 6px 8px; font-size: 12px; border: 1px solid #cbd5e1; vertical-align: top;
 }
 #report-pdf-sheet .rpt-free-table tr:nth-child(even) td { background: #f8fafc; }
+
+/* ==========================================================================
+   v4.11 — one scroll dimension per page, cell images + annotator
+   ========================================================================== */
+
+@media (min-width: 861px) {
+    /* Quote editor: FIXED page like the wizard — the form column and the A4
+       pane each scroll internally; the page itself never scrolls. */
+    #panel-create.active { height: calc(var(--appvh, 100vh) - 92px); min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+    #panel-create .section-header { flex-shrink: 0; }
+    #panel-create .split-view { flex: 1; min-height: 0; height: auto; }
+    #panel-create .control-side { height: 100%; min-height: 0; overflow-y: auto; }
+    #panel-create .preview-side { height: 100%; min-height: 0; }
+    #panel-create .sheet-scroller { flex: 1; min-height: 0; overflow-y: auto; }
+
+    /* Page-scrolled tabs must not hide content behind tiny INNER scrollbars —
+       one scroll dimension per page (Stav). The lists grow naturally. */
+    .catalog-list, .scrape-results-list { max-height: none; overflow-y: visible; }
+}
+
+/* --- Report table cells: text OR image --- */
+.rb-cellwrap { position: relative; display: flex; min-width: 0; }
+.rb-cellwrap .rb-cell { flex: 1; min-width: 0; padding-inline-end: 30px !important; }
+.rb-cam {
+    position: absolute; inset-inline-end: 4px; top: 50%; transform: translateY(-50%);
+    width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+    border-radius: 5px; cursor: pointer; color: var(--text-muted); font-size: 0.72rem;
+}
+.rb-cam:hover { color: var(--color-accent); background: rgba(77, 142, 240, 0.12); }
+.rb-cellwrap.rb-has-img {
+    border: 1px solid var(--border-color); border-radius: 6px;
+    background: var(--bg-main); align-items: center; justify-content: center;
+    min-height: 54px; padding: 4px;
+}
+.rb-cell-img { max-width: 100%; max-height: 74px; border-radius: 4px; cursor: crosshair; display: block; }
+.rb-imgdel {
+    position: absolute; top: 2px; inset-inline-end: 2px;
+    width: 18px; height: 18px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 0.6rem; line-height: 1;
+}
+.rb-imgdel:hover { background: #e11d48; }
+
+/* Images inside the printed report tables */
+#report-pdf-sheet .rpt-free-table td .rpt-cell-img { max-width: 100%; max-height: 110px; border-radius: 3px; display: block; margin: 0 auto; }
+
+/* Findings photo: clicking the image opens the annotator */
+.rf-photo.has img { cursor: crosshair; }
+
+/* --- Image annotator modal --- */
+.annotator-box {
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: 14px; padding: 16px; max-width: 920px; width: 100%;
+    display: flex; flex-direction: column; gap: 12px; align-items: center;
+    max-height: 94vh; overflow-y: auto;
+}
+.ann-head { text-align: center; display: flex; flex-direction: column; gap: 2px; }
+.ann-head b { font-size: 1rem; }
+.ann-head span { font-size: 0.78rem; color: var(--text-muted); }
+#ann-canvas {
+    max-width: 100%; border-radius: 8px; border: 1px solid var(--border-color);
+    touch-action: none; cursor: crosshair; background: #fff;
+}
+.ann-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
