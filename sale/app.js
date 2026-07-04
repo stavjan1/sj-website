@@ -1137,6 +1137,7 @@ function filterProjectsList() {
 
     renderProjectsList(filtered);
     updateMetricsDashboard();
+    renderFollowupReminders();
 }
 
 function updateMetricsDashboard() {
@@ -1180,8 +1181,75 @@ function cycleProjectStatus(projectId, e) {
     if (!proj) return;
     const idx = statuses.indexOf(proj.status || 'טיוטה');
     proj.status = statuses[(idx + 1) % statuses.length];
+    proj.statusChangedAt = Date.now(); // drives the follow-up reminders
     saveProjects();
     filterProjectsList();
+}
+
+// ==========================================================================
+// Follow-up reminders — a sent quote that got no answer is money on the table.
+// Any project in status 'נשלח' for 3+ days surfaces a nudge card with a
+// one-click prefilled WhatsApp follow-up message.
+// ==========================================================================
+const FOLLOWUP_AFTER_DAYS = 3;
+
+function _snoozeKey(projectId) { return getStorageKey('sj_snooze_' + projectId); }
+
+function getDueFollowups() {
+    const now = Date.now();
+    return (projectsList || []).filter(p => {
+        if ((p.status || '') !== 'נשלח') return false;
+        const since = p.statusChangedAt || new Date(p.created).getTime() || now;
+        if (now - since < FOLLOWUP_AFTER_DAYS * 24 * 60 * 60 * 1000) return false;
+        const snoozedUntil = parseInt(localStorage.getItem(_snoozeKey(p.id)) || '0', 10);
+        return now > snoozedUntil;
+    });
+}
+
+function snoozeFollowup(projectId, days, e) {
+    if (e) e.stopPropagation();
+    localStorage.setItem(_snoozeKey(projectId), String(Date.now() + days * 24 * 60 * 60 * 1000));
+    renderFollowupReminders();
+    showToast(days >= 30 ? 'סומן כטופל 👍' : 'אזכיר שוב מחר');
+}
+
+function followupWhatsApp(projectId, e) {
+    if (e) e.stopPropagation();
+    const proj = projectsList.find(p => p.id === projectId);
+    if (!proj) return;
+    const q = proj.quoteData || {};
+    const biz = (appState.settings.businessDetails && appState.settings.businessDetails.name) || '';
+    const msg = `היי ${q.clientName || ''}, כאן ${biz} 🙂\nרק מוודא שקיבלת את הצעת המחיר ששלחתי${q.subject ? ` עבור "${q.subject}"` : ''} — אשמח לשמוע אם יש שאלות או משהו שכדאי להתאים.`;
+    window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener');
+    snoozeFollowup(projectId, 1);
+}
+
+function renderFollowupReminders() {
+    const box = document.getElementById('followup-reminders');
+    if (!box) return;
+    const due = getDueFollowups();
+    if (due.length === 0) { box.innerHTML = ''; return; }
+    const rows = due.map(p => {
+        const since = p.statusChangedAt || new Date(p.created).getTime() || Date.now();
+        const days = Math.floor((Date.now() - since) / (24 * 60 * 60 * 1000));
+        return `<div class="followup-row">
+            <div class="fu-info">
+                <span class="fu-name">${escapeHtml(p.name)}</span>
+                <span class="fu-days">ממתין ${days} ימים</span>
+            </div>
+            <div class="fu-actions">
+                <button class="btn btn-success btn-small" onclick="followupWhatsApp('${p.id}', event)" title="שלח תזכורת בוואטסאפ">
+                    <i class="fa-brands fa-whatsapp"></i> תזכורת
+                </button>
+                <button class="btn btn-secondary btn-small" onclick="snoozeFollowup('${p.id}', 1, event)" title="הזכר לי מחר">מחר</button>
+                <button class="btn btn-secondary btn-small" onclick="snoozeFollowup('${p.id}', 30, event)" title="סמן כטופל">✓</button>
+            </div>
+        </div>`;
+    }).join('');
+    box.innerHTML = `<div class="followup-card">
+        <div class="fu-title"><i class="fa-solid fa-bell"></i> ${due.length === 1 ? 'הצעה אחת ממתינה' : due.length + ' הצעות ממתינות'} למעקב — לקוח שלא ענה זה כסף על השולחן</div>
+        ${rows}
+    </div>`;
 }
 
 function renderProjectsList(list) {
@@ -2321,6 +2389,14 @@ function setChatMode(mode, projOverride) {
     if (priceBtn) {
         priceBtn.classList.toggle('active', mode === 'price');
         priceBtn.classList.toggle('locked', STAGE_ORDER[stage] < 1);
+    }
+    // A short pulse on the newly-active pill makes the stage handoff feel alive.
+    const activePill = mode === 'plan' ? planBtn : priceBtn;
+    if (activePill) {
+        activePill.classList.remove('pulse');
+        void activePill.offsetWidth; // restart the animation
+        activePill.classList.add('pulse');
+        setTimeout(() => activePill.classList.remove('pulse'), 900);
     }
     const input = document.getElementById('chat-user-input');
     if (input) input.placeholder = mode === 'plan'

@@ -12,7 +12,7 @@
   // Paste the project ID from clarity.microsoft.com to activate. Loads only on
   // the PUBLIC marketing pages — never inside /sale, so business/client data
   // in the quote tool is never recorded.
-  var CLARITY_ID = ''; // e.g. 'abcdef1234'
+  var CLARITY_ID = 'xgux1eczkt'; // clarity.microsoft.com → project SJ
   if (CLARITY_ID && MODE !== 'sale' && window.location.pathname.indexOf('/sale') !== 0) {
     (function (c, l, a, r, i, t, y) {
       c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };

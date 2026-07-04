@@ -1896,6 +1896,32 @@ textarea#ai-input {
 }
 
 /* ==========================================================================
+   Follow-up reminders (sent quotes waiting 3+ days)
+   ========================================================================== */
+.followup-card {
+    background: rgba(240, 192, 64, 0.07);
+    border: 1px solid rgba(240, 192, 64, 0.35);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    animation: fadeIn 0.3s ease;
+}
+.followup-card .fu-title {
+    font-size: 0.9rem; font-weight: 700; color: #f0c040;
+    margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+}
+.followup-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; flex-wrap: wrap;
+    padding: 8px 0;
+    border-top: 1px dashed rgba(240, 192, 64, 0.2);
+}
+.followup-row .fu-info { display: flex; flex-direction: column; }
+.followup-row .fu-name { font-weight: 700; font-size: 0.92rem; }
+.followup-row .fu-days { font-size: 0.78rem; color: var(--text-muted); }
+.followup-row .fu-actions { display: flex; gap: 6px; }
+
+/* ==========================================================================
    Project workflow: plan → price → draft
    ========================================================================== */
 .chat-mode-toggle {
@@ -1931,6 +1957,12 @@ textarea#ai-input {
 .mode-pill.locked::after {
     content: '🔒';
     font-size: 0.7rem;
+}
+.mode-pill.pulse { animation: pillPulse 0.85s ease; }
+@keyframes pillPulse {
+    0% { box-shadow: 0 0 0 0 rgba(77, 142, 240, 0.55); }
+    70% { box-shadow: 0 0 0 12px rgba(77, 142, 240, 0); }
+    100% { box-shadow: 0 4px 14px var(--color-accent-glow); }
 }
 .stage-hint {
     margin-inline-start: auto;

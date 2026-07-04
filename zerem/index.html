@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>זרם — תוכנת הצעות המחיר לאנשי חשמל | תכנון, תמחור והצעה ב-PDF</title>
+    <meta name="description" content="זרם: מתכנן את העבודה, בונה רשימת חומרים מלאה, מתמחר לפי המחירים שלך — ומפיק הצעת מחיר PDF מוכנה לשליחה. לחשמלאים, מתקיני עמדות טעינה, סולארי וקבלני שיפוצים. חינם בתקופת ההשקה.">
+    <meta name="keywords" content="תוכנת הצעות מחיר לחשמלאים, הצעת מחיר חשמלאי, תמחור עבודות חשמל, רשימת חומרים, הצעת מחיר PDF">
+    <link rel="canonical" href="https://www.sj-eng.co.il/zerem/">
+    <meta property="og:title" content="זרם — מתכנן. מתמחר. סוגר.">
+    <meta property="og:description" content="מהתיאור של העבודה ועד הצעת מחיר PDF מוכנה לשליחה — תכנון, רשימת חומרים ותמחור בזרימה אחת.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.sj-eng.co.il/zerem/">
+    <meta property="og:image" content="https://www.sj-eng.co.il/assets/og-image.jpg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230a0e1a'/%3E%3Cpath d='M42 82 L62 46 L47 46 L58 18 L38 54 L52 54 Z' fill='%2322d3ee'/%3E%3C/svg%3E">
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "זרם — תוכנת הצעות מחיר",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "url": "https://www.sj-eng.co.il/zerem/",
+      "description": "תוכנה לאנשי חשמל: תכנון העבודה, רשימת חומרים מלאה, תמחור והפקת הצעת מחיר PDF.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "ILS", "description": "חינם בתקופת ההשקה" },
+      "publisher": { "@id": "https://www.sj-eng.co.il/#business" }
+    }
+    </script>
+    <style>
+        :root {
+            --z-bg: #070b14;
+            --z-bg2: #0b1120;
+            --z-card: #101828;
+            --z-line: #1d2940;
+            --z-text: #eef2fb;
+            --z-dim: #8b9bb8;
+            --z-cyan: #22d3ee;
+            --z-blue: #4d8ef0;
+            --z-grad: linear-gradient(100deg, #4d8ef0 0%, #22d3ee 100%);
+            --z-radius: 16px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Assistant', 'Segoe UI', sans-serif;
+            background: var(--z-bg);
+            color: var(--z-text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+        a { color: inherit; text-decoration: none; }
+
+        .wrap { max-width: 1080px; margin: 0 auto; padding: 0 22px; }
+
+        /* Header */
+        .z-header {
+            position: sticky; top: 0; z-index: 50;
+            background: rgba(7, 11, 20, 0.82);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--z-line);
+        }
+        .z-header .wrap { display: flex; align-items: center; justify-content: space-between; height: 62px; }
+        .z-logo { display: flex; align-items: center; gap: 9px; font-size: 1.35rem; font-weight: 800; letter-spacing: -0.5px; }
+        .z-logo .bolt {
+            width: 30px; height: 30px; border-radius: 9px;
+            background: var(--z-grad);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .z-logo .bolt svg { width: 16px; height: 16px; }
+        .z-header-actions { display: flex; align-items: center; gap: 14px; }
+        .z-login-link { color: var(--z-dim); font-weight: 600; font-size: 0.95rem; transition: color .2s; }
+        .z-login-link:hover { color: var(--z-text); }
+        .z-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            background: var(--z-grad);
+            color: #041018; font-weight: 800; font-size: 1rem;
+            padding: 10px 22px; border-radius: 50px; border: none; cursor: pointer;
+            transition: transform .2s ease, box-shadow .2s ease;
+            box-shadow: 0 6px 24px rgba(34, 211, 238, 0.25);
+        }
+        .z-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 32px rgba(34, 211, 238, 0.4); }
+        .z-btn.ghost {
+            background: transparent; color: var(--z-text);
+            border: 1px solid var(--z-line); box-shadow: none;
+        }
+        .z-btn.ghost:hover { border-color: var(--z-cyan); box-shadow: none; }
+        .z-btn.big { padding: 15px 34px; font-size: 1.12rem; }
+
+        /* Hero — blueprint style: engineering grid + technical line art */
+        .z-hero { position: relative; padding: 84px 0 60px; text-align: center; }
+        .z-hero::before {
+            content: ''; position: absolute; inset: 0; pointer-events: none;
+            background:
+                radial-gradient(600px 320px at 50% -10%, rgba(77, 142, 240, 0.22), transparent 70%),
+                radial-gradient(420px 260px at 85% 30%, rgba(34, 211, 238, 0.1), transparent 70%),
+                repeating-linear-gradient(0deg, rgba(77, 142, 240, 0.05) 0 1px, transparent 1px 34px),
+                repeating-linear-gradient(90deg, rgba(77, 142, 240, 0.05) 0 1px, transparent 1px 34px);
+            mask-image: linear-gradient(to bottom, black 0%, black 72%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to bottom, black 0%, black 72%, transparent 100%);
+        }
+        .z-blueprint {
+            position: absolute; inset: 0; pointer-events: none;
+            display: flex; align-items: flex-start; justify-content: space-between;
+            opacity: 0.5;
+        }
+        .z-blueprint svg { width: 300px; height: auto; }
+        @media (max-width: 900px) { .z-blueprint svg { width: 170px; opacity: 0.55; } }
+        .z-hero .wrap { position: relative; }
+        .z-eyebrow {
+            display: inline-flex; align-items: center; gap: 8px;
+            font-size: 0.85rem; font-weight: 700; color: var(--z-cyan);
+            background: rgba(34, 211, 238, 0.08);
+            border: 1px solid rgba(34, 211, 238, 0.3);
+            padding: 6px 16px; border-radius: 50px; margin-bottom: 22px;
+        }
+        .z-hero h1 {
+            font-size: clamp(2.4rem, 6.5vw, 4.2rem);
+            font-weight: 800; line-height: 1.12; letter-spacing: -1px;
+            margin-bottom: 18px;
+        }
+        .z-hero h1 .grad {
+            background: var(--z-grad);
+            -webkit-background-clip: text; background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .z-hero .sub {
+            max-width: 640px; margin: 0 auto 30px;
+            color: var(--z-dim); font-size: 1.18rem; line-height: 1.8;
+        }
+        .z-hero .sub strong { color: var(--z-text); }
+        .z-cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 14px; }
+        .z-by {
+            font-size: 0.82rem; color: var(--z-dim); margin-top: 18px;
+        }
+        .z-by a { color: var(--z-cyan); font-weight: 700; }
+        .z-by a:hover { text-decoration: underline; }
+
+        /* Flow visual */
+        .z-flow {
+            display: flex; align-items: stretch; justify-content: center; gap: 0;
+            max-width: 860px; margin: 46px auto 0; flex-wrap: wrap;
+        }
+        .z-flow-step {
+            flex: 1; min-width: 220px; position: relative;
+            background: var(--z-card);
+            border: 1px solid var(--z-line);
+            border-radius: var(--z-radius);
+            padding: 26px 22px 22px;
+            margin: 8px; text-align: right;
+            transition: transform .25s ease, border-color .25s ease;
+        }
+        .z-flow-step:hover { transform: translateY(-5px); border-color: rgba(34, 211, 238, 0.5); }
+        .z-flow-step .num {
+            position: absolute; top: -14px; inset-inline-start: 20px;
+            width: 28px; height: 28px; border-radius: 50%;
+            background: var(--z-grad); color: #041018;
+            font-weight: 800; font-size: 0.9rem;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .z-flow-step h3 { font-size: 1.15rem; font-weight: 800; margin-bottom: 8px; }
+        .z-flow-step h3 .ico { margin-inline-end: 6px; }
+        .z-flow-step p { color: var(--z-dim); font-size: 0.95rem; line-height: 1.7; }
+        .z-flow-step p strong { color: var(--z-text); }
+
+        /* Pain section */
+        .z-pain { padding: 74px 0 10px; text-align: center; }
+        .z-pain h2, .z-section h2 {
+            font-size: clamp(1.7rem, 4vw, 2.5rem); font-weight: 800; letter-spacing: -0.5px; margin-bottom: 12px;
+        }
+        .z-pain .lead { color: var(--z-dim); max-width: 620px; margin: 0 auto 34px; font-size: 1.08rem; }
+        .z-pain-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px; }
+        .z-pain-card {
+            background: rgba(240, 82, 82, 0.05);
+            border: 1px solid rgba(240, 82, 82, 0.22);
+            border-radius: var(--z-radius); padding: 20px; text-align: right;
+        }
+        .z-pain-card .pi { font-size: 1.3rem; }
+        .z-pain-card h4 { font-weight: 700; margin: 6px 0 4px; }
+        .z-pain-card p { color: var(--z-dim); font-size: 0.92rem; }
+
+        /* Features */
+        .z-section { padding: 74px 0; text-align: center; }
+        .z-section .lead { color: var(--z-dim); max-width: 640px; margin: 0 auto 40px; font-size: 1.08rem; }
+        .z-feat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 18px; }
+        .z-feat {
+            background: var(--z-card); border: 1px solid var(--z-line);
+            border-radius: var(--z-radius); padding: 26px 22px; text-align: right;
+            transition: transform .25s ease, border-color .25s ease;
+        }
+        .z-feat:hover { transform: translateY(-4px); border-color: rgba(77, 142, 240, 0.5); }
+        .z-feat .fi {
+            width: 46px; height: 46px; border-radius: 13px;
+            background: rgba(77, 142, 240, 0.12);
+            border: 1px solid rgba(77, 142, 240, 0.3);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.25rem; margin-bottom: 14px;
+        }
+        .z-feat h3 { font-size: 1.08rem; font-weight: 800; margin-bottom: 7px; }
+        .z-feat p { color: var(--z-dim); font-size: 0.94rem; line-height: 1.7; }
+
+        /* Audience */
+        .z-aud { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+        .z-chip {
+            background: var(--z-card); border: 1px solid var(--z-line);
+            border-radius: 50px; padding: 10px 22px;
+            font-weight: 700; font-size: 0.95rem;
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .z-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--z-grad); }
+
+        /* Pricing */
+        .z-price-card {
+            max-width: 460px; margin: 0 auto;
+            background: linear-gradient(170deg, rgba(77,142,240,0.12), var(--z-card) 55%);
+            border: 1px solid rgba(34, 211, 238, 0.35);
+            border-radius: 22px; padding: 38px 32px; text-align: center;
+            position: relative;
+        }
+        .z-price-card .badge {
+            position: absolute; top: -14px; right: 50%; transform: translateX(50%);
+            background: var(--z-grad); color: #041018;
+            font-size: 0.8rem; font-weight: 800; padding: 5px 18px; border-radius: 20px;
+            white-space: nowrap;
+        }
+        .z-price-card h3 { font-size: 1.3rem; font-weight: 800; margin-bottom: 4px; }
+        .z-price-card .amount { font-size: 3rem; font-weight: 800; margin: 8px 0 2px; }
+        .z-price-card .amount small { font-size: 1rem; color: var(--z-dim); font-weight: 600; }
+        .z-price-card ul { list-style: none; margin: 20px 0 26px; text-align: right; }
+        .z-price-card ul li { padding: 7px 26px 7px 0; position: relative; color: var(--z-dim); font-size: 0.97rem; }
+        .z-price-card ul li::before { content: '⚡'; position: absolute; right: 0; }
+        .z-price-note { color: var(--z-dim); font-size: 0.85rem; margin-top: 14px; }
+
+        /* Final CTA */
+        .z-final {
+            padding: 80px 0; text-align: center;
+            background:
+                radial-gradient(500px 280px at 50% 100%, rgba(34, 211, 238, 0.12), transparent 70%),
+                var(--z-bg2);
+            border-top: 1px solid var(--z-line);
+        }
+        .z-final h2 { font-size: clamp(1.8rem, 4.5vw, 2.7rem); font-weight: 800; margin-bottom: 12px; }
+        .z-final p { color: var(--z-dim); margin-bottom: 28px; font-size: 1.1rem; }
+
+        /* Footer */
+        .z-footer {
+            border-top: 1px solid var(--z-line);
+            padding: 30px 0; text-align: center; color: var(--z-dim); font-size: 0.88rem;
+        }
+        .z-footer .credit {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: var(--z-card); border: 1px solid var(--z-line);
+            padding: 8px 18px; border-radius: 50px; margin-bottom: 12px;
+        }
+        .z-footer .credit a { color: var(--z-cyan); font-weight: 700; }
+        .z-footer .credit a:hover { text-decoration: underline; }
+
+        /* Reveal animation */
+        .rv { opacity: 0; transform: translateY(22px); transition: opacity .6s ease, transform .6s ease; }
+        .rv.on { opacity: 1; transform: none; }
+
+        @media (max-width: 640px) {
+            .z-hero { padding: 56px 0 40px; }
+            .z-flow-step { min-width: 100%; }
+            .z-header .z-login-link { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="z-header">
+        <div class="wrap">
+            <a href="#" class="z-logo">
+                <span class="bolt"><svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M42 88 L66 44 L48 44 L60 10 L36 56 L52 56 Z" fill="#041018"/></svg></span>
+                זרם
+            </a>
+            <div class="z-header-actions">
+                <a href="/sale/" class="z-login-link">כניסה למערכת</a>
+                <a href="/sale/" class="z-btn">התחל חינם</a>
+            </div>
+        </div>
+    </header>
+
+    <section class="z-hero">
+        <!-- Blueprint line-art: electrical panel (right) + quote document (left) -->
+        <div class="z-blueprint" aria-hidden="true">
+            <svg viewBox="0 0 220 300" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-top:40px;">
+                <!-- Electrical panel schematic -->
+                <rect x="30" y="20" width="160" height="220" rx="8" stroke="#4d8ef0" stroke-width="1.2"/>
+                <rect x="42" y="34" width="136" height="42" rx="4" stroke="#22d3ee" stroke-width="1" stroke-dasharray="4 3"/>
+                <text x="110" y="60" fill="#4d8ef0" font-size="11" text-anchor="middle" font-family="monospace">MAIN 3x25A</text>
+                <g stroke="#4d8ef0" stroke-width="1">
+                    <rect x="42" y="90" width="28" height="40" rx="3"/><line x1="56" y1="98" x2="56" y2="112"/>
+                    <rect x="78" y="90" width="28" height="40" rx="3"/><line x1="92" y1="98" x2="92" y2="112"/>
+                    <rect x="114" y="90" width="28" height="40" rx="3"/><line x1="128" y1="98" x2="128" y2="112"/>
+                    <rect x="150" y="90" width="28" height="40" rx="3"/><line x1="164" y1="98" x2="164" y2="112"/>
+                </g>
+                <g stroke="#22d3ee" stroke-width="1" stroke-dasharray="3 3">
+                    <rect x="42" y="144" width="64" height="40" rx="3"/>
+                    <rect x="114" y="144" width="64" height="40" rx="3"/>
+                </g>
+                <path d="M96 200 L112 172 L101 172 L109 152 L94 178 L104 178 Z" stroke="#22d3ee" stroke-width="1.2" fill="none"/>
+                <!-- dimension marks -->
+                <g stroke="#4d8ef0" stroke-width="0.8" opacity="0.7">
+                    <line x1="30" y1="256" x2="190" y2="256"/><line x1="30" y1="250" x2="30" y2="262"/><line x1="190" y1="250" x2="190" y2="262"/>
+                </g>
+                <text x="110" y="274" fill="#4d8ef0" font-size="10" text-anchor="middle" font-family="monospace" opacity="0.7">600mm</text>
+            </svg>
+            <svg viewBox="0 0 220 300" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-top:110px;">
+                <!-- Quote document schematic -->
+                <rect x="40" y="20" width="150" height="200" rx="6" stroke="#4d8ef0" stroke-width="1.2"/>
+                <path d="M52 44 L88 44" stroke="#22d3ee" stroke-width="2"/>
+                <g stroke="#4d8ef0" stroke-width="1" opacity="0.85">
+                    <line x1="52" y1="66" x2="178" y2="66"/><line x1="52" y1="82" x2="160" y2="82"/>
+                    <line x1="52" y1="98" x2="170" y2="98"/><line x1="52" y1="114" x2="150" y2="114"/>
+                </g>
+                <rect x="52" y="130" width="126" height="1" fill="#22d3ee"/>
+                <g stroke="#22d3ee" stroke-width="1" stroke-dasharray="4 3">
+                    <rect x="52" y="142" width="126" height="26" rx="3"/>
+                </g>
+                <text x="115" y="159" fill="#22d3ee" font-size="10" text-anchor="middle" font-family="monospace">₪ TOTAL</text>
+                <circle cx="160" cy="196" r="14" stroke="#4d8ef0" stroke-width="1" stroke-dasharray="3 2"/>
+                <path d="M154 196 L158 200 L166 191" stroke="#22d3ee" stroke-width="1.4"/>
+                <g stroke="#4d8ef0" stroke-width="0.8" opacity="0.7">
+                    <line x1="198" y1="20" x2="198" y2="220"/><line x1="192" y1="20" x2="204" y2="20"/><line x1="192" y1="220" x2="204" y2="220"/>
+                </g>
+                <text x="209" y="124" fill="#4d8ef0" font-size="10" text-anchor="middle" font-family="monospace" opacity="0.7" transform="rotate(90 209 124)">A4</text>
+            </svg>
+        </div>
+        <div class="wrap">
+            <span class="z-eyebrow">⚡ תוכנת הצעות המחיר של אנשי החשמל</span>
+            <h1>מתכנן. מתמחר.<br><span class="grad">סוגר עבודות.</span></h1>
+            <p class="sub">
+                לקוח מבקש הצעת מחיר? <strong>זרם</strong> עוזר לך להבין קודם מה בכלל העבודה ואיך לבצע אותה,
+                בונה <strong>רשימת חומרים מלאה</strong> — כולל כל האביזר הקטן ששוכחים —
+                מתמחר לפי המחירים <strong>שלך</strong>, ומפיק <strong>הצעת מחיר PDF</strong> מוכנה לשליחה. הכל בזרימה אחת.
+            </p>
+            <div class="z-cta-row">
+                <a href="/sale/" class="z-btn big">התחל עכשיו — חינם ⚡</a>
+                <a href="#flow" class="z-btn ghost big">איך זה עובד?</a>
+            </div>
+            <p class="z-by">BY <a href="/">SJ הנדסת חשמל</a> · לאתר המשרד לחץ כאן</p>
+
+            <div class="z-flow" id="flow">
+                <div class="z-flow-step rv">
+                    <span class="num">1</span>
+                    <h3><span class="ico">🗺️</span>תכנון העבודה</h3>
+                    <p>מתארים את העבודה במשפט. סוכן ה-AI מפרק אותה לשלבי ביצוע ובונה <strong>רשימת מוצרים מלאה</strong> — ציוד ראשי, אביזרים נלווים, מתכלים וכלי עבודה.</p>
+                </div>
+                <div class="z-flow-step rv" style="transition-delay:.1s;">
+                    <span class="num">2</span>
+                    <h3><span class="ico">💰</span>תמחור חכם</h3>
+                    <p>הרשימה עוברת לסוכן התמחור — שמשתמש <strong>במאגר המחירים האישי שלך</strong> (ייבוא מאקסל בקליק) עם השלמות ממחירי שוק. עבודה + חומרים, בלי לפספס.</p>
+                </div>
+                <div class="z-flow-step rv" style="transition-delay:.2s;">
+                    <span class="num">3</span>
+                    <h3><span class="ico">📄</span>הצעה מוכנה</h3>
+                    <p>עורכים טיוטה, מפיקים <strong>PDF ממותג עם הלוגו שלך</strong> — ושולחים ללקוח בוואטסאפ. מהתיאור ועד ההצעה: דקות, לא ערב שלם.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="z-pain">
+        <div class="wrap">
+            <h2 class="rv">נשמע מוכר?</h2>
+            <p class="lead rv">כל איש מקצוע מכיר את הערב הזה שנשרף על הצעת מחיר אחת.</p>
+            <div class="z-pain-grid">
+                <div class="z-pain-card rv"><span class="pi">🌙</span><h4>ערב שלם על הצעה</h4><p>במקום לנוח אחרי יום עבודה — יושבים מול אקסל ומחשבון.</p></div>
+                <div class="z-pain-card rv" style="transition-delay:.07s;"><span class="pi">🔩</span><h4>שכחת אביזר = הפסד</h4><p>מהדקים, מא"זים, קופסאות, שילוט — כל פריט שנשכח יוצא מהכיס שלך.</p></div>
+                <div class="z-pain-card rv" style="transition-delay:.14s;"><span class="pi">📉</span><h4>תמחור מהבטן</h4><p>בלי מחירים עדכניים מול העיניים — או שמפסידים את העבודה, או שמפסידים עליה.</p></div>
+                <div class="z-pain-card rv" style="transition-delay:.21s;"><span class="pi">📱</span><h4>הצעה לא מקצועית</h4><p>הודעת וואטסאפ עם סכום זה לא הצעה. לקוחות סוגרים עם מי שנראה רציני.</p></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="z-section">
+        <div class="wrap">
+            <h2 class="rv">כל מה שצריך, בכלי אחד</h2>
+            <p class="lead rv">נבנה על ידי מהנדס חשמל שמתמחר עבודות כאלה כל יום — לא על ידי חברת תוכנה שמנחשת.</p>
+            <div class="z-feat-grid">
+                <div class="z-feat rv"><div class="fi">🤖</div><h3>סוכן AI שמבין חשמל</h3><p>מדבר עברית של אנשי מקצוע: פחת, מא"ז, תלת-פאזי, חח"י. מזהה נקודות עיוורון בעבודה לפני שהן עולות כסף.</p></div>
+                <div class="z-feat rv" style="transition-delay:.06s;"><div class="fi">📊</div><h3>מאגר מחירים אישי</h3><p>מדביקים מחירון מאקסל או סורקים דף ספק — והתמחור רץ על המחירים האמיתיים שלך. המחיר שלך תמיד גובר על מחיר השוק.</p></div>
+                <div class="z-feat rv" style="transition-delay:.12s;"><div class="fi">📄</div><h3>PDF ממותג שלך</h3><p>לוגו, פרטי עסק, תנאי תשלום וסעיפים מנוסחים מקצועית — הצעה שנראית כמו של משרד גדול.</p></div>
+                <div class="z-feat rv"><div class="fi">💬</div><h3>שליחה בוואטסאפ</h3><p>ההצעה מוכנה? קליק אחד והיא אצל הלקוח — בערוץ שבו העסקאות באמת נסגרות.</p></div>
+                <div class="z-feat rv" style="transition-delay:.06s;"><div class="fi">☁️</div><h3>גיבוי ענן אוטומטי</h3><p>מתחברים עם Google — וכל הפרויקטים, ההצעות והמחירים שמורים בענן וזמינים מכל מכשיר.</p></div>
+                <div class="z-feat rv" style="transition-delay:.12s;"><div class="fi">📱</div><h3>עובד מכל מקום</h3><p>מהמחשב במשרד או מהטלפון באתר העבודה — בלי התקנות ובלי עדכונים.</p></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="z-section" style="padding-top:0;">
+        <div class="wrap">
+            <h2 class="rv">נבנה בשבילך</h2>
+            <p class="lead rv">מותאם לתחום שלך — סוכן ה-AI מכוון את עצמו לפי המקצוע שתבחר.</p>
+            <div class="z-aud rv">
+                <span class="z-chip"><span class="dot"></span>חשמלאים מוסמכים</span>
+                <span class="z-chip"><span class="dot"></span>מתקיני עמדות טעינה</span>
+                <span class="z-chip"><span class="dot"></span>מתקיני מערכות סולאריות</span>
+                <span class="z-chip"><span class="dot"></span>קבלני שיפוצים</span>
+                <span class="z-chip"><span class="dot"></span>קבלני בנייה וגמר</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="z-section" style="padding-top:20px;">
+        <div class="wrap">
+            <div class="z-price-card rv">
+                <span class="badge">תקופת השקה</span>
+                <h3>מתחילים חינם</h3>
+                <div class="amount">₪0 <small>/ עכשיו</small></div>
+                <ul>
+                    <li>תכנון + תמחור + הצעות PDF — ללא הגבלת פרויקטים</li>
+                    <li>מאגר מחירים אישי עם ייבוא מאקסל</li>
+                    <li>גיבוי ענן עם חשבון Google</li>
+                    <li>מצב אורח להתנסות בלי הרשמה</li>
+                </ul>
+                <a href="/sale/" class="z-btn big" style="width:100%;">פותחים פרויקט ראשון ⚡</a>
+                <p class="z-price-note">גרסת Pro עם יכולות מתקדמות — בקרוב. מצטרפי תקופת ההשקה יקבלו תנאים מועדפים.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="z-final">
+        <div class="wrap">
+            <h2 class="rv">ההצעה הבאה שלך — בעשר דקות</h2>
+            <p class="rv">בלי כרטיס אשראי. בלי התקנה. נכנסים, מתארים עבודה, ורואים את הקסם.</p>
+            <a href="/sale/" class="z-btn big rv">התחל עכשיו — חינם ⚡</a>
+        </div>
+    </section>
+
+    <footer class="z-footer">
+        <div class="wrap">
+            <div class="credit">
+                ⚡ זרם — מוצר מבית <a href="/">SJ הנדסת חשמל</a> · לכניסה לאתר המשרד לחץ כאן
+            </div>
+            <p>&copy; 2026 זרם by SJ הנדסת חשמל. כל הזכויות שמורות.</p>
+        </div>
+    </footer>
+
+    <script>
+        const obs = new IntersectionObserver((entries, o) => {
+            entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add('on'); o.unobserve(en.target); } });
+        }, { threshold: 0.12 });
+        document.querySelectorAll('.rv').forEach(el => obs.observe(el));
+    </script>
+</body>
+</html>
