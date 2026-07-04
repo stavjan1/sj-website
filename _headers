@@ -1,0 +1,40 @@
+# Cloudflare Pages headers — kill the Edge/Safari stale-cache problem.
+# HTML must always revalidate (so a deploy shows up on the next refresh in
+# EVERY browser); the service worker file too. Hashed/versioned assets can
+# cache hard.
+
+/
+  Cache-Control: no-cache
+
+/*.html
+  Cache-Control: no-cache
+
+/sale/
+  Cache-Control: no-cache
+
+/sale/index.html
+  Cache-Control: no-cache
+
+/sale/sw.js
+  Cache-Control: no-cache
+
+/zerem/
+  Cache-Control: no-cache
+
+/q/
+  Cache-Control: no-cache
+
+/sale/styles.css
+  Cache-Control: no-cache
+
+/sale/app.js
+  Cache-Control: no-cache
+
+/styles.css
+  Cache-Control: no-cache
+
+/app.js
+  Cache-Control: no-cache
+
+/assistant.js
+  Cache-Control: no-cache
