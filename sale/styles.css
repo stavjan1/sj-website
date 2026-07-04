@@ -51,7 +51,8 @@ body {
     background-color: var(--bg-main);
     color: var(--text-primary);
     line-height: 1.5;
-    height: 100vh;
+    width: var(--appvw, 100vw);
+    height: var(--appvh, 100vh);
     overflow: hidden;
 }
 
@@ -74,8 +75,8 @@ body {
 /* App Container Layout */
 .app-container {
     display: flex;
-    width: 100vw;
-    height: 100vh;
+    width: var(--appvw, 100vw);
+    height: var(--appvh, 100vh);
 }
 
 /* Sidebar Navigation */
@@ -226,7 +227,7 @@ body {
 /* Main Workspace */
 .main-content {
     flex-grow: 1;
-    height: 100vh;
+    height: var(--appvh, 100vh);
     overflow-y: auto;
     background-color: var(--bg-main);
     position: relative;
@@ -2710,8 +2711,8 @@ textarea#ai-input {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100vw;
-    height: 100vh;
+    width: var(--appvw, 100vw);
+    height: var(--appvh, 100vh);
     background: radial-gradient(circle at center, rgba(15, 23, 42, 0.96) 0%, rgba(2, 6, 23, 0.99) 100%);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -3812,3 +3813,10 @@ body:not(.in-project) .proj-tab { display: none !important; }
     touch-action: none; cursor: crosshair; background: #fff;
 }
 .ann-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+/* v4.12: projects toolbar — search + both sorts on ONE line (desktop) */
+@media (min-width: 861px) {
+    .project-search-row { flex-wrap: nowrap; }
+    .project-search-input-wrap { flex: 1 1 auto; }
+    .project-filter-select { flex-shrink: 0; }
+}

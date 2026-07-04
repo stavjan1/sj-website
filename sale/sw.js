@@ -2,7 +2,7 @@
 // Purpose: make the app installable (PWA) and let the shell open instantly,
 // including offline at a job site (the user's data lives in localStorage
 // anyway). AI calls and cloud sync (/api/*) are ALWAYS network-only.
-const CACHE = 'zerem-shell-v9';
+const CACHE = 'zerem-shell-v10';
 const SHELL = [
   '/sale/',
   '/sale/index.html',

@@ -1297,8 +1297,8 @@ function formatHebrewDate(dateString) {
 
 // Switch between panels (tabs)
 function switchTab(tabId) {
-    // If attempting to go to pricing or quote tabs without an active project, block it
-    if ((tabId === 'wizard' || tabId === 'create') && !activeProjectId) {
+    // Project-scoped tabs (chat / editor / reports) need an open project.
+    if ((tabId === 'wizard' || tabId === 'create' || tabId === 'reports') && !activeProjectId) {
         showToast('אנא בחר או צור פרויקט תחילה בלשונית ניהול פרויקטים', 'error');
         switchTab('projects');
         return;
@@ -1340,6 +1340,13 @@ function switchTab(tabId) {
     }
     if (tabId === 'reports') {
         initReportsPanel();
+        // Inside a project: the report is FOR this client — prefill if empty.
+        const proj = projectsList.find(p => p.id === activeProjectId);
+        const rc = document.getElementById('report-client');
+        if (proj && rc && !rc.value.trim()) {
+            rc.value = (proj.quoteData && proj.quoteData.clientName) || proj.name || '';
+            scheduleReportPreview();
+        }
     }
     if (tabId === 'catalog') {
         renderPriceCatalog();
@@ -2018,9 +2025,11 @@ function applyDisplayZoomFix(forceDpr) {
             z = Math.max(0.75, Math.min(1, Math.round((1 / dpr) * 100) / 100)); // 125% → 0.8
         }
         document.body.style.zoom = z === 1 ? '' : String(z);
-        // Inside zoomed content 100vh no longer reaches the real viewport
-        // bottom — expose the true usable height for the fixed-screen layouts.
+        // Inside zoomed content 100vh/100vw no longer reach the real viewport
+        // edges (the app rendered 'out of frame' at 80%) — expose the true
+        // usable size; body/.app-container/.main-content are sized by these.
         document.documentElement.style.setProperty('--appvh', Math.round(window.innerHeight / z) + 'px');
+        document.documentElement.style.setProperty('--appvw', Math.round(window.innerWidth / z) + 'px');
     } catch (e) { /* non-fatal */ }
 }
 window.addEventListener('resize', () => {
