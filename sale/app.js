@@ -15,6 +15,34 @@ function isAdmin() {
 function showAdminTabIfNeeded() {
     const adminTab = document.getElementById('tab-admin');
     if (adminTab) adminTab.style.display = isAdmin() ? 'flex' : 'none';
+    const drawerAdmin = document.getElementById('more-drawer-admin');
+    if (drawerAdmin) drawerAdmin.style.display = isAdmin() ? 'flex' : 'none';
+}
+
+// ==========================================================================
+// Mobile "עוד" drawer — the tabs beyond the field workflow (projects/chat/quote)
+// ==========================================================================
+const MOBILE_CORE_TABS = ['projects', 'wizard', 'create'];
+
+function toggleMoreDrawer() {
+    const drawer = document.getElementById('more-drawer');
+    if (!drawer) return;
+    drawer.classList.contains('open') ? closeMoreDrawer() : openMoreDrawer();
+}
+
+function openMoreDrawer() {
+    document.getElementById('more-drawer')?.classList.add('open');
+    document.getElementById('more-drawer-backdrop')?.classList.add('open');
+}
+
+function closeMoreDrawer() {
+    document.getElementById('more-drawer')?.classList.remove('open');
+    document.getElementById('more-drawer-backdrop')?.classList.remove('open');
+}
+
+function navFromDrawer(tabId) {
+    closeMoreDrawer();
+    switchTab(tabId);
 }
 
 function adminSaveGeminiKey() {
@@ -555,6 +583,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsClientId = document.getElementById('settings-drive-client-id');
     if (settingsClientId) settingsClientId.value = globalClientId;
 
+    // Theme: default follows the OS (prefers-color-scheme); a manual choice in
+    // Settings (settings.theme) overrides and persists — applied by loadSettings.
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        applySystemTheme('light');
+    }
+    try {
+        window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+            if (!appState.settings || !appState.settings.theme) applySystemTheme(e.matches ? 'light' : 'dark');
+        });
+    } catch (e) { /* older browsers */ }
+
+    // PWA: register the service worker (installable app + offline shell).
+    if ('serviceWorker' in navigator && location.protocol === 'https:') {
+        navigator.serviceWorker.register('sw.js').catch(() => { /* non-fatal */ });
+    }
+
     const activeUser = getActiveUser();
     if (!activeUser) {
         document.getElementById('lock-screen').style.display = 'flex';
@@ -877,6 +921,9 @@ function switchTab(tabId) {
     });
     const targetTabBtn = document.getElementById(`tab-${tabId}`);
     if (targetTabBtn) targetTabBtn.classList.add('active');
+    // On mobile, tabs living inside the "עוד" drawer light up the More button.
+    const moreBtn = document.getElementById('tab-more');
+    if (moreBtn) moreBtn.classList.toggle('active', !MOBILE_CORE_TABS.includes(tabId));
     
     // Update content panels visibility
     document.querySelectorAll('.content-panel').forEach(panel => {
@@ -1522,8 +1569,8 @@ function loadSettings() {
             _setCheck('pdf-show-watermark', appState.settings.pdfShowWatermark ?? true);
             _setCheck('pdf-show-signature', appState.settings.pdfShowSignature ?? false);
 
-            // Apply saved theme and background on load
-            applySystemTheme(appState.settings.theme || 'dark');
+            // Apply saved theme (explicit user choice wins; otherwise follow the OS)
+            applySystemTheme(appState.settings.theme || defaultThemeByOS());
             applySystemBackground(appState.settings.selectedBackground || 'none');
             updatePdfCustomStyles();
         } catch (e) {
@@ -1531,13 +1578,17 @@ function loadSettings() {
         }
     } else {
         // Apply defaults if no settings are saved
-        applySystemTheme('dark');
+        applySystemTheme(defaultThemeByOS());
         applySystemBackground('none');
         updatePdfCustomStyles();
     }
 }
 
 // ===== Theme & Custom Background Handlers =====
+// No explicit user choice → follow the operating system's light/dark setting.
+function defaultThemeByOS() {
+    return (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+}
 function applySystemTheme(theme) {
     if (theme === 'light') {
         document.body.classList.add('light-theme');
@@ -2215,6 +2266,19 @@ function escapeAttr(s) {
     return escapeHtml(s).replace(/"/g, '&quot;');
 }
 
+// Reorder quote work items with up/down arrows (deliberate: arrows, not
+// drag-and-drop — reliable with a thumb on a phone).
+function moveWorkItemRow(btn, dir) {
+    const row = btn.closest('.work-item-form-row');
+    if (!row) return;
+    const sibling = dir === -1 ? row.previousElementSibling : row.nextElementSibling;
+    if (!sibling) return;
+    if (dir === -1) row.parentNode.insertBefore(row, sibling);
+    else row.parentNode.insertBefore(sibling, row);
+    updateRowIndices();
+    updatePreviewFromForm();
+}
+
 function addWorkItemRow(title = '', description = '', price = 0) {
     const container = document.getElementById('work-items-container');
     const index = container.children.length + 1;
@@ -2236,12 +2300,20 @@ function addWorkItemRow(title = '', description = '', price = 0) {
                 <input type="number" class="item-price-input" placeholder="מחיר" value="${price || ''}" oninput="calculateItemizedTotal()">
             </div>
             ` : ''}
-            <button type="button" class="btn btn-danger btn-small" onclick="deleteWorkItemRow(this)" style="height:38px; width:38px; padding:0; justify-content:center;">
-                <i class="fa-solid fa-trash-can"></i>
-            </button>
+            <div class="work-item-actions">
+                <button type="button" class="btn btn-secondary btn-small wi-move" onclick="moveWorkItemRow(this, -1)" title="הזז למעלה">
+                    <i class="fa-solid fa-chevron-up"></i>
+                </button>
+                <button type="button" class="btn btn-secondary btn-small wi-move" onclick="moveWorkItemRow(this, 1)" title="הזז למטה">
+                    <i class="fa-solid fa-chevron-down"></i>
+                </button>
+                <button type="button" class="btn btn-danger btn-small" onclick="deleteWorkItemRow(this)" style="height:38px; width:38px; padding:0; justify-content:center;">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </div>
         </div>
     `;
-    
+
     container.appendChild(row);
     updateRowIndices();
     updatePreviewFromForm();
@@ -3003,6 +3075,7 @@ function setChatMode(mode, projOverride) {
 
     renderChatHistory(mode === 'plan' ? ensurePlanHistory(proj) : proj.chatHistory);
     updatePlanActionBar(proj);
+    updatePriceActionBar(proj);
     updateStageHint(proj);
 }
 
@@ -3010,8 +3083,21 @@ function updateStageHint(proj) {
     const hint = document.getElementById('stage-hint');
     if (!hint) return;
     const stage = getProjectStage(proj);
-    const labels = { planning: 'שלב 1/3 — תכנון העבודה', pricing: 'שלב 2/3 — תמחור', draft: 'שלב 3/3 — הכנת טיוטה' };
-    hint.textContent = labels[stage] || '';
+    const labels = { planning: 'שלב 1/3 — תכנון', pricing: 'שלב 2/3 — תמחור', draft: 'שלב 3/3 — טיוטה' };
+    // "Where am I": project name + stage, always visible in the chat header.
+    const name = proj && proj.name ? (proj.name.length > 18 ? proj.name.slice(0, 18) + '…' : proj.name) : '';
+    hint.textContent = name ? `${name} · ${labels[stage] || ''}` : (labels[stage] || '');
+}
+
+// A clear "next step" after pricing has answers: continue to the draft.
+function updatePriceActionBar(proj) {
+    const bar = document.getElementById('price-action-bar');
+    if (!bar) return;
+    const show = activeChatMode === 'price'
+        && proj && getProjectStage(proj) === 'pricing'
+        && (proj.chatHistory || []).some(m => m.role === 'user')
+        && (proj.chatHistory || [])[proj.chatHistory.length - 1]?.role === 'model';
+    bar.style.display = show ? 'flex' : 'none';
 }
 
 // The "is this everything?" bar appears after the planner produced a list.
@@ -3246,6 +3332,7 @@ async function runPricingAgent(activeProject, promptChars) {
 
         showTypingIndicator(false);
         renderChatHistory(activeProject.chatHistory);
+        updatePriceActionBar(activeProject); // clear "next step" → draft
 
         applyMaterialsFromResponse(activeProject, responseText);
     } catch (err) {

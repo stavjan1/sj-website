@@ -1987,6 +1987,56 @@ textarea#ai-input {
 #report-pdf-sheet .rpt-footer { border-top: 1px solid #cbd5e1; padding-top: 10px; }
 
 /* ==========================================================================
+   Mobile "עוד" drawer (bottom sheet above the nav bar)
+   ========================================================================== */
+.nav-more-btn { display: none; } /* mobile only — enabled in the media query */
+@media (max-width: 768px) { .nav-more-btn { display: flex; } }
+
+#more-drawer-backdrop {
+    display: none; position: fixed; inset: 0;
+    background: rgba(2, 6, 23, 0.6); z-index: 1001;
+}
+#more-drawer-backdrop.open { display: block; }
+#more-drawer {
+    position: fixed; left: 0; right: 0; bottom: 65px; z-index: 1002;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-color);
+    border-radius: 18px 18px 0 0;
+    padding: 10px 14px 16px;
+    transform: translateY(110%);
+    transition: transform 0.25s ease;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+}
+#more-drawer.open { transform: translateY(0); }
+.more-drawer-handle {
+    width: 42px; height: 4px; border-radius: 2px;
+    background: var(--border-hover); margin: 0 auto 12px;
+}
+.more-drawer-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.more-drawer-grid button, .more-drawer-grid a {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-family: inherit; font-size: 0.92rem; font-weight: 600;
+    padding: 13px 14px; min-height: 48px;
+    cursor: pointer; text-decoration: none; text-align: right;
+}
+.more-drawer-grid button:active, .more-drawer-grid a:active { border-color: var(--color-accent); }
+.more-drawer-grid i { color: var(--color-accent); width: 20px; text-align: center; }
+
+/* Work-item reorder arrows */
+.work-item-actions { display: flex; flex-direction: column; gap: 4px; }
+.work-item-actions .wi-move { height: 26px; width: 38px; padding: 0; justify-content: center; min-height: 0; }
+@media (max-width: 768px) {
+    .work-item-actions { flex-direction: row; }
+    .work-item-actions .wi-move { height: 44px; width: 44px; }
+}
+
+/* ==========================================================================
    Admin catalog workspace (upload → analyze → everyone's catalog)
    ========================================================================== */
 .syscat-step {
@@ -2297,6 +2347,86 @@ textarea#ai-input {
         background-color: transparent;
         color: var(--color-accent);
     }
+
+    /* ==== Mobile-first nav: 4 core buttons + "עוד" (no hidden horizontal scroll) ==== */
+    .sidebar { justify-content: space-around; overflow: visible; }
+    .sidebar .sidebar-home-link { display: none !important; }        /* moved into the drawer */
+    .nav-menu { width: 100%; justify-content: space-around; }
+    .nav-btn:not(.mobile-core):not(.nav-more-btn) { display: none; } /* the rest live in עוד */
+    .nav-btn { min-width: 0; flex: 1; }
+    .nav-btn span { font-size: 0.68rem; }
+    /* Shorter labels on the bottom bar */
+    #tab-wizard span { font-size: 0; }
+    #tab-wizard span::after { content: 'צ\'אט'; font-size: 0.68rem; }
+    #tab-create span { font-size: 0; }
+    #tab-create span::after { content: 'הצעה'; font-size: 0.68rem; }
+    #tab-projects span { font-size: 0; }
+    #tab-projects span::after { content: 'פרויקטים'; font-size: 0.68rem; }
+
+    /* ==== Chat as a full screen ==== */
+    .model-quota-bar { padding: 4px 0; }
+    .quota-ring-wrap { transform: scale(0.72); transform-origin: right center; }
+    .chat-search-wrap { display: none; }            /* search is a desktop tool */
+    .chat-mode-toggle {
+        position: sticky; top: 0; z-index: 20;
+        background: var(--bg-main);
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .stage-hint { font-size: 0.72rem; white-space: normal; text-align: left; }
+    .chat-messages { min-height: 52vh; }
+    .chat-input-area {
+        position: sticky; bottom: 70px; z-index: 20;
+        background: var(--bg-main);
+        padding-top: 8px;
+    }
+    .chat-suggestions .chip { min-height: 44px; padding: 10px 16px; }
+
+    /* ==== Editor: form first — the A4 lives in the fullscreen preview ==== */
+    #panel-create .sheet-scroller { display: none; }
+    #panel-create .preview-side { min-height: 0; }
+    .preview-actions {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px; width: 100%;
+    }
+    .preview-actions .btn { flex-direction: row; height: 46px; justify-content: center; }
+    .preview-actions .btn.btn-success { grid-column: 1 / -1; } /* הורד PDF ראשי ורחב */
+
+    /* Two-column settings layouts stack on phones (reports/catalog/settings/admin) */
+    .settings-grid { grid-template-columns: 1fr !important; }
+
+    /* ==== Reports: one finding = one vertical block ==== */
+    .rf-row {
+        grid-template-columns: 32px 1fr 44px;
+        grid-template-areas:
+            "num loc del"
+            "desc desc desc"
+            "photo photo photo";
+        border: 1px solid var(--border-color);
+        border-radius: 10px; padding: 10px; margin-bottom: 10px;
+    }
+    .rf-row .rf-num { grid-area: num; }
+    .rf-row .rf-loc { grid-area: loc; }
+    .rf-row .cr-del { grid-area: del; width: 44px; height: 44px; }
+    .rf-row .rf-desc { grid-area: desc; min-height: 70px; }
+    .rf-row .rf-photo { grid-area: photo; width: 100%; height: 86px; }
+
+    /* ==== Excel import: view-only on phones ==== */
+    #catalog-import-card .mobile-only-note { display: block !important; }
+    #catalog-import-card textarea,
+    #catalog-import-card .btn,
+    #catalog-import-card label.btn { display: none; }
+
+    /* ==== The 44px thumb rule ==== */
+    .btn, .btn-small, .mode-pill, .cr-del,
+    input[type="text"], input[type="number"], input[type="date"],
+    input[type="email"], input[type="password"], input[type="tel"], select {
+        min-height: 44px;
+    }
+    .mode-pill { white-space: nowrap; }
+    .fu-actions .btn { min-height: 44px; }
+    .stage-step { min-height: 40px; }
 
     /* Main Content Adjustments */
     .main-content {

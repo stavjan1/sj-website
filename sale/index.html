@@ -25,6 +25,15 @@
     
     <!-- Custom styling -->
     <link rel="stylesheet" href="styles.css">
+
+    <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#0c1020">
+    <link rel="icon" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="זרם">
 </head>
 <body class="dark-theme">
     <!-- Branded loading splash — covers initial load so neither the app nor the
@@ -69,17 +78,21 @@
             </a>
 
             <nav class="nav-menu">
-                <button class="nav-btn active" id="tab-projects" onclick="switchTab('projects')">
+                <button class="nav-btn mobile-core active" id="tab-projects" onclick="switchTab('projects')">
                     <i class="fa-solid fa-folder-open"></i>
                     <span>ניהול פרויקטים</span>
                 </button>
-                <button class="nav-btn" id="tab-wizard" onclick="switchTab('wizard')">
+                <button class="nav-btn mobile-core" id="tab-wizard" onclick="switchTab('wizard')">
                     <i class="fa-solid fa-calculator"></i>
                     <span>צ'אט תמחור וחומרים</span>
                 </button>
-                <button class="nav-btn" id="tab-create" onclick="switchTab('create')">
+                <button class="nav-btn mobile-core" id="tab-create" onclick="switchTab('create')">
                     <i class="fa-solid fa-file-invoice-dollar"></i>
                     <span>עורך הצעות מחיר</span>
+                </button>
+                <button class="nav-btn nav-more-btn" id="tab-more" onclick="toggleMoreDrawer()">
+                    <i class="fa-solid fa-ellipsis"></i>
+                    <span>עוד</span>
                 </button>
                 <button class="nav-btn" id="tab-reports" onclick="switchTab('reports')">
                     <i class="fa-solid fa-clipboard-check"></i>
@@ -315,6 +328,16 @@
                                     </button>
                                     <button type="button" class="btn btn-secondary btn-small" onclick="continuePlanning()">
                                         <i class="fa-solid fa-plus"></i> זה לא הכל — הוספת פריטים
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- After pricing replies: clear "next step" forward -->
+                            <div class="plan-action-bar" id="price-action-bar" style="display:none;">
+                                <span class="pab-q">התמחור מוכן?</span>
+                                <div class="pab-btns">
+                                    <button type="button" class="btn btn-success btn-small" onclick="goToDraft()">
+                                        המשך להכנת טיוטה <i class="fa-solid fa-arrow-left"></i>
                                     </button>
                                 </div>
                             </div>
@@ -907,9 +930,12 @@
                         </div>
 
                         <!-- Import from Excel / CSV (paste or file) -->
-                        <div class="section-card">
+                        <div class="section-card" id="catalog-import-card">
                             <div class="card-header"><h3><i class="fa-solid fa-file-excel" style="color:var(--color-success);"></i> ייבוא מאקסל / CSV</h3></div>
                             <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+                                <p class="input-help mobile-only-note" style="display:none;">
+                                    📱 ייבוא מחירונים מומלץ לבצע <strong>במחשב</strong> — שם ההעתקה מאקסל נוחה. בנייד המאגר זמין לצפייה ולחיפוש.
+                                </p>
                                 <p class="input-help" style="line-height:1.7;">
                                     להעלאת מחירון משלך יש להשתמש באקסל עם <strong>3 עמודות בלבד וללא כותרת</strong>.
                                     סדר העמודות יהיה בדיוק: <strong>שם המוצר , מחיר , יחידה</strong>.<br>
@@ -1475,6 +1501,21 @@
             <div class="rpt-sign-role" id="rpt-sign-role"></div>
         </div>
         <div class="rpt-footer" id="rpt-footer"><!-- cloned from quote sheet footer --></div>
+    </div>
+
+    <!-- Mobile "עוד" drawer — the tabs that aren't part of the field workflow -->
+    <div id="more-drawer-backdrop" onclick="closeMoreDrawer()"></div>
+    <div id="more-drawer">
+        <div class="more-drawer-handle"></div>
+        <div class="more-drawer-grid">
+            <button onclick="navFromDrawer('reports')"><i class="fa-solid fa-clipboard-check"></i><span>דוחות בדיקה</span></button>
+            <button onclick="navFromDrawer('history')"><i class="fa-solid fa-clock-rotate-left"></i><span>היסטוריית הצעות</span></button>
+            <button onclick="navFromDrawer('catalog')"><i class="fa-solid fa-tags"></i><span>מאגר מחירים</span></button>
+            <button onclick="navFromDrawer('business')"><i class="fa-solid fa-briefcase"></i><span>פרטי עסק</span></button>
+            <button onclick="navFromDrawer('settings')"><i class="fa-solid fa-sliders"></i><span>הגדרות</span></button>
+            <button id="more-drawer-admin" style="display:none;" onclick="navFromDrawer('admin')"><i class="fa-solid fa-shield-halved" style="color:#f0c040;"></i><span>Admin</span></button>
+            <a href="/zerem/"><i class="fa-solid fa-arrow-right"></i><span>חזרה לאתר</span></a>
+        </div>
     </div>
 
     <!-- Client signature modal — the client signs on THIS screen (mouse/finger) -->
