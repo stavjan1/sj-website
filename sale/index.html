@@ -131,7 +131,7 @@
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
                 </div>
-                <span class="version">v4.3</span>
+                <span class="version">v4.4</span>
             </div>
         </aside>
         
@@ -257,6 +257,11 @@
 
                     <!-- Model selector + quota ring -->
                     <div class="model-quota-bar">
+                        <!-- Generic model classes — real model names stay server-side (Move 2) -->
+                        <div class="model-class-pills" id="model-class-pills">
+                            <button type="button" class="model-class-btn active" id="model-class-basic" onclick="setModelClass('basic')">מודל בסיסי</button>
+                            <button type="button" class="model-class-btn" id="model-class-advanced" onclick="setModelClass('advanced')">מודל מתקדם ⚡<i class="fa-solid fa-lock model-class-lock" id="model-class-lock"></i></button>
+                        </div>
                         <div class="model-selector-wrap" style="display: none;">
                             <label class="model-lbl">מודל AI</label>
                             <select id="gemini-model-select" onchange="changeGeminiModel(this.value)" class="model-select-input">
@@ -660,6 +665,8 @@
                                             <div class="footer-notice">
                                                 הצעת מחיר זו תקפה לשלושה חודשים. עם אישור וחתימת הלקוח תשמש כהסכם לביצוע העבודה בהתאם לאמור בה.
                                             </div>
+                                            <!-- Free/guest plans carry the product credit; Pro+ get a clean PDF -->
+                                            <div class="pdf-zerem-credit" id="pdf-zerem-credit" style="display:none;">הופק באמצעות זרם ⚡ zerem</div>
                                         </footer>
                                     </div>
                                 </div>
@@ -739,6 +746,22 @@
                                 <button type="button" class="btn-google-login" onclick="connectGoogleToSaveGuestWork()">
                                     <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
                                     <span>שמור את עבודתי — התחברות עם Google</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Current plan (Move 2 tiers) -->
+                        <div class="section-card" id="tier-card">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-gem text-accent"></i> המסלול שלי</h3>
+                            </div>
+                            <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
+                                <div class="tier-badge-row">
+                                    <span class="tier-badge" id="tier-badge">חינם</span>
+                                    <span class="input-help" id="tier-usage-summary" style="margin:0;"></span>
+                                </div>
+                                <button type="button" class="btn btn-accent" id="tier-upgrade-btn" onclick="showUpgradeModal('general')" style="display:none;">
+                                    <i class="fa-solid fa-bolt"></i> שדרוג מסלול
                                 </button>
                             </div>
                         </div>
@@ -1312,6 +1335,41 @@
                                     להפעלה קבועה לכל המבקרים — הגדר בשרת (Cloudflare Pages → Environment variables):
                                     <code>GEMINI_API_KEY</code> (ראשי) ו-<code>GEMINI_API_KEY_2</code> (גיבוי). המפתחות כאן משמשים כגיבוי מקומי מהדפדפן.
                                 </p>
+                            </div>
+                        </div>
+
+                        <!-- Tier management: assign plans to users by email (no payments yet) -->
+                        <div class="section-card" style="border-color:rgba(240,192,64,0.25);">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-user-tag" style="color:#f0c040;"></i> ניהול מסלולים</h3>
+                            </div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+                                <p class="input-help" style="margin:0;">
+                                    שיוך מסלול ידני למשתמש (עד שיש סליקה). <strong>free</strong> = ברירת המחדל,
+                                    <strong>pro</strong> / <strong>business</strong> = בתשלום.
+                                </p>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label class="input-help" style="margin-bottom:4px;display:block;">אימייל משתמש</label>
+                                    <input type="email" id="admin-tier-email" placeholder="user@gmail.com" dir="ltr" style="text-align:left;">
+                                </div>
+                                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                                    <select id="admin-tier-select" class="model-select-input" style="flex:1;min-width:120px;">
+                                        <option value="free">חינם (free)</option>
+                                        <option value="pro">Pro</option>
+                                        <option value="business">עסקי (business)</option>
+                                    </select>
+                                    <button class="btn btn-secondary btn-small" onclick="adminLookupTier()"><i class="fa-solid fa-magnifying-glass"></i> בדוק</button>
+                                    <button class="btn btn-accent btn-small" onclick="adminSetTier()"><i class="fa-solid fa-save"></i> שייך מסלול</button>
+                                </div>
+                                <p class="input-help" id="admin-tier-status" style="display:none;"></p>
+                                <details style="border-top:1px solid var(--border-color);padding-top:10px;">
+                                    <summary class="input-help" style="cursor:pointer;">עריכת מגבלות המסלולים (JSON)</summary>
+                                    <textarea id="admin-tier-config" rows="8" dir="ltr" style="width:100%;margin-top:8px;font-family:monospace;font-size:0.75rem;"></textarea>
+                                    <div style="display:flex;gap:8px;margin-top:8px;">
+                                        <button class="btn btn-secondary btn-small" onclick="adminLoadTierConfig()"><i class="fa-solid fa-download"></i> טען נוכחי</button>
+                                        <button class="btn btn-accent btn-small" onclick="adminSaveTierConfig()"><i class="fa-solid fa-upload"></i> שמור לשרת</button>
+                                    </div>
+                                </details>
                             </div>
                         </div>
 

@@ -1,20 +1,22 @@
 // Cloudflare Pages Function — multi-provider AI chat proxy.
-// The browser sends OpenAI-style { provider, model, messages, response_format?,
+// The browser sends OpenAI-style { modelClass?, messages, response_format?,
 // stream? } and reads choices[...] back. Keys stay server-side. Provider
 // fallback + format translation live in ./_ai.js. Default provider: Gemini,
 // falling back to DeepSeek (then Grok) when out of quota.
 //
-// Daily quota (server-enforced, can't be reset by clearing the browser):
-// counted per verified Google account when the client sends its token, else
-// per IP. Stored in the same KV namespace as user data (`quota:<id>:<date>`,
-// auto-expiring). Admin is exempt. Tune with env vars QUOTA_USER / QUOTA_GUEST.
-// If KV isn't bound the check is skipped — the app still works.
+// Move 2 (tiers): the daily quota comes from the caller's plan
+// (guest/free/pro/business — see ./_tiers.js, admin-tunable via KV
+// `config:tiers`). The client never names real models — it sends
+// modelClass "basic" | "advanced" and the server maps it (advanced =
+// gemini-2.5-pro, allowed for pro+ only; others are silently served basic).
+// Legacy {provider, model} bodies are still accepted but the model name is
+// honored only for the admin — everyone else gets their class mapping.
 
 import { generate } from './_ai.js';
-
-const ADMIN_EMAIL = 'stavjan19989@gmail.com';
-const DEFAULT_QUOTA_USER = 150; // signed-in Google users, per day
-const DEFAULT_QUOTA_GUEST = 40; // guests (per IP), per day
+import {
+  ADMIN_EMAIL, MODEL_CLASS, loadTierConfig, getTierForEmail,
+  verifyGoogleEmail, bearerToken, dayKey,
+} from './_tiers.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -30,58 +32,65 @@ export async function onRequestPost(context) {
     return json({ error: { message: 'בקשה ללא הודעות (messages).' } }, 400);
   }
 
-  // ---- Server-side daily quota ----
-  if (env.SJ_DATA) {
-    const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
-    const email = token ? await verifyGoogleEmail(token) : null;
-    const isAdmin = email && email.toLowerCase() === ADMIN_EMAIL;
-    if (!isAdmin) {
-      const id = email
-        ? 'u:' + email.toLowerCase()
-        : 'ip:' + (request.headers.get('CF-Connecting-IP') || 'unknown');
-      const limit = email
-        ? int(env.QUOTA_USER, DEFAULT_QUOTA_USER)
-        : int(env.QUOTA_GUEST, DEFAULT_QUOTA_GUEST);
-      const day = new Date().toISOString().slice(0, 10);
-      const key = `quota:${id}:${day}`;
+  const email = await verifyGoogleEmail(bearerToken(request));
+  const isAdmin = !!email && email.toLowerCase() === ADMIN_EMAIL;
+  const tier = await getTierForEmail(env, email);
+  const config = await loadTierConfig(env);
+  const limits = config[tier] || config.free;
+
+  // ---- Server-side daily quota (per tier) ----
+  if (env.SJ_DATA && !isAdmin) {
+    const id = email
+      ? 'u:' + email.toLowerCase()
+      : 'ip:' + (request.headers.get('CF-Connecting-IP') || 'unknown');
+    const limit = limits.aiDaily;
+    if (limit !== -1) {
+      const key = `quota:${id}:${dayKey()}`;
       const used = parseInt((await env.SJ_DATA.get(key)) || '0', 10);
       if (used >= limit) {
-        return json({ error: { message: email
-          ? `הגעת למכסת ${limit} הבקשות היומית. המכסה מתאפסת בחצות (UTC).`
-          : `הגעת למכסת ${limit} הבקשות היומית למשתמשי אורח. התחברות עם Google מגדילה את המכסה.` } }, 429);
+        return json({
+          error: {
+            code: 'QUOTA_AI',
+            tier,
+            limit,
+            message: email
+              ? `הגעת למכסת ${limit} בקשות ה-AI היומית של המסלול שלך. המכסה מתאפסת בחצות — או ששדרוג מסלול פותח אותה מיד.`
+              : `הגעת למכסת ${limit} הבקשות היומית למשתמשי אורח. התחברות עם Google מגדילה את המכסה — חינם.`,
+          },
+        }, 429);
       }
       // Best-effort increment (KV is eventually consistent — good enough here).
       context.waitUntil(env.SJ_DATA.put(key, String(used + 1), { expirationTtl: 60 * 60 * 26 }));
     }
   }
 
-  return generate(env, {
-    provider: (body.provider || 'gemini').toLowerCase(),
-    model: body.model,
+  // ---- Model-class mapping (real model names never come from the browser) ----
+  const wantAdvanced = body.modelClass === 'advanced';
+  const cls = wantAdvanced && limits.advancedModel ? MODEL_CLASS.advanced : MODEL_CLASS.basic;
+  let provider = cls.provider;
+  let model = cls.model;
+  if (isAdmin && body.provider) {
+    // Admin may still steer explicitly (testing/fallback tooling).
+    provider = String(body.provider).toLowerCase();
+    model = body.model || model;
+  }
+
+  const res = await generate(env, {
+    provider,
+    model,
     messages: body.messages,
     response_format: body.response_format,
     temperature: body.temperature,
     max_tokens: body.max_tokens,
     stream: body.stream === true,
   });
-}
 
-async function verifyGoogleEmail(token) {
+  // Tell the client which class actually served (e.g. advanced was requested
+  // but the plan doesn't include it → served basic).
   try {
-    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: 'Bearer ' + token },
-    });
-    if (!res.ok) return null;
-    const info = await res.json();
-    return info && info.email ? info.email : null;
-  } catch {
-    return null;
-  }
-}
-
-function int(v, fallback) {
-  const n = parseInt(v, 10);
-  return Number.isFinite(n) && n > 0 ? n : fallback;
+    res.headers.set('X-Model-Class', cls === MODEL_CLASS.advanced ? 'advanced' : 'basic');
+  } catch { /* immutable headers on some responses — non-fatal */ }
+  return res;
 }
 
 function json(obj, status) {

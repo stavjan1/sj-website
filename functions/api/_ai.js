@@ -26,7 +26,8 @@ export const PROVIDERS = {
     // free-tier-capable default (2.0-flash kept in the list for compatibility
     // if a caller explicitly asks for it).
     defaultModel: 'gemini-2.5-flash',
-    models: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'],
+    // gemini-2.5-pro = the "מודל מתקדם ⚡" class (pro+ plans, mapped in chat.js).
+    models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash'],
   },
   deepseek: {
     label: 'DeepSeek',

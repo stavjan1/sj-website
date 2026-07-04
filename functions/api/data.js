@@ -11,6 +11,14 @@
 //
 // Free KV tier: 1 GB storage, 100k reads/day, 1k writes/day. The client
 // debounces writes to stay well within budget.
+//
+// Move 2 (tiers): free-plan users may save up to N NEW quotes to the cloud per
+// calendar month (default 5, admin-tunable via `config:tiers`). A sync that
+// would push a 6th new quote is rejected with code QUOTA_QUOTES — the client
+// keeps everything locally (PDF export still works) and shows the upgrade
+// screen. Counted by history-entry IDs that don't exist in the stored blob.
+
+import { loadTierConfig, getTierForEmail, monthKey } from './_tiers.js';
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -46,13 +54,38 @@ export async function onRequest(context) {
       return json({ error: { message: 'אין נתונים לשמירה.' } }, 400);
     }
 
+    const existingRaw = await env.SJ_DATA.get(key);
+    const existing = existingRaw ? safeParse(existingRaw) : null;
+
     // SAFETY: never let a fully-empty payload overwrite an existing non-empty
     // record. Protects against a blank local load wiping the cloud copy.
-    const incomingEmpty = isEmptyDb(incoming);
-    if (incomingEmpty) {
-      const existing = await env.SJ_DATA.get(key);
-      if (existing && !isEmptyDb(safeParse(existing))) {
-        return json({ ok: true, skipped: 'empty-over-nonempty' });
+    if (isEmptyDb(incoming) && existing && !isEmptyDb(existing)) {
+      return json({ ok: true, skipped: 'empty-over-nonempty' });
+    }
+
+    // ---- Free-plan monthly cloud-quote cap ----
+    const tier = await getTierForEmail(env, email);
+    const config = await loadTierConfig(env);
+    const limit = (config[tier] || config.free).quotesPerMonth;
+    if (limit !== -1) {
+      const existingIds = new Set(
+        (existing && Array.isArray(existing.history) ? existing.history : [])
+          .map((q) => q && q.id).filter(Boolean));
+      const newQuotes = (Array.isArray(incoming.history) ? incoming.history : [])
+        .filter((q) => q && q.id && !existingIds.has(q.id));
+      if (newQuotes.length > 0) {
+        const moKey = `quotesmo:${email.toLowerCase()}:${monthKey()}`;
+        const used = parseInt((await env.SJ_DATA.get(moKey)) || '0', 10);
+        if (used + newQuotes.length > limit) {
+          return json({
+            error: {
+              code: 'QUOTA_QUOTES', tier, limit, used,
+              message: `במסלול החינמי נשמרות עד ${limit} הצעות חדשות בענן בכל חודש. ההצעות ממשיכות להישמר במכשיר הזה וייצוא PDF עובד כרגיל — שדרוג מסלול פותח שמירה ללא הגבלה.`,
+            },
+          }, 402);
+        }
+        // ~40 days TTL — the key dies naturally after its month ends.
+        context.waitUntil(env.SJ_DATA.put(moKey, String(used + newQuotes.length), { expirationTtl: 60 * 60 * 24 * 40 }));
       }
     }
 
