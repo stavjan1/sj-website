@@ -141,7 +141,7 @@
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
                 </div>
-                <span class="version">v4.8</span>
+                <span class="version">v4.9</span>
             </div>
         </aside>
         
@@ -153,9 +153,16 @@
                 <span class="banner-label"><i class="fa-solid fa-folder-open text-accent"></i> פרויקט פעיל:</span>
                 <span class="banner-value" id="active-project-name">אין פרויקט טעון (בחר או צור פרויקט תחילה)</span>
                 <span class="banner-badge" id="active-project-status" style="display:none;">טיוטה</span>
-                <span id="banner-sync-indicator" style="margin-right:auto; display:none; align-items:center; gap:6px; color:var(--text-secondary); font-size:0.8rem;">
+                <span id="banner-sync-indicator" style="display:none; align-items:center; gap:6px; color:var(--text-secondary); font-size:0.8rem;">
                     <i class="fa-solid fa-arrows-rotate fa-spin text-success" style="color:var(--color-success)"></i> <span>מסנכרן ענן...</span>
                 </span>
+                <!-- Sun/Moon theme flip — sits at the far LEFT of the top bar.
+                     light→dark: the moon drops in while the sun sets;
+                     dark→light: the sun rises and knocks the moon up (CSS). -->
+                <button type="button" class="theme-flip" id="theme-flip" onclick="flipTheme()" aria-label="החלפת מצב תצוגה">
+                    <span class="tf-face tf-sun"><i class="fa-solid fa-sun"></i><b>LIGHT MODE</b></span>
+                    <span class="tf-face tf-moon"><i class="fa-solid fa-moon"></i><b>DARK MODE</b></span>
+                </button>
             </div>
             
             <!-- Tab: Projects Manager -->
@@ -165,8 +172,46 @@
                     <p class="section-subtitle">נהל את שלב התמחור והצעת המחיר לכל לקוח תחת פרויקט ייעודי.</p>
                 </div>
                 
-                <!-- Metrics Dashboard (ServiceTitan / Jobber Style) -->
-                <div class="metrics-dashboard" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:20px;">
+                <div class="projects-layout">
+                <!-- RIGHT (RTL start): create merged with the list, list scrolls internally -->
+                <div class="projects-main">
+                    <div class="create-project-inline">
+                        <i class="fa-solid fa-folder-plus text-accent"></i>
+                        <input type="text" id="new-project-name" placeholder="פרויקט חדש — שם הפרויקט / לקוח (למשל: וילה בקיסריה - יוסי כהן)" onkeydown="if(event.key==='Enter')createNewProject()">
+                        <button class="btn btn-accent" onclick="createNewProject()">
+                            <i class="fa-solid fa-plus"></i> צור פרויקט
+                        </button>
+                    </div>
+
+                    <!-- Search + filter — only above the list -->
+                    <div class="project-search-row" style="margin-bottom:12px;">
+                        <div class="project-search-input-wrap">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="project-search-q" placeholder="חפש שם..." oninput="filterProjectsList()">
+                        </div>
+                        <select id="project-sort" onchange="filterProjectsList()" class="project-filter-select">
+                            <option value="newest">חדש ← ישן</option>
+                            <option value="oldest">ישן ← חדש</option>
+                            <option value="name-asc">שם א←ת</option>
+                            <option value="name-desc">שם ת←א</option>
+                        </select>
+                        <select id="project-status-filter" onchange="filterProjectsList()" class="project-filter-select">
+                            <option value="all">כל הסטטוסים</option>
+                            <option value="טיוטה">טיוטה</option>
+                            <option value="נשלח">נשלח</option>
+                            <option value="הושלם">הושלם</option>
+                        </select>
+                    </div>
+
+                    <!-- Follow-up nudges: quotes sent 3+ days ago with no answer -->
+                    <div id="followup-reminders"></div>
+                    <div id="projects-list-container" class="projects-list">
+                        <!-- Dynamically loaded by script -->
+                    </div>
+                </div>
+
+                <!-- LEFT: KPI stats stacked in a column -->
+                <aside class="projects-stats">
                     <div class="metric-card" style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:12px; padding:16px; display:flex; align-items:center; gap:16px; box-shadow:0 4px 10px rgba(0,0,0,0.1); transition: transform 0.2s ease;">
                         <div class="metric-icon" style="width:44px; height:44px; border-radius:10px; background:rgba(37,99,235,0.12); color:var(--color-accent); display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
                             <i class="fa-solid fa-file-signature"></i>
@@ -203,57 +248,7 @@
                             <span id="metric-conversion-rate" style="font-size:1.45rem; font-weight:800; color:var(--text-primary);">0%</span>
                         </div>
                     </div>
-                </div>
-                
-                <div class="split-view">
-                    <!-- Right side: Create Project -->
-                    <div class="control-side">
-                        <div class="section-card">
-                            <div class="card-header">
-                                <h3><i class="fa-solid fa-folder-plus text-accent"></i> יצירת פרויקט חדש</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="form-group">
-                                    <label for="new-project-name">שם הפרויקט / לקוח</label>
-                                    <input type="text" id="new-project-name" placeholder="לדוגמה: וילה בקיסריה - יוסי כהן">
-                                </div>
-                                <button class="btn btn-accent" style="width:100%;" onclick="createNewProject()">
-                                    <i class="fa-solid fa-plus"></i> צור פרויקט חדש
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Left side: Projects List -->
-                    <div class="preview-side" style="background-color: var(--bg-card); padding: 20px; display:flex; flex-direction:column; gap:0;">
-                        <h3 style="margin-bottom:12px;"><i class="fa-solid fa-list-check text-accent"></i> פרויקטים קיימים</h3>
-
-                        <!-- Search + filter — only above the list -->
-                        <div class="project-search-row" style="margin-bottom:12px;">
-                            <div class="project-search-input-wrap">
-                                <i class="fa-solid fa-magnifying-glass"></i>
-                                <input type="text" id="project-search-q" placeholder="חפש שם..." oninput="filterProjectsList()">
-                            </div>
-                            <select id="project-sort" onchange="filterProjectsList()" class="project-filter-select">
-                                <option value="newest">חדש ← ישן</option>
-                                <option value="oldest">ישן ← חדש</option>
-                                <option value="name-asc">שם א←ת</option>
-                                <option value="name-desc">שם ת←א</option>
-                            </select>
-                            <select id="project-status-filter" onchange="filterProjectsList()" class="project-filter-select">
-                                <option value="all">כל הסטטוסים</option>
-                                <option value="טיוטה">טיוטה</option>
-                                <option value="נשלח">נשלח</option>
-                                <option value="הושלם">הושלם</option>
-                            </select>
-                        </div>
-
-                        <!-- Follow-up nudges: quotes sent 3+ days ago with no answer -->
-                        <div id="followup-reminders"></div>
-                        <div id="projects-list-container" class="projects-list" style="flex:1; overflow-y:auto;">
-                            <!-- Dynamically loaded by script -->
-                        </div>
-                    </div>
+                </aside>
                 </div>
             </section>
             
@@ -885,7 +880,7 @@
                                     <i class="fa-solid fa-star"></i> תן חוות דעת על המוצר
                                 </a>
                             </div>
-                            <p class="input-help" style="margin:14px 0 0;opacity:.7;">גרסה <span id="about-version">v4.8</span> · &copy; 2026 SJ הנדסת חשמל · כל הזכויות שמורות.</p>
+                            <p class="input-help" style="margin:14px 0 0;opacity:.7;">גרסה <span id="about-version">v4.9</span> · &copy; 2026 SJ הנדסת חשמל · כל הזכויות שמורות.</p>
                         </div>
                     </div>
                 </div>
@@ -935,9 +930,24 @@
                             </div>
                         </div>
 
+                        <!-- Free-form report body: stack text boxes and tables in any order -->
                         <div class="section-card">
                             <div class="card-header flex-header">
-                                <h3><i class="fa-solid fa-list-ol text-accent"></i> טבלת ממצאים</h3>
+                                <h3><i class="fa-solid fa-cubes text-accent"></i> גוף הדוח — טקסט וטבלאות</h3>
+                            </div>
+                            <div class="card-body">
+                                <p class="input-help" style="margin:0 0 10px;">בונים את הדוח בלוק אחרי בלוק: תיבת טקסט, ואם צריך — טבלה (קל להוסיף שורות ועמודות), ואז עוד טקסט, וכן הלאה.</p>
+                                <div id="report-blocks"></div>
+                                <div class="rb-add-row">
+                                    <button class="btn btn-secondary btn-small" onclick="addReportBlock('text')"><i class="fa-solid fa-align-right"></i> הוסף תיבת טקסט</button>
+                                    <button class="btn btn-secondary btn-small" onclick="addReportBlock('table')"><i class="fa-solid fa-table"></i> הוסף טבלה</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="section-card">
+                            <div class="card-header flex-header">
+                                <h3><i class="fa-solid fa-list-ol text-accent"></i> ממצאים עם תמונות מהשטח (אופציונלי)</h3>
                                 <button class="btn btn-accent btn-small" onclick="addReportFinding()"><i class="fa-solid fa-plus"></i> הוסף ממצא</button>
                             </div>
                             <div class="card-body">
@@ -959,10 +969,21 @@
                         </div>
                     </div>
 
-                    <div class="section-card">
-                        <div class="card-header"><h3><i class="fa-solid fa-box-archive text-accent"></i> דוחות שמורים</h3></div>
-                        <div class="card-body">
-                            <div id="reports-saved-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+                    <div style="display:flex;flex-direction:column;gap:20px;">
+                        <!-- Live preview: the REAL A4 report sheet, scaled to fit, updates as you type -->
+                        <div class="section-card">
+                            <div class="card-header"><h3><i class="fa-solid fa-eye text-accent"></i> מבט מהיר — כך ייראה הדוח</h3></div>
+                            <div class="card-body" style="padding:10px;">
+                                <div id="report-live-preview" class="report-live-preview"></div>
+                            </div>
+                        </div>
+
+                        <div class="section-card">
+                            <div class="card-header"><h3><i class="fa-solid fa-box-archive text-accent"></i> דוחות שמורים</h3></div>
+                            <div class="card-body">
+                                <p class="input-help" style="margin:0 0 10px;">לחיצה על דוח טוענת אותו במלואו. "תבנית בלבד" מייבאת רק את המבנה (בלוקים, טבלאות ופתיח) — בלי התוכן.</p>
+                                <div id="reports-saved-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1594,6 +1615,7 @@
         <h1 class="rpt-title" id="rpt-title">דוח בדיקה</h1>
         <div class="rpt-intro" id="rpt-intro"></div>
         <div class="rpt-warning" id="rpt-warning"></div>
+        <div id="rpt-blocks"><!-- free-form text/table blocks rendered here --></div>
         <table class="rpt-table" id="rpt-table">
             <thead>
                 <tr><th style="width:34px;">מס'</th><th style="width:110px;">מיקום</th><th>תיאור הממצא</th><th style="width:130px;">תמונה</th></tr>

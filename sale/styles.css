@@ -3640,3 +3640,126 @@ body:not(.in-project) .proj-tab { display: none !important; }
 /* About/legal/credit links row (settings) */
 .about-links { display: flex; flex-wrap: wrap; gap: 10px; }
 .about-links .btn { min-height: 42px; }
+
+/* ==========================================================================
+   v4.9 — sun/moon theme flip, fixed projects screen, report block editor
+   ========================================================================== */
+
+/* --- Theme flip button (top bar, far left) ------------------------------ */
+.theme-flip {
+    position: relative; overflow: hidden;
+    width: 128px; height: 34px; flex-shrink: 0;
+    margin-right: auto; /* RTL flex: auto right-margin pushes it to the LEFT end */
+    border: 1px solid var(--border-color); border-radius: 999px;
+    background: var(--bg-input); cursor: pointer; padding: 0;
+}
+.tf-face {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    font-size: 0.62rem; font-weight: 800; letter-spacing: 0.6px;
+    will-change: transform;
+}
+.tf-face i { font-size: 0.85rem; }
+.tf-sun { color: #b45309; } .tf-sun i { color: #f59e0b; }
+.tf-moon { color: #93c5fd; } .tf-moon i { color: #bfdbfe; }
+body:not(.light-theme) .theme-flip { background: #0b1222; }
+
+/* Choreography — light→dark: the moon DROPS IN from above while the sun SETS
+   below; dark→light: the sun RISES with a punchy overshoot and the moon gets
+   KNOCKED up and away (slight delay + rotation = the "hit"). */
+.tf-sun {
+    transform: translateY(140%);
+    transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.4, 1); /* rise = punch */
+}
+.tf-moon {
+    transform: translateY(-140%) rotate(18deg);
+    transition: transform 0.5s cubic-bezier(0.22, 0.9, 0.36, 1);
+}
+body.light-theme .tf-sun { transform: translateY(0); }
+body.light-theme .tf-moon {
+    transform: translateY(-150%) rotate(24deg);
+    transition-delay: 0.10s;                     /* the sun hits first… */
+    transition-timing-function: cubic-bezier(0.5, -0.3, 0.75, 0.6); /* …moon flies */
+}
+body:not(.light-theme) .tf-sun {
+    transform: translateY(150%);
+    transition-timing-function: ease-in;         /* sunset — sinks away */
+}
+body:not(.light-theme) .tf-moon { transform: translateY(0) rotate(0deg); transition-delay: 0.05s; }
+
+/* --- Projects: fixed screen, stats column on the LEFT ------------------- */
+.projects-layout { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 16px; }
+.projects-main {
+    min-width: 0; display: flex; flex-direction: column;
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: 12px; padding: 14px;
+}
+.projects-main #projects-list-container { flex: 1; min-height: 0; overflow-y: auto; }
+.projects-stats { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; }
+.projects-stats .metric-card { flex-shrink: 0; }
+.create-project-inline {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; margin-bottom: 12px;
+    background: rgba(77, 142, 240, 0.06);
+    border: 1px dashed rgba(77, 142, 240, 0.45); border-radius: 10px;
+}
+.create-project-inline > i { color: var(--color-accent); font-size: 1.05rem; flex-shrink: 0; }
+.create-project-inline input { flex: 1; min-width: 0; }
+.create-project-inline .btn { white-space: nowrap; flex-shrink: 0; }
+
+@media (min-width: 861px) {
+    /* The whole projects screen is FIXED — only the list scrolls.
+       min-height:0 overrides .content-panel's min-height:100%. */
+    #panel-projects { height: calc(100vh - 92px); min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+    #panel-projects .section-header { flex-shrink: 0; margin-bottom: 8px; }
+    #panel-projects .projects-layout { flex: 1; min-height: 0; }
+    #panel-projects .projects-stats .metric-card { padding: 12px 14px; }
+}
+@media (max-width: 768px) {
+    /* Phone: normal scrolling page; stats become a compact 2×2 grid below */
+    .projects-layout { grid-template-columns: 1fr; }
+    .projects-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; order: 2; }
+    .projects-main { order: 1; }
+    .create-project-inline { flex-wrap: wrap; }
+    .create-project-inline input { flex-basis: 100%; }
+}
+
+/* --- Report body blocks (text / table) ---------------------------------- */
+.rb-add-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.rb-block {
+    border: 1px solid var(--border-color); border-radius: 10px;
+    padding: 10px; margin-bottom: 10px; background: var(--bg-input);
+}
+.rb-block textarea { width: 100%; }
+.rb-controls { display: flex; align-items: center; gap: 4px; margin-bottom: 8px; }
+.rb-kind { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); margin-inline-end: auto; display: flex; gap: 5px; align-items: center; }
+.rb-controls button {
+    width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border-color);
+    background: transparent; color: var(--text-muted); cursor: pointer; font-size: 0.7rem;
+}
+.rb-controls button:hover { color: var(--text-primary); border-color: var(--color-accent); }
+.rb-controls .rb-del:hover { color: #f05252; border-color: #f05252; }
+.rb-table { display: grid; gap: 4px; }
+.rb-cell { padding: 6px 8px !important; font-size: 0.82rem !important; }
+.rb-cell.rb-head { font-weight: 700; background: rgba(77, 142, 240, 0.10) !important; }
+.rb-table-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+
+/* --- Report live preview: the REAL A4 sheet, scaled into the card ------- */
+.report-live-preview { min-height: 120px; overflow: hidden; border-radius: 8px; }
+#report-pdf-sheet.in-preview {
+    position: static; left: auto; top: auto;
+    transform-origin: top right;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    border-radius: 4px;
+}
+
+/* Free-form blocks inside the printed report */
+#report-pdf-sheet .rpt-free-text { margin: 10px 0; white-space: pre-line; }
+#report-pdf-sheet .rpt-free-table { width: 100%; border-collapse: collapse; margin: 12px 0; page-break-inside: avoid; }
+#report-pdf-sheet .rpt-free-table th {
+    background: #1e3a8a; color: #fff; padding: 6px 8px; font-size: 12px; text-align: right; border: 1px solid #cbd5e1;
+}
+#report-pdf-sheet .rpt-free-table td {
+    padding: 6px 8px; font-size: 12px; border: 1px solid #cbd5e1; vertical-align: top;
+}
+#report-pdf-sheet .rpt-free-table tr:nth-child(even) td { background: #f8fafc; }

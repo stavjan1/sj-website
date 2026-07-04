@@ -906,16 +906,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsClientId = document.getElementById('settings-drive-client-id');
     if (settingsClientId) settingsClientId.value = globalClientId;
 
-    // Theme: default follows the OS (prefers-color-scheme); a manual choice in
-    // Settings (settings.theme) overrides and persists — applied by loadSettings.
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
-        applySystemTheme('light');
-    }
-    try {
-        window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
-            if (!appState.settings || !appState.settings.theme) applySystemTheme(e.matches ? 'light' : 'dark');
-        });
-    } catch (e) { /* older browsers */ }
+    // Theme: LIGHT by default for everyone (product decision). A manual choice
+    // (flip button / Settings) is saved in settings.theme and re-applied by
+    // loadSettings right after, so dark users never flash light for long.
+    applySystemTheme('light');
 
     // PWA: register the service worker (installable app + offline shell).
     if ('serviceWorker' in navigator && location.protocol === 'https:') {
@@ -1980,9 +1974,10 @@ function loadSettings() {
 }
 
 // ===== Theme & Custom Background Handlers =====
-// No explicit user choice → follow the operating system's light/dark setting.
+// Product decision (Stav, 04/07): LIGHT is the default for everyone; a manual
+// choice (the sun/moon flip button or Settings) persists per user.
 function defaultThemeByOS() {
-    return (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+    return 'light';
 }
 function applySystemTheme(theme) {
     if (theme === 'light') {
@@ -2025,10 +2020,24 @@ function applySystemTheme(theme) {
             toggleIcon.className = 'fa-solid fa-sun';
         }
     }
+
+    // Top-bar flip button: the sun/moon faces animate via CSS transitions
+    // driven by body.light-theme, so here we only keep aria state fresh.
+    const flip = document.getElementById('theme-flip');
+    if (flip) flip.setAttribute('aria-label', theme === 'light' ? 'עבור למצב כהה (DARK MODE)' : 'עבור למצב בהיר (LIGHT MODE)');
+}
+
+// The top-bar sun/moon flip: light→dark = the moon drops in from above while
+// the sun sets; dark→light = the sun rises and "punches" the moon away up.
+// The choreography lives in CSS (.tf-face transitions); this just toggles.
+function flipTheme() {
+    toggleSystemTheme();
 }
 
 function toggleSystemTheme() {
-    const current = (appState.settings && appState.settings.theme) || 'dark';
+    // Read the VISIBLE state, not the saved setting — with no saved choice the
+    // app defaults to light, and assuming 'dark' here made the first click a no-op.
+    const current = document.body.classList.contains('light-theme') ? 'light' : 'dark';
     const next = current === 'dark' ? 'light' : 'dark';
     setSystemTheme(next);
 }
@@ -2982,6 +2991,160 @@ const REPORT_TYPES = {
 };
 
 let reportFindings = []; // { location, desc, img(dataURL) }
+
+// Free-form report body: an ordered list of blocks the user stacks —
+// { type:'text', text } | { type:'table', rows:[["",…],…] } (first row = header).
+let reportBlocks = [];
+
+function addReportBlock(type, afterIndex) {
+    const block = type === 'table'
+        ? { type: 'table', rows: [['', '', ''], ['', '', ''], ['', '', '']] }
+        : { type: 'text', text: '' };
+    if (typeof afterIndex === 'number') reportBlocks.splice(afterIndex + 1, 0, block);
+    else reportBlocks.push(block);
+    renderReportBlocks();
+    scheduleReportPreview();
+}
+
+function removeReportBlock(i) {
+    reportBlocks.splice(i, 1);
+    renderReportBlocks();
+    scheduleReportPreview();
+}
+
+function moveReportBlock(i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= reportBlocks.length) return;
+    [reportBlocks[i], reportBlocks[j]] = [reportBlocks[j], reportBlocks[i]];
+    renderReportBlocks();
+    scheduleReportPreview();
+}
+
+// Table sizing — Stav asked for EASY row/column add, so these are one click.
+function reportTableAddRow(i) {
+    const t = reportBlocks[i];
+    if (!t || t.type !== 'table') return;
+    t.rows.push(new Array(t.rows[0].length).fill(''));
+    renderReportBlocks(); scheduleReportPreview();
+}
+function reportTableAddCol(i) {
+    const t = reportBlocks[i];
+    if (!t || t.type !== 'table' || t.rows[0].length >= 6) { if (t && t.rows[0].length >= 6) showToast('עד 6 עמודות — שהטבלה תישאר קריאה ב-A4', 'error'); return; }
+    t.rows.forEach(r => r.push(''));
+    renderReportBlocks(); scheduleReportPreview();
+}
+function reportTableDelRow(i) {
+    const t = reportBlocks[i];
+    if (!t || t.type !== 'table' || t.rows.length <= 1) return;
+    t.rows.pop();
+    renderReportBlocks(); scheduleReportPreview();
+}
+function reportTableDelCol(i) {
+    const t = reportBlocks[i];
+    if (!t || t.type !== 'table' || t.rows[0].length <= 1) return;
+    t.rows.forEach(r => r.pop());
+    renderReportBlocks(); scheduleReportPreview();
+}
+function setReportTableCell(i, r, c, v) {
+    const t = reportBlocks[i];
+    if (t && t.type === 'table' && t.rows[r]) t.rows[r][c] = v;
+}
+
+function renderReportBlocks() {
+    const box = document.getElementById('report-blocks');
+    if (!box) return;
+    if (reportBlocks.length === 0) {
+        box.innerHTML = '<p class="input-help" style="margin:0;">הדוח מתחיל ריק — הוסף תיבת טקסט או טבלה למטה.</p>';
+        return;
+    }
+    box.innerHTML = reportBlocks.map((b, i) => {
+        const controls = `
+            <div class="rb-controls">
+                <span class="rb-kind">${b.type === 'table' ? '<i class="fa-solid fa-table"></i> טבלה' : '<i class="fa-solid fa-align-right"></i> טקסט'}</span>
+                <button title="העבר למעלה" onclick="moveReportBlock(${i},-1)"><i class="fa-solid fa-chevron-up"></i></button>
+                <button title="העבר למטה" onclick="moveReportBlock(${i},1)"><i class="fa-solid fa-chevron-down"></i></button>
+                <button title="מחק בלוק" class="rb-del" onclick="removeReportBlock(${i})"><i class="fa-solid fa-xmark"></i></button>
+            </div>`;
+        if (b.type === 'text') {
+            return `<div class="rb-block">${controls}
+                <textarea rows="3" placeholder="כתוב כאן טקסט חופשי לדוח..." oninput="reportBlocks[${i}].text=this.value">${escapeHtml(b.text)}</textarea>
+            </div>`;
+        }
+        const cols = b.rows[0].length;
+        const grid = b.rows.map((row, r) => row.map((cell, c) =>
+            `<input type="text" class="rb-cell${r === 0 ? ' rb-head' : ''}" value="${escapeHtml(cell)}"
+                placeholder="${r === 0 ? 'כותרת' : ''}" oninput="setReportTableCell(${i},${r},${c},this.value)">`
+        ).join('')).join('');
+        return `<div class="rb-block">${controls}
+            <div class="rb-table" style="grid-template-columns:repeat(${cols},1fr);">${grid}</div>
+            <div class="rb-table-actions">
+                <button class="btn btn-secondary btn-small" onclick="reportTableAddRow(${i})"><i class="fa-solid fa-plus"></i> שורה</button>
+                <button class="btn btn-secondary btn-small" onclick="reportTableAddCol(${i})"><i class="fa-solid fa-plus"></i> עמודה</button>
+                <button class="btn btn-secondary btn-small" onclick="reportTableDelRow(${i})"><i class="fa-solid fa-minus"></i> שורה</button>
+                <button class="btn btn-secondary btn-small" onclick="reportTableDelCol(${i})"><i class="fa-solid fa-minus"></i> עמודה</button>
+                <span class="input-help" style="margin:0;">${b.rows.length}×${cols} · השורה הראשונה = כותרות</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ---- Live preview: the REAL A4 sheet lives inside the preview box, scaled ----
+function mountReportPreview() {
+    const box = document.getElementById('report-live-preview');
+    const sheet = document.getElementById('report-pdf-sheet');
+    if (!box || !sheet || sheet.parentElement === box) return;
+    sheet.classList.add('in-preview');
+    sheet.removeAttribute('aria-hidden');
+    box.appendChild(sheet);
+}
+
+function refreshReportPreview() {
+    const box = document.getElementById('report-live-preview');
+    const sheet = document.getElementById('report-pdf-sheet');
+    if (!box || !sheet) return;
+    mountReportPreview();
+    try { buildReportSheet(collectReport()); } catch (e) { return; }
+    const w = box.clientWidth;
+    if (!w) return; // panel hidden — nothing to scale yet
+    // Fit the card's width AND stay a compact "quick look" (~520px tall max).
+    const s = Math.min(1, w / 794, 520 / Math.max(sheet.offsetHeight, 1123));
+    sheet.style.transform = `scale(${s})`;
+    sheet.style.transformOrigin = 'top right';
+    sheet.style.marginBottom = `${-(1 - s) * sheet.offsetHeight}px`;
+}
+
+let _rptPreviewTimer = null;
+function scheduleReportPreview() {
+    if (_rptPreviewTimer) clearTimeout(_rptPreviewTimer);
+    _rptPreviewTimer = setTimeout(refreshReportPreview, 350);
+}
+
+// Import from a saved report: TEMPLATE ONLY — the structure without content.
+// Keeps: type/title, intro, warning, block layout (text emptied; tables keep
+// their size + header row). Clears: client, site, findings content, summary.
+function importReportTemplate(idx, e) {
+    if (e) e.stopPropagation();
+    const r = savedReports[idx];
+    if (!r) return;
+    document.getElementById('report-type').value = r.type || 'custom';
+    applyReportTypeDefaults();
+    if (r.type === 'custom') document.getElementById('report-custom-title').value = r.title || '';
+    document.getElementById('report-intro').value = r.intro || '';
+    document.getElementById('report-warning').value = r.warning || '';
+    ['report-client', 'report-site', 'report-summary'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+    });
+    document.getElementById('report-date').value = getTodayDateString();
+    document.getElementById('report-number').value = nextReportNumber();
+    reportBlocks = (r.blocks || []).map(b => b.type === 'table'
+        ? { type: 'table', rows: b.rows.map((row, ri) => ri === 0 ? [...row] : row.map(() => '')) }
+        : { type: 'text', text: '' });
+    reportFindings = [{ location: '', desc: '', img: '' }];
+    renderReportBlocks();
+    renderReportFindings();
+    scheduleReportPreview();
+    showToast('התבנית יובאה — מלא את התוכן החדש');
+}
 let savedReports = [];
 
 function initReportsPanel() {
@@ -2995,7 +3158,15 @@ function initReportsPanel() {
     if (intro && !intro.value) applyReportTypeDefaults();
     if (reportFindings.length === 0) reportFindings.push({ location: '', desc: '', img: '' });
     renderReportFindings();
+    renderReportBlocks();
     renderSavedReports();
+    // Live preview: any typing anywhere in the panel refreshes it (debounced).
+    const panel = document.getElementById('panel-reports');
+    if (panel && !panel._previewWired) {
+        panel._previewWired = true;
+        panel.addEventListener('input', scheduleReportPreview);
+    }
+    scheduleReportPreview();
 }
 
 function nextReportNumber() {
@@ -3085,6 +3256,9 @@ function collectReport() {
         intro: (document.getElementById('report-intro')?.value || '').trim(),
         warning: (document.getElementById('report-warning')?.value || '').trim(),
         summary: (document.getElementById('report-summary')?.value || '').trim(),
+        blocks: reportBlocks.filter(b => b.type === 'table'
+            ? b.rows.some(row => row.some(c => c && c.trim()))
+            : (b.text && b.text.trim())),
         findings: reportFindings.filter(f => f.location || f.desc || f.img),
         savedAt: Date.now()
     };
@@ -3100,6 +3274,16 @@ function buildReportSheet(r) {
     set('rpt-intro', r.intro);
     const warn = document.getElementById('rpt-warning');
     if (warn) { warn.textContent = r.warning; warn.style.display = r.warning ? 'block' : 'none'; }
+    // Free-form blocks (text + tables) render between the intro and the findings.
+    const blocksBox = document.getElementById('rpt-blocks');
+    if (blocksBox) {
+        blocksBox.innerHTML = (r.blocks || []).map(b => {
+            if (b.type === 'text') return `<div class="rpt-free-text">${escapeHtml(b.text)}</div>`;
+            const head = `<tr>${b.rows[0].map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr>`;
+            const body = b.rows.slice(1).map(row => `<tr>${row.map(c => `<td>${escapeHtml(c)}</td>`).join('')}</tr>`).join('');
+            return `<table class="rpt-free-table"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+        }).join('');
+    }
     const tbody = document.getElementById('rpt-tbody');
     if (tbody) {
         tbody.innerHTML = r.findings.map((f, i) => `
@@ -3131,12 +3315,14 @@ function buildReportSheet(r) {
 function downloadReportPDF() {
     const r = collectReport();
     if (!r.client) { showToast('הזן לכבוד מי הדוח (שם הלקוח)', 'error'); return; }
-    if (r.findings.length === 0 && !r.summary) { showToast('הוסף לפחות ממצא אחד או סיכום', 'error'); return; }
+    if (r.findings.length === 0 && r.blocks.length === 0 && !r.summary) { showToast('הוסף תוכן לדוח — טקסט, טבלה, ממצא או סיכום', 'error'); return; }
     if (typeof html2pdf === 'undefined') { showToast('מנוע ה-PDF לא נטען — רענן את הדף ונסה שוב', 'error'); return; }
     buildReportSheet(r);
     const el = document.getElementById('report-pdf-sheet');
     const filename = `${r.title}_${r.number}_${(r.client || '').replace(/\s+/g, '_')}.pdf`;
     showToast('מכין את הדוח להורדה...');
+    // The sheet lives scaled inside the live-preview box — capture it unscaled.
+    const restoreSheet = _unscaleSheetForCapture(el);
     return html2pdf().set({
         margin: 8,
         filename,
@@ -3145,13 +3331,13 @@ function downloadReportPDF() {
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'legacy'] }
     }).from(el).save()
-        .then(() => { showToast('הדוח הורד בהצלחה 🎉'); saveReportToList(false); })
-        .catch(err => { console.error('Report PDF error:', err); showToast('שגיאה ביצירת הדוח', 'error'); });
+        .then(() => { restoreSheet(); refreshReportPreview(); showToast('הדוח הורד בהצלחה 🎉'); saveReportToList(false); })
+        .catch(err => { restoreSheet(); refreshReportPreview(); console.error('Report PDF error:', err); showToast('שגיאה ביצירת הדוח', 'error'); });
 }
 
 function saveReportToList(toast = true) {
     const r = collectReport();
-    if (!r.client && r.findings.length === 0) { if (toast) showToast('אין מה לשמור עדיין', 'error'); return; }
+    if (!r.client && r.findings.length === 0 && r.blocks.length === 0) { if (toast) showToast('אין מה לשמור עדיין', 'error'); return; }
     savedReports = savedReports.filter(x => x.number !== r.number); // resave = replace
     savedReports.unshift(r);
     savedReports = savedReports.slice(0, 30);
@@ -3177,9 +3363,14 @@ function loadSavedReport(idx) {
     document.getElementById('report-intro').value = r.intro || '';
     document.getElementById('report-warning').value = r.warning || '';
     document.getElementById('report-summary').value = r.summary || '';
+    reportBlocks = (r.blocks || []).map(b => b.type === 'table'
+        ? { type: 'table', rows: b.rows.map(row => [...row]) }
+        : { type: 'text', text: b.text || '' });
     reportFindings = (r.findings || []).map(f => ({ ...f }));
     if (reportFindings.length === 0) reportFindings.push({ location: '', desc: '', img: '' });
+    renderReportBlocks();
     renderReportFindings();
+    scheduleReportPreview();
     showToast('הדוח נטען לעריכה');
 }
 
@@ -3199,24 +3390,28 @@ function renderSavedReports() {
         return;
     }
     box.innerHTML = savedReports.map((r, i) => `
-        <div class="saved-report-row" onclick="loadSavedReport(${i})" title="טען לעריכה">
+        <div class="saved-report-row" onclick="loadSavedReport(${i})" title="טען דוח מלא לעריכה">
             <div class="sr-info">
                 <span class="sr-title">${escapeHtml(r.title)}</span>
-                <span class="sr-meta">${escapeHtml(r.client || '')} · ${formatHebrewDate(r.date)} · ${r.findings.length} ממצאים</span>
+                <span class="sr-meta">${escapeHtml(r.client || '')} · ${formatHebrewDate(r.date)} · ${(r.findings || []).length} ממצאים${(r.blocks || []).length ? ' · ' + r.blocks.length + ' בלוקים' : ''}</span>
             </div>
+            <button class="btn btn-secondary btn-small" onclick="importReportTemplate(${i}, event)" title="ייבא רק את המבנה — בלי התוכן">תבנית בלבד</button>
             <button class="cr-del" onclick="deleteSavedReport(${i}, event)" title="מחק"><i class="fa-solid fa-xmark"></i></button>
         </div>`).join('');
 }
 
 function newReport() {
     reportFindings = [{ location: '', desc: '', img: '' }];
+    reportBlocks = [];
     ['report-client', 'report-site', 'report-summary', 'report-custom-title'].forEach(id => {
         const el = document.getElementById(id); if (el) el.value = '';
     });
     document.getElementById('report-date').value = getTodayDateString();
     document.getElementById('report-number').value = nextReportNumber();
     applyReportTypeDefaults();
+    renderReportBlocks();
     renderReportFindings();
+    scheduleReportPreview();
 }
 
 // ==========================================================================
