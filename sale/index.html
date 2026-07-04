@@ -81,6 +81,10 @@
                     <i class="fa-solid fa-file-invoice-dollar"></i>
                     <span>עורך הצעות מחיר</span>
                 </button>
+                <button class="nav-btn" id="tab-reports" onclick="switchTab('reports')">
+                    <i class="fa-solid fa-clipboard-check"></i>
+                    <span>דוחות בדיקה</span>
+                </button>
                 <button class="nav-btn" id="tab-history" onclick="switchTab('history')">
                     <i class="fa-solid fa-clock-rotate-left"></i>
                     <span>היסטוריית הצעות</span>
@@ -494,6 +498,10 @@
                                     <i class="fa-solid fa-file-pdf"></i>
                                     <span>הורד PDF</span>
                                 </button>
+                                <button class="btn btn-secondary" id="btn-sign-quote" onclick="openSignatureModal()" title="הלקוח חותם על ההצעה — במסך, עם האצבע או העכבר">
+                                    <i class="fa-solid fa-signature"></i>
+                                    <span>החתמת לקוח</span>
+                                </button>
                                 <button class="btn btn-secondary" onclick="shareWhatsApp()">
                                     <i class="fa-solid fa-share-nodes"></i>
                                     <span>שתף בוואטסאפ</span>
@@ -579,8 +587,8 @@
                                     <div id="pdf-signature-row" style="display:none; margin-top:20px; margin-bottom:20px; justify-content:space-between; border-top:1px dashed var(--pdf-custom-secondary, #cbd5e1); padding-top:12px; direction: rtl;">
                                         <div style="display:flex; flex-direction:column; gap:4px; width:45%; text-align:right;">
                                             <span style="font-weight:700; font-size:0.92rem; color:var(--pdf-custom-primary, #1e3a8a);">חתימת מאשר ההצעה (הלקוח):</span>
-                                            <div style="height:35px; border-bottom:1px solid #94a3b8; margin-top:6px; position:relative;">
-                                                <span style="font-size:0.7rem; color:#94a3b8; position:absolute; bottom:-18px; right:0;">שם ותאריך החתימה</span>
+                                            <div id="pdf-client-signature-slot" style="height:35px; border-bottom:1px solid #94a3b8; margin-top:6px; position:relative;">
+                                                <span id="pdf-client-signature-caption" style="font-size:0.7rem; color:#94a3b8; position:absolute; bottom:-18px; right:0;">שם ותאריך החתימה</span>
                                             </div>
                                         </div>
                                         <div style="display:flex; flex-direction:column; gap:4px; width:45%; text-align:left; align-items:flex-end;">
@@ -790,6 +798,83 @@
                     </div>
                     <!-- hidden security card (kept for JS refs) -->
                     <div id="settings-security-card" style="display:none;"></div>
+                </div>
+            </section>
+
+            <!-- Inspection Reports Panel (דוח ליקויים / תאורה / טרמוגרפי) -->
+            <section id="panel-reports" class="content-panel">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-clipboard-check text-accent"></i> דוחות בדיקה</h2>
+                    <p class="section-subtitle">דוח ליקויים, דוח תאורה או דוח טרמוגרפי — ממלאים ממצאים, מצרפים תמונות מהשטח, ומפיקים PDF ממותג ללקוח.</p>
+                </div>
+
+                <div class="settings-grid">
+                    <div style="display:flex;flex-direction:column;gap:20px;">
+                        <div class="section-card">
+                            <div class="card-header"><h3><i class="fa-solid fa-file-lines text-accent"></i> פרטי הדוח</h3></div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label>סוג הדוח</label>
+                                    <select id="report-type" onchange="applyReportTypeDefaults()">
+                                        <option value="defects">דוח בדיקת מתקן — ליקויים</option>
+                                        <option value="lighting">דוח בדיקת תאורה (עוצמות הארה)</option>
+                                        <option value="thermal">דוח בדיקה טרמוגרפית</option>
+                                        <option value="custom">אחר (כותרת חופשית)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" id="report-custom-title-wrap" style="display:none;margin-bottom:0;">
+                                    <label>כותרת הדוח</label>
+                                    <input type="text" id="report-custom-title" placeholder="לדוגמה: דוח בדיקת הארקות">
+                                </div>
+                                <div class="catalog-manual-row">
+                                    <input type="text" id="report-client" placeholder="לכבוד (שם הלקוח)">
+                                    <input type="text" id="report-site" placeholder="האתר / כתובת הבדיקה">
+                                </div>
+                                <div class="catalog-manual-row">
+                                    <input type="date" id="report-date" style="max-width:170px;">
+                                    <input type="text" id="report-number" placeholder="מס' דוח" style="max-width:150px;">
+                                </div>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label>פתיח הדוח</label>
+                                    <textarea id="report-intro" rows="4"></textarea>
+                                </div>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label>הדגשה חשובה (תופיע במסגרת מודגשת בצהוב)</label>
+                                    <textarea id="report-warning" rows="3"></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="section-card">
+                            <div class="card-header flex-header">
+                                <h3><i class="fa-solid fa-list-ol text-accent"></i> טבלת ממצאים</h3>
+                                <button class="btn btn-accent btn-small" onclick="addReportFinding()"><i class="fa-solid fa-plus"></i> הוסף ממצא</button>
+                            </div>
+                            <div class="card-body">
+                                <div id="report-findings"></div>
+                            </div>
+                        </div>
+
+                        <div class="section-card">
+                            <div class="card-header"><h3><i class="fa-solid fa-flag-checkered text-accent"></i> סיכום, המלצות והפקה</h3></div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+                                <textarea id="report-summary" rows="4" placeholder="מסקנות, המלצות והנחיות להמשך..."></textarea>
+                                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                    <button class="btn btn-success" onclick="downloadReportPDF()"><i class="fa-solid fa-file-pdf"></i> הפק דוח PDF</button>
+                                    <button class="btn btn-secondary" onclick="saveReportToList()"><i class="fa-solid fa-floppy-disk"></i> שמור דוח</button>
+                                    <button class="btn btn-secondary" onclick="newReport()"><i class="fa-solid fa-file-circle-plus"></i> דוח חדש</button>
+                                </div>
+                                <p class="input-help">הדוחות נשמרים במכשיר זה. תמונות מהשטח נדחסות אוטומטית כדי לחסוך מקום.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-card">
+                        <div class="card-header"><h3><i class="fa-solid fa-box-archive text-accent"></i> דוחות שמורים</h3></div>
+                        <div class="card-body">
+                            <div id="reports-saved-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -1213,6 +1298,9 @@
                                     <div>מאגר המערכת הנוכחי: <span id="admin-syscat-count" style="color:var(--color-success);">—</span></div>
                                     <div>המאגר האישי שלך: <span id="admin-syscat-mine" style="color:var(--color-accent);">—</span></div>
                                 </div>
+                                <button class="btn btn-secondary" onclick="adminAnalyzeCatalog()" title="מאחד וריאציות זניחות (וו פתוח/סגור), שומר וריאציות הנדסיות (לוח 12/18/24), מסיר זבל">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> נתח וסדר את המאגר עם AI
+                                </button>
                                 <button class="btn btn-accent" onclick="adminPublishSystemCatalog()">
                                     <i class="fa-solid fa-upload"></i> פרסם את המאגר האישי שלי כמאגר המערכת
                                 </button>
@@ -1326,6 +1414,67 @@
                 </div>
                 <button type="submit" class="btn btn-accent btn-full" style="margin-top: 10px;">סיום והמשך לאפליקציה</button>
             </form>
+        </div>
+    </div>
+
+    <!-- Hidden A4 sheet used to render inspection reports to PDF (html2pdf
+         clones it; kept off-screen). Logo + business footer are copied from
+         the live quote sheet at build time so branding stays in one place. -->
+    <div id="report-pdf-sheet" dir="rtl" aria-hidden="true">
+        <div class="rpt-header">
+            <div class="rpt-recipient">
+                <div class="rpt-label">לכבוד:</div>
+                <div class="rpt-client" id="rpt-client">—</div>
+                <div class="rpt-site" id="rpt-site"></div>
+            </div>
+            <div class="rpt-logo" id="rpt-logo"><!-- cloned from quote sheet --></div>
+            <div class="rpt-meta">
+                <div id="rpt-date">—</div>
+                <div>דוח מס': <span id="rpt-number">—</span></div>
+            </div>
+        </div>
+        <div class="rpt-divider"></div>
+        <h1 class="rpt-title" id="rpt-title">דוח בדיקה</h1>
+        <div class="rpt-intro" id="rpt-intro"></div>
+        <div class="rpt-warning" id="rpt-warning"></div>
+        <table class="rpt-table" id="rpt-table">
+            <thead>
+                <tr><th style="width:34px;">מס'</th><th style="width:110px;">מיקום</th><th>תיאור הממצא</th><th style="width:130px;">תמונה</th></tr>
+            </thead>
+            <tbody id="rpt-tbody"></tbody>
+        </table>
+        <div class="rpt-summary-wrap" id="rpt-summary-wrap">
+            <div class="rpt-summary-title">סיכום והמלצות:</div>
+            <div class="rpt-summary" id="rpt-summary"></div>
+        </div>
+        <div class="rpt-sign">
+            <div>בברכה,</div>
+            <div class="rpt-sign-name" id="rpt-sign-name">—</div>
+            <div class="rpt-sign-role" id="rpt-sign-role"></div>
+        </div>
+        <div class="rpt-footer" id="rpt-footer"><!-- cloned from quote sheet footer --></div>
+    </div>
+
+    <!-- Client signature modal — the client signs on THIS screen (mouse/finger) -->
+    <div id="signature-modal" class="lock-screen-container" style="display:none; z-index:100000; background: rgba(2, 6, 23, 0.92);">
+        <div class="section-card" style="max-width:560px; width:92%; margin:auto;">
+            <div class="card-header flex-header">
+                <h3><i class="fa-solid fa-signature text-accent"></i> אישור וחתימת הלקוח</h3>
+                <button class="btn-close" onclick="closeSignatureModal()">&times;</button>
+            </div>
+            <div class="card-body" style="display:flex; flex-direction:column; gap:12px;">
+                <p class="input-help" style="line-height:1.6;">
+                    מסור את המסך ללקוח — חותמים עם <strong>האצבע או העכבר</strong> בתוך המסגרת.
+                    החתימה תוטבע בהצעת המחיר יחד עם השם והתאריך.
+                </p>
+                <canvas id="signature-canvas" width="500" height="200"
+                        style="width:100%; height:200px; background:#fff; border-radius:10px; border:2px dashed #94a3b8; cursor:crosshair; touch-action:none;"></canvas>
+                <input type="text" id="signature-name" placeholder="שם החותם (הלקוח)">
+                <div style="display:flex; gap:8px; justify-content:flex-end;">
+                    <button class="btn btn-secondary" onclick="clearSignatureCanvas()"><i class="fa-solid fa-eraser"></i> נקה</button>
+                    <button class="btn btn-success" onclick="saveQuoteSignature()"><i class="fa-solid fa-check"></i> אשר חתימה</button>
+                </div>
+            </div>
         </div>
     </div>
 

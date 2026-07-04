@@ -832,6 +832,9 @@ function switchTab(tabId) {
         ensureQuoteNumber();
         requestAnimationFrame(fitQuotePreview); // scale the A4 preview to fit the pane
     }
+    if (tabId === 'reports') {
+        initReportsPanel();
+    }
     if (tabId === 'catalog') {
         renderPriceCatalog();
     }
@@ -1062,6 +1065,7 @@ function loadProject(id, navigate = true) {
     
     // Fill Quote Form
     fillFormFromState();
+    renderQuoteSignature();
     
     // Apply checkboxes sync
     const toggleCheckbox = document.getElementById('form-itemized-prices-toggle');
@@ -1152,7 +1156,7 @@ function updateMetricsDashboard() {
         
         if (status === 'נשלח') {
             sentCount++;
-        } else if (status === 'הושלם') {
+        } else if (status === 'הושלם' || status === 'שולם') {
             approvedCount++;
             approvedSum += finalPrice;
         }
@@ -1176,7 +1180,7 @@ function updateMetricsDashboard() {
 
 function cycleProjectStatus(projectId, e) {
     e.stopPropagation();
-    const statuses = ['טיוטה', 'נשלח', 'הושלם'];
+    const statuses = ['טיוטה', 'נשלח', 'הושלם', 'שולם'];
     const proj = projectsList.find(p => p.id === projectId);
     if (!proj) return;
     const idx = statuses.indexOf(proj.status || 'טיוטה');
@@ -1184,6 +1188,17 @@ function cycleProjectStatus(projectId, e) {
     proj.statusChangedAt = Date.now(); // drives the follow-up reminders
     saveProjects();
     filterProjectsList();
+}
+
+function setProjectStatus(projectId, status, e) {
+    if (e) e.stopPropagation();
+    const proj = projectsList.find(p => p.id === projectId);
+    if (!proj) return;
+    proj.status = status;
+    proj.statusChangedAt = Date.now();
+    saveProjects();
+    filterProjectsList();
+    showToast(`"${proj.name}" סומן: ${status}`);
 }
 
 // ==========================================================================
@@ -1195,10 +1210,13 @@ const FOLLOWUP_AFTER_DAYS = 3;
 
 function _snoozeKey(projectId) { return getStorageKey('sj_snooze_' + projectId); }
 
+// Two follow-up stages: a sent QUOTE waiting for an answer, and a completed
+// job waiting for PAYMENT. The nudge message adapts to the stage.
 function getDueFollowups() {
     const now = Date.now();
     return (projectsList || []).filter(p => {
-        if ((p.status || '') !== 'נשלח') return false;
+        const st = p.status || '';
+        if (st !== 'נשלח' && st !== 'הושלם') return false;
         const since = p.statusChangedAt || new Date(p.created).getTime() || now;
         if (now - since < FOLLOWUP_AFTER_DAYS * 24 * 60 * 60 * 1000) return false;
         const snoozedUntil = parseInt(localStorage.getItem(_snoozeKey(p.id)) || '0', 10);
@@ -1213,15 +1231,55 @@ function snoozeFollowup(projectId, days, e) {
     showToast(days >= 30 ? 'סומן כטופל 👍' : 'אזכיר שוב מחר');
 }
 
+function _followupMessage(proj) {
+    const q = proj.quoteData || {};
+    const biz = (appState.settings.businessDetails && appState.settings.businessDetails.name) || '';
+    const isPayment = (proj.status || '') === 'הושלם';
+    const what = isPayment ? 'דרישת התשלום' : 'הצעת המחיר';
+    return `היי ${q.clientName || ''}, כאן ${biz} 🙂\nרק מוודא שקיבלת את ${what} ששלחתי${q.subject ? ` עבור "${q.subject}"` : ''} — אשמח לשמוע אם יש שאלות או משהו שכדאי להתאים.`;
+}
+
 function followupWhatsApp(projectId, e) {
     if (e) e.stopPropagation();
     const proj = projectsList.find(p => p.id === projectId);
     if (!proj) return;
-    const q = proj.quoteData || {};
-    const biz = (appState.settings.businessDetails && appState.settings.businessDetails.name) || '';
-    const msg = `היי ${q.clientName || ''}, כאן ${biz} 🙂\nרק מוודא שקיבלת את הצעת המחיר ששלחתי${q.subject ? ` עבור "${q.subject}"` : ''} — אשמח לשמוע אם יש שאלות או משהו שכדאי להתאים.`;
-    window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener');
+    const msg = _followupMessage(proj);
+    // With a stored client phone the chat opens directly with them.
+    const phone = String(proj.clientPhone || '').replace(/[^\d]/g, '');
+    const target = phone ? (phone.startsWith('0') ? '972' + phone.slice(1) : phone) : '';
+    window.open(`https://wa.me/${target}?text=` + encodeURIComponent(msg), '_blank', 'noopener');
     snoozeFollowup(projectId, 1);
+}
+
+// "הקפץ תזכורת ללקוח" — opens a ready email draft to the client.
+function followupEmail(projectId, e) {
+    if (e) e.stopPropagation();
+    const proj = projectsList.find(p => p.id === projectId);
+    if (!proj || !proj.clientEmail) return;
+    const isPayment = (proj.status || '') === 'הושלם';
+    const subject = `${isPayment ? 'תזכורת לתשלום' : 'מעקב הצעת מחיר'} — ${(proj.quoteData && proj.quoteData.subject) || proj.name}`;
+    window.open(`mailto:${encodeURIComponent(proj.clientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(_followupMessage(proj))}`, '_self');
+    snoozeFollowup(projectId, 1);
+}
+
+function saveFollowupContact(projectId, e) {
+    if (e) e.stopPropagation();
+    const proj = projectsList.find(p => p.id === projectId);
+    if (!proj) return;
+    const email = (document.getElementById('fu-email-' + projectId)?.value || '').trim();
+    const phone = (document.getElementById('fu-phone-' + projectId)?.value || '').trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('כתובת אימייל לא תקינה', 'error'); return; }
+    proj.clientEmail = email;
+    proj.clientPhone = phone;
+    saveProjects();
+    renderFollowupReminders();
+    showToast('פרטי הקשר של הלקוח נשמרו');
+}
+
+function openProjectFromReminder(projectId, e) {
+    if (e) e.stopPropagation();
+    loadProject(projectId, false);
+    showToast('הפרויקט נטען — אפשר לעדכן סטטוס בכרטיס');
 }
 
 function renderFollowupReminders() {
@@ -1232,22 +1290,37 @@ function renderFollowupReminders() {
     const rows = due.map(p => {
         const since = p.statusChangedAt || new Date(p.created).getTime() || Date.now();
         const days = Math.floor((Date.now() - since) / (24 * 60 * 60 * 1000));
+        const isPayment = (p.status || '') === 'הושלם';
+        const hasContact = !!(p.clientEmail || p.clientPhone);
+        const contactLine = hasContact
+            ? `<span class="fu-contact">${p.clientEmail ? '📧 ' + escapeHtml(p.clientEmail) : ''}${p.clientEmail && p.clientPhone ? ' · ' : ''}${p.clientPhone ? '📱 ' + escapeHtml(p.clientPhone) : ''}</span>`
+            : `<span class="fu-contact-capture">
+                <input type="email" id="fu-email-${p.id}" placeholder="אימייל הלקוח" onclick="event.stopPropagation()">
+                <input type="tel" id="fu-phone-${p.id}" placeholder="נייד הלקוח" onclick="event.stopPropagation()">
+                <button class="btn btn-secondary btn-small" onclick="saveFollowupContact('${p.id}', event)">שמור</button>
+               </span>`;
+        const advanceBtn = isPayment
+            ? `<button class="btn btn-secondary btn-small" onclick="setProjectStatus('${p.id}', 'שולם', event)" title="הלקוח שילם">💰 סמן שולם</button>`
+            : `<button class="btn btn-secondary btn-small" onclick="setProjectStatus('${p.id}', 'הושלם', event)" title="ההצעה אושרה">✓ סמן הושלם</button>`;
         return `<div class="followup-row">
             <div class="fu-info">
-                <span class="fu-name">${escapeHtml(p.name)}</span>
-                <span class="fu-days">ממתין ${days} ימים</span>
+                <a class="fu-name" onclick="openProjectFromReminder('${p.id}', event)" title="פתח את הפרויקט">${escapeHtml(p.name)}</a>
+                <span class="fu-days">${isPayment ? 'ממתין לתשלום' : 'ממתין לתשובה'} ${days} ימים</span>
+                ${contactLine}
             </div>
             <div class="fu-actions">
+                ${p.clientEmail ? `<button class="btn btn-accent btn-small" onclick="followupEmail('${p.id}', event)" title="פתח טיוטת מייל ללקוח"><i class="fa-solid fa-envelope"></i> הקפץ תזכורת ללקוח</button>` : ''}
                 <button class="btn btn-success btn-small" onclick="followupWhatsApp('${p.id}', event)" title="שלח תזכורת בוואטסאפ">
-                    <i class="fa-brands fa-whatsapp"></i> תזכורת
+                    <i class="fa-brands fa-whatsapp"></i>
                 </button>
+                ${advanceBtn}
                 <button class="btn btn-secondary btn-small" onclick="snoozeFollowup('${p.id}', 1, event)" title="הזכר לי מחר">מחר</button>
-                <button class="btn btn-secondary btn-small" onclick="snoozeFollowup('${p.id}', 30, event)" title="סמן כטופל">✓</button>
+                <button class="btn btn-secondary btn-small" onclick="snoozeFollowup('${p.id}', 30, event)" title="הפסק להזכיר">✕</button>
             </div>
         </div>`;
     }).join('');
     box.innerHTML = `<div class="followup-card">
-        <div class="fu-title"><i class="fa-solid fa-bell"></i> ${due.length === 1 ? 'הצעה אחת ממתינה' : due.length + ' הצעות ממתינות'} למעקב — לקוח שלא ענה זה כסף על השולחן</div>
+        <div class="fu-title"><i class="fa-solid fa-bell"></i> ${due.length === 1 ? 'פרויקט אחד ממתין' : due.length + ' פרויקטים ממתינים'} למעקב — לקוח שלא ענה זה כסף על השולחן</div>
         ${rows}
     </div>`;
 }
@@ -1328,7 +1401,8 @@ function syncCurrentQuoteToProject() {
             vatType: document.getElementById('form-vat-type').value,
             finalPrice: appState.currentQuote.finalPrice,
             summary: document.getElementById('form-summary').value,
-            showItemizedPrices: appState.currentQuote.showItemizedPrices || false
+            showItemizedPrices: appState.currentQuote.showItemizedPrices || false,
+            signature: appState.currentQuote.signature || null
         };
         saveProjects();
     }
@@ -2339,6 +2413,420 @@ function toggleItemizedPrices(checked, syncProject = true) {
         syncCurrentQuoteToProject();
     }
     updatePreviewFromForm();
+}
+
+// ==========================================================================
+// Inspection reports (דוח ליקויים / תאורה / טרמוגרפי) — findings + site
+// photos → branded A4 PDF. Stored locally per user; photos are compressed
+// and kept out of the cloud sync to respect the KV size budget.
+// ==========================================================================
+const REPORT_TYPES = {
+    defects: {
+        title: 'דוח ליקויים — בדיקת מתקן חשמל',
+        intro: 'בעת הבדיקה נמצאו ליקויים בטיחותיים במתקן החשמל, כמפורט בטבלת הממצאים שלהלן. יש לטפל בליקויים באמצעות חשמלאי בעל רישיון מתאים.',
+        warning: 'אישור הבדיקה יינתן רק לאחר השלמת הטיפול בכל הליקויים המפורטים בדוח זה ואישורם על ידי הגורם המוסמך.'
+    },
+    lighting: {
+        title: 'דוח בדיקת עוצמות הארה (תאורה)',
+        intro: 'בדיקת התאורה בוצעה בכפוף לתקנות התכנון והבנייה וחוק החשמל, בסביבת העבודה הקרובה ובאמצעות מכשיר מדידה תקני ומכויל (לוקסמטר).',
+        warning: 'ערכי הייחוס: 300LUX למשרדים ומעברים, 500LUX לעמדות עבודה. עוצמת הארה נמוכה מהנדרש עלולה להוות סכנה בטיחותית.'
+    },
+    thermal: {
+        title: 'דוח בדיקה טרמוגרפית',
+        intro: 'הבדיקה הטרמוגרפית בוצעה באמצעות מצלמה תרמית מכוילת, תחת עומס עבודה מייצג של המתקן. הממצאים מדורגים לפי חומרת הפרשי הטמפרטורה.',
+        warning: 'ממצא חריג מחייב טיפול של חשמלאי מוסמך ובדיקה טרמוגרפית חוזרת לאחר התיקון.'
+    },
+    custom: { title: '', intro: '', warning: '' }
+};
+
+let reportFindings = []; // { location, desc, img(dataURL) }
+let savedReports = [];
+
+function initReportsPanel() {
+    try { savedReports = JSON.parse(localStorage.getItem(getStorageKey('sj_reports')) || '[]') || []; }
+    catch (e) { savedReports = []; }
+    const d = document.getElementById('report-date');
+    if (d && !d.value) d.value = getTodayDateString();
+    const n = document.getElementById('report-number');
+    if (n && !n.value) n.value = nextReportNumber();
+    const intro = document.getElementById('report-intro');
+    if (intro && !intro.value) applyReportTypeDefaults();
+    if (reportFindings.length === 0) reportFindings.push({ location: '', desc: '', img: '' });
+    renderReportFindings();
+    renderSavedReports();
+}
+
+function nextReportNumber() {
+    const year = new Date().getFullYear();
+    let max = 0;
+    savedReports.forEach(r => {
+        const m = String(r.number || '').match(new RegExp('^R-' + year + '-(\\d+)$'));
+        if (m) max = Math.max(max, parseInt(m[1], 10));
+    });
+    return `R-${year}-${max + 1}`;
+}
+
+function applyReportTypeDefaults() {
+    const type = document.getElementById('report-type')?.value || 'defects';
+    const t = REPORT_TYPES[type] || REPORT_TYPES.defects;
+    const customWrap = document.getElementById('report-custom-title-wrap');
+    if (customWrap) customWrap.style.display = type === 'custom' ? 'block' : 'none';
+    const intro = document.getElementById('report-intro');
+    const warning = document.getElementById('report-warning');
+    if (intro) intro.value = t.intro;
+    if (warning) warning.value = t.warning;
+}
+
+function addReportFinding() {
+    if (reportFindings.length >= 12) { showToast('עד 12 ממצאים בדוח אחד (בשביל PDF קריא)', 'error'); return; }
+    reportFindings.push({ location: '', desc: '', img: '' });
+    renderReportFindings();
+}
+
+function removeReportFinding(i) {
+    reportFindings.splice(i, 1);
+    renderReportFindings();
+}
+
+function renderReportFindings() {
+    const box = document.getElementById('report-findings');
+    if (!box) return;
+    if (reportFindings.length === 0) {
+        box.innerHTML = '<p class="input-help">אין ממצאים עדיין — לחץ "הוסף ממצא".</p>';
+        return;
+    }
+    box.innerHTML = reportFindings.map((f, i) => `
+        <div class="rf-row">
+            <span class="rf-num">${i + 1}</span>
+            <input type="text" class="rf-loc" value="${escapeHtml(f.location)}" placeholder="מיקום (למשל: מטבח)" oninput="reportFindings[${i}].location=this.value">
+            <textarea class="rf-desc" rows="2" placeholder="תיאור הממצא וההמלצה" oninput="reportFindings[${i}].desc=this.value">${escapeHtml(f.desc)}</textarea>
+            <label class="rf-photo${f.img ? ' has' : ''}" title="${f.img ? 'החלף תמונה' : 'צרף תמונה מהשטח'}">
+                ${f.img ? `<img src="${f.img}" alt="">` : '<i class="fa-solid fa-camera"></i>'}
+                <input type="file" accept="image/*" style="display:none" onchange="onReportPhoto(${i}, this)">
+            </label>
+            <button class="cr-del" onclick="removeReportFinding(${i})" title="מחק ממצא"><i class="fa-solid fa-xmark"></i></button>
+        </div>`).join('');
+}
+
+// Compress site photos (phone camera shots are 3-8MB) to a small JPEG so a
+// full report stays well inside the localStorage budget.
+function onReportPhoto(i, input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const img = new Image();
+    img.onload = () => {
+        const MAX = 700;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width * scale);
+        c.height = Math.round(img.height * scale);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        reportFindings[i].img = c.toDataURL('image/jpeg', 0.72);
+        URL.revokeObjectURL(img.src);
+        renderReportFindings();
+    };
+    img.src = URL.createObjectURL(file);
+    input.value = '';
+}
+
+function collectReport() {
+    const type = document.getElementById('report-type')?.value || 'defects';
+    const title = type === 'custom'
+        ? (document.getElementById('report-custom-title')?.value || '').trim() || 'דוח בדיקה'
+        : REPORT_TYPES[type].title;
+    return {
+        type, title,
+        client: (document.getElementById('report-client')?.value || '').trim(),
+        site: (document.getElementById('report-site')?.value || '').trim(),
+        date: document.getElementById('report-date')?.value || getTodayDateString(),
+        number: (document.getElementById('report-number')?.value || '').trim() || nextReportNumber(),
+        intro: (document.getElementById('report-intro')?.value || '').trim(),
+        warning: (document.getElementById('report-warning')?.value || '').trim(),
+        summary: (document.getElementById('report-summary')?.value || '').trim(),
+        findings: reportFindings.filter(f => f.location || f.desc || f.img),
+        savedAt: Date.now()
+    };
+}
+
+function buildReportSheet(r) {
+    const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    set('rpt-client', r.client || '—');
+    set('rpt-site', r.site);
+    set('rpt-date', formatHebrewDate(r.date));
+    set('rpt-number', r.number);
+    set('rpt-title', r.title);
+    set('rpt-intro', r.intro);
+    const warn = document.getElementById('rpt-warning');
+    if (warn) { warn.textContent = r.warning; warn.style.display = r.warning ? 'block' : 'none'; }
+    const tbody = document.getElementById('rpt-tbody');
+    if (tbody) {
+        tbody.innerHTML = r.findings.map((f, i) => `
+            <tr class="rpt-row">
+                <td>${i + 1}</td>
+                <td>${escapeHtml(f.location)}</td>
+                <td>${escapeHtml(f.desc)}</td>
+                <td>${f.img ? `<img src="${f.img}" alt="">` : ''}</td>
+            </tr>`).join('');
+    }
+    const table = document.getElementById('rpt-table');
+    if (table) table.style.display = r.findings.length ? 'table' : 'none';
+    const sumWrap = document.getElementById('rpt-summary-wrap');
+    if (sumWrap) sumWrap.style.display = r.summary ? 'block' : 'none';
+    set('rpt-summary', r.summary);
+    // Branding: clone the logo column + footer from the live quote sheet so
+    // business details are maintained in one place only.
+    const logoSrc = document.querySelector('#quote-pdf-sheet .pdf-logo-column');
+    const logoDst = document.getElementById('rpt-logo');
+    if (logoSrc && logoDst) { logoDst.innerHTML = ''; logoDst.appendChild(logoSrc.cloneNode(true)); }
+    const footSrc = document.querySelector('#quote-pdf-sheet .pdf-company-footer');
+    const footDst = document.getElementById('rpt-footer');
+    if (footSrc && footDst) { footDst.innerHTML = ''; footDst.appendChild(footSrc.cloneNode(true)); }
+    const biz = appState.settings.businessDetails || {};
+    set('rpt-sign-name', biz.owner || '');
+    set('rpt-sign-role', biz.name || '');
+}
+
+function downloadReportPDF() {
+    const r = collectReport();
+    if (!r.client) { showToast('הזן לכבוד מי הדוח (שם הלקוח)', 'error'); return; }
+    if (r.findings.length === 0 && !r.summary) { showToast('הוסף לפחות ממצא אחד או סיכום', 'error'); return; }
+    if (typeof html2pdf === 'undefined') { showToast('מנוע ה-PDF לא נטען — רענן את הדף ונסה שוב', 'error'); return; }
+    buildReportSheet(r);
+    const el = document.getElementById('report-pdf-sheet');
+    const filename = `${r.title}_${r.number}_${(r.client || '').replace(/\s+/g, '_')}.pdf`;
+    showToast('מכין את הדוח להורדה...');
+    return html2pdf().set({
+        margin: 8,
+        filename,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff', scrollY: 0 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['css', 'legacy'] }
+    }).from(el).save()
+        .then(() => { showToast('הדוח הורד בהצלחה 🎉'); saveReportToList(false); })
+        .catch(err => { console.error('Report PDF error:', err); showToast('שגיאה ביצירת הדוח', 'error'); });
+}
+
+function saveReportToList(toast = true) {
+    const r = collectReport();
+    if (!r.client && r.findings.length === 0) { if (toast) showToast('אין מה לשמור עדיין', 'error'); return; }
+    savedReports = savedReports.filter(x => x.number !== r.number); // resave = replace
+    savedReports.unshift(r);
+    savedReports = savedReports.slice(0, 30);
+    try {
+        localStorage.setItem(getStorageKey('sj_reports'), JSON.stringify(savedReports));
+        if (toast) showToast('הדוח נשמר');
+    } catch (e) {
+        showToast('אין מקום לשמירה — מחק דוחות ישנים או צרף פחות תמונות', 'error');
+    }
+    renderSavedReports();
+}
+
+function loadSavedReport(idx) {
+    const r = savedReports[idx];
+    if (!r) return;
+    document.getElementById('report-type').value = r.type || 'custom';
+    applyReportTypeDefaults();
+    if (r.type === 'custom') document.getElementById('report-custom-title').value = r.title;
+    document.getElementById('report-client').value = r.client || '';
+    document.getElementById('report-site').value = r.site || '';
+    document.getElementById('report-date').value = r.date || getTodayDateString();
+    document.getElementById('report-number').value = r.number || '';
+    document.getElementById('report-intro').value = r.intro || '';
+    document.getElementById('report-warning').value = r.warning || '';
+    document.getElementById('report-summary').value = r.summary || '';
+    reportFindings = (r.findings || []).map(f => ({ ...f }));
+    if (reportFindings.length === 0) reportFindings.push({ location: '', desc: '', img: '' });
+    renderReportFindings();
+    showToast('הדוח נטען לעריכה');
+}
+
+function deleteSavedReport(idx, e) {
+    if (e) e.stopPropagation();
+    if (!confirm('למחוק את הדוח השמור?')) return;
+    savedReports.splice(idx, 1);
+    localStorage.setItem(getStorageKey('sj_reports'), JSON.stringify(savedReports));
+    renderSavedReports();
+}
+
+function renderSavedReports() {
+    const box = document.getElementById('reports-saved-list');
+    if (!box) return;
+    if (savedReports.length === 0) {
+        box.innerHTML = '<p class="input-help">אין דוחות שמורים עדיין.</p>';
+        return;
+    }
+    box.innerHTML = savedReports.map((r, i) => `
+        <div class="saved-report-row" onclick="loadSavedReport(${i})" title="טען לעריכה">
+            <div class="sr-info">
+                <span class="sr-title">${escapeHtml(r.title)}</span>
+                <span class="sr-meta">${escapeHtml(r.client || '')} · ${formatHebrewDate(r.date)} · ${r.findings.length} ממצאים</span>
+            </div>
+            <button class="cr-del" onclick="deleteSavedReport(${i}, event)" title="מחק"><i class="fa-solid fa-xmark"></i></button>
+        </div>`).join('');
+}
+
+function newReport() {
+    reportFindings = [{ location: '', desc: '', img: '' }];
+    ['report-client', 'report-site', 'report-summary', 'report-custom-title'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+    });
+    document.getElementById('report-date').value = getTodayDateString();
+    document.getElementById('report-number').value = nextReportNumber();
+    applyReportTypeDefaults();
+    renderReportFindings();
+}
+
+// ==========================================================================
+// Admin: AI catalog analysis — merges trivial variants, drops junk, keeps
+// engineering-relevant options, so the published system catalog stays clean.
+// ==========================================================================
+async function adminAnalyzeCatalog() {
+    if (!isAdmin()) return;
+    if (!priceCatalog || priceCatalog.length === 0) { showToast('המאגר האישי ריק — אין מה לנתח', 'error'); return; }
+    const status = document.getElementById('admin-syscat-status');
+    if (status) { status.style.display = 'block'; status.style.color = ''; status.textContent = `מנתח ${priceCatalog.length} פריטים עם AI…`; }
+    const rules = `אתה עורך מאגר מחירים לענף החשמל. סדר את המאגר לפי הכללים:
+1. אחד וריאציות זניחות: אותו מוצר שנבדל רק בפרט שולי (פתוח/סגור, אורך קטן) ופער המחירים עד 7% — אחד לפריט אחד בשם גנרי, וקח את המחיר הגבוה מביניהם.
+2. אל תאחד וריאציות שמשנות בחירה הנדסית: מספר מודולים בלוח, חתך כבל, אמפראז', הספק — אלה נשארים פריטים נפרדים.
+3. נקה שמות: קצר, ברור, בלי מק"טים ארוכים ובלי טקסט שיווקי.
+4. הסר פריטים שאינם מוצרים (דמי משלוח, כותרות, שורות זבל).
+החזר אך ורק JSON: {"items":[{"name":"...","price":<מספר>,"unit":"..."}]}`;
+    try {
+        const res = await callAI(getEffectiveModel(), {
+            messages: [
+                { role: 'system', content: rules },
+                { role: 'user', content: JSON.stringify(priceCatalog.slice(0, 800)) }
+            ],
+            response_format: { type: 'json_object' },
+            temperature: 0,
+            max_tokens: 8000,
+            stream: false
+        });
+        if (!res.ok) throw new Error(await readAIError(res));
+        const data = await res.json();
+        const raw = data.choices[0].message.content;
+        const a = raw.indexOf('{'), b = raw.lastIndexOf('}');
+        const parsed = JSON.parse(raw.slice(a, b + 1));
+        const items = (parsed.items || [])
+            .map(it => ({ name: String(it.name || '').trim().slice(0, 120), price: Number(it.price), unit: String(it.unit || '').trim().slice(0, 30) }))
+            .filter(it => it.name && Number.isFinite(it.price) && it.price > 0);
+        if (items.length === 0) throw new Error('הניתוח לא החזיר פריטים');
+        const before = priceCatalog.length;
+        if (!confirm(`הניתוח סיים: ${before} פריטים → ${items.length} פריטים נקיים.\nלהחליף את המאגר האישי בתוצאה? (אפשר יהיה לפרסם למערכת אחר כך)`)) {
+            if (status) status.textContent = 'הניתוח בוטל — המאגר לא שונה.';
+            return;
+        }
+        priceCatalog = items;
+        savePriceCatalog();
+        renderPriceCatalog();
+        adminRefreshSystemCatalogInfo();
+        if (status) { status.style.color = 'var(--color-success)'; status.textContent = `נוקה ✓ ${before} → ${items.length} פריטים. עבור על התוצאה בטאב "מאגר מחירים" ואז פרסם למערכת.`; }
+        showToast('המאגר נותח ונוקה — בדוק ופרסם');
+    } catch (e) {
+        if (status) { status.style.color = 'var(--color-danger)'; status.textContent = 'הניתוח נכשל: ' + e.message; }
+    }
+}
+
+// ==========================================================================
+// Client signature — signed on THIS screen (mouse or finger), embedded into
+// the quote PDF with the signer's name and date. Deal closed on the spot.
+// ==========================================================================
+let _sigDrawing = false;
+let _sigHasInk = false;
+
+function openSignatureModal() {
+    if (!activeProjectId) { showToast('בחר פרויקט תחילה', 'error'); return; }
+    const modal = document.getElementById('signature-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    clearSignatureCanvas();
+    const nameInput = document.getElementById('signature-name');
+    if (nameInput && !nameInput.value) nameInput.value = (appState.currentQuote && appState.currentQuote.clientName) || '';
+    _initSignatureCanvas();
+}
+
+function closeSignatureModal() {
+    const modal = document.getElementById('signature-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function clearSignatureCanvas() {
+    const c = document.getElementById('signature-canvas');
+    if (!c) return;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, c.width, c.height);
+    _sigHasInk = false;
+}
+
+function _initSignatureCanvas() {
+    const c = document.getElementById('signature-canvas');
+    if (!c || c._sigWired) return;
+    c._sigWired = true;
+    const ctx = c.getContext('2d');
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#1e3a8a';
+    const pos = (e) => {
+        const r = c.getBoundingClientRect();
+        return { x: (e.clientX - r.left) * (c.width / r.width), y: (e.clientY - r.top) * (c.height / r.height) };
+    };
+    c.addEventListener('pointerdown', (e) => {
+        _sigDrawing = true;
+        const p = pos(e);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        c.setPointerCapture(e.pointerId);
+    });
+    c.addEventListener('pointermove', (e) => {
+        if (!_sigDrawing) return;
+        const p = pos(e);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        _sigHasInk = true;
+    });
+    const stop = () => { _sigDrawing = false; };
+    c.addEventListener('pointerup', stop);
+    c.addEventListener('pointercancel', stop);
+}
+
+function saveQuoteSignature() {
+    if (!_sigHasInk) { showToast('החתימה ריקה — חתמו בתוך המסגרת', 'error'); return; }
+    const c = document.getElementById('signature-canvas');
+    const name = (document.getElementById('signature-name')?.value || '').trim();
+    if (!name) { showToast('הזן את שם החותם', 'error'); return; }
+    appState.currentQuote.signature = {
+        img: c.toDataURL('image/png'),
+        name,
+        date: getTodayDateString()
+    };
+    syncCurrentQuoteToProject();
+    renderQuoteSignature();
+    closeSignatureModal();
+    showToast('ההצעה נחתמה ✍️ — החתימה תופיע ב-PDF');
+}
+
+// Show the captured signature inside the PDF sheet's client-signature slot.
+function renderQuoteSignature() {
+    const row = document.getElementById('pdf-signature-row');
+    const slot = document.getElementById('pdf-client-signature-slot');
+    const caption = document.getElementById('pdf-client-signature-caption');
+    if (!row || !slot) return;
+    const sig = appState.currentQuote && appState.currentQuote.signature;
+    // Clear a previous embed (keep the caption element).
+    slot.querySelectorAll('img').forEach(img => img.remove());
+    if (sig && sig.img) {
+        row.style.display = 'flex';
+        const img = document.createElement('img');
+        img.src = sig.img;
+        img.alt = 'חתימת הלקוח';
+        img.style.cssText = 'position:absolute; bottom:2px; right:0; height:44px; max-width:95%; object-fit:contain;';
+        slot.appendChild(img);
+        if (caption) caption.textContent = `${sig.name} · ${formatHebrewDate(sig.date)}`;
+    } else if (caption) {
+        caption.textContent = 'שם ותאריך החתימה';
+    }
 }
 
 function updatePriceDisplayMode() {
