@@ -2363,6 +2363,23 @@ textarea#ai-input {
     #tab-projects span { font-size: 0; }
     #tab-projects span::after { content: 'פרויקטים'; font-size: 0.68rem; }
 
+    /* ==== Narrow-width hardening (incl. iOS Display Zoom ≈ 320px logical) ====
+       A CSS-grid/flex item defaults to min-width:auto, so its content can push
+       the column past the screen. min-width:0 lets it shrink; long strings wrap.
+       Fixes the horizontal-scroll + "content slides under the nav" at 320px. */
+    html, body { overflow-x: hidden; }
+    .app-container, .main-content, .content-panel { max-width: 100%; overflow-x: hidden; }
+    .split-view > *, .control-side, .preview-side,
+    .chat-container, .chat-messages, .chat-mode-toggle, .chat-toolbar,
+    .chat-suggestions, .chat-input-area, .settings-grid > * {
+        min-width: 0; max-width: 100%;
+    }
+    .chat-bubble { max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+    /* Less vertical waste from oversized headers on a phone */
+    .section-header h2 { font-size: 1.25rem; line-height: 1.25; }
+    .section-subtitle { font-size: 0.82rem; }
+    .content-panel { padding: 12px 12px 0; }
+
     /* ==== Chat as a full screen ==== */
     .model-quota-bar { padding: 4px 0; }
     .quota-ring-wrap { transform: scale(0.72); transform-origin: right center; }
@@ -2372,15 +2389,31 @@ textarea#ai-input {
         background: var(--bg-main);
         padding: 8px 10px;
         border-bottom: 1px solid var(--border-color);
+        flex-wrap: wrap;
     }
-    .stage-hint { font-size: 0.72rem; white-space: normal; text-align: left; }
-    .chat-messages { min-height: 52vh; }
+    .stage-hint { font-size: 0.72rem; white-space: normal; text-align: left; flex-basis: 100%; }
+    .chat-messages { min-height: 48vh; }
     .chat-input-area {
-        position: sticky; bottom: 70px; z-index: 20;
+        position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); z-index: 20;
         background: var(--bg-main);
         padding-top: 8px;
     }
+    .chat-suggestions { flex-wrap: wrap; }
     .chat-suggestions .chip { min-height: 44px; padding: 10px 16px; }
+
+    /* ==== Bottom nav + safe area (iPhone home indicator / Safari toolbar) ==== */
+    .sidebar {
+        height: auto; min-height: 62px;
+        padding-bottom: max(6px, env(safe-area-inset-bottom));
+    }
+    .main-content { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+    /* Lift the in-app helper bubble above the bottom nav so it can't cover it */
+    .sj-assist-launcher {
+        bottom: calc(78px + env(safe-area-inset-bottom)) !important;
+        left: 14px !important; width: 50px !important; height: 50px !important;
+        z-index: 999 !important; /* below the nav (1000) */
+    }
+    .sj-assist-panel { bottom: calc(78px + env(safe-area-inset-bottom)) !important; }
 
     /* ==== Editor: form first — the A4 lives in the fullscreen preview ==== */
     #panel-create .sheet-scroller { display: none; }
