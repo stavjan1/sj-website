@@ -2214,16 +2214,25 @@ img {
 }
 
 @media (max-width: 480px) {
+    /* Floating buttons on very narrow screens (incl. iPhone Display Zoom):
+       smaller, tighter, and the tertiary rate-us button steps aside — it
+       already exists in the testimonials section and the footer. */
+    .widget-btn { width: 44px !important; height: 44px !important; }
+    .widget-btn svg { width: 20px !important; height: 20px !important; }
+    .sticky-contact-widget { gap: 8px !important; }
+    .widget-btn.review-btn { display: none !important; }
+    .sj-assist-launcher { width: 46px !important; height: 46px !important; }
+
     .section-title {
         font-size: 1.8rem;
     }
-    
+
     .hero-title {
-        font-size: 2.5rem;
+        font-size: 2.2rem;
     }
-    
+
     .hero-subtitle {
-        font-size: 1.2rem;
+        font-size: 1.1rem;
     }
     
     .hero-tags {

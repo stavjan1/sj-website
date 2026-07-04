@@ -256,11 +256,21 @@ function incrementDailyUsage(model) {
 function getEffectiveModel() {
     return selectedGeminiModel;
 }
+// Plain daily AI-request counter (what the user actually understands).
+// The server enforces the real per-tier quota; this is the visible meter.
+const DAILY_AI_ALLOWANCE = 150; // Move 2 will read the per-tier number from the server
+
+function _aiReqKey() { return getStorageKey('sj_ai_reqs_' + new Date().toISOString().slice(0, 10)); }
+function getAiRequestCount() { return parseInt(localStorage.getItem(_aiReqKey()) || '0', 10); }
+function bumpAiRequestCount() {
+    const n = getAiRequestCount() + 1;
+    localStorage.setItem(_aiReqKey(), String(n));
+    return n;
+}
+
 function updateQuotaUI() {
-    const model  = selectedGeminiModel;
-    const used   = getWeightedUsage(model);
-    const budget = WEIGHTED_DAILY_BUDGET_DEFAULT;
-    const pct    = Math.min(100, Math.round((used / budget) * 100));
+    const reqs = getAiRequestCount();
+    const pct = Math.min(100, Math.round((reqs / DAILY_AI_ALLOWANCE) * 100));
     const offset = MODEL_CIRCUMFERENCE * (1 - pct / 100);
 
     const arc = document.getElementById('quota-arc');
@@ -268,13 +278,11 @@ function updateQuotaUI() {
         arc.style.strokeDashoffset = offset;
         arc.style.stroke = pct >= 100 ? '#f05252' : pct >= 75 ? '#f0c040' : 'var(--color-accent)';
     }
+    // No percent, no engine name — just how many AI requests were used today.
     const pctEl = document.getElementById('quota-pct');
-    if (pctEl) pctEl.textContent = pct + '%';
+    if (pctEl) pctEl.textContent = reqs;
     const nameEl = document.getElementById('quota-model-name');
-    if (nameEl) nameEl.textContent = aiLabel(model) + ' · היום';
-    // Legacy element (may be absent after redesign) — guard.
-    const usedEl = document.getElementById('quota-used');
-    if (usedEl) usedEl.textContent = Math.round(used);
+    if (nameEl) nameEl.textContent = 'בקשות AI · היום';
 }
 function changeGeminiModel(model) {
     selectedGeminiModel = model;
@@ -375,6 +383,8 @@ async function callAI(value, payload) {
     const [provider, model] = String(value || selectedGeminiModel).split('|');
     let proxyRes = null;
     try {
+        bumpAiRequestCount();
+        updateQuotaUI();
         // Identify the caller so the server counts the daily quota per Google
         // account (guests are counted per IP; admin is exempt server-side).
         const headers = { 'Content-Type': 'application/json' };
@@ -598,6 +608,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if ('serviceWorker' in navigator && location.protocol === 'https:') {
         navigator.serviceWorker.register('sw.js').catch(() => { /* non-fatal */ });
     }
+
+    // Estimate side panel: hidden by default (chat gets the full width);
+    // the "אומדן" toolbar button re-opens it and the choice is remembered.
+    toggleEstimatePanel(localStorage.getItem('sj_hide_estimate') !== '0');
 
     const activeUser = getActiveUser();
     if (!activeUser) {
@@ -3042,6 +3056,18 @@ function ensurePlanHistory(proj) {
     return proj.planChatHistory;
 }
 
+// The estimate/materials side panel is a power-tool, not the main flow —
+// hidden by default so the chat gets the full screen. Toggle remembers.
+function toggleEstimatePanel(force) {
+    const panel = document.getElementById('panel-wizard');
+    if (!panel) return;
+    const hide = force !== undefined ? force : !panel.classList.contains('hide-estimate');
+    panel.classList.toggle('hide-estimate', hide);
+    localStorage.setItem('sj_hide_estimate', hide ? '1' : '0');
+    const btn = document.getElementById('btn-toggle-estimate');
+    if (btn) btn.classList.toggle('active', !hide);
+}
+
 // Switch the chat between the planning and pricing conversations.
 function setChatMode(mode, projOverride) {
     const proj = projOverride || projectsList.find(p => p.id === activeProjectId);
@@ -3590,7 +3616,12 @@ function handleChatKeyDown(event) {
 function renderChatHistory(chatHistory) {
     const log = document.getElementById('chat-messages-log');
     if (!log) return;
-    
+
+    // Starter chips only help an empty conversation — once it's rolling they
+    // just eat chat height.
+    const sugg = document.querySelector('.chat-suggestions');
+    if (sugg) sugg.style.display = (chatHistory || []).some(m => m.role === 'user') ? 'none' : 'flex';
+
     log.innerHTML = '';
     
     chatHistory.forEach(msg => {

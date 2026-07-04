@@ -2203,11 +2203,33 @@ textarea#ai-input {
    scrolling ("leaner", less padding-heavy). Desktop only; the mobile layout
    below 861px keeps its own comfortable spacing.
    ========================================================================== */
+/* Estimate side panel collapsed (default): the chat owns the screen. */
+#panel-wizard.hide-estimate .preview-side { display: none !important; }
+#panel-wizard.hide-estimate .split-view { grid-template-columns: 1fr !important; }
+#panel-wizard.hide-estimate .control-side { max-width: 940px; width: 100%; margin: 0 auto; }
+#btn-toggle-estimate.active { border-color: var(--color-accent); color: var(--color-accent); }
+
 @media (min-width: 861px) {
     .content-panel { padding: 22px 30px; }
     .section-header { margin-bottom: 16px; }
     .section-header h2 { font-size: 1.4rem; margin-bottom: 3px; }
     .section-subtitle { font-size: 0.88rem; }
+
+    /* Chat gets the full window height: slim every bar around it */
+    #panel-wizard .control-side { height: calc(100vh - 118px) !important; }
+    #panel-wizard .section-header { margin-bottom: 8px; }
+    #panel-wizard .section-subtitle { display: none; }   /* the chat explains itself */
+    .chat-mode-toggle { padding: 6px 10px; }
+    .chat-toolbar { padding: 6px 10px; }
+    .chat-input-area { padding: 8px 10px; }
+    .chat-input-area textarea { min-height: 44px; }
+    .plan-action-bar { padding: 6px 12px; margin: 4px 10px; }
+    .plan-action-bar .pab-q { font-size: 0.85rem; }
+    .plan-action-bar .btn { padding: 7px 14px; }
+    .chat-suggestions { padding: 4px 10px 8px; gap: 6px; }
+    .chat-suggestions .chip { padding: 6px 14px; }
+    .model-quota-bar { padding: 0; }
+    .quota-ring-wrap { transform: scale(0.82); transform-origin: left center; }
 
     .section-card { margin-bottom: 14px; border-radius: 11px; }
     .card-header { padding: 10px 16px; }
