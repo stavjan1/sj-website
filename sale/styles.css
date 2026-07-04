@@ -2003,11 +2003,18 @@ textarea#ai-input {
     border-top: 1px solid var(--border-color);
     border-radius: 18px 18px 0 0;
     padding: 10px 14px 16px;
-    transform: translateY(110%);
-    transition: transform 0.25s ease;
+    /* Hidden = its own height PLUS the 65px nav offset, so no sliver peeks. */
+    transform: translateY(calc(100% + 90px));
+    transition: transform 0.25s ease, visibility 0.25s;
     box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+    visibility: hidden;
 }
-#more-drawer.open { transform: translateY(0); }
+#more-drawer.open { transform: translateY(0); pointer-events: auto; visibility: visible; }
+/* The drawer is a mobile-only mechanism — never render it on desktop. */
+@media (min-width: 769px) {
+    #more-drawer, #more-drawer-backdrop { display: none !important; }
+}
 .more-drawer-handle {
     width: 42px; height: 4px; border-radius: 2px;
     background: var(--border-hover); margin: 0 auto 12px;
