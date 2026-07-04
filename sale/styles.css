@@ -3586,3 +3586,35 @@ body.has-custom-bg.light-theme .chat-container {
 
 /* Editor toolbar buttons must never get clipped — wrap instead */
 .preview-actions { flex-wrap: wrap; justify-content: flex-end; }
+
+/* ==========================================================================
+   Project-scoped navigation (v4.6) — the wizard/editor tabs exist only
+   inside an open project: guided, chronological flow.
+   ========================================================================== */
+.nav-proj-label {
+    display: flex; align-items: center; gap: 8px;
+    margin: 12px 14px 2px; padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.72rem; font-weight: 700; color: var(--color-accent);
+    min-width: 0;
+}
+.nav-proj-label i { font-size: 0.68rem; flex-shrink: 0; }
+.nav-proj-label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-proj-divider { border-bottom: 1px solid var(--border-color); margin: 10px 14px; }
+
+.step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+    background: var(--bg-input); border: 1px solid var(--border-color);
+    font-size: 0.66rem; font-weight: 800; color: var(--text-muted);
+}
+.nav-btn.active .step-num { background: rgba(255,255,255,0.18); border-color: transparent; color: #fff; }
+
+/* No open project → the project tabs don't exist anywhere (desktop + mobile) */
+body:not(.in-project) .proj-tab { display: none !important; }
+
+@media (max-width: 768px) {
+    /* Bottom bar: icons only — the label/divider/step numbers are desktop chrome */
+    .nav-proj-label, .nav-proj-divider { display: none !important; }
+    .step-num { display: none !important; }
+}

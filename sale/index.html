@@ -82,14 +82,24 @@
                     <i class="fa-solid fa-folder-open"></i>
                     <span>ניהול פרויקטים</span>
                 </button>
-                <button class="nav-btn mobile-core" id="tab-wizard" onclick="switchTab('wizard')">
+                <!-- Project workspace tabs: exist ONLY while a project is open
+                     (guided, chronological flow — Stav 04/07). Kept as flat
+                     siblings so the mobile bottom bar keeps working. -->
+                <div class="nav-proj-label proj-tab" id="nav-proj-label">
+                    <i class="fa-solid fa-bolt"></i>
+                    <span id="nav-project-name">הפרויקט</span>
+                </div>
+                <button class="nav-btn mobile-core proj-tab" id="tab-wizard" onclick="switchTab('wizard')">
+                    <b class="step-num">1</b>
                     <i class="fa-solid fa-calculator"></i>
-                    <span>צ'אט תמחור וחומרים</span>
+                    <span>תכנון ותמחור (צ'אט)</span>
                 </button>
-                <button class="nav-btn mobile-core" id="tab-create" onclick="switchTab('create')">
+                <button class="nav-btn mobile-core proj-tab" id="tab-create" onclick="switchTab('create')">
+                    <b class="step-num">2</b>
                     <i class="fa-solid fa-file-invoice-dollar"></i>
-                    <span>עורך הצעות מחיר</span>
+                    <span>עורך ההצעה (PDF)</span>
                 </button>
+                <div class="nav-proj-divider proj-tab"></div>
                 <button class="nav-btn nav-more-btn" id="tab-more" onclick="toggleMoreDrawer()">
                     <i class="fa-solid fa-ellipsis"></i>
                     <span>עוד</span>
@@ -131,7 +141,7 @@
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
                 </div>
-                <span class="version">v4.5</span>
+                <span class="version">v4.6</span>
             </div>
         </aside>
         

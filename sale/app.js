@@ -1566,7 +1566,7 @@ function deleteProject(id, event) {
 function updateActiveProjectBanner(proj) {
     const bannerName = document.getElementById('active-project-name');
     const bannerStatus = document.getElementById('active-project-status');
-    
+
     if (proj) {
         bannerName.textContent = proj.name;
         bannerStatus.textContent = proj.status || 'טיוטה';
@@ -1575,6 +1575,12 @@ function updateActiveProjectBanner(proj) {
         bannerName.textContent = 'אין פרויקט פעיל (בחר או צור פרויקט תחילה)';
         bannerStatus.style.display = 'none';
     }
+
+    // Project-scoped navigation: the wizard/editor tabs exist only while a
+    // project is open (body.in-project drives their visibility in CSS).
+    document.body.classList.toggle('in-project', !!proj);
+    const navName = document.getElementById('nav-project-name');
+    if (navName) navName.textContent = proj ? proj.name : '';
 }
 
 function filterProjectsList() {
