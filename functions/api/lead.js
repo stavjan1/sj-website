@@ -7,6 +7,7 @@
 // key + verified domain (sj-eng.co.il) are added.
 
 import { generate } from './_ai.js';
+import { rateLimit } from './_tiers.js';
 
 const WEB3FORMS_KEY = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
 const SJ_FROM = 'SJ הנדסת חשמל <info@sj-eng.co.il>';
@@ -21,6 +22,11 @@ const DRAFT_PROMPT = `אתה כותב בשם SJ הנדסת חשמל מייל ק�
 
 export async function onRequestPost(context) {
   const { request, env } = context;
+
+  // Cost/spam guard: this endpoint runs the AI and sends email, unauthenticated.
+  if (!(await rateLimit(env, request, 'lead', 3))) {
+    return json({ error: { message: 'נשלחו כבר מספר בקשות. נסו שוב בעוד דקה.' } }, 429);
+  }
 
   let body;
   try { body = await request.json(); } catch { return json({ error: { message: 'בקשה לא תקינה.' } }, 400); }

@@ -116,3 +116,47 @@ export function jsonResponse(obj, status) {
     headers: { 'Content-Type': 'application/json; charset=utf-8' },
   });
 }
+
+// Lightweight per-IP rate limiter (KV-backed). Returns true when the caller is
+// allowed, false when over the limit. Fails OPEN if KV isn't bound (dev). Used
+// to protect the unauthenticated AI/email endpoints (/scrape, /lead) from cost
+// abuse — /chat already has its own per-tier daily quota.
+export async function rateLimit(env, request, bucket, maxPerMinute) {
+  if (!env.SJ_DATA) return true;
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const minute = Math.floor(Date.now() / 60000);
+  const key = `rl:${bucket}:${ip}:${minute}`;
+  try {
+    const used = parseInt((await env.SJ_DATA.get(key)) || '0', 10);
+    if (used >= maxPerMinute) return false;
+    // TTL 120s covers the whole minute window plus clock skew.
+    await env.SJ_DATA.put(key, String(used + 1), { expirationTtl: 120 });
+    return true;
+  } catch {
+    return true; // never let the limiter itself take the endpoint down
+  }
+}
+
+// SSRF guard: reject URLs that resolve to loopback/link-local/private ranges or
+// non-web schemes, so /api/scrape can't be turned into a server-side fetch of
+// internal services or cloud metadata endpoints.
+export function isPublicHttpUrl(raw) {
+  let u;
+  try { u = new URL(raw); } catch { return false; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+  const host = u.hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.internal') || host.endsWith('.local')) return false;
+  if (host === '169.254.169.254' || host === 'metadata' || host.endsWith('.metadata.google.internal')) return false;
+  // Bare IPv6 or loopback
+  if (host === '::1' || host === '[::1]' || host.startsWith('[')) return false;
+  // Private / loopback / link-local IPv4 ranges
+  const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const [a, b] = [parseInt(m[1], 10), parseInt(m[2], 10)];
+    if (a === 127 || a === 10 || a === 0) return false;
+    if (a === 172 && b >= 16 && b <= 31) return false;
+    if (a === 192 && b === 168) return false;
+    if (a === 169 && b === 254) return false;
+  }
+  return true;
+}

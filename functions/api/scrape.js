@@ -8,6 +8,7 @@
 // anti-bot sites). Extraction is done by the same multi-provider AI (_ai.js).
 
 import { generate } from './_ai.js';
+import { rateLimit, isPublicHttpUrl } from './_tiers.js';
 
 const MAX_CONTENT = 35000; // chars of page text fed to the extractor (token guard)
 
@@ -24,6 +25,15 @@ export async function onRequestPost(context) {
   const url = String(body.url || '').trim();
   if (!/^https?:\/\/.+/i.test(url)) {
     return json({ error: { message: 'נא להזין כתובת אתר תקינה (http/https).' } }, 400);
+  }
+  // SSRF guard: never fetch internal/loopback/metadata hosts.
+  if (!isPublicHttpUrl(url)) {
+    return json({ error: { message: 'הכתובת אינה כתובת אתר ציבורית תקינה.' } }, 400);
+  }
+  // Cost guard: this endpoint runs the AI extractor and is unauthenticated —
+  // cap per IP so it can't be used to drain AI credits.
+  if (!(await rateLimit(env, request, 'scrape', 10))) {
+    return json({ error: { message: 'יותר מדי בקשות סריקה. נסו שוב בעוד דקה.' } }, 429);
   }
 
   // 0) Shopify fast-path: collection pages expose a public products.json —

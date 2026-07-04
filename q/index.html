@@ -67,6 +67,10 @@
     <script>
         const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         const fmt = (n) => (Number(n) || 0).toLocaleString('he-IL');
+        // Only allow inline data-image sources. Anything else (incl. a crafted
+        // string that tries to break out of the src attribute) is dropped — the
+        // share payload comes from another user's account, so treat it as data.
+        const safeImg = (s) => /^data:image\/(png|jpe?g|gif|webp|svg\+xml);/i.test(String(s || '')) ? String(s) : '';
 
         async function load() {
             const t = new URLSearchParams(location.search).get('t') || '';
@@ -99,7 +103,7 @@
                         <div class="sub">${esc(q.clientSub || '')}</div>
                     </div>
                     <div class="qs-biz">
-                        ${q.logo ? `<img src="${q.logo}" alt="">` : ''}
+                        ${safeImg(q.logo) ? `<img src="${safeImg(q.logo)}" alt="">` : ''}
                         <div class="bn">${esc(biz.name || '')}</div>
                         <div class="bo">${esc(biz.owner || '')}</div>
                     </div>
@@ -114,9 +118,9 @@
                 <div class="qs-total"><span>סה"כ לתשלום:</span><span>${fmt(q.finalPrice)} ₪</span></div>
                 <div class="qs-vat">${esc(q.vatLabel || '')}</div>
                 ${q.summary ? `<div class="qs-summary"><strong>פירוט תנאים נוספים:</strong>\n${esc(q.summary)}</div>` : ''}
-                ${q.signature && q.signature.img ? `
+                ${q.signature && safeImg(q.signature.img) ? `
                     <div class="qs-signed">
-                        <img src="${q.signature.img}" alt="חתימה">
+                        <img src="${safeImg(q.signature.img)}" alt="חתימה">
                         <span>✓ ההצעה אושרה ונחתמה על ידי <strong>${esc(q.signature.name)}</strong> בתאריך ${esc(q.signature.date)}</span>
                     </div>` : ''}
                 <div class="qs-actions">

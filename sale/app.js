@@ -1378,11 +1378,30 @@ function loadProjects() {
     switchTab('projects');
 }
 
+// Write to localStorage, surviving a full quota. A user with many report/logo
+// images can fill the ~5MB budget; an uncaught QuotaExceededError would abort
+// the save mid-flow and silently lose work. Here we warn once and still push to
+// the cloud, which has no such limit — so the data isn't lost.
+let _storageWarned = false;
+function safeLocalSet(key, value) {
+    try {
+        localStorage.setItem(key, value);
+        return true;
+    } catch (e) {
+        if (!_storageWarned) {
+            _storageWarned = true;
+            showToast('הזיכרון המקומי מלא — העבודה נשמרת בענן. מחק דוחות/תמונות ישנים כדי לפנות מקום.', 'error');
+        }
+        try { if (isCloudUser()) cloudSaveNow(); } catch (e2) {}
+        return false;
+    }
+}
+
 function saveProjects() {
     guardBeforeShrink('sj_projects', projectsList.length, 'before saveProjects');
-    localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList));
-    localStorage.setItem(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList));
-    localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
+    safeLocalSet(getStorageKey('sj_projects'), JSON.stringify(projectsList));
+    safeLocalSet(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList));
+    safeLocalSet(getStorageKey('sj_db_last_updated'), Date.now().toString());
     scheduleCloudSync();
 }
 
@@ -2417,8 +2436,8 @@ function loadHistory() {
 
 function saveHistory() {
     guardBeforeShrink('sj_quote_history', (appState.history || []).length, 'before saveHistory');
-    localStorage.setItem(getStorageKey('sj_quote_history'), JSON.stringify(appState.history));
-    localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
+    safeLocalSet(getStorageKey('sj_quote_history'), JSON.stringify(appState.history));
+    safeLocalSet(getStorageKey('sj_db_last_updated'), Date.now().toString());
     scheduleCloudSync();
 }
 
