@@ -75,7 +75,7 @@ export async function onRequestPost(context) {
     model = body.model || model;
   }
 
-  const res = await generate(env, {
+  return generate(env, {
     provider,
     model,
     messages: body.messages,
@@ -84,13 +84,6 @@ export async function onRequestPost(context) {
     max_tokens: body.max_tokens,
     stream: body.stream === true,
   });
-
-  // Tell the client which class actually served (e.g. advanced was requested
-  // but the plan doesn't include it → served basic).
-  try {
-    res.headers.set('X-Model-Class', cls === MODEL_CLASS.advanced ? 'advanced' : 'basic');
-  } catch { /* immutable headers on some responses — non-fatal */ }
-  return res;
 }
 
 function json(obj, status) {

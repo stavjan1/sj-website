@@ -63,7 +63,22 @@ export async function onRequest(context) {
       return json({ ok: true, skipped: 'empty-over-nonempty' });
     }
 
-    // ---- Free-plan monthly cloud-quote cap ----
+    // The full backup ALWAYS saves (settings, projects, catalog, history) — the
+    // cloud is the source of truth across devices, so we never reject a sync.
+    const payload = JSON.stringify({ ...incoming, lastUpdated: incoming.lastUpdated || Date.now() });
+    // KV value hard limit is 25 MB; cap far below that to stay sane.
+    if (payload.length > 5 * 1024 * 1024) {
+      return json({ error: { message: 'הנתונים גדולים מדי לאחסון בענן.' } }, 413);
+    }
+    await env.SJ_DATA.put(key, payload);
+
+    // ---- Free-plan monthly cloud-quote counter (SOFT — never blocks the save) ----
+    // Count quotes that are genuinely new to the cloud this sync. Re-syncing an
+    // existing library (new device, guest→Google upgrade, cleared KV) must NOT
+    // count old quotes as new, so we compare against the just-saved snapshot's
+    // predecessor. When over the monthly allowance we still save everything and
+    // only flag `quotaSoftExceeded` so the client can show a gentle upgrade nudge.
+    let quotaSoftExceeded = false;
     const tier = await getTierForEmail(env, email);
     const config = await loadTierConfig(env);
     const limit = (config[tier] || config.free).quotesPerMonth;
@@ -73,29 +88,20 @@ export async function onRequest(context) {
           .map((q) => q && q.id).filter(Boolean));
       const newQuotes = (Array.isArray(incoming.history) ? incoming.history : [])
         .filter((q) => q && q.id && !existingIds.has(q.id));
-      if (newQuotes.length > 0) {
+      // Only count as "new this month" when the cloud already had a library
+      // (existing non-empty). A first/rebuild sync seeds the baseline for free.
+      const hadCloudLibrary = existing && Array.isArray(existing.history) && existing.history.length > 0;
+      if (newQuotes.length > 0 && hadCloudLibrary) {
         const moKey = `quotesmo:${email.toLowerCase()}:${monthKey()}`;
         const used = parseInt((await env.SJ_DATA.get(moKey)) || '0', 10);
-        if (used + newQuotes.length > limit) {
-          return json({
-            error: {
-              code: 'QUOTA_QUOTES', tier, limit, used,
-              message: `במסלול החינמי נשמרות עד ${limit} הצעות חדשות בענן בכל חודש. ההצעות ממשיכות להישמר במכשיר הזה וייצוא PDF עובד כרגיל — שדרוג מסלול פותח שמירה ללא הגבלה.`,
-            },
-          }, 402);
-        }
+        const next = used + newQuotes.length;
+        quotaSoftExceeded = next > limit;
         // ~40 days TTL — the key dies naturally after its month ends.
-        context.waitUntil(env.SJ_DATA.put(moKey, String(used + newQuotes.length), { expirationTtl: 60 * 60 * 24 * 40 }));
+        context.waitUntil(env.SJ_DATA.put(moKey, String(next), { expirationTtl: 60 * 60 * 24 * 40 }));
       }
     }
 
-    const payload = JSON.stringify({ ...incoming, lastUpdated: incoming.lastUpdated || Date.now() });
-    // KV value hard limit is 25 MB; cap far below that to stay sane.
-    if (payload.length > 5 * 1024 * 1024) {
-      return json({ error: { message: 'הנתונים גדולים מדי לאחסון בענן.' } }, 413);
-    }
-    await env.SJ_DATA.put(key, payload);
-    return json({ ok: true, updatedAt: Date.now() });
+    return json({ ok: true, updatedAt: Date.now(), quotaSoftExceeded });
   }
 
   return json({ error: { message: 'מתודה לא נתמכת.' } }, 405);

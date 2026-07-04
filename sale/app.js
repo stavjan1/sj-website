@@ -1052,26 +1052,62 @@ async function cloudSaveNow() {
         // 501 = KV binding not configured yet → stay local-only, silently.
         if (res.status === 501) return false;
         if (res.status === 401) { handleExpiredCloudToken(); return false; }
-        // 402 = the free plan's monthly cloud-quote cap — everything stays
-        // saved locally (PDF export unaffected); nudge once toward upgrade.
-        if (res.status === 402) {
-            try {
-                const body = await res.json();
-                if (body && body.error && body.error.code === 'QUOTA_QUOTES') {
-                    handleQuoteQuotaExceeded(body.error.message);
-                }
-            } catch (e) {}
-            return false;
-        }
-        return res.ok;
+        if (!res.ok) return false;
+        // The backup always saves now; the server only FLAGS when a free user
+        // passed their monthly new-quote allowance so we can nudge once.
+        try {
+            const body = await res.json();
+            if (body && body.quotaSoftExceeded) handleQuoteQuotaExceeded();
+        } catch (e) {}
+        return true;
     } catch (e) {
         // Offline / transient — local copy stays authoritative until reconnect.
         return false;
     }
 }
 
-// Pull the cloud copy on login and adopt it if it's newer than local; if local
-// is newer (e.g. work done offline), push local up instead.
+// Union two lists by a stable identity key so no unique item is ever lost.
+// On an id-collision the `preferCloud` side wins (it's the more-recently-synced
+// copy). Works for projects/history/trash (id), catalog (name) and users.
+function _mergeListById(localArr, cloudArr, preferCloud) {
+    const keyOf = (it) => (it && (it.id || it.username || it.name)) || null;
+    const byKey = new Map();
+    const add = (arr, isPreferred) => {
+        (Array.isArray(arr) ? arr : []).forEach((item) => {
+            const k = keyOf(item);
+            if (k == null) return;               // skip un-keyable junk
+            if (!byKey.has(k) || isPreferred) byKey.set(k, item);
+        });
+    };
+    // Add the losing side first, then the preferred side overwrites collisions.
+    if (preferCloud) { add(localArr, false); add(cloudArr, true); }
+    else { add(cloudArr, false); add(localArr, true); }
+    return Array.from(byKey.values());
+}
+
+// Merge the cloud blob INTO the current local state (union by id) rather than
+// replacing wholesale. Two devices that edited independently now CONVERGE to
+// the union instead of the last-syncer clobbering the other's projects — the
+// root cause of "Chrome has 1 project, Edge has 3 different ones".
+function mergeCloudIntoLocal(cloud) {
+    const local = buildDatabaseObject();
+    const cloudTs = (cloud && cloud.lastUpdated) || 0;
+    const localTs = parseInt(localStorage.getItem(getStorageKey('sj_db_last_updated')) || '0', 10);
+    const preferCloud = cloudTs >= localTs; // newer side wins per-item conflicts
+    applyDatabaseObject({
+        settings: preferCloud ? (cloud.settings || local.settings) : (local.settings || cloud.settings),
+        history: _mergeListById(local.history, cloud.history, preferCloud),
+        projects: _mergeListById(local.projects, cloud.projects, preferCloud),
+        trash: _mergeListById(local.trash, cloud.trash, preferCloud),
+        catalog: _mergeListById(local.catalog, cloud.catalog, preferCloud),
+        users: _mergeListById(local.users, cloud.users, preferCloud),
+        lastUpdated: Math.max(cloudTs, localTs) || Date.now(),
+    });
+}
+
+// Pull the cloud copy on login and MERGE it with local (union by id), then push
+// the merged union back so the other device converges too. Cloud is the shared
+// source of truth — we no longer depend on any single browser's storage.
 async function cloudLoadAndMerge(silent) {
     if (!isCloudUser()) return;
     try {
@@ -1084,17 +1120,18 @@ async function cloudLoadAndMerge(silent) {
         if (!res.ok) return;
         const body = await res.json();
         const cloud = body && body.data;
-        const cloudTs = (cloud && cloud.lastUpdated) || 0;
-        const localTs = parseInt(localStorage.getItem(getStorageKey('sj_db_last_updated')) || '0', 10);
-        if (cloud && cloudTs > localTs) {
-            backupLocalSnapshot('before cloud(KV) load');
-            applyDatabaseObject(cloud);
+        if (cloud) {
+            backupLocalSnapshot('before cloud(KV) merge');
+            mergeCloudIntoLocal(cloud);
             try {
                 loadSettings(); filterProjectsList(); renderHistoryList();
                 if (typeof activeProjectId !== 'undefined' && activeProjectId) loadProject(activeProjectId, false);
             } catch (e) {}
+            // Push the merged union up so the other device gets the missing items.
+            cloudSaveNow();
             if (!silent) showToast('הנתונים סונכרנו מהענן');
-        } else if (localTs > cloudTs) {
+        } else {
+            // No cloud copy yet → seed it from local.
             cloudSaveNow();
         }
     } catch (e) { /* non-fatal */ }
@@ -6043,9 +6080,11 @@ async function completeGoogleLogin(email, profession, token, rememberMe) {
         if (accountEmpty && guestHasWork) {
             applyDatabaseObject(guestWork);
             try { loadSettings(); filterProjectsList(); renderHistoryList(); } catch (e) {}
-            await cloudSaveNow();
+            const saved = await cloudSaveNow();
             hideAuthLoadingAfterMin(2000);
-            showToast('עבודתך נשמרה לחשבון Google ✓');
+            // Only promise a cloud backup if it actually succeeded.
+            showToast(saved ? 'עבודתך נשמרה לחשבון Google ✓'
+                            : 'התחברת ✓ — העבודה נשמרת במכשיר; גיבוי הענן יתעדכן כשהחיבור יתייצב');
             return;
         }
     }
