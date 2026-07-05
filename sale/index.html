@@ -24,7 +24,7 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
     
     <!-- Custom styling -->
-    <link rel="stylesheet" href="styles.css?v=428">
+    <link rel="stylesheet" href="styles.css?v=429">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -147,29 +147,50 @@
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
                 </div>
-                <span class="version">v4.28</span>
+                <span class="version">v4.29</span>
             </div>
         </aside>
         
         <!-- Main Workspace -->
         <main class="main-content">
-            
-            <!-- Active Project Banner -->
+
+            <!-- Two-row top navigation (desktop): 3 worlds + contextual sub-tabs -->
+            <div class="topnav" id="topnav">
+                <div class="topnav-row1">
+                    <div class="topnav-brand">
+                        <div class="topnav-logo"><i class="fa-solid fa-bolt"></i></div>
+                        <div><div class="tb-name">SJ הנדסת חשמל</div><div class="tb-sub">מערכת הצעות מחיר</div></div>
+                    </div>
+                    <div class="topnav-worlds">
+                        <button class="topnav-world active" data-world="projects" onclick="switchWorld('projects')"><i class="fa-solid fa-folder-open"></i> ניהול פרויקטים</button>
+                        <button class="topnav-world" data-world="accounting" onclick="switchWorld('accounting')"><span class="tw-bee">🐝</span> הנהלת חשבונות</button>
+                        <button class="topnav-world" data-world="prefs" onclick="switchWorld('prefs')"><i class="fa-solid fa-sliders"></i> העדפות</button>
+                    </div>
+                    <div class="topnav-right">
+                        <span id="banner-sync-indicator" style="display:none; align-items:center; gap:6px; color:var(--text-secondary); font-size:0.78rem;">
+                            <i class="fa-solid fa-arrows-rotate fa-spin" style="color:var(--color-success)"></i> <span>מסנכרן…</span>
+                        </span>
+                        <button type="button" class="theme-flip" id="theme-flip" onclick="flipTheme()" aria-label="החלפת מצב תצוגה">
+                            <i id="theme-flip-icon" class="fa-solid fa-sun"></i>
+                            <b id="theme-flip-label">LIGHT MODE</b>
+                        </button>
+                        <div class="topnav-user">
+                            <img id="topnav-avatar" class="tn-avatar" alt="" style="display:none;">
+                            <span id="topnav-username" class="tn-username">משתמש</span>
+                            <button class="tn-logout" onclick="handleUserLogout()" title="התנתקות" aria-label="התנתקות"><i class="fa-solid fa-right-from-bracket"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="topnav-sub" id="topnav-sub"></div>
+            </div>
+
+            <!-- Active Project Banner (slim — the project you're inside) -->
             <div class="active-project-banner" id="project-banner">
                 <span class="banner-label"><i class="fa-solid fa-folder-open text-accent"></i> פרויקט פעיל:</span>
                 <span class="banner-value" id="active-project-name">אין פרויקט טעון (בחר או צור פרויקט תחילה)</span>
                 <span class="banner-badge" id="active-project-status" style="display:none;">טיוטה</span>
-                <span id="banner-sync-indicator" style="display:none; align-items:center; gap:6px; color:var(--text-secondary); font-size:0.8rem;">
-                    <i class="fa-solid fa-arrows-rotate fa-spin text-success" style="color:var(--color-success)"></i> <span>מסנכרן ענן...</span>
-                </span>
-                <!-- Theme toggle — far LEFT of the top bar. Shows the CURRENT
-                     mode; clicking switches (label+icon swap, no gimmicks). -->
-                <button type="button" class="theme-flip" id="theme-flip" onclick="flipTheme()" aria-label="החלפת מצב תצוגה">
-                    <i id="theme-flip-icon" class="fa-solid fa-sun"></i>
-                    <b id="theme-flip-label">LIGHT MODE</b>
-                </button>
             </div>
-            
+
             <!-- Tab: Projects Manager -->
             <section id="panel-projects" class="content-panel active">
                 <div class="section-header">
@@ -724,6 +745,20 @@
                 <div id="archive-list" class="archive-list"></div>
             </section>
 
+            <!-- Accounting world (SmartBee): invoices + clients + card processing -->
+            <section id="panel-accounting" class="content-panel">
+                <div class="section-header">
+                    <h2><span style="font-size:1.3rem;">🐝</span> הנהלת חשבונות</h2>
+                    <p class="section-subtitle">הפקת חשבוניות וקבלות, ניהול לקוחות וסליקת אשראי — הכל במקום אחד, מחובר ל-SmartBee.</p>
+                </div>
+                <div class="acct-soon">
+                    <div class="acct-soon-icon">🐝</div>
+                    <h3>בקרוב — חשבוניות וסליקה</h3>
+                    <p>העולם הזה יכיל: <strong>הפקת חשבונית / קבלה / חשבון עסקה</strong>, <strong>ניהול לקוחות</strong>, ו<strong>סליקת אשראי</strong> — הכל דרך חיבור ל-SmartBee, ישירות מתוך הפרויקט (הצעה שאושרה ← הפק חשבונית ← סמן שולם).</p>
+                    <p class="input-help" style="margin-top:10px;">המנוע כבר בבנייה. עד שיהיה מוכן — אפשר להמשיך לנהל פרויקטים והצעות כרגיל.</p>
+                </div>
+            </section>
+
             <section id="panel-history" class="content-panel">
                 <div class="section-header">
                     <h2><i class="fa-solid fa-clock-rotate-left"></i> היסטוריית הצעות מחיר</h2>
@@ -920,7 +955,7 @@
                                     <i class="fa-solid fa-star"></i> תן חוות דעת על המוצר
                                 </a>
                             </div>
-                            <p class="input-help" style="margin:14px 0 0;opacity:.7;">גרסה <span id="about-version">v4.28</span> · &copy; 2026 SJ הנדסת חשמל · כל הזכויות שמורות.</p>
+                            <p class="input-help" style="margin:14px 0 0;opacity:.7;">גרסה <span id="about-version">v4.29</span> · &copy; 2026 SJ הנדסת חשמל · כל הזכויות שמורות.</p>
                         </div>
                     </div>
                 </div>
@@ -1772,7 +1807,7 @@
     </div>
 
     <!-- Application Script -->
-    <script src="app.js?v=428"></script>
+    <script src="app.js?v=429"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
     <script src="../assistant.js?v=43" defer></script>

@@ -4081,3 +4081,71 @@ body:not(.in-project) .proj-tab { display: none !important; }
 .pv-total .v { color: var(--color-accent); font-size: 1.1rem; }
 .pv-empty { color: var(--text-muted); font-size: 0.85rem; padding: 8px 2px; }
 .pv-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: 4px; }
+
+/* ==========================================================================
+   v4.29 — top navigation: 3 worlds + contextual sub-tab row (desktop)
+   The sidebar becomes the MOBILE nav; the top bar drives desktop.
+   ========================================================================== */
+.topnav { display: none; background: var(--bg-card); border-bottom: 1px solid var(--border-color); }
+.topnav-row1 { display: flex; align-items: center; gap: 16px; padding: 8px 20px; }
+.topnav-brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex-shrink: 0; }
+.topnav-logo { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, var(--color-accent), #7dd3fc); color: #fff; flex-shrink: 0; }
+.tb-name { font-weight: 800; font-size: 0.9rem; }
+.tb-sub { font-size: 0.68rem; color: var(--text-muted); }
+.topnav-worlds { display: flex; gap: 6px; margin-inline: auto; }
+.topnav-world {
+    display: inline-flex; align-items: center; gap: 8px; padding: 9px 20px; border-radius: 10px;
+    border: 1px solid transparent; background: transparent; color: var(--text-secondary);
+    font-family: inherit; font-size: 0.92rem; font-weight: 700; cursor: pointer; transition: all 0.2s ease;
+}
+.topnav-world:hover { background: var(--bg-input); }
+.topnav-world.active { background: var(--color-accent); color: #fff; box-shadow: 0 3px 12px var(--color-accent-glow); }
+.tw-bee { font-size: 1.05rem; }
+.topnav-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.topnav-user { display: flex; align-items: center; gap: 8px; }
+.tn-avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
+.tn-username { font-size: 0.82rem; font-weight: 600; max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tn-logout { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border-color); background: transparent; color: #f05252; cursor: pointer; }
+.tn-logout:hover { background: rgba(240,82,82,0.1); }
+.topnav-sub { display: flex; gap: 5px; padding: 0 20px 9px; flex-wrap: wrap; }
+.topnav-sub-btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 15px; border-radius: 999px;
+    border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-secondary);
+    font-family: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease;
+}
+.topnav-sub-btn:hover { border-color: var(--color-accent); }
+.topnav-sub-btn.active { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
+.topnav-sub-btn.is-step { background: rgba(77,142,240,0.08); border-style: dashed; }
+
+/* Accounting placeholder */
+.acct-soon { text-align: center; max-width: 580px; margin: 36px auto; padding: 30px 26px;
+    background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; }
+.acct-soon-icon { font-size: 2.6rem; margin-bottom: 6px; }
+.acct-soon h3 { margin: 0 0 12px; font-size: 1.25rem; }
+.acct-soon p { color: var(--text-secondary); line-height: 1.75; margin: 0; }
+
+@media (min-width: 861px) {
+    .sidebar { display: none !important; }                     /* desktop → top bar */
+    .topnav { display: block; }
+    .app-container { display: block; }
+    .main-content {
+        display: flex; flex-direction: column;
+        height: var(--appvh, 100vh); width: 100%; overflow: hidden;
+    }
+    .topnav, #project-banner { flex-shrink: 0; }
+    body:not(.in-project) #project-banner { display: none; }
+    #project-banner { padding: 6px 24px; background: transparent; border: none; margin: 0; }
+    /* The active panel fills the space below the bars; most scroll as a whole. */
+    .content-panel.active { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+    /* Panels that own their internal scroll keep it (list scrolls, not the page). */
+    #panel-projects.active, #panel-create.active, #panel-archive.active {
+        height: auto; flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column;
+    }
+    #panel-wizard.active { flex: 1 1 auto; min-height: 0; overflow: hidden; padding-bottom: 0; }
+    /* Wizard/editor inner columns fill the flex panel instead of a vh calc. */
+    #panel-wizard .control-side, #panel-wizard .preview-side { height: 100% !important; }
+    #panel-wizard .split-view, #panel-create .split-view { height: 100%; }
+    #panel-create .control-side { height: 100%; }
+    #panel-create .preview-side { height: 100%; }
+}

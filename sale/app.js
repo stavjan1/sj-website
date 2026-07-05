@@ -965,6 +965,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const vatSel = document.getElementById('form-vat-type');
         if (vatSel) vatSel.addEventListener('change', () => rememberQuotePref('vatType', vatSel.value));
         markActivePdfTemplate(); // highlight the saved design template pill
+        syncTopNav('projects'); // seed the desktop top-bar world + sub-tab row
         setTimeout(showWelcomeOnboarding, 900); // first-run walkthrough (once)
     }
     hideAppSplash();
@@ -1344,6 +1345,71 @@ function formatHebrewDate(dateString) {
 }
 
 // Switch between panels (tabs)
+// ==========================================================================
+// Top navigation — three "worlds" (Stav 05/07): ניהול פרויקטים / הנהלת חשבונות
+// / העדפות. A world's sub-tabs render in a second row (Nielsen: recognition
+// over recall — every option visible, no hidden menus). All the existing
+// content panels are unchanged; this only regroups how you reach them. The old
+// sidebar stays as the MOBILE nav; the top bar takes over on desktop.
+// ==========================================================================
+const NAV_WORLDS = {
+    projects:   { label: 'ניהול פרויקטים', icon: 'fa-folder-open', tabs: [
+        { id: 'projects', label: 'פרויקטים',        icon: 'fa-list-check' },
+        { id: 'history',  label: 'היסטוריית הצעות', icon: 'fa-clock-rotate-left' },
+        { id: 'archive',  label: 'ארכיון לקוחות',   icon: 'fa-address-book' },
+    ] },
+    accounting: { label: 'הנהלת חשבונות', icon: 'fa-file-invoice-dollar', bee: true, tabs: [
+        { id: 'accounting', label: 'חשבוניות וסליקה', icon: 'fa-receipt' },
+    ] },
+    prefs:      { label: 'העדפות', icon: 'fa-sliders', tabs: [
+        { id: 'business', label: 'פרטי עסק',      icon: 'fa-briefcase' },
+        { id: 'catalog',  label: 'מאגר מחירים',   icon: 'fa-tags' },
+        { id: 'settings', label: 'הגדרות מערכת',  icon: 'fa-gear' },
+    ] },
+};
+const TAB_WORLD = {
+    projects: 'projects', wizard: 'projects', create: 'projects', reports: 'projects',
+    history: 'projects', archive: 'projects',
+    accounting: 'accounting',
+    business: 'prefs', catalog: 'prefs', settings: 'prefs', admin: 'prefs',
+};
+let activeWorld = 'projects';
+
+function switchWorld(world) {
+    if (!NAV_WORLDS[world]) return;
+    activeWorld = world;
+    let target;
+    if (world === 'projects') target = activeProjectId ? 'wizard' : 'projects';
+    else if (world === 'accounting') target = 'accounting';
+    else target = 'business';
+    switchTab(target); // switchTab re-syncs the world + sub-tab row
+}
+function syncTopNav(tabId) {
+    const world = TAB_WORLD[tabId] || 'projects';
+    activeWorld = world;
+    document.querySelectorAll('.topnav-world').forEach(b => b.classList.toggle('active', b.dataset.world === world));
+    renderSubTabs(tabId);
+}
+function renderSubTabs(activeTabId) {
+    const row = document.getElementById('topnav-sub');
+    if (!row) return;
+    let tabs = (NAV_WORLDS[activeWorld].tabs || []).slice();
+    if (activeWorld === 'prefs' && isAdmin()) tabs.push({ id: 'admin', label: 'ניהול (Admin)', icon: 'fa-shield-halved' });
+    // Inside an open project, the flow steps live between "פרויקטים" and the rest.
+    if (activeWorld === 'projects' && activeProjectId) {
+        const steps = [
+            { id: 'wizard', label: '1 · תכנון ותמחור', icon: 'fa-calculator', step: true },
+            { id: 'create', label: '2 · עורך ההצעה',   icon: 'fa-file-invoice-dollar', step: true },
+            { id: 'reports', label: '3 · דוחות',        icon: 'fa-clipboard-check', step: true },
+        ];
+        tabs = [tabs[0], ...steps, ...tabs.slice(1)];
+    }
+    const cur = activeTabId || (document.querySelector('.content-panel.active') || {}).id?.replace('panel-', '') || 'projects';
+    row.innerHTML = tabs.map(t =>
+        `<button class="topnav-sub-btn ${t.step ? 'is-step' : ''} ${t.id === cur ? 'active' : ''}" data-tab="${t.id}" onclick="switchTab('${t.id}')"><i class="fa-solid ${t.icon}"></i> ${t.label}</button>`
+    ).join('');
+}
+
 function switchTab(tabId) {
     // Project-scoped tabs (chat / editor / reports) need an open project.
     if ((tabId === 'wizard' || tabId === 'create' || tabId === 'reports') && !activeProjectId) {
@@ -1406,6 +1472,8 @@ function switchTab(tabId) {
     if (tabId === 'archive') {
         renderClientArchive();
     }
+    // Keep the top-bar world + sub-tab row in sync with whatever panel is shown.
+    syncTopNav(tabId);
 }
 
 // ==========================================================================
@@ -7085,6 +7153,16 @@ function updateUserProfileUI() {
             chipAvatar.textContent = shownName.trim().charAt(0).toUpperCase();
             chipAvatar.classList.remove('has-photo');
         }
+    }
+
+    // Mirror the identity into the desktop top-bar user chip.
+    const tnUser = document.getElementById('topnav-username');
+    if (tnUser) tnUser.textContent = shownName;
+    const tnAvatar = document.getElementById('topnav-avatar');
+    if (tnAvatar) {
+        const pic = isGuest ? null : localStorage.getItem('gsi_picture');
+        if (pic) { tnAvatar.src = pic; tnAvatar.style.display = ''; }
+        else { tnAvatar.style.display = 'none'; }
     }
 
     const profileNameDisplay = document.getElementById('profile-username-display');
