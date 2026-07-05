@@ -4322,11 +4322,16 @@ body.light-theme .card-header { background: linear-gradient(180deg, rgba(37,99,2
     .projects-list:not(.grid-view) .project-card .project-endcap { flex: 0 0 auto; }
 }
 
-/* Wizard: the chat page was cut at the bottom (green action button hidden).
-   Trim the control/estimate height a touch so the action bar always shows. */
+/* Wizard fills the flex panel: header takes its natural height, the split-view
+   (chat + estimate) flexes to fill the rest, so the chat action bar is ALWAYS
+   visible. The old magic-number heights (calc appvh-106 / -132) were tuned to a
+   specific bar height and cut the input at the bottom once the top bar / stage
+   rail changed the overhead. Being last in the file, this wins the !important ties. */
 @media (min-width: 861px) {
-    #panel-wizard .control-side { height: calc(var(--appvh, 100vh) - 132px) !important; }
-    #panel-wizard .preview-side { height: calc(var(--appvh, 100vh) - 132px); }
+    #panel-wizard.active { display: flex; flex-direction: column; }
+    #panel-wizard.active .section-header { flex-shrink: 0; }
+    #panel-wizard .split-view { flex: 1 1 auto; min-height: 0; height: auto !important; }
+    #panel-wizard .control-side, #panel-wizard .preview-side { height: 100% !important; min-height: 0; }
 }
 
 /* Recycle bin modal */
@@ -4405,10 +4410,12 @@ body.boxes-light .card-header { background: linear-gradient(180deg, rgba(37,99,2
         background: var(--bg-card); border-inline-end: 1px solid var(--border-color);
         box-shadow: 2px 0 16px rgba(0,0,0,0.14);
     }
-    /* Make room on the RTL-start side so the stage panels clear the rail. */
+    /* Make room on the RTL-start side so the stage panels — and the active-
+       project banner above them — clear the rail (banner was hidden under it). */
     body.in-project-stage #panel-wizard.active,
     body.in-project-stage #panel-create.active,
     body.in-project-stage #panel-reports.active { padding-inline-start: 120px; }
+    body.in-project-stage #project-banner { padding-inline-start: 124px; }
 }
 
 .project-rail .rail-back {
