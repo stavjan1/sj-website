@@ -1067,6 +1067,15 @@ function isCloudUser() {
     return !!googleAccessToken && !isGuestUser() && !!getActiveUser();
 }
 
+// Signed-in IDENTITY check — true for a Google user even when the short-lived
+// access token isn't in memory yet (it refreshes silently). Use this for UI
+// gates (e.g. the accounting world) so a signed-in user isn't shown a "please
+// sign in" wall just because the token is mid-refresh on a fresh load.
+function isSignedIn() {
+    const u = getActiveUser();
+    return !!u && u.toLowerCase() !== 'guest';
+}
+
 // The full per-user database blob (same shape the legacy Drive sync used).
 function buildDatabaseObject() {
     const usersRaw = localStorage.getItem('sj_app_users');
@@ -2316,12 +2325,16 @@ let acctSection = 'cashflow';
 let acctCashScope = 'month';      // 'month' | 'year'
 let acctItems = [];               // draft line items for the create form
 let acctDraftProjectId = '';      // project the draft was prefilled from
+let acctVatBasis = 'exclude';     // 'exclude' (prices pre-VAT) | 'include' | 'exempt'
+// (VAT_RATE is declared once globally, near the pricing logic.)
 
 const SB_DOC_TYPES = [
     { id: 'DealInvoice',    label: 'חשבון עסקה' },
     { id: 'Invoice',        label: 'חשבונית מס' },
     { id: 'InvoiceReceipt', label: 'חשבונית מס / קבלה' },
     { id: 'Receipt',        label: 'קבלה' },
+    { id: 'RefundInvoice',  label: 'חשבונית זיכוי (ביטול חשבונית)' },
+    { id: 'ReceiptRefund',  label: 'ביטול קבלה' },
 ];
 const sbDocLabel = (id) => (SB_DOC_TYPES.find(d => d.id === id) || {}).label || id;
 // A document that itself records money received (vs. only billing it).
@@ -2336,7 +2349,7 @@ function switchAcctSection(sec) { acctSection = sec; renderAccounting(); }
 function renderAccounting() {
     const root = document.getElementById('acct-root');
     if (!root) return;
-    if (!isCloudUser()) {
+    if (!isSignedIn()) {
         root.innerHTML = `<div class="acct-soon"><div class="acct-soon-icon">🔒</div><h3>נדרשת התחברות</h3>
             <p>התחבר עם חשבון Google כדי להפיק חשבוניות ולנהל חשבונות — הנתונים מסתנכרנים בין המכשירים.</p></div>`;
         return;
@@ -2444,7 +2457,9 @@ function acctCreateHtml() {
         .concat(projectsList.map(p => `<option value="${p.id}" ${p.id === acctDraftProjectId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`)).join('');
     const docOpts = SB_DOC_TYPES.map(d => `<option value="${d.id}">${d.label}</option>`).join('');
     const clientDatalist = acctAllClients().map(c => `<option value="${escapeHtml(c.name)}">`).join('');
+    const vatPill = (val, label) => `<button type="button" class="vat-pill ${acctVatBasis === val ? 'active' : ''}" onclick="acctSetVatBasis('${val}')">${label}</button>`;
     return `
+      <div class="acct-create-2col">
         <div class="acct-form">
             <div class="form-row">
                 <label>מלא מתוך פרויקט</label>
@@ -2452,36 +2467,36 @@ function acctCreateHtml() {
             </div>
             <div class="form-row">
                 <label>סוג מסמך</label>
-                <select id="acct-doctype">${docOpts}</select>
+                <select id="acct-doctype" onchange="acctRenderDocPreview()">${docOpts}</select>
             </div>
             <div class="acct-sub">פרטי הלקוח</div>
             <div class="form-grid2">
-                <input id="acct-cname" list="acct-clients" placeholder="שם הלקוח / העסק *" oninput="acctMaybeFillClient(this.value)">
-                <input id="acct-cdealer" placeholder="ח.פ / ע.מ (לא חובה)" dir="ltr">
-                <input id="acct-cphone" placeholder="טלפון" dir="ltr">
-                <input id="acct-cemail" placeholder="אימייל" dir="ltr">
-                <input id="acct-caddr" placeholder="כתובת">
-                <input id="acct-ccity" placeholder="עיר">
+                <input id="acct-cname" list="acct-clients" placeholder="שם הלקוח / העסק *" oninput="acctMaybeFillClient(this.value);acctRenderDocPreview()">
+                <input id="acct-cdealer" placeholder="ח.פ / ע.מ (ללקוח עסקי)" dir="ltr" oninput="acctRenderDocPreview()">
+                <input id="acct-cphone" placeholder="טלפון" dir="ltr" oninput="acctRenderDocPreview()">
+                <input id="acct-cemail" placeholder="אימייל" dir="ltr" oninput="acctRenderDocPreview()">
+                <input id="acct-caddr" placeholder="כתובת" oninput="acctRenderDocPreview()">
+                <input id="acct-ccity" placeholder="עיר" oninput="acctRenderDocPreview()">
             </div>
+            <p class="input-help" style="margin:4px 0 0;">ח.פ וכתובת נדרשים רק ללקוח עסקי שרוצה לקזז מע"מ — ללקוח פרטי אפשר בלעדיהם.</p>
             <datalist id="acct-clients">${clientDatalist}</datalist>
             <div class="acct-sub">סעיפים</div>
             <div id="acct-items"></div>
             <button class="btn btn-secondary btn-small" onclick="acctAddItem()" style="margin-top:8px;"><i class="fa-solid fa-plus"></i> הוסף סעיף</button>
-            <div class="form-row" style="margin-top:12px;">
-                <label>מע"מ</label>
-                <select id="acct-vat">
-                    <option value="exclude">המחירים ללא מע"מ (יתווסף)</option>
-                    <option value="include">המחירים כוללים מע"מ</option>
-                    <option value="exempt">פטור ממע"מ</option>
-                </select>
-            </div>
-            <div class="acct-total-row">סה"כ: <b id="acct-total">₪0</b></div>
+            <div class="acct-sub">מע"מ</div>
+            <div class="vat-pills">${vatPill('exclude', 'המחירים ללא מע"מ')}${vatPill('include', 'המחירים כולל מע"מ')}${vatPill('exempt', 'פטור ממע"מ')}</div>
+            <div class="vat-breakdown" id="acct-vat-breakdown"></div>
             <div class="designer-actions" style="margin-top:14px;">
                 <button class="btn btn-secondary" onclick="switchAcctSection('documents')">ביטול</button>
                 <button class="btn btn-accent" id="acct-submit" onclick="acctSubmitDocument()"><i class="fa-solid fa-paper-plane"></i> הפק ב-SmartBee</button>
             </div>
             <p class="input-help" style="margin-top:8px;">המסמך מופק דרך SmartBee ומקבל מספר רשמי. מוגבל ל-${(5000).toLocaleString('he-IL')} ₪ למסמך בשלב זה.</p>
-        </div>`;
+        </div>
+        <div class="acct-preview-pane">
+            <div class="designer-preview-label"><i class="fa-solid fa-eye"></i> כך ייראה המסמך</div>
+            <div id="acct-doc-preview" class="acct-doc-preview"></div>
+        </div>
+      </div>`;
 }
 function acctRenderItems() {
     const box = document.getElementById('acct-items');
@@ -2489,7 +2504,7 @@ function acctRenderItems() {
     if (acctItems.length === 0) acctItems = [{ description: '', quantity: 1, pricePerUnit: 0 }];
     box.innerHTML = acctItems.map((it, i) => `
         <div class="acct-item">
-            <input placeholder="תיאור" value="${escapeHtml(it.description || '')}" oninput="acctItems[${i}].description=this.value">
+            <input placeholder="תיאור" value="${escapeHtml(it.description || '')}" oninput="acctItems[${i}].description=this.value;acctRenderDocPreview()">
             <input type="number" min="0" step="1" placeholder="כמות" value="${it.quantity}" oninput="acctItems[${i}].quantity=parseFloat(this.value)||0;acctUpdateTotal()" style="max-width:80px">
             <input type="number" min="0" step="0.01" placeholder="מחיר" value="${it.pricePerUnit}" oninput="acctItems[${i}].pricePerUnit=parseFloat(this.value)||0;acctUpdateTotal()" dir="ltr" style="max-width:110px">
             <button class="btn btn-danger btn-small" onclick="acctItems.splice(${i},1);acctRenderItems();acctUpdateTotal()"><i class="fa-solid fa-xmark"></i></button>
@@ -2497,9 +2512,68 @@ function acctRenderItems() {
     acctUpdateTotal();
 }
 function acctAddItem() { acctItems.push({ description: '', quantity: 1, pricePerUnit: 0 }); acctRenderItems(); }
+function acctSetVatBasis(basis) {
+    acctVatBasis = basis;
+    document.querySelectorAll('.vat-pill').forEach(p => p.classList.remove('active'));
+    const map = { exclude: 0, include: 1, exempt: 2 };
+    const pills = document.querySelectorAll('.vat-pill');
+    if (pills[map[basis]]) pills[map[basis]].classList.add('active');
+    acctUpdateTotal();
+}
+// Split the item subtotal into before-VAT / VAT / total per the chosen basis, so
+// both "עם" and "בלי" מע"מ are shown side by side and stay in sync live.
+function acctVatBreakdown() {
+    const sub = acctItems.reduce((s, it) => s + (Number(it.quantity) || 0) * (Number(it.pricePerUnit) || 0), 0);
+    if (acctVatBasis === 'exempt') return { before: sub, vat: 0, total: sub };
+    if (acctVatBasis === 'include') { const before = sub / (1 + VAT_RATE); return { before, vat: sub - before, total: sub }; }
+    return { before: sub, vat: sub * VAT_RATE, total: sub * (1 + VAT_RATE) };
+}
 function acctUpdateTotal() {
-    const t = acctItems.reduce((s, it) => s + (Number(it.quantity) || 0) * (Number(it.pricePerUnit) || 0), 0);
-    const el = document.getElementById('acct-total'); if (el) el.textContent = nisFmt(t);
+    const b = acctVatBreakdown();
+    const box = document.getElementById('acct-vat-breakdown');
+    if (box) box.innerHTML = `
+        <div class="vb-line"><span>לפני מע"מ</span><b>${nisFmt(b.before)}</b></div>
+        <div class="vb-line"><span>מע"מ (18%)</span><b>${nisFmt(b.vat)}</b></div>
+        <div class="vb-line vb-total"><span>סה"כ כולל מע"מ</span><b>${nisFmt(b.total)}</b></div>`;
+    acctRenderDocPreview();
+}
+// Live mock of the document as it will look (mirrors the SmartBee layout so the
+// user sees the result before producing it). Read-only; SmartBee renders the real
+// PDF, but the structure/values match.
+function acctRenderDocPreview() {
+    const box = document.getElementById('acct-doc-preview');
+    if (!box) return;
+    const val = (id) => (document.getElementById(id)?.value || '').trim();
+    const biz = (appState.settings && appState.settings.businessDetails) || {};
+    const bizName = biz.name || getActiveUser() || 'העסק שלי';
+    const docType = val('acct-doctype') || 'DealInvoice';
+    const b = acctVatBreakdown();
+    const cust = { name: val('acct-cname'), dealer: val('acct-cdealer'), addr: val('acct-caddr'), city: val('acct-ccity'), phone: val('acct-cphone') };
+    const today = new Date().toLocaleDateString('he-IL');
+    const rows = acctItems.filter(it => (it.description || '').trim() || Number(it.pricePerUnit))
+        .map(it => `<tr><td>${escapeHtml(it.description || '')}</td><td>${it.quantity}</td><td>${nisFmt(it.pricePerUnit)}</td><td>${nisFmt((Number(it.quantity) || 0) * (Number(it.pricePerUnit) || 0))}</td></tr>`).join('')
+        || '<tr><td colspan="4" style="text-align:center;opacity:.5;">— אין סעיפים —</td></tr>';
+    box.innerHTML = `
+      <div class="dp-sheet">
+        <div class="dp-head">
+          <div class="dp-biz-name">${escapeHtml(bizName)}</div>
+          ${biz.owner ? `<div class="dp-biz-sub">${escapeHtml(biz.owner)}</div>` : ''}
+          ${biz.id ? `<div class="dp-biz-sub">ע.מ / ח.פ: ${escapeHtml(biz.id)}</div>` : ''}
+          ${biz.phone ? `<div class="dp-biz-sub">${escapeHtml(biz.phone)}</div>` : ''}
+        </div>
+        <div class="dp-title">${sbDocLabel(docType)}<span class="dp-num"> (טיוטה)</span></div>
+        <div class="dp-meta">
+          <div><b>לכבוד:</b> ${escapeHtml(cust.name || '—')}${cust.dealer ? '<br>ח.פ: ' + escapeHtml(cust.dealer) : ''}${cust.addr ? '<br>' + escapeHtml(cust.addr) + (cust.city ? ', ' + escapeHtml(cust.city) : '') : ''}${cust.phone ? '<br>' + escapeHtml(cust.phone) : ''}</div>
+          <div class="dp-date">${today}</div>
+        </div>
+        <table class="dp-table"><thead><tr><th>תיאור</th><th>כמות</th><th>מחיר</th><th>סה"כ</th></tr></thead>
+          <tbody>${rows}</tbody></table>
+        <div class="dp-totals">
+          <div><span>לפני מע"מ</span><b>${nisFmt(b.before)}</b></div>
+          <div><span>מע"מ 18%</span><b>${nisFmt(b.vat)}</b></div>
+          <div class="dp-grand"><span>סה"כ לתשלום</span><b>${nisFmt(b.total)}</b></div>
+        </div>
+      </div>`;
 }
 function acctPrefillFromProject(pid) {
     acctDraftProjectId = pid;
@@ -2536,14 +2610,20 @@ function acctMaybeFillClient(name) {
 }
 
 async function acctSubmitDocument() {
+    if (!googleAccessToken) {
+        // Token lapsed since load — refresh it quietly, ask to retry in a moment.
+        if (typeof silentIdTokenAuth === 'function') silentIdTokenAuth();
+        showToast('מתחבר לחשבון… נסה שוב עוד רגע', 'error');
+        return;
+    }
     const val = (id) => (document.getElementById(id)?.value || '').trim();
     const customer = { name: val('acct-cname'), dealerNumber: val('acct-cdealer'), phone: val('acct-cphone'), email: val('acct-cemail'), address: val('acct-caddr'), city: val('acct-ccity') };
     if (customer.name.length < 2) { showToast('חסר שם לקוח', 'error'); return; }
     const items = acctItems.filter(it => (it.description || '').trim() && (Number(it.pricePerUnit) || 0) >= 0 && (Number(it.quantity) || 0) > 0);
     if (items.length === 0) { showToast('הוסף לפחות סעיף אחד', 'error'); return; }
     const docType = val('acct-doctype') || 'DealInvoice';
-    const vatType = val('acct-vat') || 'exclude';
-    const total = items.reduce((s, it) => s + it.quantity * it.pricePerUnit, 0);
+    const vatType = acctVatBasis;
+    const total = acctVatBreakdown().total;
     const btn = document.getElementById('acct-submit');
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> מפיק…'; }
     try {
@@ -2562,7 +2642,7 @@ async function acctSubmitDocument() {
         };
         invoicesList.unshift(doc);
         saveInvoices();
-        acctItems = []; acctDraftProjectId = '';
+        acctItems = []; acctDraftProjectId = ''; acctVatBasis = 'exclude';
         switchAcctSection('documents');
         showToast('המסמך נשלח להפקה ב-SmartBee ⏳');
         if (doc.apiMessageId) setTimeout(() => acctPollDocument(doc.id), 2500);
@@ -7048,9 +7128,11 @@ function mintGoogleAccessToken() {
                 }
             },
         });
-        // Called from within a user gesture → the popup is allowed; consent is
-        // already granted so it completes fast (often with no visible window).
-        tc.requestAccessToken({ prompt: '' });
+        // prompt:'none' → mint SILENTLY for a returning, consented user and, if
+        // that's not possible, fail quietly with NO account-picker window (the
+        // ID-token path already covers sync). This is the automatic refresh — the
+        // explicit "connect" button still uses a visible prompt.
+        tc.requestAccessToken({ prompt: 'none' });
     } catch (e) { /* stay local-only */ }
 }
 
