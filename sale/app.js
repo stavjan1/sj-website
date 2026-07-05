@@ -2009,6 +2009,9 @@ function filterProjectsList() {
 
     if (q) filtered = filtered.filter(p => p.name.toLowerCase().includes(q));
     if (statusFilter !== 'all') filtered = filtered.filter(p => (p.status || 'טיוטה') === statusFilter);
+    if (activeCategoryFilter) filtered = filtered.filter(p => (p.category || '') === activeCategoryFilter);
+
+    renderProjectCategories();
 
     const dir = projectSort.dir === 'asc' ? 1 : -1;
     if (projectSort.field === 'name') filtered.sort((a, b) => dir * a.name.localeCompare(b.name, 'he'));
@@ -2017,6 +2020,89 @@ function filterProjectsList() {
     renderProjectsList(filtered);
     updateMetricsDashboard();
     renderFollowupReminders();
+}
+
+// ── Project categories (user-managed labels for filtering the list) ───────────
+// `null` filter = show all. Managed names live in settings.projectCategories;
+// any category actually used on a project is also shown even if not managed.
+let activeCategoryFilter = null;
+
+function getProjectCategories() {
+    const managed = (appState.settings && appState.settings.projectCategories) || [];
+    const set = new Set(managed);
+    (projectsList || []).forEach(p => { if (p.category) set.add(p.category); });
+    return [...set];
+}
+
+function renderProjectCategories() {
+    const box = document.getElementById('projects-cats');
+    if (!box) return;
+    const cats = getProjectCategories();
+    const total = (projectsList || []).length;
+    const countFor = (c) => (projectsList || []).filter(p => (p.category || '') === c).length;
+    const item = (label, key, count, active, removable) =>
+        `<div class="cat-item ${active ? 'active' : ''}">
+            <button class="cat-btn" onclick="setCategoryFilter(${key === null ? 'null' : "'" + encodeURIComponent(key) + "'"})">
+                <span class="cat-name">${escapeHtml(label)}</span><span class="cat-count">${count}</span>
+            </button>
+            ${removable ? `<button class="cat-del" title="הסר קטגוריה" onclick="removeProjectCategory('${encodeURIComponent(key)}')"><i class="fa-solid fa-xmark"></i></button>` : ''}
+        </div>`;
+    let html = `<div class="cat-head"><i class="fa-solid fa-tags"></i> קטגוריות</div>`;
+    html += item('הכל', null, total, activeCategoryFilter === null, false);
+    cats.forEach(c => { html += item(c, c, countFor(c), activeCategoryFilter === c, true); });
+    html += `<div class="cat-add">
+        <input type="text" id="new-cat-name" placeholder="קטגוריה חדשה…" maxlength="30" onkeydown="if(event.key==='Enter')addProjectCategory()">
+        <button class="cat-add-btn" title="הוסף" onclick="addProjectCategory()"><i class="fa-solid fa-plus"></i></button>
+    </div>`;
+    box.innerHTML = html;
+}
+
+function setCategoryFilter(catEnc) {
+    activeCategoryFilter = (catEnc === null || catEnc === 'null') ? null : decodeURIComponent(catEnc);
+    filterProjectsList();
+}
+
+function addProjectCategory() {
+    const inp = document.getElementById('new-cat-name');
+    const name = (inp?.value || '').trim();
+    if (!name) return;
+    if (!appState.settings.projectCategories) appState.settings.projectCategories = [];
+    if (!appState.settings.projectCategories.includes(name)) {
+        appState.settings.projectCategories.push(name);
+        persistSettings();
+    }
+    if (inp) inp.value = '';
+    renderProjectCategories();
+    showToast(`קטגוריה "${name}" נוספה`);
+}
+
+function removeProjectCategory(catEnc) {
+    const name = decodeURIComponent(catEnc);
+    if (appState.settings.projectCategories) {
+        appState.settings.projectCategories = appState.settings.projectCategories.filter(c => c !== name);
+        persistSettings();
+    }
+    // Clear the label off any project that used it, so it isn't resurrected.
+    (projectsList || []).forEach(p => { if (p.category === name) p.category = ''; });
+    saveProjects();
+    if (activeCategoryFilter === name) activeCategoryFilter = null;
+    filterProjectsList();
+}
+
+function assignProjectCategory(projectId, cat) {
+    const p = projectsList.find(x => x.id === projectId);
+    if (!p) return;
+    p.category = cat || '';
+    saveProjects();
+    filterProjectsList();
+}
+
+// Persist just the settings object (used by category management).
+function persistSettings() {
+    try {
+        localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
+    } catch (e) { /* storage full / disabled — non-fatal */ }
+    if (typeof scheduleCloudSync === 'function') scheduleCloudSync();
 }
 
 function updateMetricsDashboard() {
@@ -2225,6 +2311,10 @@ function renderProjectsList(list) {
         return;
     }
 
+    const cats = getProjectCategories();
+    const catOptions = (sel) => cats.map(c =>
+        `<option value="${escapeHtml(c)}" ${sel === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+
     list.forEach(p => {
         const isActive = p.id === activeProjectId;
         const status = p.status || 'טיוטה';
@@ -2240,6 +2330,13 @@ function renderProjectsList(list) {
                 <div class="project-title">${escapeHtml(p.name)}</div>
                 <div class="project-meta">
                     <span><i class="fa-solid fa-calendar"></i> ${formatHebrewDate(p.created)}</span>
+                    <label class="proj-cat-chip ${p.category ? 'has-cat' : ''}" onclick="event.stopPropagation()">
+                        <i class="fa-solid fa-tag"></i>
+                        <select class="proj-cat-select" onchange="assignProjectCategory('${p.id}', this.value)">
+                            <option value="">ללא קטגוריה</option>
+                            ${catOptions(p.category || '')}
+                        </select>
+                    </label>
                 </div>
             </div>
             <div class="stage-chain" title="שרשרת העבודה של הפרויקט">

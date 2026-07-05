@@ -3682,8 +3682,10 @@ body:not(.in-project) .proj-tab { display: none !important; }
 .theme-flip.is-dark { background: #0b1222; color: #93c5fd; }
 .theme-flip.is-dark i { color: #bfdbfe; transform: rotate(-20deg); }
 
-/* --- Projects: fixed screen, stats column on the LEFT ------------------- */
-.projects-layout { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 16px; }
+/* --- Projects: fixed screen, categories on the RIGHT, stats on the LEFT --
+   RTL grid: first track = rightmost. DOM order is cats → main → stats, so the
+   categories rail sits at the RTL start (right) and stats at the end (left). */
+.projects-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr) 250px; gap: 16px; }
 .projects-main {
     min-width: 0; display: flex; flex-direction: column;
     background: var(--bg-card); border: 1px solid var(--border-color);
@@ -3692,6 +3694,67 @@ body:not(.in-project) .proj-tab { display: none !important; }
 .projects-main #projects-list-container { flex: 1; min-height: 0; overflow-y: auto; }
 .projects-stats { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow-y: auto; }
 .projects-stats .metric-card { flex-shrink: 0; }
+
+/* --- Categories rail (user-managed labels; filter the list on click) ----- */
+.projects-cats {
+    display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow-y: auto;
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: 12px; padding: 12px 10px;
+}
+.projects-cats .cat-head {
+    font-size: 0.78rem; font-weight: 800; color: var(--text-secondary);
+    letter-spacing: .3px; padding: 2px 6px 8px; display: flex; align-items: center; gap: 7px;
+    border-bottom: 1px solid var(--border-color); margin-bottom: 4px;
+}
+.projects-cats .cat-head i { color: var(--color-accent); }
+.cat-item { display: flex; align-items: center; gap: 2px; }
+.cat-item .cat-btn {
+    flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 7px 10px; border-radius: 8px; border: 1px solid transparent;
+    background: transparent; color: var(--text-secondary); cursor: pointer;
+    font-size: 0.86rem; font-weight: 600; text-align: start; transition: all .12s ease;
+}
+.cat-item .cat-btn:hover { background: rgba(77, 142, 240, 0.08); color: var(--text-primary); }
+.cat-item.active .cat-btn {
+    background: rgba(77, 142, 240, 0.15); border-color: rgba(77, 142, 240, 0.5);
+    color: var(--color-accent); font-weight: 700;
+}
+.cat-item .cat-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-item .cat-count {
+    flex-shrink: 0; font-size: 0.72rem; font-weight: 700; color: var(--text-muted);
+    background: var(--bg-input); border-radius: 999px; padding: 1px 8px; min-width: 22px; text-align: center;
+}
+.cat-item.active .cat-count { background: rgba(77, 142, 240, 0.2); color: var(--color-accent); }
+.cat-item .cat-del {
+    flex-shrink: 0; width: 24px; height: 24px; border: none; background: transparent;
+    color: var(--text-muted); cursor: pointer; border-radius: 6px; opacity: 0; transition: opacity .12s;
+}
+.cat-item:hover .cat-del { opacity: 1; }
+.cat-item .cat-del:hover { color: #f05252; background: rgba(240, 82, 82, 0.12); }
+.cat-add { display: flex; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-color); }
+.cat-add input {
+    flex: 1; min-width: 0; padding: 7px 9px; font-size: 0.82rem;
+    border: 1px solid var(--border-color); border-radius: 8px;
+    background: var(--bg-input); color: var(--text-primary);
+}
+.cat-add-btn {
+    flex-shrink: 0; width: 32px; border: 1px solid rgba(77, 142, 240, 0.5); border-radius: 8px;
+    background: rgba(77, 142, 240, 0.12); color: var(--color-accent); cursor: pointer;
+}
+.cat-add-btn:hover { background: rgba(77, 142, 240, 0.22); }
+
+/* Per-card category chip (a compact tag-select in the project meta row) */
+.proj-cat-chip {
+    display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+    color: var(--text-muted); font-size: 0.78rem;
+    padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border-color);
+}
+.proj-cat-chip.has-cat { color: var(--color-accent); border-color: rgba(77, 142, 240, 0.5); background: rgba(77, 142, 240, 0.08); }
+.proj-cat-chip .proj-cat-select {
+    border: none; background: transparent; color: inherit; font-size: 0.78rem;
+    font-weight: 600; cursor: pointer; padding: 0; max-width: 120px;
+}
+.proj-cat-chip .proj-cat-select:focus { outline: none; }
 .create-project-inline {
     display: flex; align-items: center; gap: 10px;
     padding: 10px 12px; margin-bottom: 12px;
@@ -3713,10 +3776,18 @@ body:not(.in-project) .proj-tab { display: none !important; }
     #panel-projects .projects-stats .metric-card { padding: 12px 14px; }
 }
 @media (max-width: 768px) {
-    /* Phone: normal scrolling page; stats become a compact 2×2 grid below */
+    /* Phone: normal scrolling page; categories become a horizontal strip on
+       top, stats a compact 2×2 grid below the list. */
     .projects-layout { grid-template-columns: 1fr; }
-    .projects-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; order: 2; }
+    .projects-cats { order: 0; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; gap: 8px; padding: 10px; }
+    .projects-cats .cat-head { border-bottom: none; margin: 0; padding: 0 6px 0 0; align-self: center; flex-shrink: 0; }
+    .projects-cats .cat-item { flex-shrink: 0; }
+    .projects-cats .cat-item .cat-btn { white-space: nowrap; }
+    .projects-cats .cat-del { display: none; }
+    .projects-cats .cat-add { order: 99; margin: 0; padding: 0; border-top: none; border-inline-start: 1px solid var(--border-color); padding-inline-start: 8px; flex-shrink: 0; }
+    .projects-cats .cat-add input { width: 110px; flex: 0 0 auto; }
     .projects-main { order: 1; }
+    .projects-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; order: 2; }
     .create-project-inline { flex-wrap: wrap; }
     .create-project-inline input { flex-basis: 100%; }
 }
@@ -4238,15 +4309,17 @@ body:not(.in-project) .proj-tab { display: none !important; }
 /* light mode keeps the same subtle accent tab */
 body.light-theme .card-header { background: linear-gradient(180deg, rgba(37,99,235,0.08) 0%, transparent 100%); }
 
-/* True centering of the stage chain: 3-track grid so the middle is centered in
-   the CARD (not in the leftover space between two unequal side blocks). */
+/* Clean compact single-line row: title (right) | stage-chain | endcap (left).
+   (A grid attempt to center the chain squeezed the side columns and wrapped
+   the endcap onto a second line — reverted to a tidy nowrap flex row.) */
 @media (min-width: 861px) {
     .projects-list:not(.grid-view) .project-card {
-        display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px;
+        display: flex; flex-direction: row; align-items: center; flex-wrap: nowrap;
+        gap: 12px; padding: 7px 14px;
     }
-    .projects-list:not(.grid-view) .project-card .project-info { justify-self: start; }
-    .projects-list:not(.grid-view) .project-card .stage-chain { justify-self: center; }
-    .projects-list:not(.grid-view) .project-card .project-endcap { justify-self: end; }
+    .projects-list:not(.grid-view) .project-card .project-info { flex: 0 0 auto; min-width: 0; }
+    .projects-list:not(.grid-view) .project-card .stage-chain { flex: 1 1 auto; justify-content: center; }
+    .projects-list:not(.grid-view) .project-card .project-endcap { flex: 0 0 auto; }
 }
 
 /* Wizard: the chat page was cut at the bottom (green action button hidden).
