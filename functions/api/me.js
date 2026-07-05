@@ -24,6 +24,7 @@ export async function onRequestGet(context) {
   // Current usage — best effort (KV may not be bound in local testing).
   let aiToday = 0;
   let quotesThisMonth = 0;
+  let pdfThisMonth = 0;
   if (env.SJ_DATA) {
     try {
       const id = email
@@ -33,6 +34,9 @@ export async function onRequestGet(context) {
       if (email) {
         quotesThisMonth = parseInt(
           (await env.SJ_DATA.get(`quotesmo:${email.toLowerCase()}:${monthKey()}`)) || '0', 10);
+        // The real free-tier gate: distinct PDF exports this month (/api/pdf).
+        pdfThisMonth = parseInt(
+          (await env.SJ_DATA.get(`pdfmo:${email.toLowerCase()}:${monthKey()}`)) || '0', 10);
       }
     } catch { /* usage stays 0 */ }
   }
@@ -41,6 +45,6 @@ export async function onRequestGet(context) {
     tier,
     email: email || null,
     limits,
-    usage: { aiToday, quotesThisMonth },
+    usage: { aiToday, quotesThisMonth, pdfThisMonth },
   });
 }

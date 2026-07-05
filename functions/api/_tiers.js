@@ -26,7 +26,9 @@ export const TIER_DEFAULTS = {
     reports: false, reminders: false, shareLink: false, advancedModel: false, pdfCredit: true,
   },
   free: {
-    aiDaily: 20, projects: 3, quotesPerMonth: 5, catalogItems: 10,
+    // quotesPerMonth = distinct PDF exports allowed per month (monthly-renewing,
+    // server-enforced per Google account; guests can't export at all).
+    aiDaily: 20, projects: 3, quotesPerMonth: 3, catalogItems: 10,
     reports: false, reminders: false, shareLink: false, advancedModel: false, pdfCredit: true,
   },
   pro: {

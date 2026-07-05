@@ -325,7 +325,7 @@ function setQuotaCharging(on) {
 const TIER_LABELS = { guest: 'אורח', free: 'חינם', pro: 'Pro ⚡', business: 'עסקי', admin: 'מנהל מערכת' };
 const TIER_FALLBACK = {
     guest:    { aiDaily: 10,  projects: 1,  quotesPerMonth: 0,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, pdfCredit: true },
-    free:     { aiDaily: 20,  projects: 3,  quotesPerMonth: 5,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, pdfCredit: true },
+    free:     { aiDaily: 20,  projects: 3,  quotesPerMonth: 3,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, pdfCredit: true },
     pro:      { aiDaily: 150, projects: -1, quotesPerMonth: -1, catalogItems: 1000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  pdfCredit: false },
     business: { aiDaily: 300, projects: -1, quotesPerMonth: -1, catalogItems: 2000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  pdfCredit: false },
     admin:    { aiDaily: -1,  projects: -1, quotesPerMonth: -1, catalogItems: 5000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  pdfCredit: false },
@@ -396,7 +396,7 @@ function applyTierGates() {
         const parts = [];
         parts.push(`בקשות AI: ${L.aiDaily === -1 ? 'ללא הגבלה' : L.aiDaily + ' ביום'}`);
         parts.push(`פרויקטים: ${L.projects === -1 ? 'ללא הגבלה' : L.projects}`);
-        if (L.quotesPerMonth > 0) parts.push(`הצעות בענן: ${(userTier.usage.quotesThisMonth || 0)}/${L.quotesPerMonth} החודש`);
+        if (L.quotesPerMonth > 0) parts.push(`הורדות PDF: ${(userTier.usage.pdfThisMonth || 0)}/${L.quotesPerMonth} החודש`);
         usageEl.textContent = parts.join(' · ');
     }
     const upBtn = document.getElementById('tier-upgrade-btn');
@@ -467,6 +467,8 @@ const UPGRADE_REASONS = {
     share:    'קישור אישי ללקוח — זמין במסלול Pro',
     ai:       'נגמרו בקשות ה-AI להיום במסלול שלך',
     advanced: 'המודל המתקדם ⚡ זמין במסלול Pro',
+    guestPdf: 'כדי להוריד PDF — התחברות עם Google (חינם)',
+    pdfQuota: 'הגעת למכסת ההצעות החודשית של המסלול החינמי',
 };
 
 function showUpgradeModal(reason) {
@@ -492,7 +494,7 @@ function showUpgradeModal(reason) {
                     <ul>
                         <li>20 בקשות AI ביום</li>
                         <li>עד 3 פרויקטים</li>
-                        <li>5 הצעות בענן בחודש</li>
+                        <li>3 הורדות PDF בחודש</li>
                         <li>מאגר אישי — 10 פריטים</li>
                         <li>חתימת לקוח על המסך</li>
                     </ul>
@@ -5593,7 +5595,39 @@ function addSternItemToQuote(dbIndex) {
 // ==========================================================================
 // PDF Generation & Download
 // ==========================================================================
-function downloadPDF() {
+// Server-checked monthly PDF-export gate. Guests are blocked (no enforceable
+// identity); signed-in free users get N/month per Google account; pro+ unlimited.
+// Fails OPEN on any server/network error so infra hiccups never block a real
+// user's deliverable.
+async function checkPdfExportAllowed() {
+    if (isGuestUser() || !googleAccessToken) return { allow: false, reason: 'guest' };
+    if (isAdmin()) return { allow: true };
+    try {
+        const proj = projectsList.find(p => p.id === activeProjectId);
+        const quoteId = activeProjectId
+            || (appState.currentQuote && appState.currentQuote.id)
+            || (proj && proj.quoteData && proj.quoteData.quoteNumber)
+            || (document.getElementById('form-quote-number')?.value || '');
+        const res = await fetch('/api/pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({ quoteId: String(quoteId) }),
+        });
+        if (!res.ok) return { allow: true }; // fail-open on server error
+        return await res.json();
+    } catch (e) {
+        return { allow: true }; // offline → don't block the user's own deliverable
+    }
+}
+
+async function downloadPDF() {
+    // Export gate: guests must sign in (free); free tier has a monthly cap.
+    const gate = await checkPdfExportAllowed();
+    if (gate && gate.allow === false) {
+        showUpgradeModal(gate.reason === 'quota' ? 'pdfQuota' : 'guestPdf');
+        return;
+    }
+
     ensureQuoteNumber();
     const clientName = document.getElementById('form-client-name').value.trim() || 'לקוח';
     const subject = document.getElementById('form-quote-subject').value.trim() || 'הצעת מחיר';
