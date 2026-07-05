@@ -3521,27 +3521,36 @@ function openQuoteDesigner() {
     modal.id = 'quote-designer';
     modal.className = 'upgrade-modal-backdrop';
     modal.innerHTML = `
-        <div class="designer-box" role="dialog" aria-modal="true">
+        <div class="designer-box designer-box-2col" role="dialog" aria-modal="true">
             <button class="upgrade-close" onclick="closeQuoteDesigner()" aria-label="סגור">✕</button>
-            <div class="designer-head">
-                <h2><i class="fa-solid fa-object-group text-accent"></i> עיצוב ידני של ההצעה</h2>
-                <label class="designer-eng">
-                    <input type="checkbox" id="designer-english" ${getQuoteLayout().english ? 'checked' : ''} onchange="setQuoteEnglish(this.checked)">
-                    <span>הצעה באנגלית (הפוך כיוון ל-LTR)</span>
-                </label>
+            <div class="designer-controls">
+                <div class="designer-head">
+                    <h2><i class="fa-solid fa-object-group text-accent"></i> עיצוב ידני של ההצעה</h2>
+                    <label class="designer-eng">
+                        <input type="checkbox" id="designer-english" ${getQuoteLayout().english ? 'checked' : ''} onchange="setQuoteEnglish(this.checked)">
+                        <span>הצעה באנגלית (LTR)</span>
+                    </label>
+                </div>
+                <p class="input-help" style="margin:0 0 12px;">גרור בלוקים לשינוי סדר, וכוונן יישור / גודל / הדגשה / קו תחתון. התצוגה מתעדכנת בזמן אמת ←</p>
+                <div id="designer-blocks" class="designer-blocks"></div>
+                <div class="designer-actions">
+                    <button class="btn btn-secondary" onclick="resetQuoteDesign()"><i class="fa-solid fa-rotate-left"></i> אפס</button>
+                    <button class="btn btn-accent" onclick="closeQuoteDesigner()"><i class="fa-solid fa-check"></i> סיימתי</button>
+                </div>
             </div>
-            <p class="input-help" style="margin:0 0 12px;">גרור בלוקים לשינוי סדר, וכוונן יישור / גודל / הדגשה / קו תחתון לכל בלוק. שורת הסיכום והפרטים בתחתית קבועה.</p>
-            <div id="designer-blocks" class="designer-blocks"></div>
-            <div class="designer-actions">
-                <button class="btn btn-secondary" onclick="resetQuoteDesign()"><i class="fa-solid fa-rotate-left"></i> אפס לברירת מחדל</button>
-                <button class="btn btn-accent" onclick="closeQuoteDesigner()"><i class="fa-solid fa-check"></i> סיימתי</button>
+            <div class="designer-preview-pane">
+                <div class="designer-preview-label"><i class="fa-solid fa-eye"></i> תצוגה מקדימה חיה</div>
+                <div id="designer-preview" class="designer-preview"></div>
             </div>
         </div>`;
     modal.addEventListener('click', (e) => { if (e.target === modal) closeQuoteDesigner(); });
     document.body.appendChild(modal);
     renderDesignerBlocks();
+    renderDesignerPreview();
+    window.addEventListener('resize', renderDesignerPreview);
 }
 function closeQuoteDesigner() {
+    window.removeEventListener('resize', renderDesignerPreview);
     const m = document.getElementById('quote-designer');
     if (m) m.remove();
 }
@@ -3555,7 +3564,8 @@ function renderDesignerBlocks() {
         const b = L.blocks[id] || {};
         const alignBtn = (val, icon, title) => `<button class="db-ctrl ${b.align === val || (val === '' && !b.align) ? 'on' : ''}" title="${title}" onclick="setBlockStyle('${id}','align','${val}')"><i class="fa-solid ${icon}"></i></button>`;
         return `<div class="designer-row" draggable="true" data-idx="${i}"
-                    ondragstart="designerDragStart(${i})" ondragover="event.preventDefault()" ondrop="designerDrop(${i})">
+                    ondragstart="designerDragStart(${i},this)" ondragover="designerDragOver(event,this)"
+                    ondragleave="this.classList.remove('drag-over')" ondrop="designerDrop(${i})" ondragend="designerDragEnd()">
             <span class="db-handle" title="גרור לשינוי סדר"><i class="fa-solid fa-grip-vertical"></i></span>
             <span class="db-name">${labelOf(id)}</span>
             <span class="db-ctrls">
@@ -3575,6 +3585,31 @@ function renderDesignerBlocks() {
             </span>
         </div>`;
     }).join('');
+    renderDesignerPreview();
+}
+
+// Live, scaled snapshot of the real quote sheet inside the designer. Clones the
+// (already layout-applied) #quote-pdf-sheet — the .a4-sheet styling is class-based
+// so the clone renders correctly (same pattern as the fullscreen preview). It's a
+// read-only mirror; the real sheet stays the single source of truth for the PDF.
+function renderDesignerPreview() {
+    const box = document.getElementById('designer-preview');
+    const sheet = document.getElementById('quote-pdf-sheet');
+    if (!box || !sheet) return;
+    const clone = sheet.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.classList.add('designer-preview-sheet');
+    clone.style.position = 'static';
+    clone.style.left = 'auto'; clone.style.top = 'auto'; clone.style.margin = '0';
+    clone.style.visibility = 'visible'; clone.style.opacity = '1';
+    box.innerHTML = '';
+    box.appendChild(clone);
+    // Scale the A4 sheet (794px wide) to fit the preview column. `zoom` (not
+    // transform) shrinks the LAYOUT box too, so the container sizes/scrolls
+    // naturally — this is an on-screen preview, so zoom is fine here.
+    const boxW = (box.clientWidth || 320) - 20; // minus padding
+    const scale = Math.min(1, boxW / 794);
+    clone.style.zoom = String(scale);
 }
 
 function moveDesignBlock(i, dir) {
@@ -3584,8 +3619,11 @@ function moveDesignBlock(i, dir) {
     [L.order[i], L.order[j]] = [L.order[j], L.order[i]];
     saveQuoteLayout(); applyQuoteLayout(); renderDesignerBlocks();
 }
-function designerDragStart(i) { _designMoveFrom = i; }
+function designerDragStart(i, el) { _designMoveFrom = i; if (el) setTimeout(() => el.classList.add('dragging'), 0); }
+function designerDragOver(e, el) { e.preventDefault(); if (el) el.classList.add('drag-over'); }
+function designerDragEnd() { document.querySelectorAll('.designer-row').forEach(r => r.classList.remove('drag-over', 'dragging')); }
 function designerDrop(i) {
+    designerDragEnd();
     if (_designMoveFrom === null || _designMoveFrom === i) return;
     const L = getQuoteLayout();
     const [moved] = L.order.splice(_designMoveFrom, 1);

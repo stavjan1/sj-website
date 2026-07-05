@@ -4034,6 +4034,23 @@ body:not(.in-project) .proj-tab { display: none !important; }
 .db-ctrl.on { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
 .db-move .db-ctrl { height: 16px; min-width: 24px; }
 .db-sep { width: 1px; height: 16px; background: var(--border-color); margin: 0 3px; }
+
+/* v5.3 — designer 2-column layout with live preview + drag feedback */
+.designer-box-2col { max-width: 960px; display: flex; gap: 20px; align-items: stretch; }
+.designer-controls { flex: 1 1 500px; min-width: 0; display: flex; flex-direction: column; }
+.designer-preview-pane { flex: 0 0 340px; display: flex; flex-direction: column; min-width: 0; border-inline-start: 1px solid var(--border-color); padding-inline-start: 18px; }
+.designer-preview-label { font-size: 0.8rem; font-weight: 800; color: var(--text-secondary); margin-bottom: 10px; display: flex; align-items: center; gap: 7px; }
+.designer-preview-label i { color: var(--color-accent); }
+.designer-preview { flex: 1; overflow: auto; background: rgba(100,116,139,0.14); border-radius: 10px; padding: 10px; display: flex; justify-content: center; align-items: flex-start; max-height: 62vh; }
+.designer-preview .designer-preview-sheet { box-shadow: 0 6px 24px rgba(0,0,0,0.35); flex-shrink: 0; }
+.designer-row.dragging { opacity: 0.45; }
+.designer-row.drag-over { border-color: var(--color-accent); box-shadow: 0 -3px 0 var(--color-accent) inset; }
+
+@media (max-width: 900px) {
+    .designer-box-2col { flex-direction: column; max-width: 640px; }
+    .designer-preview-pane { flex: none; border-inline-start: none; padding-inline-start: 0; border-top: 1px solid var(--border-color); padding-top: 14px; }
+    .designer-preview { max-height: 340px; }
+}
 .designer-actions { display: flex; gap: 10px; justify-content: space-between; flex-wrap: wrap; }
 
 /* English mode: the sheet flips to LTR; keep the money column readable */
