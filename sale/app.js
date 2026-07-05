@@ -1030,11 +1030,19 @@ function buildDatabaseObject() {
 // Apply a cloud blob onto in-memory state + localStorage (does not re-render).
 function applyDatabaseObject(cloudData) {
     if (!cloudData) return;
+    // DATA-LOSS GUARD: never overwrite a non-empty local collection with an
+    // empty incoming one. A stale/poisoned cloud copy (or a merge that filtered
+    // everything out) must NEVER wipe the projects/history/catalog — that was
+    // the "everything suddenly vanished" bug. An empty incoming is applied only
+    // when we currently have nothing (a genuine fresh/empty account).
+    const acceptList = (incoming, current) =>
+        Array.isArray(incoming) && (incoming.length > 0 || (current || []).length === 0);
+
     if (cloudData.settings) { appState.settings = cloudData.settings; localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings)); }
-    if (cloudData.history) { appState.history = cloudData.history; localStorage.setItem(getStorageKey('sj_quote_history'), JSON.stringify(appState.history)); }
-    if (cloudData.projects) { projectsList = cloudData.projects; localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList)); }
-    if (cloudData.trash) { trashedProjectsList = cloudData.trash; localStorage.setItem(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList)); }
-    if (cloudData.catalog) { priceCatalog = cloudData.catalog; localStorage.setItem(getStorageKey('sj_price_catalog'), JSON.stringify(priceCatalog)); }
+    if (acceptList(cloudData.history, appState.history)) { appState.history = cloudData.history; localStorage.setItem(getStorageKey('sj_quote_history'), JSON.stringify(appState.history)); }
+    if (acceptList(cloudData.projects, projectsList)) { projectsList = cloudData.projects; localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList)); }
+    if (Array.isArray(cloudData.trash)) { trashedProjectsList = cloudData.trash; localStorage.setItem(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList)); }
+    if (acceptList(cloudData.catalog, priceCatalog)) { priceCatalog = cloudData.catalog; localStorage.setItem(getStorageKey('sj_price_catalog'), JSON.stringify(priceCatalog)); }
     // Merge cloud account records into the local list (union by username) —
     // the same behavior as the legacy Drive-file sync — so profession/display
     // lookups work on a device that has only ever synced through KV.
@@ -1130,29 +1138,18 @@ function _mergeListById(localArr, cloudArr, preferCloud) {
 // the union instead of the last-syncer clobbering the other's projects — the
 // root cause of "Chrome has 1 project, Edge has 3 different ones".
 function mergeCloudIntoLocal(cloud) {
-    const local = buildDatabaseObject();
     const cloudTs = (cloud && cloud.lastUpdated) || 0;
     const localTs = parseInt(localStorage.getItem(getStorageKey('sj_db_last_updated')) || '0', 10);
-    const preferCloud = cloudTs >= localTs; // newer side wins per-item conflicts
-
-    // Tombstones: a project that sits in EITHER side's trash was deleted on
-    // purpose — the union must not resurrect it (e.g. deleted offline on this
-    // device while the cloud copy still lists it). It stays in the trash,
-    // recoverable, instead of silently reappearing as active.
-    const mergedTrash = _mergeListById(local.trash, cloud.trash, preferCloud);
-    const trashedIds = new Set(mergedTrash.map((t) => t && t.id).filter(Boolean));
-    const mergedProjects = _mergeListById(local.projects, cloud.projects, preferCloud)
-        .filter((p) => !trashedIds.has(p.id));
-
-    applyDatabaseObject({
-        settings: preferCloud ? (cloud.settings || local.settings) : (local.settings || cloud.settings),
-        history: _mergeListById(local.history, cloud.history, preferCloud),
-        projects: mergedProjects,
-        trash: mergedTrash,
-        catalog: _mergeListById(local.catalog, cloud.catalog, preferCloud),
-        users: _mergeListById(local.users, cloud.users, preferCloud),
-        lastUpdated: Math.max(cloudTs, localTs) || Date.now(),
-    });
+    // LAST-WRITER-WINS at the blob level: adopt the cloud copy only when it's
+    // strictly newer than what this device has. Simpler and SAFE — it
+    // propagates deletions without a union resurrecting them, and it cannot
+    // filter every project out and wipe the account (the union+tombstone merge
+    // did both). applyDatabaseObject additionally refuses to overwrite a
+    // non-empty local list with an empty one, so a stale/poisoned cloud copy
+    // can never cause data loss; the device that still has the data keeps it
+    // and pushes it back up (cloudSaveNow), which self-heals the cloud.
+    if (cloudTs > localTs) applyDatabaseObject(cloud);
+    // else: local is newer or equal → keep local; the caller pushes it up.
 }
 
 // Pull the cloud copy on login and MERGE it with local (union by id), then push

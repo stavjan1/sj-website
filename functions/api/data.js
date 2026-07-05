@@ -63,6 +63,18 @@ export async function onRequest(context) {
       return json({ ok: true, skipped: 'empty-over-nonempty' });
     }
 
+    // PER-COLLECTION SAFETY: never let a collection that HAD data get wiped to
+    // empty by a single sync (the "everything vanished" bug — an empty projects
+    // list with a non-empty trash slipped past the all-empty check above and
+    // poisoned the cloud). Preserve the existing non-empty collection instead.
+    if (existing) {
+      for (const k of ['projects', 'history', 'catalog']) {
+        const inLen = Array.isArray(incoming[k]) ? incoming[k].length : 0;
+        const exLen = Array.isArray(existing[k]) ? existing[k].length : 0;
+        if (inLen === 0 && exLen > 0) incoming[k] = existing[k];
+      }
+    }
+
     // The full backup ALWAYS saves (settings, projects, catalog, history) — the
     // cloud is the source of truth across devices, so we never reject a sync.
     const payload = JSON.stringify({ ...incoming, lastUpdated: incoming.lastUpdated || Date.now() });
