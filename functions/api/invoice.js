@@ -92,11 +92,14 @@ export async function onRequestPost(context) {
   const DOC_TYPES = ['InvoiceReceipt', 'Receipt', 'ReceiptRefund', 'Invoice', 'RefundInvoice', 'DealInvoice'];
   const docType = DOC_TYPES.includes(body.docType) ? body.docType : 'DealInvoice';
 
+  const nowIso = new Date().toISOString();
   const payload = {
     providerUserToken,
     providerMsgId: String(body.quoteId || Date.now()),        // dedup on SmartBee's side
     providerMsgReferenceId: String(body.reference || body.quoteId || ''),
     docType,
+    docDate: body.docDate || nowIso,
+    dueDate: body.dueDate || nowIso,                          // required by SmartBee for these doc types
     customer: {
       name: String(customer.name).slice(0, 100),
       email: customer.email || undefined,
@@ -114,7 +117,12 @@ export async function onRequestPost(context) {
   if (!r.ok) {
     return jsonResponse({ error: { message: 'יצירת המסמך נכשלה ב-SmartBee.' }, status: r.status, detail: r.data }, 502);
   }
-  // The create response returns an id to track the async result.
-  const apiMessageId = r.data && (r.data.apiMessageId || r.data.id || (r.data.data && r.data.data.apiMessageId));
+  // The create response wraps the tracking id in `result` (resultCodeId 101 =
+  // queued). Later GET ?msg=<id> reports 102=created / 96=validation error.
+  const apiMessageId = r.data && (r.data.result || r.data.apiMessageId || r.data.id);
+  const codeId = r.data && r.data.resultCodeId;
+  if (codeId && codeId >= 94 && codeId <= 99) {
+    return jsonResponse({ error: { message: 'SmartBee דחתה את המסמך.', code: 'VALIDATION' }, detail: r.data }, 400);
+  }
   return jsonResponse({ ok: true, apiMessageId: apiMessageId || null, result: r.data });
 }
