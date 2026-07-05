@@ -4078,6 +4078,22 @@ function getPriceCatalogPromptBlock(contextText) {
     return `\n\nמאגר מחירי ספקים (₪) — מקור אמת למחירי חומרים, התאם כמויות/יחידות; פריט שאינו ברשימה — אמוד כרגיל וציין שזו הערכה:\n` + lines.join('\n');
 }
 
+// The user's LABOR price book (Stern list, stern-pricing.json) injected into the
+// pricing agent so labor (part B) is priced from real, defensible numbers instead
+// of a guessed hours×rate. Only the electrical trades share this book.
+const LABOR_BOOK_PROFESSIONS = ['electrician', 'charger_installer', 'solar_installer'];
+function getSternLaborPromptBlock() {
+    const profession = (appState.settings && appState.settings.profession) || 'electrician';
+    if (!LABOR_BOOK_PROFESSIONS.includes(profession)) return '';
+    const lines = (sternPricingDatabase || [])
+        .filter(it => it && it.description && Number(it.price) > 0)
+        .map(it => `• ${String(it.description).trim()}${it.unit ? ' (' + it.unit + ')' : ''} — ${Number(it.price)} ₪`);
+    if (!lines.length) return '';
+    return `\n\n# מחירון עבודה של סתיו (מבוסס מחירון שטרן) — מקור אמת למחירי עבודה (₪), עבודה בלבד ללא חומרים
+תמחר את חלק העבודה (חלק B) לפי המחירון הזה: לכל משימת עבודה מצא את הסעיף התואם ביותר וקח את מחירו כפי שהוא (זה המחיר של סתיו, לא הערכה). אם עבודה מורכבת מכמה סעיפים — סכם אותם וציין מאילו. רק אם אין שום סעיף מתאים — אמוד לפי שעות × תעריף שעתי, וסמן במפורש "(הערכה — אין במחירון)". תמיד ציין ליד כל סעיף עבודה את שם הסעיף מהמחירון שלקחת ממנו.
+${lines.join('\n')}`;
+}
+
 // The personal catalog cap comes from the plan (free: 10 items; Pro: 1,000).
 function personalCatalogCap() {
     if (isAdmin()) return PERSONAL_CATALOG_MAX;
@@ -5911,7 +5927,7 @@ async function runPricingAgent(activeProject, promptChars) {
     const recentUserText = (activeProject.chatHistory || [])
         .filter(m => m.role === 'user').slice(-2)
         .map(m => (m.parts && m.parts[0] && m.parts[0].text) || '').join(' ');
-    const systemInstructionText = getProfessionSystemInstruction() + getPriceCatalogPromptBlock(recentUserText);
+    const systemInstructionText = getProfessionSystemInstruction() + getSternLaborPromptBlock() + getPriceCatalogPromptBlock(recentUserText);
     const _t0 = performance.now();
     setQuotaCharging(true);
     try {
