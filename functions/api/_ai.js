@@ -97,14 +97,30 @@ function pickModel(cfg, model) {
   return cfg.models.includes(model) ? model : cfg.defaultModel;
 }
 
-// OpenAI-style messages -> Gemini request body.
+// A data: URL → Gemini inline_data part (or null if not a supported image).
+function dataUrlToInlinePart(dataUrl) {
+  const m = /^data:(image\/(?:png|jpe?g|gif|webp));base64,([A-Za-z0-9+/=]+)$/i.exec(String(dataUrl || ''));
+  if (!m) return null;
+  return { inline_data: { mime_type: m[1].toLowerCase(), data: m[2] } };
+}
+
+// OpenAI-style messages -> Gemini request body. A message may carry an
+// `images` array of data: URLs (site photos) — they become inline_data parts
+// so the multimodal model can "see" the job.
 export function toGemini(messages, opts = {}) {
   const contents = [];
   let system = '';
   for (const m of messages || []) {
     if (!m || typeof m.content !== 'string') continue;
     if (m.role === 'system') { system += (system ? '\n' : '') + m.content; continue; }
-    contents.push({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] });
+    const parts = [{ text: m.content }];
+    if (Array.isArray(m.images)) {
+      for (const img of m.images.slice(0, 4)) {
+        const part = dataUrlToInlinePart(img);
+        if (part) parts.push(part);
+      }
+    }
+    contents.push({ role: m.role === 'assistant' ? 'model' : 'user', parts });
   }
   const body = { contents };
   if (system) body.systemInstruction = { parts: [{ text: system }] };

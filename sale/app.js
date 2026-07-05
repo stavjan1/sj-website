@@ -640,13 +640,21 @@ const GEMINI_RETRIABLE = [429, 401, 403, 500, 502, 503];
 
 // Browser-side direct Gemini call (local/dev fallback only). Converts the
 // OpenAI-style messages the app speaks into Gemini's request shape.
+function _dataUrlToInlinePart(dataUrl) {
+    const m = /^data:(image\/(?:png|jpe?g|gif|webp));base64,([A-Za-z0-9+/=]+)$/i.exec(String(dataUrl || ''));
+    return m ? { inline_data: { mime_type: m[1].toLowerCase(), data: m[2] } } : null;
+}
 function _messagesToGemini(payload) {
     const contents = [];
     let system = '';
     for (const m of payload.messages || []) {
         if (!m || typeof m.content !== 'string') continue;
         if (m.role === 'system') { system += (system ? '\n' : '') + m.content; continue; }
-        contents.push({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] });
+        const parts = [{ text: m.content }];
+        if (Array.isArray(m.images)) {
+            for (const img of m.images.slice(0, 4)) { const p = _dataUrlToInlinePart(img); if (p) parts.push(p); }
+        }
+        contents.push({ role: m.role === 'assistant' ? 'model' : 'user', parts });
     }
     const body = { contents };
     if (system) body.systemInstruction = { parts: [{ text: system }] };
@@ -784,7 +792,9 @@ function historyToMessages(systemText, chatHistory) {
     (chatHistory || []).forEach(msg => {
         const role = msg.role === 'user' ? 'user' : 'assistant';
         const text = (msg.parts && msg.parts[0] && msg.parts[0].text) || '';
-        messages.push({ role, content: text });
+        const m = { role, content: text };
+        if (Array.isArray(msg.images) && msg.images.length) m.images = msg.images; // site photos for vision
+        messages.push(m);
     });
     return messages;
 }
@@ -1571,6 +1581,7 @@ function loadProject(id, navigate = true) {
     
     activeProjectId = id;
     localStorage.setItem(getStorageKey('sj_active_project_id'), id);
+    pendingChatPhotos = []; renderChatAttachments(); // don't carry photos between projects
 
     // Reset model to default each time a project is loaded
     changeGeminiModel('gemini|gemini-2.5-flash');
@@ -4281,11 +4292,18 @@ async function sendChatMessage() {
     }
 
     const inputArea = document.getElementById('chat-user-input');
-    const userText = inputArea.value.trim();
-    if (!userText) return;
+    let userText = inputArea.value.trim();
+    // A message can be text, photos, or both — but not empty.
+    if (!userText && pendingChatPhotos.length === 0) return;
 
     const activeProject = projectsList.find(p => p.id === activeProjectId);
     if (!activeProject) return;
+
+    // Attach and clear the pending site photos (given to the AI as vision).
+    const photos = pendingChatPhotos.slice();
+    pendingChatPhotos = [];
+    renderChatAttachments();
+    if (!userText && photos.length) userText = 'צירפתי תמונה מהשטח — התייחס אליה בתכנון/בתמחור.';
 
     // Behind-the-scenes instruction? consume the one-shot flag now.
     const isHidden = _nextUserMsgHidden;
@@ -4295,6 +4313,7 @@ async function sendChatMessage() {
     if (activeChatMode === 'plan') {
         const planMsg = { role: 'user', parts: [{ text: userText }] };
         if (isHidden) planMsg.hidden = true;
+        if (photos.length) planMsg.images = photos;
         ensurePlanHistory(activeProject).push(planMsg);
         saveProjects();
         renderChatHistory(activeProject.planChatHistory);
@@ -4311,6 +4330,7 @@ async function sendChatMessage() {
         parts: [{ text: userText }]
     };
     if (isHidden) userMsg.hidden = true;
+    if (photos.length) userMsg.images = photos;
     activeProject.chatHistory.push(userMsg);
     saveProjects();
 
@@ -4602,6 +4622,41 @@ function applyChatSearch() {
 // scenes instruction: the AI receives it but it never appears in the chat UI.
 let _nextUserMsgHidden = false;
 
+// Photos the user attached to the next chat message (site pictures the AI can
+// "see"). Compressed data: URLs, cleared once the message is sent.
+let pendingChatPhotos = [];
+
+function onChatPhotoPicked(input) {
+    const files = Array.from(input.files || []);
+    input.value = '';
+    files.slice(0, 4 - pendingChatPhotos.length).forEach(file => {
+        // A touch smaller than report photos — chat images ride inside the
+        // conversation blob, and Gemini downscales large inputs anyway.
+        _compressImageFile(file, (dataUrl) => {
+            if (pendingChatPhotos.length >= 4) { showToast('אפשר עד 4 תמונות בהודעה', 'error'); return; }
+            pendingChatPhotos.push(dataUrl);
+            renderChatAttachments();
+        });
+    });
+}
+
+function removeChatPhoto(i) {
+    pendingChatPhotos.splice(i, 1);
+    renderChatAttachments();
+}
+
+function renderChatAttachments() {
+    const box = document.getElementById('chat-attachments');
+    if (!box) return;
+    if (pendingChatPhotos.length === 0) { box.style.display = 'none'; box.innerHTML = ''; return; }
+    box.style.display = 'flex';
+    box.innerHTML = pendingChatPhotos.map((src, i) => `
+        <span class="chat-attach-thumb">
+            <img src="${src}" alt="">
+            <button type="button" onclick="removeChatPhoto(${i})" title="הסר">✕</button>
+        </span>`).join('');
+}
+
 function sendSuggestedChatPrompt(text, hidden) {
     const input = document.getElementById('chat-user-input');
     if (input) {
@@ -4653,12 +4708,19 @@ function renderChatHistory(chatHistory) {
         const bubble = document.createElement('div');
         const role = msg.role === 'user' ? 'user' : 'model';
         bubble.className = `chat-bubble ${role}`;
-        
+
         let text = msg.parts[0].text;
         text = text.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
         text = text.replace(/({[\s\S]*?})/, '').trim();
 
-        bubble.innerHTML = formatChatMarkdown(text);
+        let html = formatChatMarkdown(text);
+        // Attached site photos render as thumbnails inside the user's bubble.
+        if (Array.isArray(msg.images) && msg.images.length) {
+            const thumbs = msg.images.filter(src => /^data:image\//i.test(src))
+                .map(src => `<img class="chat-bubble-photo" src="${src}" alt="תמונה מהשטח">`).join('');
+            html = `<div class="chat-bubble-photos">${thumbs}</div>` + html;
+        }
+        bubble.innerHTML = html;
         log.appendChild(bubble);
     });
 
