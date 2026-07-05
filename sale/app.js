@@ -2576,7 +2576,10 @@ function applyQuoteLayout() {
         el.style.textAlign = b.align || '';
         el.style.fontWeight = b.bold ? '700' : '';
         el.style.textDecoration = b.underline ? 'underline' : '';
-        el.style.zoom = BLOCK_SIZES[b.size] && b.size !== 'md' ? String(BLOCK_SIZES[b.size]) : '';
+        // Size via font-size (em), NOT `zoom` — html2canvas (the PDF renderer)
+        // ignores `zoom`, so the on-screen size change was lost in the export.
+        // font-size scales text blocks reliably in both the preview and the PDF.
+        el.style.fontSize = (BLOCK_SIZES[b.size] && b.size !== 'md') ? (BLOCK_SIZES[b.size] + 'em') : '';
     });
     // The header divider isn't a movable block; without an explicit order it
     // stays at 0 and floats to the top once blocks are reordered. Pin it to sit
