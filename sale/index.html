@@ -24,7 +24,7 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
     
     <!-- Custom styling -->
-    <link rel="stylesheet" href="styles.css?v=415">
+    <link rel="stylesheet" href="styles.css?v=416">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -143,7 +143,7 @@
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
                 </div>
-                <span class="version">v4.15</span>
+                <span class="version">v4.16</span>
             </div>
         </aside>
         
@@ -542,6 +542,10 @@
                         <div class="preview-toolbar">
                             <span><i class="fa-solid fa-eye text-accent"></i> תצוגה מקדימה (A4)</span>
                             <div class="preview-actions">
+                                <button class="btn btn-secondary desktop-only-btn" id="btn-design-quote" onclick="openQuoteDesigner()" title="סדר וגזור בלוקים, יישור וגופן — עיצוב ידני (במחשב)">
+                                    <i class="fa-solid fa-object-group"></i>
+                                    <span>עיצוב ידני</span>
+                                </button>
                                 <button class="btn btn-secondary" onclick="openFullPdfPreview()">
                                     <i class="fa-solid fa-expand"></i>
                                     <span>תצוגה מלאה</span>
@@ -577,7 +581,7 @@
                                 
                                 <div class="pdf-wrapper">
                                     <!-- Header structure matching Word template perfectly -->
-                                    <header class="pdf-header">
+                                    <header class="pdf-header pdf-block" data-block="header">
                                         <div class="pdf-header-grid">
                                             <!-- Right column: Recipient Info -->
                                             <div class="pdf-recipient-column">
@@ -616,13 +620,13 @@
                                     <div class="pdf-header-divider"></div>
                                     
                                     <!-- Title -->
-                                    <div class="pdf-title-container">
+                                    <div class="pdf-title-container pdf-block" data-block="title">
                                         <h1 class="pdf-title">הצעת מחיר ל<span id="pdf-subject">נושא הצעה</span></h1>
                                         <div class="underline-bar"></div>
                                     </div>
                                     
                                     <!-- Work Items Details List / Table -->
-                                    <div class="pdf-content-area">
+                                    <div class="pdf-content-area pdf-block" data-block="body">
                                         <div id="pdf-work-items" class="pdf-items-list">
                                             <!-- Dynamically filled by script -->
                                         </div>
@@ -640,7 +644,7 @@
                                     </div>
                                     
                                     <!-- Client & Contractor Signature Row -->
-                                    <div id="pdf-signature-row" style="display:none; margin-top:20px; margin-bottom:20px; justify-content:space-between; border-top:1px dashed var(--pdf-custom-secondary, #cbd5e1); padding-top:12px; direction: rtl;">
+                                    <div id="pdf-signature-row" class="pdf-block" data-block="signature" style="display:none; margin-top:20px; margin-bottom:20px; justify-content:space-between; border-top:1px dashed var(--pdf-custom-secondary, #cbd5e1); padding-top:12px; direction: rtl;">
                                         <div style="display:flex; flex-direction:column; gap:4px; width:45%; text-align:right;">
                                             <span style="font-weight:700; font-size:0.92rem; color:var(--pdf-custom-primary, #1e3a8a);">חתימת מאשר ההצעה (הלקוח):</span>
                                             <div id="pdf-client-signature-slot" style="height:35px; border-bottom:1px solid #94a3b8; margin-top:6px; position:relative;">
@@ -894,7 +898,7 @@
                                     <i class="fa-solid fa-star"></i> תן חוות דעת על המוצר
                                 </a>
                             </div>
-                            <p class="input-help" style="margin:14px 0 0;opacity:.7;">גרסה <span id="about-version">v4.15</span> · &copy; 2026 SJ הנדסת חשמל · כל הזכויות שמורות.</p>
+                            <p class="input-help" style="margin:14px 0 0;opacity:.7;">גרסה <span id="about-version">v4.16</span> · &copy; 2026 SJ הנדסת חשמל · כל הזכויות שמורות.</p>
                         </div>
                     </div>
                 </div>
@@ -1729,7 +1733,7 @@
     </div>
 
     <!-- Application Script -->
-    <script src="app.js?v=415"></script>
+    <script src="app.js?v=416"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
     <script src="../assistant.js?v=43" defer></script>

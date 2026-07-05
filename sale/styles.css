@@ -3915,3 +3915,46 @@ body:not(.in-project) .proj-tab { display: none !important; }
     max-width: 150px; max-height: 150px; border-radius: 8px;
     border: 1px solid rgba(255,255,255,0.15); cursor: default;
 }
+
+/* ==========================================================================
+   v4.16 — manual block designer (desktop)
+   ========================================================================== */
+@media (max-width: 768px) { .desktop-only-btn { display: none !important; } }
+
+.designer-box {
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: 16px; padding: 22px; max-width: 640px; width: 100%;
+    max-height: 92vh; overflow-y: auto; position: relative;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.55);
+}
+.designer-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+.designer-head h2 { font-size: 1.15rem; margin: 0; }
+.designer-eng { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+.designer-eng input { width: 16px; height: 16px; }
+.designer-blocks { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.designer-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; background: var(--bg-input);
+    border: 1px solid var(--border-color); border-radius: 10px;
+    cursor: grab;
+}
+.designer-row:active { cursor: grabbing; }
+.db-handle { color: var(--text-muted); cursor: grab; }
+.db-name { font-weight: 700; font-size: 0.85rem; flex: 1; min-width: 0; }
+.db-ctrls { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+.db-move { display: flex; flex-direction: column; gap: 2px; }
+.db-ctrl {
+    min-width: 26px; height: 24px; padding: 0 6px; border-radius: 6px;
+    border: 1px solid var(--border-color); background: var(--bg-card);
+    color: var(--text-secondary); cursor: pointer; font-size: 0.72rem;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+.db-ctrl:hover { border-color: var(--color-accent); color: var(--text-primary); }
+.db-ctrl.on { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
+.db-move .db-ctrl { height: 16px; min-width: 24px; }
+.db-sep { width: 1px; height: 16px; background: var(--border-color); margin: 0 3px; }
+.designer-actions { display: flex; gap: 10px; justify-content: space-between; flex-wrap: wrap; }
+
+/* English mode: the sheet flips to LTR; keep the money column readable */
+#quote-pdf-sheet.pdf-english { direction: ltr; }
+#quote-pdf-sheet.pdf-english .pdf-header-grid { direction: ltr; }

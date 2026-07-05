@@ -2278,6 +2278,178 @@ function updatePdfCustomStyles() {
 }
 
 // ==========================================================================
+// Manual block designer (Move 3) — reorder + style the quote's blocks.
+// Desktop only; applied as CSS/order to the EXISTING proven sheet (never a
+// rewrite), so the PDF stays reliable. Persisted in settings.quoteLayout.
+// ==========================================================================
+const QUOTE_BLOCKS = [
+    { id: 'header',    label: 'כותרת עליונה (לקוח + לוגו)' },
+    { id: 'title',     label: 'שם ההצעה' },
+    { id: 'body',      label: 'סעיפי העבודה והמחיר' },
+    { id: 'signature', label: 'אזור חתימה' },
+];
+const BLOCK_SIZES = { sm: 0.9, md: 1, lg: 1.12 };
+
+function defaultQuoteLayout() {
+    const blocks = {};
+    QUOTE_BLOCKS.forEach(b => { blocks[b.id] = { align: '', size: 'md', bold: false, underline: false }; });
+    return { order: QUOTE_BLOCKS.map(b => b.id), blocks, english: false };
+}
+function getQuoteLayout() {
+    if (!appState.settings.quoteLayout) appState.settings.quoteLayout = defaultQuoteLayout();
+    const L = appState.settings.quoteLayout;
+    if (!Array.isArray(L.order)) L.order = QUOTE_BLOCKS.map(b => b.id);
+    if (!L.blocks) L.blocks = defaultQuoteLayout().blocks;
+    QUOTE_BLOCKS.forEach(b => { if (!L.blocks[b.id]) L.blocks[b.id] = { align: '', size: 'md', bold: false, underline: false }; });
+    return L;
+}
+function saveQuoteLayout() {
+    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
+    scheduleCloudSync();
+}
+
+// Apply the layout to the live #quote-pdf-sheet (also what html2canvas captures).
+function applyQuoteLayout() {
+    const sheet = document.getElementById('quote-pdf-sheet');
+    if (!sheet) return;
+    const L = getQuoteLayout();
+    const wrapper = sheet.querySelector('.pdf-wrapper');
+    if (wrapper) { wrapper.style.display = 'flex'; wrapper.style.flexDirection = 'column'; }
+
+    // English mode → LTR for the whole sheet.
+    sheet.setAttribute('dir', L.english ? 'ltr' : 'rtl');
+    sheet.classList.toggle('pdf-english', !!L.english);
+
+    L.order.forEach((id, i) => {
+        const el = sheet.querySelector(`[data-block="${id}"]`);
+        if (!el) return;
+        el.style.order = String(i);
+        const b = L.blocks[id] || {};
+        el.style.textAlign = b.align || '';
+        el.style.fontWeight = b.bold ? '700' : '';
+        el.style.textDecoration = b.underline ? 'underline' : '';
+        el.style.zoom = BLOCK_SIZES[b.size] && b.size !== 'md' ? String(BLOCK_SIZES[b.size]) : '';
+    });
+    // The footer (total + company) is intentionally pinned last.
+    const footer = sheet.querySelector('.pdf-footer-section');
+    if (footer) footer.style.order = String(L.order.length + 1);
+}
+
+let _designMoveFrom = null;
+function openQuoteDesigner() {
+    // Desktop-only feature (mobile uses the one-tap templates).
+    if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
+        showToast('העיצוב הידני זמין במחשב. בנייד — בחר תבנית מוכנה בעורך ההצעה 🙂');
+        return;
+    }
+    closeQuoteDesigner();
+    updatePreviewFromForm(); // make sure the sheet reflects the current quote
+    const modal = document.createElement('div');
+    modal.id = 'quote-designer';
+    modal.className = 'upgrade-modal-backdrop';
+    modal.innerHTML = `
+        <div class="designer-box" role="dialog" aria-modal="true">
+            <button class="upgrade-close" onclick="closeQuoteDesigner()" aria-label="סגור">✕</button>
+            <div class="designer-head">
+                <h2><i class="fa-solid fa-object-group text-accent"></i> עיצוב ידני של ההצעה</h2>
+                <label class="designer-eng">
+                    <input type="checkbox" id="designer-english" ${getQuoteLayout().english ? 'checked' : ''} onchange="setQuoteEnglish(this.checked)">
+                    <span>הצעה באנגלית (הפוך כיוון ל-LTR)</span>
+                </label>
+            </div>
+            <p class="input-help" style="margin:0 0 12px;">גרור בלוקים לשינוי סדר, וכוונן יישור / גודל / הדגשה / קו תחתון לכל בלוק. שורת הסיכום והפרטים בתחתית קבועה.</p>
+            <div id="designer-blocks" class="designer-blocks"></div>
+            <div class="designer-actions">
+                <button class="btn btn-secondary" onclick="resetQuoteDesign()"><i class="fa-solid fa-rotate-left"></i> אפס לברירת מחדל</button>
+                <button class="btn btn-accent" onclick="closeQuoteDesigner()"><i class="fa-solid fa-check"></i> סיימתי</button>
+            </div>
+        </div>`;
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeQuoteDesigner(); });
+    document.body.appendChild(modal);
+    renderDesignerBlocks();
+}
+function closeQuoteDesigner() {
+    const m = document.getElementById('quote-designer');
+    if (m) m.remove();
+}
+
+function renderDesignerBlocks() {
+    const box = document.getElementById('designer-blocks');
+    if (!box) return;
+    const L = getQuoteLayout();
+    const labelOf = (id) => (QUOTE_BLOCKS.find(b => b.id === id) || {}).label || id;
+    box.innerHTML = L.order.map((id, i) => {
+        const b = L.blocks[id] || {};
+        const alignBtn = (val, icon, title) => `<button class="db-ctrl ${b.align === val || (val === '' && !b.align) ? 'on' : ''}" title="${title}" onclick="setBlockStyle('${id}','align','${val}')"><i class="fa-solid ${icon}"></i></button>`;
+        return `<div class="designer-row" draggable="true" data-idx="${i}"
+                    ondragstart="designerDragStart(${i})" ondragover="event.preventDefault()" ondrop="designerDrop(${i})">
+            <span class="db-handle" title="גרור לשינוי סדר"><i class="fa-solid fa-grip-vertical"></i></span>
+            <span class="db-name">${labelOf(id)}</span>
+            <span class="db-ctrls">
+                ${alignBtn('right', 'fa-align-right', 'ימין')}
+                ${alignBtn('center', 'fa-align-center', 'מרכז')}
+                ${alignBtn('left', 'fa-align-left', 'שמאל')}
+                <span class="db-sep"></span>
+                <button class="db-ctrl" title="הקטן" onclick="stepBlockSize('${id}',-1)">A−</button>
+                <button class="db-ctrl" title="הגדל" onclick="stepBlockSize('${id}',1)">A+</button>
+                <span class="db-sep"></span>
+                <button class="db-ctrl ${b.bold ? 'on' : ''}" title="הדגשה" onclick="toggleBlockStyle('${id}','bold')"><b>B</b></button>
+                <button class="db-ctrl ${b.underline ? 'on' : ''}" title="קו תחתון" onclick="toggleBlockStyle('${id}','underline')"><u>U</u></button>
+            </span>
+            <span class="db-move">
+                <button class="db-ctrl" title="למעלה" onclick="moveDesignBlock(${i},-1)"><i class="fa-solid fa-chevron-up"></i></button>
+                <button class="db-ctrl" title="למטה" onclick="moveDesignBlock(${i},1)"><i class="fa-solid fa-chevron-down"></i></button>
+            </span>
+        </div>`;
+    }).join('');
+}
+
+function moveDesignBlock(i, dir) {
+    const L = getQuoteLayout();
+    const j = i + dir;
+    if (j < 0 || j >= L.order.length) return;
+    [L.order[i], L.order[j]] = [L.order[j], L.order[i]];
+    saveQuoteLayout(); applyQuoteLayout(); renderDesignerBlocks();
+}
+function designerDragStart(i) { _designMoveFrom = i; }
+function designerDrop(i) {
+    if (_designMoveFrom === null || _designMoveFrom === i) return;
+    const L = getQuoteLayout();
+    const [moved] = L.order.splice(_designMoveFrom, 1);
+    L.order.splice(i, 0, moved);
+    _designMoveFrom = null;
+    saveQuoteLayout(); applyQuoteLayout(); renderDesignerBlocks();
+}
+function setBlockStyle(id, prop, val) {
+    const L = getQuoteLayout();
+    L.blocks[id][prop] = val;
+    saveQuoteLayout(); applyQuoteLayout(); renderDesignerBlocks();
+}
+function toggleBlockStyle(id, prop) {
+    const L = getQuoteLayout();
+    L.blocks[id][prop] = !L.blocks[id][prop];
+    saveQuoteLayout(); applyQuoteLayout(); renderDesignerBlocks();
+}
+function stepBlockSize(id, dir) {
+    const order = ['sm', 'md', 'lg'];
+    const L = getQuoteLayout();
+    let idx = order.indexOf(L.blocks[id].size || 'md') + dir;
+    idx = Math.max(0, Math.min(order.length - 1, idx));
+    L.blocks[id].size = order[idx];
+    saveQuoteLayout(); applyQuoteLayout(); renderDesignerBlocks();
+}
+function setQuoteEnglish(on) {
+    getQuoteLayout().english = !!on;
+    saveQuoteLayout(); applyQuoteLayout();
+}
+function resetQuoteDesign() {
+    appState.settings.quoteLayout = defaultQuoteLayout();
+    saveQuoteLayout(); applyQuoteLayout(); renderDesignerBlocks();
+    const eng = document.getElementById('designer-english'); if (eng) eng.checked = false;
+    showToast('העיצוב אופס לברירת המחדל');
+}
+
+// ==========================================================================
 // PDF design templates (Move 3) — one-click presets over the design system.
 // Fine-tuning stays available in פרטי עסק → עיצוב; a preset just sets the
 // same knobs (font, sizes, colors, watermark) and saves them.
@@ -3070,7 +3242,8 @@ function formatPriceString(val) {
 
 function updatePreviewFromForm() {
     const biz = appState.settings.businessDetails;
-    
+    try { applyQuoteLayout(); } catch (e) {} // manual block design (order/align/size/dir)
+
     const clientName = document.getElementById('form-client-name').value || 'שם הלקוח';
     const clientSub = document.getElementById('form-client-sub').value || 'כתובת הלקוח / טלפון';
     const quoteNumber = document.getElementById('form-quote-number').value || '2026-101';
