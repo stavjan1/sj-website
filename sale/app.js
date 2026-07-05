@@ -789,11 +789,19 @@ async function readAIError(response) {
 function historyToMessages(systemText, chatHistory) {
     const messages = [];
     if (systemText) messages.push({ role: 'system', content: systemText });
-    (chatHistory || []).forEach(msg => {
+    const hist = chatHistory || [];
+    // Only the MOST RECENT photo turn is sent to the model. Re-sending every
+    // image on every turn would balloon token cost and can blow past the
+    // request-size limit — the current turn's photo is what needs "seeing".
+    let lastImgIdx = -1;
+    for (let i = hist.length - 1; i >= 0; i--) {
+        if (Array.isArray(hist[i].images) && hist[i].images.length) { lastImgIdx = i; break; }
+    }
+    hist.forEach((msg, i) => {
         const role = msg.role === 'user' ? 'user' : 'assistant';
         const text = (msg.parts && msg.parts[0] && msg.parts[0].text) || '';
         const m = { role, content: text };
-        if (Array.isArray(msg.images) && msg.images.length) m.images = msg.images; // site photos for vision
+        if (i === lastImgIdx) m.images = msg.images; // site photos for vision (latest turn only)
         messages.push(m);
     });
     return messages;
@@ -991,6 +999,7 @@ function getStorageKey(key) {
 // (501) or the network is down, the local copy remains the source of truth.
 // ==========================================================================
 var _cloudSaveTimer = null;
+let _cloudFullWarned = false; // one-time "cloud blob is full" (413) notice
 
 function isGuestUser() {
     return (getActiveUser() || '').toLowerCase() === 'guest';
@@ -1067,6 +1076,17 @@ async function cloudSaveNow() {
         // 501 = KV binding not configured yet → stay local-only, silently.
         if (res.status === 501) return false;
         if (res.status === 401) { handleExpiredCloudToken(); return false; }
+        // 413 = the per-user cloud blob exceeded the size cap (usually too many
+        // photos/reports). Warn once — otherwise the backup fails invisibly and
+        // the user believes their work is safe in the cloud when it isn't.
+        if (res.status === 413) {
+            if (!_cloudFullWarned) {
+                _cloudFullWarned = true;
+                showToast('הגיבוי לענן מלא (יותר מדי תמונות/דוחות). מחק פריטים כבדים ישנים כדי לחדש את הגיבוי — העבודה עדיין נשמרת במכשיר.', 'error');
+            }
+            return false;
+        }
+        _cloudFullWarned = false; // a successful save re-arms the warning
         if (!res.ok) return false;
         // The backup always saves now; the server only FLAGS when a free user
         // passed their monthly new-quote allowance so we can nudge once.
@@ -2544,16 +2564,23 @@ function applyQuoteLayout() {
     sheet.setAttribute('dir', L.english ? 'ltr' : 'rtl');
     sheet.classList.toggle('pdf-english', !!L.english);
 
+    let headerOrder = 0;
     L.order.forEach((id, i) => {
         const el = sheet.querySelector(`[data-block="${id}"]`);
         if (!el) return;
         el.style.order = String(i);
+        if (id === 'header') headerOrder = i;
         const b = L.blocks[id] || {};
         el.style.textAlign = b.align || '';
         el.style.fontWeight = b.bold ? '700' : '';
         el.style.textDecoration = b.underline ? 'underline' : '';
         el.style.zoom = BLOCK_SIZES[b.size] && b.size !== 'md' ? String(BLOCK_SIZES[b.size]) : '';
     });
+    // The header divider isn't a movable block; without an explicit order it
+    // stays at 0 and floats to the top once blocks are reordered. Pin it to sit
+    // right after the header wherever the header lands.
+    const divider = sheet.querySelector('.pdf-header-divider');
+    if (divider) divider.style.order = String(headerOrder);
     // The footer (total + company) is intentionally pinned last.
     const footer = sheet.querySelector('.pdf-footer-section');
     if (footer) footer.style.order = String(L.order.length + 1);
@@ -5114,8 +5141,10 @@ function renderChatHistory(chatHistory) {
 
         let html = formatChatMarkdown(text);
         // Attached site photos render as thumbnails inside the user's bubble.
+        // Full data-URL validation (not just the prefix) so a tampered blob
+        // can't smuggle a src-attribute breakout into innerHTML.
         if (Array.isArray(msg.images) && msg.images.length) {
-            const thumbs = msg.images.filter(src => /^data:image\//i.test(src))
+            const thumbs = msg.images.filter(src => /^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+$/i.test(String(src || '')))
                 .map(src => `<img class="chat-bubble-photo" src="${src}" alt="תמונה מהשטח">`).join('');
             html = `<div class="chat-bubble-photos">${thumbs}</div>` + html;
         }

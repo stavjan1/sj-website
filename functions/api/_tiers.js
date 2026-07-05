@@ -149,6 +149,9 @@ export function isPublicHttpUrl(raw) {
   if (host === '169.254.169.254' || host === 'metadata' || host.endsWith('.metadata.google.internal')) return false;
   // Bare IPv6 or loopback
   if (host === '::1' || host === '[::1]' || host.startsWith('[')) return false;
+  // Non-standard IP encodings (integer 2130706433, hex 0x7f..., octal 0177...)
+  // can smuggle a loopback/private address past the dotted-quad check below.
+  if (/^\d+$/.test(host) || /^0x/i.test(host) || /(^|\.)0\d/.test(host)) return false;
   // Private / loopback / link-local IPv4 ranges
   const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
   if (m) {
