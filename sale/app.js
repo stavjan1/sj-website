@@ -1396,15 +1396,8 @@ function renderSubTabs(activeTabId) {
     if (!row) return;
     let tabs = (NAV_WORLDS[activeWorld].tabs || []).slice();
     if (activeWorld === 'prefs' && isAdmin()) tabs.push({ id: 'admin', label: 'ניהול (Admin)', icon: 'fa-shield-halved' });
-    // Inside an open project, the flow steps live between "פרויקטים" and the rest.
-    if (activeWorld === 'projects' && activeProjectId) {
-        const steps = [
-            { id: 'wizard', label: '1 · תכנון ותמחור', icon: 'fa-calculator', step: true },
-            { id: 'create', label: '2 · עורך ההצעה',   icon: 'fa-file-invoice-dollar', step: true },
-            { id: 'reports', label: '3 · דוחות',        icon: 'fa-clipboard-check', step: true },
-        ];
-        tabs = [tabs[0], ...steps, ...tabs.slice(1)];
-    }
+    // Inside an open project the flow steps live in the right-side stage rail
+    // (renderProjectRail), not here — keeps the top sub-row for world-level tabs.
     const cur = activeTabId || (document.querySelector('.content-panel.active') || {}).id?.replace('panel-', '') || 'projects';
     row.innerHTML = tabs.map(t =>
         `<button class="topnav-sub-btn ${t.step ? 'is-step' : ''} ${t.id === cur ? 'active' : ''}" data-tab="${t.id}" onclick="switchTab('${t.id}')"><i class="fa-solid ${t.icon}"></i> ${t.label}</button>`
@@ -1475,6 +1468,8 @@ function switchTab(tabId) {
     }
     // Keep the top-bar world + sub-tab row in sync with whatever panel is shown.
     syncTopNav(tabId);
+    // Refresh the in-project rail's active step (desktop stage nav).
+    updateProjectRail();
 }
 
 // ==========================================================================
@@ -1969,6 +1964,64 @@ function updateActiveProjectBanner(proj) {
     document.body.classList.toggle('in-project', !!proj);
     const navName = document.getElementById('nav-project-name');
     if (navName) navName.textContent = proj ? proj.name : '';
+    updateProjectRail();
+}
+
+// ── In-project stage rail (desktop) ──────────────────────────────────────────
+// A vertical rail on the RTL start (right) that mirrors the project flow, plus a
+// back button to the projects list. Replaces the horizontal step sub-tabs on
+// desktop; the mobile bottom bar keeps its own proj-tab buttons. Invoice/receipt
+// are reserved (shown as "בקרוב") for the accounting flow.
+const PROJECT_RAIL_STAGES = [
+    { tab: 'wizard',  label: 'תכנון ותמחור', icon: 'fa-compass-drafting' },
+    { tab: 'create',  label: 'עורך ההצעה',   icon: 'fa-file-invoice-dollar' },
+    { tab: 'reports', label: 'דוחות',        icon: 'fa-clipboard-check' },
+];
+const PROJECT_RAIL_SOON = [
+    { label: 'חשבונית', icon: 'fa-file-invoice' },
+    { label: 'קבלה',    icon: 'fa-receipt' },
+];
+
+function renderProjectRail() {
+    const rail = document.getElementById('project-rail');
+    if (!rail) return;
+    const proj = projectsList.find(p => p.id === activeProjectId);
+    const cur = ((document.querySelector('.content-panel.active') || {}).id || '').replace('panel-', '');
+    const step = (s, i) => `
+        <button class="rail-step ${s.tab === cur ? 'active' : ''}" onclick="switchTab('${s.tab}')" title="${s.label}">
+            <span class="rail-step-num">${i + 1}</span>
+            <i class="fa-solid ${s.icon}"></i>
+            <span class="rail-step-label">${s.label}</span>
+        </button>`;
+    const soon = (s) => `
+        <button class="rail-step rail-soon" disabled title="${s.label} — בקרוב">
+            <span class="rail-step-num"><i class="fa-solid fa-lock"></i></span>
+            <i class="fa-solid ${s.icon}"></i>
+            <span class="rail-step-label">${s.label}</span>
+        </button>`;
+    rail.innerHTML = `
+        <button class="rail-back" onclick="switchTab('projects')" title="חזרה לכל הפרויקטים">
+            <i class="fa-solid fa-arrow-right"></i><span>הפרויקטים</span>
+        </button>
+        <div class="rail-proj" title="${proj ? escapeHtml(proj.name) : ''}">${proj ? escapeHtml(proj.name) : ''}</div>
+        <div class="rail-steps">${PROJECT_RAIL_STAGES.map(step).join('')}</div>
+        <div class="rail-divider"></div>
+        <div class="rail-steps rail-steps-soon">${PROJECT_RAIL_SOON.map(soon).join('')}</div>`;
+}
+
+function updateProjectRail() {
+    const rail = document.getElementById('project-rail');
+    if (!rail) return;
+    // Only show the rail on the actual project stages — a project can stay open
+    // while the user visits העדפות/חשבונות, and the rail shouldn't float there.
+    const cur = ((document.querySelector('.content-panel.active') || {}).id || '').replace('panel-', '');
+    const onStage = !!activeProjectId && PROJECT_RAIL_STAGES.some(s => s.tab === cur);
+    document.body.classList.toggle('in-project-stage', onStage);
+    if (!onStage) return;
+    renderProjectRail();
+    // Pin the rail just below the top bar (its height varies with the sub row).
+    const tn = document.getElementById('topnav');
+    if (tn) document.documentElement.style.setProperty('--topnav-h', Math.round(tn.getBoundingClientRect().height) + 'px');
 }
 
 // Sort state: which field ('date'|'name') and direction ('desc'|'asc').

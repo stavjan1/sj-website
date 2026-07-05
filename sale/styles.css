@@ -4388,3 +4388,60 @@ body.boxes-dark .section-card { background: linear-gradient(160deg, #162038 0%, 
 body.boxes-dark .card-header { background: linear-gradient(180deg, var(--color-accent-glow) 0%, transparent 100%); }
 body.boxes-light .section-card { background: #ffffff; }
 body.boxes-light .card-header { background: linear-gradient(180deg, rgba(37,99,235,0.08) 0%, transparent 100%); }
+
+/* ==========================================================================
+   v5.1 — in-project stage rail (desktop)
+   A vertical rail pinned to the RTL start (right), below the top bar. Replaces
+   the horizontal step sub-tabs while inside a project. Mobile keeps its own
+   proj-tab bottom-bar buttons, so the rail is desktop-only.
+   ========================================================================== */
+.project-rail { display: none; }
+
+@media (min-width: 861px) {
+    body.in-project-stage .project-rail {
+        display: flex; flex-direction: column; gap: 8px;
+        position: fixed; top: var(--topnav-h, 92px); inset-inline-start: 0; bottom: 0;
+        width: 112px; z-index: 25; padding: 12px 8px; overflow-y: auto;
+        background: var(--bg-card); border-inline-end: 1px solid var(--border-color);
+        box-shadow: 2px 0 16px rgba(0,0,0,0.14);
+    }
+    /* Make room on the RTL-start side so the stage panels clear the rail. */
+    body.in-project-stage #panel-wizard.active,
+    body.in-project-stage #panel-create.active,
+    body.in-project-stage #panel-reports.active { padding-inline-start: 120px; }
+}
+
+.project-rail .rail-back {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px 6px; border-radius: 9px; border: 1px solid var(--border-color);
+    background: var(--bg-input); color: var(--text-secondary); cursor: pointer;
+    font-size: 0.74rem; font-weight: 700; white-space: nowrap; flex-shrink: 0;
+}
+.project-rail .rail-back:hover { color: var(--color-accent); border-color: var(--color-accent); }
+.project-rail .rail-proj {
+    font-size: 0.72rem; font-weight: 800; color: var(--text-primary); text-align: center;
+    padding: 2px 2px 8px; border-bottom: 1px solid var(--border-color); flex-shrink: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.project-rail .rail-steps { display: flex; flex-direction: column; gap: 6px; }
+.project-rail .rail-step {
+    position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 11px 4px; border-radius: 10px; border: 1px solid transparent;
+    background: transparent; color: var(--text-secondary); cursor: pointer; transition: all .12s ease;
+}
+.project-rail .rail-step > i { font-size: 1.1rem; }
+.project-rail .rail-step .rail-step-label { font-size: 0.68rem; font-weight: 600; text-align: center; line-height: 1.15; }
+.project-rail .rail-step .rail-step-num {
+    position: absolute; top: 5px; inset-inline-end: 7px;
+    width: 15px; height: 15px; border-radius: 50%; background: var(--bg-input);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.58rem; font-weight: 800; color: var(--text-muted);
+}
+.project-rail .rail-step:hover:not(:disabled) { background: rgba(77,142,240,0.08); color: var(--text-primary); }
+.project-rail .rail-step.active {
+    background: rgba(77,142,240,0.15); border-color: rgba(77,142,240,0.5); color: var(--color-accent);
+}
+.project-rail .rail-step.active .rail-step-num { background: var(--color-accent); color: #fff; }
+.project-rail .rail-divider { height: 1px; background: var(--border-color); margin: 4px 2px; flex-shrink: 0; }
+.project-rail .rail-soon { opacity: 0.45; cursor: not-allowed; }
+.project-rail .rail-soon .rail-step-label { color: var(--text-muted); }
