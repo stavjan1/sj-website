@@ -4046,6 +4046,12 @@ body:not(.in-project) .proj-tab { display: none !important; }
 .designer-row.dragging { opacity: 0.45; }
 .designer-row.drag-over { border-color: var(--color-accent); box-shadow: 0 -3px 0 var(--color-accent) inset; }
 
+/* Designer block styles forced onto text-bearing children (a child <h1>/<td>
+   resets text-decoration, so an inline underline on the block did nothing). */
+.qb-bold, .qb-bold * { font-weight: 700 !important; }
+.qb-underline { text-decoration: underline !important; }
+.qb-underline *:not(i):not(svg):not(img) { text-decoration: underline !important; }
+
 @media (max-width: 900px) {
     .designer-box-2col { flex-direction: column; max-width: 640px; }
     .designer-preview-pane { flex: none; border-inline-start: none; padding-inline-start: 0; border-top: 1px solid var(--border-color); padding-top: 14px; }
@@ -4644,6 +4650,8 @@ body.boxes-light .card-header { background: linear-gradient(180deg, rgba(37,99,2
 .vat-pill { padding: 8px 14px; border-radius: 9px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-secondary); cursor: pointer; font-weight: 700; font-size: 0.84rem; }
 .vat-pill:hover { border-color: var(--color-accent); }
 .vat-pill.active { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
+.acct-payment { margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 4px; }
+.acct-payment input[type="date"] { color-scheme: dark; }
 .vat-breakdown { margin-top: 12px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; padding: 8px 14px; }
 .vb-line { display: flex; justify-content: space-between; padding: 4px 0; font-size: 0.88rem; color: var(--text-secondary); }
 .vb-line b { color: var(--text-primary); }

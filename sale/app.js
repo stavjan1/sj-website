@@ -1463,7 +1463,10 @@ function renderSubTabs(activeTabId) {
     if (activeWorld === 'prefs' && isAdmin()) tabs.push({ id: 'admin', label: 'ניהול (Admin)', icon: 'fa-shield-halved' });
     // Inside an open project the flow steps live in the right-side stage rail
     // (renderProjectRail), not here — keeps the top sub-row for world-level tabs.
-    const cur = activeTabId || (document.querySelector('.content-panel.active') || {}).id?.replace('panel-', '') || 'projects';
+    let cur = activeTabId || (document.querySelector('.content-panel.active') || {}).id?.replace('panel-', '') || 'projects';
+    // While inside a project (wizard/create/reports), keep "פרויקטים" the active,
+    // hugged sub-tab so it's clear which world you're in.
+    if (['wizard', 'create', 'reports'].includes(cur)) cur = 'projects';
     row.innerHTML = tabs.map(t =>
         `<button class="topnav-sub-btn ${t.step ? 'is-step' : ''} ${t.id === cur ? 'active' : ''}" data-tab="${t.id}" onclick="switchTab('${t.id}')"><i class="fa-solid ${t.icon}"></i> ${t.label}</button>`
     ).join('');
@@ -2050,9 +2053,11 @@ const PROJECT_RAIL_STAGES = [
     { tab: 'create',  label: 'עורך ההצעה',   icon: 'fa-file-invoice-dollar' },
     { tab: 'reports', label: 'דוחות',        icon: 'fa-clipboard-check' },
 ];
-const PROJECT_RAIL_SOON = [
-    { label: 'חשבונית', icon: 'fa-file-invoice' },
-    { label: 'קבלה',    icon: 'fa-receipt' },
+// Accounting documents reachable straight from a project — enabled once the
+// project has a priced quote (else locked with a tooltip explaining why).
+const PROJECT_RAIL_DOCS = [
+    { docType: 'Invoice', label: 'חשבונית', icon: 'fa-file-invoice' },
+    { docType: 'Receipt', label: 'קבלה',    icon: 'fa-receipt' },
 ];
 
 function renderProjectRail() {
@@ -2060,18 +2065,22 @@ function renderProjectRail() {
     if (!rail) return;
     const proj = projectsList.find(p => p.id === activeProjectId);
     const cur = ((document.querySelector('.content-panel.active') || {}).id || '').replace('panel-', '');
+    const priced = !!(proj && proj.quoteData && Number(proj.quoteData.finalPrice) > 0);
     const step = (s, i) => `
         <button class="rail-step ${s.tab === cur ? 'active' : ''}" onclick="switchTab('${s.tab}')" title="${s.label}">
             <span class="rail-step-num">${i + 1}</span>
             <i class="fa-solid ${s.icon}"></i>
             <span class="rail-step-label">${s.label}</span>
         </button>`;
-    const soon = (s) => `
-        <button class="rail-step rail-soon" disabled title="${s.label} — בקרוב">
-            <span class="rail-step-num"><i class="fa-solid fa-lock"></i></span>
-            <i class="fa-solid ${s.icon}"></i>
-            <span class="rail-step-label">${s.label}</span>
-        </button>`;
+    const docBtn = (d) => priced
+        ? `<button class="rail-step" onclick="openAccountingForProject('${activeProjectId}','${d.docType}')" title="הפק ${d.label} לפרויקט זה">
+                <span class="rail-step-num"><i class="fa-solid fa-plus"></i></span>
+                <i class="fa-solid ${d.icon}"></i><span class="rail-step-label">${d.label}</span>
+           </button>`
+        : `<button class="rail-step rail-soon" disabled title="יש לסיים תחילה תמחור (הצעה עם מחיר סופי) כדי להפיק ${d.label}">
+                <span class="rail-step-num"><i class="fa-solid fa-lock"></i></span>
+                <i class="fa-solid ${d.icon}"></i><span class="rail-step-label">${d.label}</span>
+           </button>`;
     rail.innerHTML = `
         <button class="rail-back" onclick="switchTab('projects')" title="חזרה לכל הפרויקטים">
             <i class="fa-solid fa-arrow-right"></i><span>הפרויקטים</span>
@@ -2079,7 +2088,21 @@ function renderProjectRail() {
         <div class="rail-proj" title="${proj ? escapeHtml(proj.name) : ''}">${proj ? escapeHtml(proj.name) : ''}</div>
         <div class="rail-steps">${PROJECT_RAIL_STAGES.map(step).join('')}</div>
         <div class="rail-divider"></div>
-        <div class="rail-steps rail-steps-soon">${PROJECT_RAIL_SOON.map(soon).join('')}</div>`;
+        <div class="rail-steps rail-steps-soon">${PROJECT_RAIL_DOCS.map(docBtn).join('')}</div>`;
+}
+
+// Jump from a project straight into the accounting create form, prefilled.
+function openAccountingForProject(projectId, docType) {
+    acctDraftProjectId = projectId;
+    acctSection = 'create';
+    acctVatBasis = 'exclude';
+    switchWorld('accounting');
+    setTimeout(() => {
+        const dt = document.getElementById('acct-doctype');
+        if (dt && docType) dt.value = docType;
+        acctPrefillFromProject(projectId);
+        acctOnDocTypeChange(); // reveal the payment section for receipt types
+    }, 0);
 }
 
 function updateProjectRail() {
@@ -2092,9 +2115,13 @@ function updateProjectRail() {
     document.body.classList.toggle('in-project-stage', onStage);
     if (!onStage) return;
     renderProjectRail();
-    // Pin the rail just below the top bar (its height varies with the sub row).
+    // Pin the rail below the top bar AND the active-project banner, so it never
+    // rides up over them (measure the banner's bottom when it's visible).
     const tn = document.getElementById('topnav');
-    if (tn) document.documentElement.style.setProperty('--topnav-h', Math.round(tn.getBoundingClientRect().height) + 'px');
+    const banner = document.getElementById('project-banner');
+    let top = tn ? tn.getBoundingClientRect().bottom : 92;
+    if (banner && banner.offsetParent !== null) top = Math.max(top, banner.getBoundingClientRect().bottom);
+    document.documentElement.style.setProperty('--topnav-h', Math.round(top) + 'px');
 }
 
 // Sort state: which field ('date'|'name') and direction ('desc'|'asc').
@@ -2326,7 +2353,16 @@ let acctCashScope = 'month';      // 'month' | 'year'
 let acctItems = [];               // draft line items for the create form
 let acctDraftProjectId = '';      // project the draft was prefilled from
 let acctVatBasis = 'exclude';     // 'exclude' (prices pre-VAT) | 'include' | 'exempt'
+let acctPayMethod = 'cash';       // receipt payment method
 // (VAT_RATE is declared once globally, near the pricing logic.)
+const isReceiptDoc = (t) => ['Receipt', 'InvoiceReceipt', 'ReceiptRefund'].includes(t);
+const PAY_METHODS = [
+    { id: 'cash', label: 'מזומן' },
+    { id: 'wireTransfer', label: 'העברה בנקאית' },
+    { id: 'creditCard', label: 'כרטיס אשראי' },
+    { id: 'check', label: 'המחאה' },
+    { id: 'other', label: 'אחר' },
+];
 
 const SB_DOC_TYPES = [
     { id: 'DealInvoice',    label: 'חשבון עסקה' },
@@ -2462,12 +2498,12 @@ function acctCreateHtml() {
       <div class="acct-create-2col">
         <div class="acct-form">
             <div class="form-row">
-                <label>מלא מתוך פרויקט</label>
+                <label>שייך לפרויקט</label>
                 <select id="acct-proj" onchange="acctPrefillFromProject(this.value)">${projOpts}</select>
             </div>
             <div class="form-row">
                 <label>סוג מסמך</label>
-                <select id="acct-doctype" onchange="acctRenderDocPreview()">${docOpts}</select>
+                <select id="acct-doctype" onchange="acctOnDocTypeChange()">${docOpts}</select>
             </div>
             <div class="acct-sub">פרטי הלקוח</div>
             <div class="form-grid2">
@@ -2486,11 +2522,13 @@ function acctCreateHtml() {
             <div class="acct-sub">מע"מ</div>
             <div class="vat-pills">${vatPill('exclude', 'המחירים ללא מע"מ')}${vatPill('include', 'המחירים כולל מע"מ')}${vatPill('exempt', 'פטור ממע"מ')}</div>
             <div class="vat-breakdown" id="acct-vat-breakdown"></div>
+            <div id="acct-payment" class="acct-payment" style="display:none;"></div>
             <div class="designer-actions" style="margin-top:14px;">
                 <button class="btn btn-secondary" onclick="switchAcctSection('documents')">ביטול</button>
                 <button class="btn btn-accent" id="acct-submit" onclick="acctSubmitDocument()"><i class="fa-solid fa-paper-plane"></i> הפק ב-SmartBee</button>
             </div>
             <p class="input-help" style="margin-top:8px;">המסמך מופק דרך SmartBee ומקבל מספר רשמי. מוגבל ל-${(5000).toLocaleString('he-IL')} ₪ למסמך בשלב זה.</p>
+            <p class="input-help" style="margin-top:6px;"><i class="fa-solid fa-palette" style="color:#2bb58a;"></i> מסמכי SmartBee מופקים בצבע <b style="color:#2bb58a;">טורקיז</b> כברירת מחדל. לשינוי הצבע יש להתחבר לאתר שלהם: <a href="https://test.smartbee.co.il" target="_blank" rel="noopener" dir="ltr">test.smartbee.co.il</a></p>
         </div>
         <div class="acct-preview-pane">
             <div class="designer-preview-label"><i class="fa-solid fa-eye"></i> כך ייראה המסמך</div>
@@ -2575,6 +2613,49 @@ function acctRenderDocPreview() {
         </div>
       </div>`;
 }
+// Receipt payment section — shown only for receipt-type documents. The chosen
+// method's fields build the SmartBee receiptDetails on submit.
+function acctOnDocTypeChange() {
+    acctRenderDocPreview();
+    const dt = document.getElementById('acct-doctype')?.value || '';
+    const box = document.getElementById('acct-payment');
+    if (!box) return;
+    if (isReceiptDoc(dt)) { box.style.display = 'block'; acctRenderPayment(); }
+    else box.style.display = 'none';
+}
+function acctSetPayMethod(m) { acctPayMethod = m; acctRenderPayment(); }
+function acctRenderPayment() {
+    const box = document.getElementById('acct-payment');
+    if (!box) return;
+    const total = Math.round(acctVatBreakdown().total);
+    const today = getTodayDateString();
+    const pills = PAY_METHODS.map(m => `<button type="button" class="vat-pill ${acctPayMethod === m.id ? 'active' : ''}" onclick="acctSetPayMethod('${m.id}')">${m.label}</button>`).join('');
+    const inp = (id, ph, val, ltr) => `<input id="${id}" placeholder="${ph}" value="${val != null ? val : ''}" ${ltr ? 'dir="ltr"' : ''}>`;
+    const amt = inp('pay-sum', 'סכום *', total, true);
+    const date = `<input id="pay-date" type="date" value="${today}" dir="ltr">`;
+    let fields;
+    if (acctPayMethod === 'cash') fields = amt + date;
+    else if (acctPayMethod === 'wireTransfer') fields = inp('pay-bank', 'בנק') + inp('pay-branch', 'סניף', '', true) + inp('pay-account', 'מס׳ חשבון', '', true) + inp('pay-ref', 'אסמכתא (מאפליקציית הבנק) *', '', true) + amt + date;
+    else if (acctPayMethod === 'creditCard') fields = inp('pay-card', '4 ספרות אחרונות', '', true) + inp('pay-cardtype', 'סוג כרטיס') + inp('pay-installments', 'מס׳ תשלומים', 1, true) + amt + date;
+    else if (acctPayMethod === 'check') fields = inp('pay-bank', 'בנק') + inp('pay-branch', 'סניף', '', true) + inp('pay-account', 'מס׳ חשבון', '', true) + inp('pay-checkid', 'מס׳ המחאה', '', true) + amt + date;
+    else fields = inp('pay-desc', 'תיאור') + amt + date;
+    box.innerHTML = `
+        <div class="acct-sub">פרטי הקבלה — איך התקבל התשלום</div>
+        <div class="form-row"><label>סוג הכנסה</label>
+            <select id="acct-income"><option value="">כללית</option><option value="מכירת רכוש קבוע">מכירת רכוש קבוע</option></select></div>
+        <div class="vat-pills">${pills}</div>
+        <div class="form-grid2" style="margin-top:10px;">${fields}</div>`;
+}
+function acctBuildReceiptDetails() {
+    const val = (id) => (document.getElementById(id)?.value || '').trim();
+    const sum = Number(val('pay-sum')) || 0;
+    const date = val('pay-date') || undefined;
+    if (acctPayMethod === 'wireTransfer') return { ok: !!val('pay-ref'), why: 'חסרה אסמכתא להעברה בנקאית', rd: { wireTransferItems: [{ bankName: val('pay-bank'), branchName: val('pay-branch'), accountNumber: val('pay-account'), referenceNum: val('pay-ref'), sum, date }] } };
+    if (acctPayMethod === 'creditCard') return { ok: true, rd: { creditCardItems: [{ cardNumber: val('pay-card'), creditCardType: val('pay-cardtype') || undefined, creditDealType: 'Regular', installmentsNumber: Number(val('pay-installments')) || 1, sum, date }] } };
+    if (acctPayMethod === 'check') return { ok: true, rd: { checkItems: [{ bankName: val('pay-bank'), branchName: val('pay-branch'), accountNumber: val('pay-account'), checkId: val('pay-checkid'), sum, date }] } };
+    if (acctPayMethod === 'other') return { ok: true, rd: { otherItems: [{ description: val('pay-desc') || 'תשלום', sum, date }] } };
+    return { ok: true, rd: { cashItems: [{ sum, date }] } };
+}
 function acctPrefillFromProject(pid) {
     acctDraftProjectId = pid;
     const p = projectsList.find(x => x.id === pid);
@@ -2595,9 +2676,10 @@ function acctPrefillFromProject(pid) {
     acctRenderItems();
 }
 function acctAllClients() {
+    // Clients = the ones you added manually + real customers from issued
+    // documents. NOT project names (a project name isn't a client).
     const map = new Map();
     clientsList.forEach(c => { if (c && c.name) map.set(c.name.trim().toLowerCase(), c); });
-    projectsList.forEach(p => { const n = (p.quoteData && p.quoteData.clientName) || ''; if (n && !map.has(n.trim().toLowerCase())) map.set(n.trim().toLowerCase(), { name: n }); });
     invoicesList.forEach(d => { const n = d.customer && d.customer.name; if (n && !map.has(n.trim().toLowerCase())) map.set(n.trim().toLowerCase(), { name: n }); });
     return [...map.values()];
 }
@@ -2624,13 +2706,21 @@ async function acctSubmitDocument() {
     const docType = val('acct-doctype') || 'DealInvoice';
     const vatType = acctVatBasis;
     const total = acctVatBreakdown().total;
+    // Receipt-type docs also need HOW the money was received (receiptDetails).
+    let receiptDetails, incomeClassName;
+    if (isReceiptDoc(docType)) {
+        const rr = acctBuildReceiptDetails();
+        if (!rr.ok) { showToast(rr.why || 'חסרים פרטי תשלום', 'error'); return; }
+        receiptDetails = rr.rd;
+        incomeClassName = val('acct-income') || undefined;
+    }
     const btn = document.getElementById('acct-submit');
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> מפיק…'; }
     try {
         const res = await fetch('/api/invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
-            body: JSON.stringify({ docType, customer, items: items.map(it => ({ description: it.description, quantity: it.quantity, pricePerUnit: it.pricePerUnit })), vatType, quoteId: acctDraftProjectId || undefined }),
+            body: JSON.stringify({ docType, customer, items: items.map(it => ({ description: it.description, quantity: it.quantity, pricePerUnit: it.pricePerUnit })), vatType, quoteId: acctDraftProjectId || undefined, receiptDetails, incomeClassName }),
         });
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || 'ההפקה נכשלה');
@@ -3571,8 +3661,11 @@ function applyQuoteLayout() {
         if (id === 'header') headerOrder = i;
         const b = L.blocks[id] || {};
         el.style.textAlign = b.align || '';
-        el.style.fontWeight = b.bold ? '700' : '';
-        el.style.textDecoration = b.underline ? 'underline' : '';
+        // Bold/underline via CLASSES that force the style onto text-bearing
+        // children too — an inline text-decoration on the block doesn't reach a
+        // child <h1>/<td> (they reset it), so underline looked like it did nothing.
+        el.classList.toggle('qb-bold', !!b.bold);
+        el.classList.toggle('qb-underline', !!b.underline);
         // Size via font-size (em), NOT `zoom` — html2canvas (the PDF renderer)
         // ignores `zoom`, so the on-screen size change was lost in the export.
         // font-size scales text blocks reliably in both the preview and the PDF.
@@ -3731,7 +3824,7 @@ function stepBlockSize(id, dir) {
 }
 function setQuoteEnglish(on) {
     getQuoteLayout().english = !!on;
-    saveQuoteLayout(); applyQuoteLayout();
+    saveQuoteLayout(); applyQuoteLayout(); renderDesignerPreview();
 }
 function resetQuoteDesign() {
     appState.settings.quoteLayout = defaultQuoteLayout();
@@ -7069,8 +7162,9 @@ function checkGoogleSession() {
 // returning, consented user this returns an ID token (JWT) with no UI, which we
 // send as the bearer to /api/* — the server verifies it via tokeninfo.
 let _idAuthTried = 0;
+let _idPromptPending = false;
 function silentIdTokenAuth() {
-    if (isGuestUser()) return;
+    if (isGuestUser() || googleAccessToken || _idPromptPending) return; // don't overlap prompts
     const clientId = localStorage.getItem('sj_global_google_client_id');
     if (!clientId) return;
     if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
@@ -7082,6 +7176,7 @@ function silentIdTokenAuth() {
             client_id: clientId,
             auto_select: true,
             callback: (resp) => {
+                _idPromptPending = false;
                 if (resp && resp.credential) {
                     googleAccessToken = resp.credential; // ID token (JWT) as the bearer
                     localStorage.setItem(getStorageKey('sj_drive_access_token'), googleAccessToken);
@@ -7091,8 +7186,11 @@ function silentIdTokenAuth() {
                 }
             },
         });
+        _idPromptPending = true;
         google.accounts.id.prompt(); // auto-selects silently for a single returning account
-    } catch (e) { /* fall back to the gesture path */ }
+        // Release the guard if no callback fires (blocked / dismissed).
+        setTimeout(() => { _idPromptPending = false; }, 4000);
+    } catch (e) { _idPromptPending = false; /* fall back to the gesture path */ }
 }
 
 // One-time (per need) first-gesture handler that mints a fresh Google access

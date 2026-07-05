@@ -92,6 +92,24 @@ export async function onRequestPost(context) {
   const DOC_TYPES = ['InvoiceReceipt', 'Receipt', 'ReceiptRefund', 'Invoice', 'RefundInvoice', 'DealInvoice'];
   const docType = DOC_TYPES.includes(body.docType) ? body.docType : 'DealInvoice';
 
+  // Receipt-type documents carry a `receiptDetails` block describing HOW the
+  // money was received (only the chosen method's array is populated). We accept
+  // it from the client as-is (validated shape below) and pass it through.
+  const RECEIPT_TYPES = ['Receipt', 'InvoiceReceipt', 'ReceiptRefund'];
+  let receiptDetails;
+  if (RECEIPT_TYPES.includes(docType) && body.receiptDetails && typeof body.receiptDetails === 'object') {
+    const rd = body.receiptDetails;
+    const arr = (a) => (Array.isArray(a) ? a : undefined);
+    receiptDetails = {
+      cashItems: arr(rd.cashItems),
+      creditCardItems: arr(rd.creditCardItems),
+      checkItems: arr(rd.checkItems),
+      wireTransferItems: arr(rd.wireTransferItems),
+      otherItems: arr(rd.otherItems),
+      taxWithholding: Number(rd.taxWithholding) || undefined,
+    };
+  }
+
   const nowIso = new Date().toISOString();
   const payload = {
     providerUserToken,
@@ -100,6 +118,7 @@ export async function onRequestPost(context) {
     docType,
     docDate: body.docDate || nowIso,
     dueDate: body.dueDate || nowIso,                          // required by SmartBee for these doc types
+    incomeClassName: body.incomeClassName || undefined,      // "סוג הכנסה" (optional free label)
     customer: {
       name: String(customer.name).slice(0, 100),
       email: customer.email || undefined,
@@ -109,6 +128,7 @@ export async function onRequestPost(context) {
       cityName: customer.city || undefined,
     },
     documentItems: { paymentItems },
+    receiptDetails,
     comments: (body.comments || '').slice(0, 5024) || undefined,
     isDraft: body.isDraft === true,
   };
