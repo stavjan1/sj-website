@@ -4000,3 +4000,32 @@ body:not(.in-project) .proj-tab { display: none !important; }
     #panel-archive .section-header, #panel-archive .project-search-row { flex-shrink: 0; }
     #panel-archive .archive-list { flex: 1; min-height: 0; overflow-y: auto; }
 }
+
+/* ==========================================================================
+   v4.18 — pricing benchmark: editor bar + admin stats dashboard
+   ========================================================================== */
+.benchmark-bar {
+    display: none; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 10px 14px; margin-bottom: 12px;
+    background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.35);
+    border-radius: 10px; font-size: 0.85rem; line-height: 1.5;
+}
+.benchmark-bar > i { color: #22c55e; }
+.benchmark-bar b { color: var(--text-primary); }
+.benchmark-bar .bm-note { color: var(--text-muted); font-size: 0.74rem; margin-inline-start: auto; }
+
+.admin-stats-kpis { display: flex; gap: 12px; flex-wrap: wrap; }
+.admin-stats-kpis .ask {
+    flex: 1; min-width: 110px; background: var(--bg-input);
+    border: 1px solid var(--border-color); border-radius: 10px;
+    padding: 12px 14px; display: flex; flex-direction: column; gap: 2px;
+}
+.admin-stats-kpis .asv { font-size: 1.5rem; font-weight: 800; color: #f0c040; }
+.admin-stats-kpis .asl { font-size: 0.75rem; color: var(--text-muted); }
+.admin-stats-live { background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px 14px; }
+.toggle-line { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.86rem; }
+.toggle-line input { width: 18px; height: 18px; flex-shrink: 0; }
+.admin-stats-tbl { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.admin-stats-tbl th, .admin-stats-tbl td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--border-color); }
+.admin-stats-tbl th { color: var(--text-muted); font-weight: 700; font-size: 0.76rem; }
+.admin-stats-tbl tbody tr:hover { background: rgba(255,255,255,0.02); }

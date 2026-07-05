@@ -1349,6 +1349,10 @@ function switchTab(tabId) {
     if (tabId === 'create') {
         ensureQuoteNumber();
         requestAnimationFrame(fitQuotePreview); // scale the A4 preview to fit the pane
+        refreshBenchmarkBar(); // "עבודה כזו תומחרה ב-X" (only if admin went live)
+    }
+    if (tabId === 'admin') {
+        try { renderAdminStats(); } catch (e) {}
     }
     if (tabId === 'reports') {
         initReportsPanel();
@@ -2079,7 +2083,8 @@ function loadSettings() {
             _set('settings-drive-client-id', appState.settings.googleClientId || localStorage.getItem('sj_global_google_client_id') || '');
             _set('settings-drive-folder-id', appState.settings.googleFolderId || '');
             _set('set-phrasing-db', appState.settings.phrasingDb || '');
-            
+            _set('set-stats-share', appState.settings.statsShareMode || 'anon');
+
             const biz = appState.settings.businessDetails;
             if (biz) {
                 document.getElementById('set-biz-name').value = biz.name || '';
@@ -2363,6 +2368,137 @@ function updatePdfCustomStyles() {
             sigRow.style.display = showSignature ? 'flex' : 'none';
         }
     }
+}
+
+// ==========================================================================
+// Pricing benchmark ("עבודה כזו תומחרה ב-X") — anonymous, labor-only.
+// Captured silently at PDF export from day one; the benchmark BAR only shows
+// once the admin flips it live AND a bucket has enough samples. Privacy: only
+// { profession, jobType, labor } leave the device — never client details.
+// ==========================================================================
+const STAT_JOB_TYPES = [
+    { id: 'panel',      label: 'לוח חשמל (החלפה/התקנה)', kw: ['לוח', 'מאמ', 'פחת', 'תלת פאזי', 'חד פאזי', 'מפסק ראשי'] },
+    { id: 'charger',    label: 'עמדת טעינה',              kw: ['טעינ', 'עמדת', 'wallbox', 'רכב חשמלי'] },
+    { id: 'solar',      label: 'מערכת סולארית',           kw: ['סולאר', 'פנל', 'ממיר', 'pv', 'נטו'] },
+    { id: 'inspection', label: 'בדיקת מתקן / הארקה',       kw: ['בדיק', 'הארק', 'מגר', 'בידוד', 'דוח'] },
+    { id: 'fault',      label: 'תיקון תקלה',              kw: ['תקל', 'תיקון', 'קצר', 'נשרף', 'הקפצ'] },
+    { id: 'points',     label: 'נקודות חשמל / תאורה',      kw: ['נקוד', 'שקע', 'מפסק', 'תאור', 'גוף תאורה', 'ספוט'] },
+    { id: 'infra',      label: 'תשתית / חיווט',           kw: ['חיווט', 'תשתית', 'כבל', 'מוביל', 'תעל', 'חפיר', 'חציב'] },
+    { id: 'other',      label: 'אחר',                     kw: [] },
+];
+function classifyJobType(text) {
+    const t = String(text || '').toLowerCase();
+    for (const j of STAT_JOB_TYPES) { if (j.kw.some(k => t.includes(k))) return j.id; }
+    return 'other';
+}
+function jobTypeLabel(id) { const j = STAT_JOB_TYPES.find(x => x.id === id); return j ? j.label : 'עבודה'; }
+
+// The labor-only figure for the active project (the pricing agent's estimate).
+function activeProjectLabor() {
+    const proj = projectsList.find(p => p.id === activeProjectId);
+    if (proj && Number(proj.laborPrice) > 0) return Number(proj.laborPrice);
+    const inp = document.getElementById('wizard-labor-price');
+    return inp && Number(inp.value) > 0 ? Number(inp.value) : 0;
+}
+
+// Fire once on PDF export — silent, non-blocking, never breaks the download.
+function recordQuoteStat() {
+    try {
+        const mode = (appState.settings && appState.settings.statsShareMode) || 'anon';
+        if (mode === 'off') return; // the user opted out of contributing
+        const labor = activeProjectLabor();
+        if (!(labor > 0)) return;
+        const proj = projectsList.find(p => p.id === activeProjectId);
+        const subject = (proj && proj.quoteData && proj.quoteData.subject) ||
+            document.getElementById('form-quote-subject')?.value || '';
+        const payload = {
+            profession: (appState.settings && appState.settings.profession) || 'general',
+            jobType: classifyJobType(subject + ' ' + ((proj && (proj.scope || []).join(' ')) || '')),
+            labor: Math.round(labor),
+            quoteId: (proj && proj.id) || (appState.currentQuote && appState.currentQuote.id) || '',
+        };
+        if (mode === 'named') {
+            payload.named = (appState.settings.businessDetails && appState.settings.businessDetails.name) || '';
+        }
+        fetch('/api/stats', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        }).catch(() => {}); // fire-and-forget
+    } catch (e) { /* stats must never affect the user's export */ }
+}
+
+// The benchmark bar in the editor. Hidden unless the server says it's live AND
+// the bucket has enough samples (config:statsLive off → shows nothing, ever).
+async function refreshBenchmarkBar() {
+    const bar = document.getElementById('benchmark-bar');
+    if (!bar) return;
+    bar.style.display = 'none';
+    const proj = projectsList.find(p => p.id === activeProjectId);
+    const subject = (proj && proj.quoteData && proj.quoteData.subject) ||
+        document.getElementById('form-quote-subject')?.value || '';
+    if (!subject.trim()) return;
+    const job = classifyJobType(subject + ' ' + ((proj && (proj.scope || []).join(' ')) || ''));
+    const prof = (appState.settings && appState.settings.profession) || 'general';
+    try {
+        const res = await fetch(`/api/stats?job=${encodeURIComponent(job)}&prof=${encodeURIComponent(prof)}`);
+        const d = await res.json();
+        if (!d || !d.live || !d.enough) return;
+        bar.innerHTML = `<i class="fa-solid fa-chart-simple"></i>
+            עבודות מסוג <b>${escapeHtml(jobTypeLabel(job))}</b> תומחרו בדרך כלל
+            <b>${d.low.toLocaleString('he-IL')}–${d.high.toLocaleString('he-IL')} ₪</b>
+            (אמצע ${d.median.toLocaleString('he-IL')} ₪, עבודה בלבד · מתוך ${d.count} הצעות)
+            <span class="bm-note">להתרשמות — כל עבודה שונה</span>`;
+        bar.style.display = 'flex';
+    } catch (e) { /* offline / not live — stay hidden */ }
+}
+
+// ---- Admin: aggregate stats dashboard (no PII) ----
+async function renderAdminStats() {
+    if (!isAdmin()) return;
+    const kpis = document.getElementById('admin-stats-kpis');
+    const tableBox = document.getElementById('admin-stats-table');
+    if (kpis) kpis.innerHTML = '<span class="input-help">טוען…</span>';
+    try {
+        const res = await fetch('/api/stats?admin=1', { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
+        const d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        if (kpis) kpis.innerHTML = `
+            <div class="ask"><span class="asv">${(d.total || 0).toLocaleString('he-IL')}</span><span class="asl">הצעות סה"כ</span></div>
+            <div class="ask"><span class="asv">${(d.thisMonth || 0).toLocaleString('he-IL')}</span><span class="asl">החודש</span></div>
+            <div class="ask"><span class="asv">${(d.buckets || []).length}</span><span class="asl">קטגוריות פעילות</span></div>`;
+        const toggle = document.getElementById('admin-stats-live-toggle');
+        if (toggle) toggle.checked = !!d.live;
+        const note = document.getElementById('admin-stats-live-note');
+        if (note) note.textContent = d.live ? 'התצוגה פעילה — משתמשים רואים ממוצעים (במקום שיש לפחות ' + d.minSamples + ' דגימות).' : 'התצוגה כבויה — נאספים נתונים בשקט.';
+        const rows = (d.buckets || []).map(b => `
+            <tr>
+                <td>${escapeHtml(jobTypeLabel(b.jobType))}</td>
+                <td>${escapeHtml(b.profession)}</td>
+                <td>${b.count}</td>
+                <td>${b.count >= d.minSamples ? b.low.toLocaleString('he-IL') + '–' + b.high.toLocaleString('he-IL') + ' ₪' : '<span class="input-help">מעט מדי</span>'}</td>
+                <td>${b.count >= d.minSamples ? b.median.toLocaleString('he-IL') + ' ₪' : '—'}</td>
+                <td>${b.named || 0}</td>
+            </tr>`).join('');
+        if (tableBox) tableBox.innerHTML = (d.buckets || []).length
+            ? `<table class="admin-stats-tbl"><thead><tr><th>סוג עבודה</th><th>מקצוע</th><th>דגימות</th><th>טווח (עבודה)</th><th>חציון</th><th>עם שם</th></tr></thead><tbody>${rows}</tbody></table>`
+            : '<p class="input-help">עוד לא נאספו נתונים. כל הורדת PDF תתחיל למלא את הטבלה.</p>';
+    } catch (e) {
+        if (kpis) kpis.innerHTML = `<span class="input-help" style="color:#f05252;">שגיאה: ${e.message}</span>`;
+    }
+}
+async function adminSetStatsLive(on) {
+    try {
+        const res = await fetch('/api/stats', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({ setLive: !!on }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        showToast(on ? 'הסטטיסטיקה פעילה — משתמשים יראו ממוצעים' : 'הסטטיסטיקה כבויה — ממשיכים לאסוף בשקט');
+        renderAdminStats();
+    } catch (e) { showToast('שגיאה: ' + e.message, 'error'); }
 }
 
 // ==========================================================================
@@ -2671,7 +2807,9 @@ function saveBusinessSettings() {
         terms: document.getElementById('set-biz-terms').value
     };
     appState.settings.phrasingDb = document.getElementById('set-phrasing-db').value;
-    
+    const shareSel = document.getElementById('set-stats-share');
+    if (shareSel) appState.settings.statsShareMode = shareSel.value; // anon | named | off
+
     // Save PDF design parameters
     appState.settings.pdfFontFamily = document.getElementById('pdf-font-family')?.value || "'Heebo', sans-serif";
     appState.settings.pdfFontSizeBody = document.getElementById('pdf-font-size-body')?.value || '12';
@@ -5483,6 +5621,7 @@ function downloadPDF() {
             restoreSheet();
             showToast('קובץ PDF הורד בהצלחה');
             saveToHistory(false);
+            recordQuoteStat(); // anonymous labor-price benchmark (silent)
         })
         .catch(err => {
             restoreSheet();
