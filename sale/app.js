@@ -1065,6 +1065,9 @@ function handleExpiredCloudToken() {
     localStorage.removeItem(getStorageKey('sj_drive_access_token'));
     sessionStorage.removeItem(getStorageKey('sj_drive_access_token'));
     updateDriveStatus(false);
+    // The token lapsed — re-arm a fresh mint on the next user gesture so cloud
+    // sync recovers by itself instead of silently staying local-only.
+    if (typeof armGoogleTokenRefreshOnGesture === 'function') armGoogleTokenRefreshOnGesture();
 }
 
 async function cloudSaveNow() {
@@ -5998,35 +6001,38 @@ function checkGoogleSession() {
         googleAccessToken = savedToken;
         updateDriveStatus(true);
     }
-    // The saved token is almost always expired — GIS access tokens live ~1h and
-    // there is NO refresh token in the implicit flow. So on every load we
-    // silently mint a FRESH one; without this, cloud sync never runs for a
-    // returning user and every browser stays a local-only island (the data
-    // never converges across devices). THIS is the cross-device sync fix.
-    silentGoogleTokenRefresh((ok) => {
-        if (ok) return; // fresh token obtained → it already kicked a cloud merge
-        refreshTierInfo();
-        // No silent token (Google session lapsed / cookies blocked). Try the old
-        // token once; a 401 clears it and the UI shows "reconnect".
-        if (savedToken) setTimeout(() => cloudLoadAndMerge(true), 400);
-    });
+    refreshTierInfo();
+    // Sync with the saved token. If it's expired the GET 401s and
+    // handleExpiredCloudToken() clears it and re-arms the gesture refresh below.
+    if (savedToken) cloudLoadAndMerge(true);
+    // GIS access tokens live ~1h with no refresh token, and minting a new one
+    // opens a popup that the browser BLOCKS unless it's triggered by a user
+    // gesture. So we re-mint the token on the user's FIRST interaction whenever
+    // we don't currently hold one — restoring cloud sync automatically (no
+    // "reconnect" button to hunt for). Without this, a returning user has no
+    // valid token → sync never runs → every browser is a local-only island.
+    armGoogleTokenRefreshOnGesture();
 }
 
-// GIS access tokens are short-lived (~1h) with no refresh token, so on every
-// load we silently request a fresh one (prompt:'none'). With an active Google
-// session + prior consent this returns a token with NO popup. onDone(true) =
-// got a fresh token and kicked a full cloud pull+merge+push.
-let _silentTokenRetry = 0;
-function silentGoogleTokenRefresh(onDone) {
-    if (isGuestUser()) { if (onDone) onDone(false); return; }
+// One-time (per need) first-gesture handler that mints a fresh Google access
+// token when we don't have one, then runs the bidirectional cloud merge. It's a
+// no-op while a valid token is held, so it never pops up unnecessarily.
+let _tokenGestureHandler = null;
+function armGoogleTokenRefreshOnGesture() {
+    if (isGuestUser() || _tokenGestureHandler) return;
+    _tokenGestureHandler = () => {
+        if (googleAccessToken) return;   // still have a token → nothing to refresh
+        document.removeEventListener('pointerdown', _tokenGestureHandler, true);
+        _tokenGestureHandler = null;
+        mintGoogleAccessToken();
+    };
+    document.addEventListener('pointerdown', _tokenGestureHandler, true);
+}
+
+function mintGoogleAccessToken() {
     const clientId = localStorage.getItem('sj_global_google_client_id');
-    if (!clientId) { if (onDone) onDone(false); return; }
-    // GIS script loads async — retry a few times before giving up.
-    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
-        if (_silentTokenRetry++ < 8) setTimeout(() => silentGoogleTokenRefresh(onDone), 500);
-        else if (onDone) onDone(false);
-        return;
-    }
+    if (!clientId || isGuestUser()) return;
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return;
     try {
         const tc = google.accounts.oauth2.initTokenClient({
             client_id: clientId,
@@ -6038,15 +6044,13 @@ function silentGoogleTokenRefresh(onDone) {
                     updateDriveStatus(true);
                     refreshTierInfo();
                     cloudLoadAndMerge(true); // pull + union-merge + push → converges every device
-                    if (onDone) onDone(true);
-                } else if (onDone) { onDone(false); }
+                }
             },
-            error_callback: () => { if (onDone) onDone(false); },
         });
-        tc.requestAccessToken({ prompt: 'none' });
-    } catch (e) {
-        if (onDone) onDone(false);
-    }
+        // Called from within a user gesture → the popup is allowed; consent is
+        // already granted so it completes fast (often with no visible window).
+        tc.requestAccessToken({ prompt: '' });
+    } catch (e) { /* stay local-only */ }
 }
 
 function updateDriveStatus(connected) {
