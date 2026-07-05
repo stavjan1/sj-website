@@ -1355,9 +1355,10 @@ function formatHebrewDate(dateString) {
 // ==========================================================================
 const NAV_WORLDS = {
     projects:   { label: 'ניהול פרויקטים', icon: 'fa-folder-open', tabs: [
-        { id: 'projects', label: 'פרויקטים',        icon: 'fa-list-check' },
-        { id: 'history',  label: 'היסטוריית הצעות', icon: 'fa-clock-rotate-left' },
-        { id: 'archive',  label: 'ארכיון לקוחות',   icon: 'fa-address-book' },
+        { id: 'projects',   label: 'פרויקטים',        icon: 'fa-list-check' },
+        { id: 'statistics', label: 'סטטיסטיקה',       icon: 'fa-chart-column' },
+        { id: 'history',    label: 'היסטוריית הצעות', icon: 'fa-clock-rotate-left' },
+        { id: 'archive',    label: 'ארכיון לקוחות',   icon: 'fa-address-book' },
     ] },
     accounting: { label: 'הנהלת חשבונות', icon: 'fa-file-invoice-dollar', bee: true, tabs: [
         { id: 'accounting', label: 'חשבוניות וסליקה', icon: 'fa-receipt' },
@@ -1370,7 +1371,7 @@ const NAV_WORLDS = {
 };
 const TAB_WORLD = {
     projects: 'projects', wizard: 'projects', create: 'projects', reports: 'projects',
-    history: 'projects', archive: 'projects',
+    history: 'projects', archive: 'projects', statistics: 'projects',
     accounting: 'accounting',
     business: 'prefs', catalog: 'prefs', settings: 'prefs', admin: 'prefs',
 };
@@ -1465,6 +1466,9 @@ function switchTab(tabId) {
     }
     if (tabId === 'archive') {
         renderClientArchive();
+    }
+    if (tabId === 'statistics') {
+        renderStatistics();
     }
     // Keep the top-bar world + sub-tab row in sync with whatever panel is shown.
     syncTopNav(tabId);
@@ -2156,6 +2160,90 @@ function persistSettings() {
         localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
     } catch (e) { /* storage full / disabled — non-fatal */ }
     if (typeof scheduleCloudSync === 'function') scheduleCloudSync();
+}
+
+// ── Statistics: pipeline board (funnel of projects by stage) ─────────────────
+// Columns: תכנון → הצעה → בוצע → ממתין לתשלום → שולם. Each project lands in one
+// column derived from its status (+ workflow stage for drafts). A completed job
+// ('הושלם') sits in "בוצע" until an invoice is issued, which flips the
+// awaitingPayment flag → "ממתין לתשלום"; marking paid sets status 'שולם'.
+const PIPELINE_COLS = [
+    { key: 'planning', label: 'תכנון',        icon: 'fa-compass-drafting', accent: '#8aa0d8' },
+    { key: 'quote',    label: 'הצעה',         icon: 'fa-file-invoice',     accent: '#f0c040' },
+    { key: 'executed', label: 'בוצע',         icon: 'fa-helmet-safety',    accent: '#34c759' },
+    { key: 'awaiting', label: 'ממתין לתשלום', icon: 'fa-hourglass-half',   accent: '#fb923c' },
+    { key: 'paid',     label: 'שולם',         icon: 'fa-sack-dollar',      accent: '#22d3ee' },
+];
+
+function projectPipelineStage(p) {
+    const s = p.status || 'טיוטה';
+    if (s === 'שולם') return 'paid';
+    if (s === 'הושלם') return p.awaitingPayment ? 'awaiting' : 'executed';
+    if (s === 'נשלח') return 'quote';
+    return getProjectStage(p) === 'planning' ? 'planning' : 'quote';
+}
+
+function projectAmount(p) {
+    const qd = p.quoteData || {};
+    return Number(qd.finalPrice || qd.total || 0) || 0;
+}
+
+function renderStatistics() {
+    const board = document.getElementById('pipeline-board');
+    if (!board) return;
+    const nis = (n) => '₪' + Math.round(n).toLocaleString('he-IL');
+    const cols = {};
+    PIPELINE_COLS.forEach(c => cols[c.key] = []);
+    (projectsList || []).forEach(p => { (cols[projectPipelineStage(p)] || cols.planning).push(p); });
+
+    board.innerHTML = PIPELINE_COLS.map(c => {
+        const items = cols[c.key];
+        const sum = items.reduce((s, p) => s + projectAmount(p), 0);
+        const cards = items.length ? items.map(p => {
+            const amt = projectAmount(p);
+            let adv = '';
+            if (c.key === 'executed') adv = `<button class="pipe-adv" onclick="pipelineAdvance('${p.id}','awaiting',event)" title="חשבונית נשלחה — העבר לממתין לתשלום">חשבונית <i class="fa-solid fa-arrow-left"></i></button>`;
+            else if (c.key === 'awaiting') adv = `<button class="pipe-adv" onclick="pipelineAdvance('${p.id}','paid',event)" title="התקבל תשלום — סמן שולם">שולם <i class="fa-solid fa-arrow-left"></i></button>`;
+            return `<div class="pipe-card" onclick="loadProject('${p.id}')" title="פתח את הפרויקט">
+                <div class="pipe-card-name">${escapeHtml(p.name)}</div>
+                <div class="pipe-card-foot">
+                    <span class="pipe-card-amt">${amt ? nis(amt) : '—'}</span>
+                    ${adv}
+                </div>
+            </div>`;
+        }).join('') : `<div class="pipe-empty">—</div>`;
+        return `<div class="pipe-col" style="--pipe-accent:${c.accent}">
+            <div class="pipe-col-head">
+                <span class="pipe-col-title"><i class="fa-solid ${c.icon}"></i> ${c.label}</span>
+                <span class="pipe-col-count">${items.length}</span>
+            </div>
+            <div class="pipe-col-sum">${nis(sum)}</div>
+            <div class="pipe-col-body">${cards}</div>
+        </div>`;
+    }).join('');
+
+    const totalCount = (projectsList || []).length;
+    const totalValue = (projectsList || []).reduce((s, p) => s + projectAmount(p), 0);
+    const paidValue = cols.paid.reduce((s, p) => s + projectAmount(p), 0);
+    const openValue = totalValue - paidValue;
+    const head = document.getElementById('pipeline-summary');
+    if (head) head.innerHTML = `
+        <div class="pipe-stat"><span class="pipe-stat-num">${totalCount}</span><span class="pipe-stat-lbl">פרויקטים</span></div>
+        <div class="pipe-stat"><span class="pipe-stat-num">${nis(totalValue)}</span><span class="pipe-stat-lbl">שווי צבר כולל</span></div>
+        <div class="pipe-stat"><span class="pipe-stat-num" style="color:#fb923c">${nis(openValue)}</span><span class="pipe-stat-lbl">פתוח (טרם שולם)</span></div>
+        <div class="pipe-stat"><span class="pipe-stat-num" style="color:#22d3ee">${nis(paidValue)}</span><span class="pipe-stat-lbl">שולם</span></div>`;
+}
+
+function pipelineAdvance(projectId, to, e) {
+    if (e) e.stopPropagation();
+    const p = projectsList.find(x => x.id === projectId);
+    if (!p) return;
+    if (to === 'awaiting') { p.status = 'הושלם'; p.awaitingPayment = true; }
+    else if (to === 'paid') { p.status = 'שולם'; p.awaitingPayment = false; }
+    p.statusChangedAt = Date.now();
+    saveProjects();
+    renderStatistics();
+    showToast(to === 'paid' ? 'סומן כשולם 💰' : 'הועבר לממתין לתשלום');
 }
 
 function updateMetricsDashboard() {

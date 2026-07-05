@@ -110,6 +110,10 @@
                     <i class="fa-solid fa-ellipsis"></i>
                     <span>עוד</span>
                 </button>
+                <button class="nav-btn" id="tab-statistics" onclick="switchTab('statistics')">
+                    <i class="fa-solid fa-chart-column"></i>
+                    <span>סטטיסטיקה</span>
+                </button>
                 <button class="nav-btn" id="tab-history" onclick="switchTab('history')">
                     <i class="fa-solid fa-clock-rotate-left"></i>
                     <span>היסטוריית הצעות</span>
@@ -744,7 +748,17 @@
                     </div>
                 </div>
             </section>
-            
+
+            <!-- Tab: Statistics — pipeline funnel of projects by stage -->
+            <section id="panel-statistics" class="content-panel">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-chart-column"></i> סטטיסטיקה</h2>
+                    <p class="section-subtitle">צינור העבודה שלך — כל הפרויקטים לפי שלב, מהתכנון ועד לתשלום, עם שווי כספי לכל עמודה.</p>
+                </div>
+                <div class="pipeline-summary" id="pipeline-summary"></div>
+                <div class="pipeline-board" id="pipeline-board"></div>
+            </section>
+
             <!-- Tab: History -->
             <!-- Client Archive: every quote/project grouped by client -->
             <section id="panel-archive" class="content-panel">
