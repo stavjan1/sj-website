@@ -4346,3 +4346,45 @@ body.light-theme .card-header { background: linear-gradient(180deg, rgba(37,99,2
 .recycle-name { font-weight: 700; font-size: 0.9rem; }
 .recycle-meta { font-size: 0.75rem; color: var(--text-muted); }
 .recycle-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+/* ==========================================================================
+   v5.1 — independent box/surface theme
+   The PAGE keeps the system theme (default dark, or .light-theme). Setting a
+   box theme re-declares the SURFACE variables on the content surfaces only, so
+   the cards flip palette while the page background stays as-is. Each surface
+   redefines both its bg and its text vars together — text can never end up on a
+   mismatched surface. Placed at end of file to win specificity ties vs the base
+   / .light-theme / v5.0 card rules.
+   ========================================================================== */
+body.boxes-dark .section-card,
+body.boxes-dark .projects-main,
+body.boxes-dark .projects-cats,
+body.boxes-dark .projects-stats,
+body.boxes-dark .metric-card,
+body.boxes-dark .project-card,
+body.boxes-dark #panel-business,
+body.boxes-dark #panel-admin {
+    --bg-card: #141d2e; --bg-card-header: #182035; --bg-input: #182035;
+    --border-color: #253045; --border-hover: #3a4d68;
+    --text-primary: #eef2fb; --text-secondary: #b6c4dc; --text-muted: #8a9cb8;
+    color: var(--text-primary);
+}
+body.boxes-light .section-card,
+body.boxes-light .projects-main,
+body.boxes-light .projects-cats,
+body.boxes-light .projects-stats,
+body.boxes-light .metric-card,
+body.boxes-light .project-card,
+body.boxes-light #panel-business,
+body.boxes-light #panel-admin {
+    --bg-card: #ffffff; --bg-card-header: #f8fafc; --bg-input: #f1f5f9;
+    --border-color: #cbd5e1; --border-hover: #94a3b8;
+    --text-primary: #0f172a; --text-secondary: #334155; --text-muted: #64748b;
+    color: var(--text-primary);
+}
+/* .section-card / .card-header carry HARDCODED backgrounds (and light-theme
+   overrides), so re-assert an explicit background matching the forced box theme. */
+body.boxes-dark .section-card { background: linear-gradient(160deg, #162038 0%, #111828 100%); }
+body.boxes-dark .card-header { background: linear-gradient(180deg, var(--color-accent-glow) 0%, transparent 100%); }
+body.boxes-light .section-card { background: #ffffff; }
+body.boxes-light .card-header { background: linear-gradient(180deg, rgba(37,99,235,0.08) 0%, transparent 100%); }

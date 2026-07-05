@@ -881,6 +881,21 @@
                                         </button>
                                     </div>
                                 </div>
+                                <div class="form-group">
+                                    <label style="font-weight:600; margin-bottom:8px; display:block;">צבע התיבות והכרטיסים</label>
+                                    <p class="input-help" style="margin:-4px 0 8px; opacity:.7;">אפשר להשאיר את התיבות בצבע נגדי לרקע — למשל רקע בהיר עם תיבות כהות.</p>
+                                    <div style="display:flex; gap:10px;">
+                                        <button type="button" class="btn btn-secondary active" id="box-btn-auto" onclick="setBoxTheme('auto')" style="flex:1; display:flex; align-items:center; justify-content:center; gap:8px; padding:10px;">
+                                            <i class="fa-solid fa-wand-magic-sparkles"></i> כמו הרקע
+                                        </button>
+                                        <button type="button" class="btn btn-secondary" id="box-btn-light" onclick="setBoxTheme('light')" style="flex:1; display:flex; align-items:center; justify-content:center; gap:8px; padding:10px;">
+                                            <i class="fa-solid fa-square"></i> תיבות בהירות
+                                        </button>
+                                        <button type="button" class="btn btn-secondary" id="box-btn-dark" onclick="setBoxTheme('dark')" style="flex:1; display:flex; align-items:center; justify-content:center; gap:8px; padding:10px;">
+                                            <i class="fa-solid fa-square" style="color:#141d2e;"></i> תיבות כהות
+                                        </button>
+                                    </div>
+                                </div>
                                 <div class="form-group" style="margin-top:8px;">
                                     <label style="font-weight:600; margin-bottom:8px; display:block;">רקע קולנועי (Cinematic Background)</label>
                                     <div class="background-grid" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:10px;">

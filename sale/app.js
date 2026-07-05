@@ -2495,6 +2495,7 @@ function loadSettings() {
 
             // Apply saved theme (explicit user choice wins; otherwise follow the OS)
             applySystemTheme(appState.settings.theme || defaultThemeByOS());
+            applyBoxTheme(appState.settings.boxTheme || 'auto');
             applySystemBackground(appState.settings.selectedBackground || 'none');
             updatePdfCustomStyles();
         } catch (e) {
@@ -2503,6 +2504,7 @@ function loadSettings() {
     } else {
         // Apply defaults if no settings are saved
         applySystemTheme(defaultThemeByOS());
+        applyBoxTheme('auto');
         applySystemBackground('none');
         updatePdfCustomStyles();
     }
@@ -2621,6 +2623,38 @@ function setSystemTheme(theme) {
     applySystemTheme(theme);
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
     showToast(theme === 'light' ? 'עבר למצב בהיר' : 'עבר למצב כהה');
+}
+
+// Independent box/surface theme, layered on top of the page theme:
+//   'auto'  → surfaces follow the system theme (default)
+//   'light' → force light cards even on a dark page
+//   'dark'  → force dark cards even on a light page
+// Scoped to content surfaces only (see .boxes-light / .boxes-dark in the CSS),
+// so text always pairs with its own surface background — the page chrome keeps
+// the system theme.
+function applyBoxTheme(mode) {
+    document.body.classList.remove('boxes-light', 'boxes-dark');
+    if (mode === 'light') document.body.classList.add('boxes-light');
+    else if (mode === 'dark') document.body.classList.add('boxes-dark');
+
+    const buttons = { auto: 'box-btn-auto', light: 'box-btn-light', dark: 'box-btn-dark' };
+    Object.entries(buttons).forEach(([k, id]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const on = k === (mode || 'auto');
+        el.classList.toggle('active', on);
+        el.style.backgroundColor = on ? 'var(--color-accent)' : '';
+        el.style.color = on ? '#fff' : '';
+    });
+}
+
+function setBoxTheme(mode) {
+    if (!appState.settings) appState.settings = {};
+    appState.settings.boxTheme = mode;
+    applyBoxTheme(mode);
+    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
+    const label = mode === 'auto' ? 'כמו הרקע' : (mode === 'light' ? 'תיבות בהירות' : 'תיבות כהות');
+    showToast('צבע תיבות: ' + label);
 }
 
 function applySystemBackground(bg) {
