@@ -2268,6 +2268,57 @@ function renderProjectsList(list) {
     });
 }
 
+// ==========================================================================
+// Recycle bin — deleted projects live in trashedProjectsList (recoverable),
+// shown in a modal with restore / permanent-delete.
+// ==========================================================================
+function openRecycleBin() {
+    closeRecycleBin();
+    const modal = document.createElement('div');
+    modal.id = 'recycle-modal';
+    modal.className = 'upgrade-modal-backdrop';
+    const rows = (trashedProjectsList || []).map(p => `
+        <div class="recycle-row">
+            <div class="recycle-info">
+                <span class="recycle-name">${escapeHtml(p.name || '—')}</span>
+                <span class="recycle-meta">נמחק ${p._deletedAt ? formatHebrewDate(p._deletedAt) : ''}</span>
+            </div>
+            <div class="recycle-actions">
+                <button class="btn btn-secondary btn-small" onclick="restoreProject('${p.id}')"><i class="fa-solid fa-rotate-left"></i> שחזר</button>
+                <button class="btn btn-danger btn-small" onclick="permanentlyDeleteProject('${p.id}')" title="מחיקה לצמיתות"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        </div>`).join('');
+    modal.innerHTML = `
+        <div class="recycle-box" role="dialog" aria-modal="true">
+            <div class="recycle-head">
+                <h2><i class="fa-solid fa-trash-can-arrow-up text-accent"></i> סל המחזור</h2>
+                <button class="upgrade-close" onclick="closeRecycleBin()" aria-label="סגור">✕</button>
+            </div>
+            <div class="recycle-list">${rows || '<p class="input-help" style="text-align:center;padding:24px;">הסל ריק — פרויקטים שתמחק יופיעו כאן וניתן יהיה לשחזר אותם.</p>'}</div>
+        </div>`;
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeRecycleBin(); });
+    document.body.appendChild(modal);
+}
+function closeRecycleBin() { const m = document.getElementById('recycle-modal'); if (m) m.remove(); }
+function restoreProject(id) {
+    const idx = (trashedProjectsList || []).findIndex(p => p.id === id);
+    if (idx === -1) return;
+    const [proj] = trashedProjectsList.splice(idx, 1);
+    delete proj._deletedAt;
+    projectsList.unshift(proj);
+    saveProjects();
+    filterProjectsList();
+    openRecycleBin(); // refresh the list
+    showToast(`"${proj.name}" שוחזר`);
+}
+function permanentlyDeleteProject(id) {
+    if (!confirm('למחוק את הפרויקט לצמיתות? לא ניתן יהיה לשחזר.')) return;
+    trashedProjectsList = (trashedProjectsList || []).filter(p => p.id !== id);
+    saveProjects();
+    openRecycleBin();
+    showToast('הפרויקט נמחק לצמיתות');
+}
+
 function syncCurrentQuoteToProject() {
     if (!activeProjectId) return;
     const proj = projectsList.find(p => p.id === activeProjectId);

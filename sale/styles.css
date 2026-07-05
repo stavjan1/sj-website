@@ -12,9 +12,10 @@
     --border-color: #253045;
     --border-hover: #3a4d68;
 
-    --text-primary: #e8edf8;
-    --text-secondary: #8ea0bc;
-    --text-muted: #5a6e8a;
+    /* Dark-mode text: raised for readability (was too gray on the navy bg). */
+    --text-primary: #eef2fb;
+    --text-secondary: #b6c4dc;
+    --text-muted: #8a9cb8;
 
     --color-accent: #4d8ef0;
     --color-accent-hover: #3070d8;
@@ -4213,3 +4214,62 @@ body:not(.in-project) .proj-tab { display: none !important; }
     .project-card .stage-chain { flex-basis: 100%; order: 3; }
     .project-endcap { margin-inline-start: auto; }
 }
+
+/* ==========================================================================
+   v5.0 — version badge, tab-hug header, true stage centering, wizard fit
+   ========================================================================== */
+
+/* Version badge in the top bar (so it's visible to show off) */
+.tb-ver {
+    font-size: 0.62rem; font-weight: 800; letter-spacing: 0.3px;
+    color: var(--color-accent); background: var(--color-accent-glow);
+    padding: 1px 7px; border-radius: 999px; vertical-align: middle; margin-inline-start: 4px;
+}
+
+/* Tab-hug: the section header "spills into" the card like an active browser tab
+   — same surface as the body (no seam), with a soft accent glow at the top. */
+.card-header {
+    background: linear-gradient(180deg, var(--color-accent-glow) 0%, transparent 100%);
+    border-bottom: none;
+    padding-bottom: 8px;
+}
+.card-header h3 { display: inline-flex; align-items: center; gap: 8px; }
+.card-header.flex-header { align-items: center; }
+/* light mode keeps the same subtle accent tab */
+body.light-theme .card-header { background: linear-gradient(180deg, rgba(37,99,235,0.08) 0%, transparent 100%); }
+
+/* True centering of the stage chain: 3-track grid so the middle is centered in
+   the CARD (not in the leftover space between two unequal side blocks). */
+@media (min-width: 861px) {
+    .projects-list:not(.grid-view) .project-card {
+        display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px;
+    }
+    .projects-list:not(.grid-view) .project-card .project-info { justify-self: start; }
+    .projects-list:not(.grid-view) .project-card .stage-chain { justify-self: center; }
+    .projects-list:not(.grid-view) .project-card .project-endcap { justify-self: end; }
+}
+
+/* Wizard: the chat page was cut at the bottom (green action button hidden).
+   Trim the control/estimate height a touch so the action bar always shows. */
+@media (min-width: 861px) {
+    #panel-wizard .control-side { height: calc(var(--appvh, 100vh) - 132px) !important; }
+    #panel-wizard .preview-side { height: calc(var(--appvh, 100vh) - 132px); }
+}
+
+/* Recycle bin modal */
+.recycle-box {
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: 16px; padding: 20px; max-width: 560px; width: 100%;
+    max-height: 82vh; display: flex; flex-direction: column;
+}
+.recycle-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.recycle-head h2 { font-size: 1.1rem; margin: 0; display: flex; gap: 8px; align-items: center; }
+.recycle-list { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.recycle-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-input);
+}
+.recycle-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.recycle-name { font-weight: 700; font-size: 0.9rem; }
+.recycle-meta { font-size: 0.75rem; color: var(--text-muted); }
+.recycle-actions { display: flex; gap: 6px; flex-shrink: 0; }
