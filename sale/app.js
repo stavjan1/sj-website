@@ -1158,8 +1158,17 @@ function mergeCloudIntoLocal(cloud) {
 // Pull the cloud copy on login and MERGE it with local (union by id), then push
 // the merged union back so the other device converges too. Cloud is the shared
 // source of truth — we no longer depend on any single browser's storage.
+//
+// SINGLE-FLIGHT: two overlapping merges (e.g. the boot sync + a token-refresh
+// sync) used to interleave and push conflicting unions, which flickered the UI
+// and could resurrect a just-deleted project. Now only one runs at a time; a
+// request that arrives mid-merge collapses into a single follow-up run.
+let _mergeBusy = false;
+let _mergePending = false;
 async function cloudLoadAndMerge(silent) {
     if (!isCloudUser()) return;
+    if (_mergeBusy) { _mergePending = true; return; }
+    _mergeBusy = true;
     try {
         const res = await fetch('/api/data', { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
         if (res.status === 501) {
@@ -1185,6 +1194,11 @@ async function cloudLoadAndMerge(silent) {
             cloudSaveNow();
         }
     } catch (e) { /* non-fatal */ }
+    finally {
+        _mergeBusy = false;
+        // Collapse any calls that arrived mid-merge into a single follow-up.
+        if (_mergePending) { _mergePending = false; setTimeout(() => cloudLoadAndMerge(true), 60); }
+    }
 }
 
 // ===== Login transition spinner ("pose" before entering the app) =====
@@ -5993,27 +6007,42 @@ function importHistoryData(event) {
 // ==========================================================================
 // Google Drive Integration
 // ==========================================================================
+// Expiry (ms) of a Google ID token (JWT), or 0 if it's not a readable JWT.
+function _jwtExpiryMs(token) {
+    try {
+        const parts = String(token || '').split('.');
+        if (parts.length !== 3) return 0;
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        return (payload.exp || 0) * 1000;
+    } catch (e) { return 0; }
+}
+// True when we already hold a Google ID token that's still valid (>60s left).
+function _haveFreshIdToken() {
+    const t = googleAccessToken || getSessionOrLocalStorageItem(getStorageKey('sj_drive_access_token'));
+    const exp = _jwtExpiryMs(t);
+    return !!exp && Date.now() < exp - 60000;
+}
+
 function checkGoogleSession() {
     if (isGuestUser()) return;
     const savedToken = getSessionOrLocalStorageItem(getStorageKey('sj_drive_access_token'));
     if (savedToken) {
-        // Optimistic: show "connected" immediately using the saved token.
-        googleAccessToken = savedToken;
+        googleAccessToken = savedToken;   // optimistic — show "connected" now
         updateDriveStatus(true);
     }
     refreshTierInfo();
-    // Sync with the saved token. If it's expired the GET 401s and
-    // handleExpiredCloudToken() clears it and re-arms the gesture refresh below.
-    if (savedToken) cloudLoadAndMerge(true);
-    // PRIMARY fix for cross-device sync: silently mint a fresh Google ID token
-    // (FedCM/iframe — no popup, no gesture) and use it as the identity bearer.
-    // Access tokens can only be refreshed via a popup (blocked on load), which
-    // is why returning users had no token → sync never ran → each browser was a
-    // local-only island. The server verifies ID tokens too (see _tiers.js).
-    silentIdTokenAuth();
-    // Fallback: if the silent path can't run (cooldown / unsupported), a fresh
-    // access token is minted on the user's first click.
-    armGoogleTokenRefreshOnGesture();
+    if (_haveFreshIdToken()) {
+        // We already have a valid identity token — sync ONCE and do NOT nag with
+        // the Google One Tap card. (This is why sign-in kept popping up when you
+        // were already connected, and why the view flickered from a double sync.)
+        cloudLoadAndMerge(true);
+    } else {
+        // No valid token → mint a fresh ID token silently (FedCM/One Tap). Its
+        // callback runs the single sync. A first-gesture access-token mint is the
+        // fallback if the silent path can't run (cooldown / unsupported).
+        silentIdTokenAuth();
+        armGoogleTokenRefreshOnGesture();
+    }
 }
 
 // Silent, popup-free identity refresh via Google Identity Services. For a
