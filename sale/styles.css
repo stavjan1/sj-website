@@ -4216,6 +4216,21 @@ body:not(.in-project) .proj-tab { display: none !important; }
 .topnav-sub-btn.active { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
 .topnav-sub-btn.is-step { background: rgba(77,142,240,0.08); border-style: dashed; }
 
+/* Tab-hug ("נשפך ללשונית"): the ACTIVE sub-tab spills down into the content —
+   flat bottom, no bottom border, reaching past the topnav's bottom line so the
+   tab and the page below read as one continuous surface (like a browser tab). */
+.topnav { position: relative; }
+.topnav-sub { position: relative; z-index: 1; }
+.topnav-sub-btn.active {
+    border-radius: 11px 11px 0 0;
+    border-bottom: none;
+    margin-bottom: -10px;
+    padding-bottom: 15px;
+    position: relative;
+    z-index: 2;
+    box-shadow: 0 -2px 10px var(--color-accent-glow);
+}
+
 /* Accounting placeholder */
 .acct-soon { text-align: center; max-width: 580px; margin: 36px auto; padding: 30px 26px;
     background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; }
