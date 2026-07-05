@@ -4531,3 +4531,73 @@ body.boxes-light .card-header { background: linear-gradient(180deg, rgba(37,99,2
 .au-proj { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px dashed var(--border-color); }
 .au-proj-name { font-size: 0.84rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .au-proj-meta { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; font-size: 0.8rem; color: var(--text-secondary); }
+
+/* ==========================================================================
+   v5.3 — Accounting world (הנהלת חשבונות): SmartBee documents, clients, cash flow
+   ========================================================================== */
+#panel-accounting .acct-tabbar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.acct-tab { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-secondary); cursor: pointer; font-weight: 700; font-size: 0.88rem; }
+.acct-tab:hover { color: var(--text-primary); border-color: var(--color-accent); }
+.acct-tab.active { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
+
+.acct-kpis { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 16px; }
+.acct-kpi { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.ak-num { font-size: 1.3rem; font-weight: 800; color: var(--text-primary); }
+.ak-lbl { font-size: 0.76rem; color: var(--text-muted); font-weight: 600; }
+
+.acct-scope { display: flex; gap: 8px; margin-bottom: 14px; }
+.acct-scope-btn { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); cursor: pointer; font-weight: 700; font-size: 0.82rem; }
+.acct-scope-btn.active { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
+
+.cf-chart { display: flex; flex-direction: column; gap: 10px; }
+.cf-row { display: grid; grid-template-columns: 72px 1fr 132px; align-items: center; gap: 12px; }
+.cf-label { font-size: 0.82rem; font-weight: 700; color: var(--text-secondary); }
+.cf-bar { background: var(--bg-input); border-radius: 8px; height: 26px; overflow: hidden; }
+.cf-bar-fill { height: 100%; background: #2b3f66; border-radius: 8px; position: relative; min-width: 3px; transition: width .3s ease; }
+.cf-bar-paid { position: absolute; inset-inline-start: 0; top: 0; height: 100%; background: #22c984; border-radius: 8px; }
+.cf-val { text-align: start; font-weight: 800; font-size: 0.9rem; color: var(--text-primary); }
+.cf-val small { display: block; font-weight: 600; font-size: 0.7rem; color: var(--text-muted); }
+
+.acct-list-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-weight: 700; color: var(--text-secondary); }
+.doc-list, .cli-list { display: flex; flex-direction: column; gap: 8px; }
+.doc-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 11px; }
+.doc-main { display: flex; align-items: center; gap: 12px; min-width: 0; flex-wrap: wrap; }
+.doc-type { font-weight: 800; color: var(--text-primary); font-size: 0.9rem; }
+.doc-client { color: var(--text-secondary); font-size: 0.85rem; }
+.doc-date { color: var(--text-muted); font-size: 0.78rem; }
+.doc-side { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+.doc-total { font-weight: 800; color: var(--text-primary); }
+.doc-badge { font-size: 0.72rem; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
+.doc-badge.ok { background: rgba(34,201,132,0.15); color: #22c984; }
+.doc-badge.pend { background: rgba(240,192,64,0.15); color: #f0c040; }
+.doc-badge.err { background: rgba(240,82,82,0.15); color: #f05252; }
+
+.acct-form { max-width: 720px; }
+.acct-form .form-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.acct-form .form-row label { min-width: 130px; font-weight: 600; color: var(--text-secondary); font-size: 0.86rem; }
+.acct-form select, .acct-form input { padding: 9px 11px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-input); color: var(--text-primary); font-size: 0.88rem; }
+.acct-form .form-row select { flex: 1; }
+.acct-sub { font-weight: 800; color: var(--text-primary); margin: 16px 0 8px; font-size: 0.92rem; }
+.form-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.form-grid2 input { width: 100%; }
+.acct-item { display: flex; gap: 8px; margin-bottom: 6px; }
+.acct-item input:first-child { flex: 1; }
+.acct-total-row { margin-top: 12px; font-size: 1rem; font-weight: 700; color: var(--text-secondary); }
+.acct-total-row b { color: var(--color-accent); font-size: 1.15rem; }
+
+.cli-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 11px; }
+.cli-name { font-weight: 700; color: var(--text-primary); }
+.cli-meta { color: var(--text-muted); font-size: 0.8rem; margin-inline-start: 10px; }
+.cli-count { color: var(--text-secondary); font-size: 0.8rem; flex-shrink: 0; }
+
+.acct-empty { text-align: center; padding: 50px 20px; color: var(--text-muted); }
+.acct-empty i { font-size: 2.4rem; margin-bottom: 12px; opacity: .6; display: block; }
+.acct-empty p { margin-bottom: 16px; }
+
+@media (max-width: 860px) {
+    .acct-kpis { grid-template-columns: 1fr 1fr; }
+    .form-grid2 { grid-template-columns: 1fr; }
+    .cf-row { grid-template-columns: 56px 1fr 100px; }
+    .acct-form .form-row { flex-wrap: wrap; }
+    .acct-form .form-row label { min-width: auto; }
+}

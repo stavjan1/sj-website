@@ -118,10 +118,6 @@
                     <i class="fa-solid fa-clock-rotate-left"></i>
                     <span>היסטוריית הצעות</span>
                 </button>
-                <button class="nav-btn" id="tab-archive" onclick="switchTab('archive')">
-                    <i class="fa-solid fa-address-book"></i>
-                    <span>ארכיון לקוחות</span>
-                </button>
                 <button class="nav-btn" id="tab-business" onclick="switchTab('business')">
                     <i class="fa-solid fa-briefcase"></i>
                     <span>פרטי עסק</span>
@@ -781,12 +777,7 @@
                     <h2><span style="font-size:1.3rem;">🐝</span> הנהלת חשבונות</h2>
                     <p class="section-subtitle">הפקת חשבוניות וקבלות, ניהול לקוחות וסליקת אשראי — הכל במקום אחד, מחובר ל-SmartBee.</p>
                 </div>
-                <div class="acct-soon">
-                    <div class="acct-soon-icon">🐝</div>
-                    <h3>בקרוב — חשבוניות וסליקה</h3>
-                    <p>העולם הזה יכיל: <strong>הפקת חשבונית / קבלה / חשבון עסקה</strong>, <strong>ניהול לקוחות</strong>, ו<strong>סליקת אשראי</strong> — הכל דרך חיבור ל-SmartBee, ישירות מתוך הפרויקט (הצעה שאושרה ← הפק חשבונית ← סמן שולם).</p>
-                    <p class="input-help" style="margin-top:10px;">המנוע כבר בבנייה. עד שיהיה מוכן — אפשר להמשיך לנהל פרויקטים והצעות כרגיל.</p>
-                </div>
+                <div id="acct-root"><!-- populated by renderAccounting() --></div>
             </section>
 
             <section id="panel-history" class="content-panel">

@@ -916,6 +916,11 @@ let projectsList = [];
 let trashedProjectsList = [];
 let activeProjectId = null;
 
+// Accounting world (הנהלת חשבונות): documents produced via SmartBee + a clients
+// book. Both sync to the cloud alongside projects (see build/applyDatabaseObject).
+let invoicesList = [];   // { id, docType, docLabel, customer, items[], total, status, docNumber, pdfUrl, apiMessageId, projectId, createdAt, paid }
+let clientsList = [];    // { id, name, phone, email, dealerNumber, address, city }
+
 // Global variables for Stern Pricing and Google OAuth
 let sternPricingDatabase = [];
 let priceCatalog = [];  // user-curated supplier price catalog (manual/import/scrape)
@@ -1071,6 +1076,8 @@ function buildDatabaseObject() {
         projects: projectsList,
         trash: trashedProjectsList,
         catalog: priceCatalog,
+        invoices: invoicesList,
+        clients: clientsList,
         users: usersRaw ? JSON.parse(usersRaw) : [],
         lastUpdated: Date.now()
     };
@@ -1092,6 +1099,8 @@ function applyDatabaseObject(cloudData) {
     if (acceptList(cloudData.projects, projectsList)) { projectsList = cloudData.projects; localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList)); }
     if (Array.isArray(cloudData.trash)) { trashedProjectsList = cloudData.trash; localStorage.setItem(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList)); }
     if (acceptList(cloudData.catalog, priceCatalog)) { priceCatalog = cloudData.catalog; localStorage.setItem(getStorageKey('sj_price_catalog'), JSON.stringify(priceCatalog)); }
+    if (acceptList(cloudData.invoices, invoicesList)) { invoicesList = cloudData.invoices; localStorage.setItem(getStorageKey('sj_invoices'), JSON.stringify(invoicesList)); }
+    if (acceptList(cloudData.clients, clientsList)) { clientsList = cloudData.clients; localStorage.setItem(getStorageKey('sj_clients'), JSON.stringify(clientsList)); }
     // Merge cloud account records into the local list (union by username) —
     // the same behavior as the legacy Drive-file sync — so profession/display
     // lookups work on a device that has only ever synced through KV.
@@ -1405,7 +1414,6 @@ const NAV_WORLDS = {
         { id: 'projects',   label: 'פרויקטים',        icon: 'fa-list-check' },
         { id: 'statistics', label: 'סטטיסטיקה',       icon: 'fa-chart-column' },
         { id: 'history',    label: 'היסטוריית הצעות', icon: 'fa-clock-rotate-left' },
-        { id: 'archive',    label: 'ארכיון לקוחות',   icon: 'fa-address-book' },
     ] },
     accounting: { label: 'הנהלת חשבונות', icon: 'fa-file-invoice-dollar', bee: true, tabs: [
         { id: 'accounting', label: 'חשבוניות וסליקה', icon: 'fa-receipt' },
@@ -1418,7 +1426,7 @@ const NAV_WORLDS = {
 };
 const TAB_WORLD = {
     projects: 'projects', wizard: 'projects', create: 'projects', reports: 'projects',
-    history: 'projects', archive: 'projects', statistics: 'projects',
+    history: 'projects', statistics: 'projects',
     accounting: 'accounting',
     business: 'prefs', catalog: 'prefs', settings: 'prefs', admin: 'prefs',
 };
@@ -1516,6 +1524,9 @@ function switchTab(tabId) {
     }
     if (tabId === 'statistics') {
         renderStatistics();
+    }
+    if (tabId === 'accounting') {
+        renderAccounting();
     }
     // Keep the top-bar world + sub-tab row in sync with whatever panel is shown.
     syncTopNav(tabId);
@@ -1712,6 +1723,8 @@ function loadProjects() {
     if (savedTrash) {
         try { trashedProjectsList = JSON.parse(savedTrash); } catch (e) { trashedProjectsList = []; }
     } else { trashedProjectsList = []; }
+    try { invoicesList = JSON.parse(localStorage.getItem(getStorageKey('sj_invoices')) || '[]') || []; } catch (e) { invoicesList = []; }
+    try { clientsList = JSON.parse(localStorage.getItem(getStorageKey('sj_clients')) || '[]') || []; } catch (e) { clientsList = []; }
     filterProjectsList();
 
     // Always land on the projects list. The wizard (planning/pricing) and the
@@ -2291,6 +2304,339 @@ function pipelineAdvance(projectId, to, e) {
     saveProjects();
     renderStatistics();
     showToast(to === 'paid' ? 'סומן כשולם 💰' : 'הועבר לממתין לתשלום');
+}
+
+// ==========================================================================
+// Accounting world (הנהלת חשבונות) — SmartBee documents, clients, cash flow.
+// Documents are produced via /api/invoice (the server holds the SmartBee creds
+// and provisions a per-user token from the master account); created docs live in
+// invoicesList and sync to the cloud. Cash flow is computed locally from them.
+// ==========================================================================
+let acctSection = 'cashflow';
+let acctCashScope = 'month';      // 'month' | 'year'
+let acctItems = [];               // draft line items for the create form
+let acctDraftProjectId = '';      // project the draft was prefilled from
+
+const SB_DOC_TYPES = [
+    { id: 'DealInvoice',    label: 'חשבון עסקה' },
+    { id: 'Invoice',        label: 'חשבונית מס' },
+    { id: 'InvoiceReceipt', label: 'חשבונית מס / קבלה' },
+    { id: 'Receipt',        label: 'קבלה' },
+];
+const sbDocLabel = (id) => (SB_DOC_TYPES.find(d => d.id === id) || {}).label || id;
+// A document that itself records money received (vs. only billing it).
+const sbIsPaidType = (id) => id === 'Receipt' || id === 'InvoiceReceipt';
+
+function saveInvoices() { safeLocalSet(getStorageKey('sj_invoices'), JSON.stringify(invoicesList)); scheduleCloudSync(); }
+function saveClients() { safeLocalSet(getStorageKey('sj_clients'), JSON.stringify(clientsList)); scheduleCloudSync(); }
+const nisFmt = (n) => '₪' + Math.round(Number(n) || 0).toLocaleString('he-IL');
+
+function switchAcctSection(sec) { acctSection = sec; renderAccounting(); }
+
+function renderAccounting() {
+    const root = document.getElementById('acct-root');
+    if (!root) return;
+    if (!isCloudUser()) {
+        root.innerHTML = `<div class="acct-soon"><div class="acct-soon-icon">🔒</div><h3>נדרשת התחברות</h3>
+            <p>התחבר עם חשבון Google כדי להפיק חשבוניות ולנהל חשבונות — הנתונים מסתנכרנים בין המכשירים.</p></div>`;
+        return;
+    }
+    const tabs = [
+        { id: 'cashflow',  label: 'תזרים',   icon: 'fa-chart-line' },
+        { id: 'documents', label: 'מסמכים',  icon: 'fa-file-invoice' },
+        { id: 'create',    label: 'הפק מסמך', icon: 'fa-plus' },
+        { id: 'clients',   label: 'לקוחות',  icon: 'fa-users' },
+    ];
+    const bar = tabs.map(t => `<button class="acct-tab ${t.id === acctSection ? 'active' : ''}" onclick="switchAcctSection('${t.id}')"><i class="fa-solid ${t.icon}"></i> ${t.label}</button>`).join('');
+    let body = '';
+    if (acctSection === 'cashflow') body = acctCashflowHtml();
+    else if (acctSection === 'documents') body = acctDocumentsHtml();
+    else if (acctSection === 'create') body = acctCreateHtml();
+    else if (acctSection === 'clients') body = acctClientsHtml();
+    root.innerHTML = `<div class="acct-tabbar">${bar}</div><div class="acct-body">${body}</div>`;
+    if (acctSection === 'create') acctRenderItems();
+}
+
+// ---- Cash flow (by month / by year) --------------------------------------
+function acctCashflowHtml() {
+    const paidDocs = invoicesList.filter(d => d.status !== 'error');
+    if (paidDocs.length === 0) {
+        return `<div class="acct-empty"><i class="fa-solid fa-chart-line"></i>
+            <p>אין עדיין תנועות. הפק מסמך ראשון והתזרים יתמלא אוטומטית.</p>
+            <button class="btn btn-accent" onclick="switchAcctSection('create')"><i class="fa-solid fa-plus"></i> הפק מסמך</button></div>`;
+    }
+    const byPeriod = {};
+    paidDocs.forEach(d => {
+        const dt = new Date(d.createdAt || Date.now());
+        const key = acctCashScope === 'year' ? String(dt.getFullYear())
+            : dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0');
+        if (!byPeriod[key]) byPeriod[key] = { issued: 0, received: 0, count: 0 };
+        byPeriod[key].issued += Number(d.total) || 0;
+        if (d.paid || sbIsPaidType(d.docType)) byPeriod[key].received += Number(d.total) || 0;
+        byPeriod[key].count++;
+    });
+    const keys = Object.keys(byPeriod).sort().reverse();
+    const max = Math.max(...keys.map(k => byPeriod[k].issued), 1);
+    const totalIssued = keys.reduce((s, k) => s + byPeriod[k].issued, 0);
+    const totalReceived = keys.reduce((s, k) => s + byPeriod[k].received, 0);
+    const labelOf = (k) => acctCashScope === 'year' ? k
+        : new Date(k + '-01').toLocaleDateString('he-IL', { month: 'short', year: '2-digit' });
+    const rows = keys.map(k => {
+        const p = byPeriod[k];
+        const pct = Math.round((p.issued / max) * 100);
+        const rpct = p.issued ? Math.round((p.received / p.issued) * 100) : 0;
+        return `<div class="cf-row">
+            <span class="cf-label">${labelOf(k)}</span>
+            <div class="cf-bar"><div class="cf-bar-fill" style="width:${pct}%"><div class="cf-bar-paid" style="width:${rpct}%"></div></div></div>
+            <span class="cf-val">${nisFmt(p.issued)}<small>${p.count} מסמכים</small></span>
+        </div>`;
+    }).join('');
+    return `
+        <div class="acct-scope">
+            <button class="acct-scope-btn ${acctCashScope === 'month' ? 'active' : ''}" onclick="acctCashScope='month';renderAccounting()">לפי חודש</button>
+            <button class="acct-scope-btn ${acctCashScope === 'year' ? 'active' : ''}" onclick="acctCashScope='year';renderAccounting()">לפי שנה</button>
+        </div>
+        <div class="acct-kpis">
+            <div class="acct-kpi"><span class="ak-num">${nisFmt(totalIssued)}</span><span class="ak-lbl">סה"כ הופק</span></div>
+            <div class="acct-kpi"><span class="ak-num" style="color:#22c984">${nisFmt(totalReceived)}</span><span class="ak-lbl">התקבל</span></div>
+            <div class="acct-kpi"><span class="ak-num" style="color:#fb923c">${nisFmt(totalIssued - totalReceived)}</span><span class="ak-lbl">פתוח</span></div>
+            <div class="acct-kpi"><span class="ak-num">${paidDocs.length}</span><span class="ak-lbl">מסמכים</span></div>
+        </div>
+        <div class="cf-chart">${rows}</div>
+        <p class="input-help" style="margin-top:10px;">הבר הכהה = סכום שהופק; החלק הירוק = שהתקבל בפועל (קבלות / חשבונית-מס-קבלה).</p>`;
+}
+
+// ---- Documents list -------------------------------------------------------
+function acctDocumentsHtml() {
+    if (invoicesList.length === 0) {
+        return `<div class="acct-empty"><i class="fa-solid fa-file-invoice"></i>
+            <p>עוד לא הפקת מסמכים.</p>
+            <button class="btn btn-accent" onclick="switchAcctSection('create')"><i class="fa-solid fa-plus"></i> הפק מסמך ראשון</button></div>`;
+    }
+    const statusBadge = (d) => {
+        if (d.status === 'created') return `<span class="doc-badge ok">הופק${d.docNumber ? ' · ' + d.docNumber : ''}</span>`;
+        if (d.status === 'error') return `<span class="doc-badge err">שגיאה</span>`;
+        return `<span class="doc-badge pend">בהפקה…</span>`;
+    };
+    const rows = invoicesList.map(d => `
+        <div class="doc-row">
+            <div class="doc-main">
+                <span class="doc-type">${sbDocLabel(d.docType)}</span>
+                <span class="doc-client">${escapeHtml((d.customer && d.customer.name) || '—')}</span>
+                <span class="doc-date">${new Date(d.createdAt).toLocaleDateString('he-IL')}</span>
+            </div>
+            <div class="doc-side">
+                <span class="doc-total">${nisFmt(d.total)}</span>
+                ${statusBadge(d)}
+                ${d.pdfUrl ? `<a class="btn btn-secondary btn-small" href="${encodeURI(d.pdfUrl)}" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i> PDF</a>` : ''}
+                ${d.status === 'pending' ? `<button class="btn btn-secondary btn-small" onclick="acctPollDocument('${d.id}')"><i class="fa-solid fa-rotate"></i></button>` : ''}
+                ${(d.status === 'created' && !d.paid && !sbIsPaidType(d.docType)) ? `<button class="btn btn-success btn-small" onclick="acctMarkPaid('${d.id}')" title="סמן שהתקבל תשלום">שולם</button>` : ''}
+            </div>
+        </div>`).join('');
+    return `<div class="acct-list-head"><span>${invoicesList.length} מסמכים</span>
+        <button class="btn btn-accent btn-small" onclick="switchAcctSection('create')"><i class="fa-solid fa-plus"></i> מסמך חדש</button></div>
+        <div class="doc-list">${rows}</div>`;
+}
+
+// ---- Create document ------------------------------------------------------
+function acctCreateHtml() {
+    const projOpts = ['<option value="">— בחר פרויקט למילוי אוטומטי —</option>']
+        .concat(projectsList.map(p => `<option value="${p.id}" ${p.id === acctDraftProjectId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`)).join('');
+    const docOpts = SB_DOC_TYPES.map(d => `<option value="${d.id}">${d.label}</option>`).join('');
+    const clientDatalist = acctAllClients().map(c => `<option value="${escapeHtml(c.name)}">`).join('');
+    return `
+        <div class="acct-form">
+            <div class="form-row">
+                <label>מלא מתוך פרויקט</label>
+                <select id="acct-proj" onchange="acctPrefillFromProject(this.value)">${projOpts}</select>
+            </div>
+            <div class="form-row">
+                <label>סוג מסמך</label>
+                <select id="acct-doctype">${docOpts}</select>
+            </div>
+            <div class="acct-sub">פרטי הלקוח</div>
+            <div class="form-grid2">
+                <input id="acct-cname" list="acct-clients" placeholder="שם הלקוח / העסק *" oninput="acctMaybeFillClient(this.value)">
+                <input id="acct-cdealer" placeholder="ח.פ / ע.מ (לא חובה)" dir="ltr">
+                <input id="acct-cphone" placeholder="טלפון" dir="ltr">
+                <input id="acct-cemail" placeholder="אימייל" dir="ltr">
+                <input id="acct-caddr" placeholder="כתובת">
+                <input id="acct-ccity" placeholder="עיר">
+            </div>
+            <datalist id="acct-clients">${clientDatalist}</datalist>
+            <div class="acct-sub">סעיפים</div>
+            <div id="acct-items"></div>
+            <button class="btn btn-secondary btn-small" onclick="acctAddItem()" style="margin-top:8px;"><i class="fa-solid fa-plus"></i> הוסף סעיף</button>
+            <div class="form-row" style="margin-top:12px;">
+                <label>מע"מ</label>
+                <select id="acct-vat">
+                    <option value="exclude">המחירים ללא מע"מ (יתווסף)</option>
+                    <option value="include">המחירים כוללים מע"מ</option>
+                    <option value="exempt">פטור ממע"מ</option>
+                </select>
+            </div>
+            <div class="acct-total-row">סה"כ: <b id="acct-total">₪0</b></div>
+            <div class="designer-actions" style="margin-top:14px;">
+                <button class="btn btn-secondary" onclick="switchAcctSection('documents')">ביטול</button>
+                <button class="btn btn-accent" id="acct-submit" onclick="acctSubmitDocument()"><i class="fa-solid fa-paper-plane"></i> הפק ב-SmartBee</button>
+            </div>
+            <p class="input-help" style="margin-top:8px;">המסמך מופק דרך SmartBee ומקבל מספר רשמי. מוגבל ל-${(5000).toLocaleString('he-IL')} ₪ למסמך בשלב זה.</p>
+        </div>`;
+}
+function acctRenderItems() {
+    const box = document.getElementById('acct-items');
+    if (!box) return;
+    if (acctItems.length === 0) acctItems = [{ description: '', quantity: 1, pricePerUnit: 0 }];
+    box.innerHTML = acctItems.map((it, i) => `
+        <div class="acct-item">
+            <input placeholder="תיאור" value="${escapeHtml(it.description || '')}" oninput="acctItems[${i}].description=this.value">
+            <input type="number" min="0" step="1" placeholder="כמות" value="${it.quantity}" oninput="acctItems[${i}].quantity=parseFloat(this.value)||0;acctUpdateTotal()" style="max-width:80px">
+            <input type="number" min="0" step="0.01" placeholder="מחיר" value="${it.pricePerUnit}" oninput="acctItems[${i}].pricePerUnit=parseFloat(this.value)||0;acctUpdateTotal()" dir="ltr" style="max-width:110px">
+            <button class="btn btn-danger btn-small" onclick="acctItems.splice(${i},1);acctRenderItems();acctUpdateTotal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>`).join('');
+    acctUpdateTotal();
+}
+function acctAddItem() { acctItems.push({ description: '', quantity: 1, pricePerUnit: 0 }); acctRenderItems(); }
+function acctUpdateTotal() {
+    const t = acctItems.reduce((s, it) => s + (Number(it.quantity) || 0) * (Number(it.pricePerUnit) || 0), 0);
+    const el = document.getElementById('acct-total'); if (el) el.textContent = nisFmt(t);
+}
+function acctPrefillFromProject(pid) {
+    acctDraftProjectId = pid;
+    const p = projectsList.find(x => x.id === pid);
+    if (!p) return;
+    const qd = p.quoteData || {};
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    set('acct-cname', qd.clientName || p.name || '');
+    set('acct-cphone', qd.clientPhone || p.clientPhone || '');
+    set('acct-cemail', qd.clientEmail || p.clientEmail || '');
+    set('acct-caddr', qd.clientAddress || '');
+    // Items from the quote, else one line for the total.
+    const items = Array.isArray(qd.items) ? qd.items.filter(x => x && (x.description || x.title)) : [];
+    if (items.length) {
+        acctItems = items.map(x => ({ description: x.description || x.title || '', quantity: Number(x.quantity) || 1, pricePerUnit: Number(x.pricePerUnit != null ? x.pricePerUnit : x.price) || 0 }));
+    } else if (qd.finalPrice) {
+        acctItems = [{ description: p.name || 'עבודת חשמל', quantity: 1, pricePerUnit: Number(qd.finalPrice) || 0 }];
+    }
+    acctRenderItems();
+}
+function acctAllClients() {
+    const map = new Map();
+    clientsList.forEach(c => { if (c && c.name) map.set(c.name.trim().toLowerCase(), c); });
+    projectsList.forEach(p => { const n = (p.quoteData && p.quoteData.clientName) || ''; if (n && !map.has(n.trim().toLowerCase())) map.set(n.trim().toLowerCase(), { name: n }); });
+    invoicesList.forEach(d => { const n = d.customer && d.customer.name; if (n && !map.has(n.trim().toLowerCase())) map.set(n.trim().toLowerCase(), { name: n }); });
+    return [...map.values()];
+}
+function acctMaybeFillClient(name) {
+    const c = clientsList.find(x => x.name && x.name.trim().toLowerCase() === (name || '').trim().toLowerCase());
+    if (!c) return;
+    const set = (id, v) => { const el = document.getElementById(id); if (el && !el.value) el.value = v || ''; };
+    set('acct-cphone', c.phone); set('acct-cemail', c.email); set('acct-cdealer', c.dealerNumber);
+    set('acct-caddr', c.address); set('acct-ccity', c.city);
+}
+
+async function acctSubmitDocument() {
+    const val = (id) => (document.getElementById(id)?.value || '').trim();
+    const customer = { name: val('acct-cname'), dealerNumber: val('acct-cdealer'), phone: val('acct-cphone'), email: val('acct-cemail'), address: val('acct-caddr'), city: val('acct-ccity') };
+    if (customer.name.length < 2) { showToast('חסר שם לקוח', 'error'); return; }
+    const items = acctItems.filter(it => (it.description || '').trim() && (Number(it.pricePerUnit) || 0) >= 0 && (Number(it.quantity) || 0) > 0);
+    if (items.length === 0) { showToast('הוסף לפחות סעיף אחד', 'error'); return; }
+    const docType = val('acct-doctype') || 'DealInvoice';
+    const vatType = val('acct-vat') || 'exclude';
+    const total = items.reduce((s, it) => s + it.quantity * it.pricePerUnit, 0);
+    const btn = document.getElementById('acct-submit');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> מפיק…'; }
+    try {
+        const res = await fetch('/api/invoice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({ docType, customer, items: items.map(it => ({ description: it.description, quantity: it.quantity, pricePerUnit: it.pricePerUnit })), vatType, quoteId: acctDraftProjectId || undefined }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || 'ההפקה נכשלה');
+        const doc = {
+            id: 'inv' + Date.now(), docType, customer, items, total,
+            status: 'pending', apiMessageId: d.apiMessageId || null,
+            projectId: acctDraftProjectId || '', createdAt: Date.now(),
+            paid: sbIsPaidType(docType),
+        };
+        invoicesList.unshift(doc);
+        saveInvoices();
+        acctItems = []; acctDraftProjectId = '';
+        switchAcctSection('documents');
+        showToast('המסמך נשלח להפקה ב-SmartBee ⏳');
+        if (doc.apiMessageId) setTimeout(() => acctPollDocument(doc.id), 2500);
+    } catch (e) {
+        showToast('שגיאה: ' + e.message, 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> הפק ב-SmartBee'; }
+    }
+}
+
+async function acctPollDocument(docId, attempt) {
+    const doc = invoicesList.find(x => x.id === docId);
+    if (!doc || !doc.apiMessageId) return;
+    attempt = attempt || 0;
+    try {
+        const res = await fetch('/api/invoice?msg=' + encodeURIComponent(doc.apiMessageId), { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
+        const d = await res.json();
+        const st = d && d.status ? d.status : {};
+        const code = st.resultCodeId;
+        const result = st.result || {};
+        if (code === 102 || code === 103) {
+            doc.status = 'created';
+            doc.docNumber = result.index || result.documentId || '';
+            doc.pdfUrl = result.linkToOriginal || result.linkToCopy || '';
+            saveInvoices();
+            if (acctSection === 'documents') renderAccounting();
+        } else if (code >= 94 && code <= 99) {
+            doc.status = 'error'; saveInvoices();
+            if (acctSection === 'documents') renderAccounting();
+            showToast('SmartBee דחתה את המסמך', 'error');
+        } else if (attempt < 6) {
+            setTimeout(() => acctPollDocument(docId, attempt + 1), 3000); // still queued
+        }
+    } catch (e) { /* transient — leave pending, user can retry */ }
+}
+function acctMarkPaid(docId) {
+    const doc = invoicesList.find(x => x.id === docId);
+    if (!doc) return;
+    doc.paid = true; saveInvoices(); renderAccounting();
+    showToast('סומן כשולם 💰');
+}
+
+// ---- Clients --------------------------------------------------------------
+function acctClientsHtml() {
+    const list = acctAllClients();
+    const rows = list.length ? list.map(c => `
+        <div class="cli-row">
+            <div class="cli-main"><span class="cli-name">${escapeHtml(c.name)}</span>
+                <span class="cli-meta">${[c.phone, c.email].filter(Boolean).map(escapeHtml).join(' · ') || '—'}</span></div>
+            <span class="cli-count">${invoicesList.filter(d => d.customer && d.customer.name === c.name).length} מסמכים</span>
+        </div>`).join('') : '<p class="input-help">אין לקוחות עדיין — הם יתווספו אוטומטית מפרויקטים וממסמכים.</p>';
+    return `
+        <div class="acct-form" style="max-width:560px;">
+            <div class="acct-sub">הוסף לקוח</div>
+            <div class="form-grid2">
+                <input id="cli-name" placeholder="שם *">
+                <input id="cli-dealer" placeholder="ח.פ / ע.מ" dir="ltr">
+                <input id="cli-phone" placeholder="טלפון" dir="ltr">
+                <input id="cli-email" placeholder="אימייל" dir="ltr">
+                <input id="cli-addr" placeholder="כתובת">
+                <input id="cli-city" placeholder="עיר">
+            </div>
+            <button class="btn btn-accent btn-small" style="margin-top:10px;" onclick="acctAddClient()"><i class="fa-solid fa-user-plus"></i> הוסף</button>
+        </div>
+        <div class="acct-sub" style="margin-top:16px;">${list.length} לקוחות</div>
+        <div class="cli-list">${rows}</div>`;
+}
+function acctAddClient() {
+    const val = (id) => (document.getElementById(id)?.value || '').trim();
+    const name = val('cli-name');
+    if (name.length < 2) { showToast('חסר שם לקוח', 'error'); return; }
+    clientsList.unshift({ id: 'cli' + Date.now(), name, dealerNumber: val('cli-dealer'), phone: val('cli-phone'), email: val('cli-email'), address: val('cli-addr'), city: val('cli-city') });
+    saveClients();
+    renderAccounting();
+    showToast('הלקוח נוסף');
 }
 
 function updateMetricsDashboard() {
@@ -6591,11 +6937,13 @@ function checkGoogleSession() {
         // were already connected, and why the view flickered from a double sync.)
         cloudLoadAndMerge(true);
     } else {
-        // No valid token → mint a fresh ID token silently (FedCM/One Tap). Its
-        // callback runs the single sync. A first-gesture access-token mint is the
-        // fallback if the silent path can't run (cooldown / unsupported).
+        // No valid token → mint a fresh ID token silently (FedCM/One Tap, no UI).
+        // Its callback runs the single sync. The first-gesture access-token mint
+        // (which CAN show Google's account window) is armed ONLY as a fallback,
+        // and only after giving the silent path a few seconds to succeed — so a
+        // returning, consented user never sees a popup mid-use.
         silentIdTokenAuth();
-        armGoogleTokenRefreshOnGesture();
+        setTimeout(() => { if (!googleAccessToken) armGoogleTokenRefreshOnGesture(); }, 4000);
     }
 }
 
