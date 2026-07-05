@@ -3836,10 +3836,10 @@ body:not(.in-project) .proj-tab { display: none !important; }
 .projects-list > * + * { margin-top: 0; }
 
 @media (min-width: 861px) {
-    /* The box hugs its content — no dead area under the last project.
-       With many projects it caps at the column height and the list scrolls. */
-    #panel-projects .projects-layout { align-items: start; }
-    .projects-main { height: auto; max-height: 100%; }
+    /* The box STRETCHES to the full column height (no dead gap under it at any
+       zoom); the project list scrolls inside it. */
+    #panel-projects .projects-layout { align-items: stretch; }
+    .projects-main { height: 100%; }
     .projects-main .create-project-inline { margin-bottom: 10px; }
     .projects-main .project-search-row { margin-bottom: 10px; }
 }
@@ -4029,3 +4029,55 @@ body:not(.in-project) .proj-tab { display: none !important; }
 .admin-stats-tbl th, .admin-stats-tbl td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--border-color); }
 .admin-stats-tbl th { color: var(--text-muted); font-weight: 700; font-size: 0.76rem; }
 .admin-stats-tbl tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+/* ==========================================================================
+   v4.28 — collapsible archive + read-only project view
+   ========================================================================== */
+.arch-head { cursor: pointer; user-select: none; }
+.arch-caret { color: var(--text-muted); font-size: 0.8rem; transition: transform 0.2s ease; flex-shrink: 0; }
+.archive-card.open .arch-caret { transform: rotate(180deg); }
+/* Collapsed by default: hide the quotes until the card is opened */
+.archive-card .arch-quotes { display: none; }
+.archive-card.open .arch-quotes { display: flex; }
+
+/* Read-only project view (opened from the archive) */
+.pv-backdrop {
+    position: fixed; inset: 0; z-index: 4000;
+    background: rgba(5,10,20,0.72); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 18px; animation: fadeIn 0.2s ease; overflow-y: auto;
+}
+.pv-box {
+    position: relative; width: 100%; max-width: 780px; max-height: 92vh; overflow-y: auto;
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: 16px; padding: 22px 22px 18px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.55);
+}
+.pv-close {
+    position: absolute; top: 12px; left: 12px; width: 34px; height: 34px; border-radius: 50%;
+    border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-muted);
+    font-size: 0.9rem; cursor: pointer;
+}
+.pv-head h2 { margin: 0 0 4px; font-size: 1.2rem; }
+.pv-sub { color: var(--text-muted); font-size: 0.85rem; margin: 0 0 6px; }
+.pv-badges { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.pv-flag { font-size: 0.74rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border-color); color: var(--text-secondary); }
+.pv-flag.on { background: rgba(74,222,128,0.10); border-color: rgba(74,222,128,0.5); color: #4ade80; }
+.pv-flag.warn { background: rgba(240,192,64,0.10); border-color: rgba(240,192,64,0.5); color: #f0c040; }
+.pv-section { margin-bottom: 18px; }
+.pv-section > h3 { font-size: 0.95rem; margin: 0 0 8px; display: flex; align-items: center; gap: 7px; }
+.pv-section > h3 .cnt { font-size: 0.75rem; color: var(--text-muted); font-weight: 500; }
+.pv-chat { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
+    background: var(--bg-main); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; }
+.pv-msg { font-size: 0.85rem; line-height: 1.6; padding: 8px 11px; border-radius: 10px; max-width: 88%; white-space: pre-line; }
+.pv-msg.user { align-self: flex-start; background: var(--color-accent); color: #fff; }
+.pv-msg.model { align-self: flex-end; background: var(--bg-input); border: 1px solid var(--border-color); }
+.pv-items { width: 100%; border-collapse: collapse; }
+.pv-items td, .pv-items th { padding: 7px 8px; font-size: 0.85rem; border-bottom: 1px solid var(--border-color); text-align: right; }
+.pv-items th { color: var(--text-muted); font-weight: 600; }
+.pv-items .pv-price { text-align: left; white-space: nowrap; font-weight: 600; }
+.pv-total { display: flex; justify-content: space-between; align-items: center; margin-top: 10px;
+    padding: 10px 12px; background: var(--bg-input); border-radius: 10px; font-weight: 800; }
+.pv-total .v { color: var(--color-accent); font-size: 1.1rem; }
+.pv-empty { color: var(--text-muted); font-size: 0.85rem; padding: 8px 2px; }
+.pv-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: 4px; }

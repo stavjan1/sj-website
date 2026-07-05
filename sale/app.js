@@ -1449,12 +1449,15 @@ function renderClientArchive() {
         return;
     }
 
+    // Search auto-expands matches; otherwise cards start collapsed (a client is
+    // one line — click to reveal their projects), so the archive stays tidy.
+    const expandAll = !!q;
     box.innerHTML = list.map(g => {
         const totalSum = g.quotes.reduce((s, x) => s + x.total, 0);
         const badge = (st) => `<span class="status-badge status-badge-${st}">${st}</span>`;
         const rows = g.quotes.map(x => `
             <div class="arch-quote">
-                <div class="arch-q-main" onclick="openProjectFromArchive('${x.projectId}')" title="פתח את הפרויקט">
+                <div class="arch-q-main" onclick="openProjectFromArchive('${x.projectId}')" title="פתח את הפרויקט (צפייה)">
                     <span class="arch-q-subject">${escapeHtml(x.subject || 'ללא נושא')}</span>
                     <span class="arch-q-meta">${x.number ? 'מס\' ' + escapeHtml(x.number) + ' · ' : ''}${x.date ? formatHebrewDate(x.date) : ''} · ${x.total ? x.total.toLocaleString('he-IL') + ' ₪' : '—'}</span>
                 </div>
@@ -1463,8 +1466,9 @@ function renderClientArchive() {
                     ${x.shareLink ? `<button class="btn btn-secondary btn-small" onclick="copyArchiveLink('${encodeURIComponent(x.shareLink)}', event)" title="העתק קישור ללקוח"><i class="fa-solid fa-link"></i></button>` : ''}
                 </div>
             </div>`).join('');
-        return `<div class="archive-card">
-            <div class="arch-head">
+        return `<div class="archive-card${expandAll ? ' open' : ''}">
+            <div class="arch-head" onclick="toggleArchiveCard(this)">
+                <i class="fa-solid fa-chevron-down arch-caret"></i>
                 <div class="arch-client">
                     <i class="fa-solid fa-user"></i>
                     <div>
@@ -1473,7 +1477,7 @@ function renderClientArchive() {
                     </div>
                 </div>
                 <div class="arch-stats">
-                    <span>${g.quotes.length} ${g.quotes.length === 1 ? 'הצעה' : 'הצעות'}</span>
+                    <span>${g.quotes.length} ${g.quotes.length === 1 ? 'פרויקט' : 'פרויקטים'}</span>
                     <span class="arch-total">${totalSum.toLocaleString('he-IL')} ₪</span>
                 </div>
             </div>
@@ -1481,9 +1485,97 @@ function renderClientArchive() {
         </div>`;
     }).join('');
 }
+function toggleArchiveCard(headEl) {
+    const card = headEl.closest('.archive-card');
+    if (card) card.classList.toggle('open');
+}
 function openProjectFromArchive(projectId) {
-    loadProject(projectId, false);
-    switchTab('wizard');
+    openProjectView(projectId);
+}
+
+// ==========================================================================
+// Read-only project view — the whole story of a project in one screen:
+// the conversation, the material components, the priced quote, and its status
+// (signed? moved to invoicing?). No editing here — a clean record to review.
+// ==========================================================================
+function _pvStripJson(text) {
+    return String(text || '').replace(/```json\s*[\s\S]*?\s*```/, '').replace(/({[\s\S]*?})\s*$/, '').trim();
+}
+function openProjectView(projectId) {
+    const proj = projectsList.find(p => p.id === projectId);
+    if (!proj) { showToast('הפרויקט לא נמצא', 'error'); return; }
+    closeProjectView();
+    const qd = proj.quoteData || {};
+    const client = qd.clientName || proj.name || '—';
+
+    // Conversation: planning then pricing, hidden system prompts excluded.
+    const convo = [].concat(proj.planChatHistory || [], proj.chatHistory || [])
+        .filter(m => m && !m.hidden)
+        .map(m => {
+            const text = _pvStripJson(m.parts && m.parts[0] && m.parts[0].text);
+            if (!text) return '';
+            return `<div class="pv-msg ${m.role === 'user' ? 'user' : 'model'}">${escapeHtml(text)}</div>`;
+        }).filter(Boolean).join('');
+
+    // Material components chosen by the pricing agent.
+    const mats = (proj.materials || []).filter(x => x && (x.name || x.description));
+    const matRows = mats.map(x => `
+        <tr><td>${escapeHtml(x.name || x.description || '')}${x.details ? ' <span class="pv-empty" style="padding:0">· ' + escapeHtml(x.details) + '</span>' : ''}</td>
+            <td class="pv-price">${Number(x.price) ? Number(x.price).toLocaleString('he-IL') + ' ₪' : '—'}</td></tr>`).join('');
+
+    // The priced quote lines.
+    const items = (qd.items || []).filter(it => it && (it.title || it.description));
+    const itemRows = items.map(it => `
+        <tr><td>${escapeHtml(it.title || '')}${it.description ? '<div class="pv-empty" style="padding:2px 0 0">' + escapeHtml(it.description) + '</div>' : ''}</td>
+            <td class="pv-price">${Number(it.price) ? Number(it.price).toLocaleString('he-IL') + ' ₪' : '—'}</td></tr>`).join('');
+
+    const signed = !!(qd.signature && qd.signature.img);
+    const status = proj.status || 'טיוטה';
+    const invoiced = status === 'שולם'; // invoicing lands here once /ניהול חשבונות ships
+
+    const box = document.createElement('div');
+    box.id = 'project-view';
+    box.className = 'pv-backdrop';
+    box.innerHTML = `
+        <div class="pv-box" role="dialog" aria-modal="true">
+            <button class="pv-close" onclick="closeProjectView()" aria-label="סגור">✕</button>
+            <div class="pv-head">
+                <h2><i class="fa-solid fa-user text-accent"></i> ${escapeHtml(client)}</h2>
+                <p class="pv-sub">${escapeHtml(qd.subject || proj.name || '')}${qd.quoteNumber ? ' · הצעה מס\' ' + escapeHtml(qd.quoteNumber) : ''}${qd.date ? ' · ' + formatHebrewDate(qd.date) : ''}</p>
+            </div>
+            <div class="pv-badges">
+                <span class="pv-flag ${status === 'טיוטה' ? '' : 'on'}">סטטוס: ${escapeHtml(status)}</span>
+                <span class="pv-flag ${signed ? 'on' : 'warn'}">${signed ? '✓ נחתם ע"י הלקוח' : 'טרם נחתם'}</span>
+                <span class="pv-flag ${invoiced ? 'on' : ''}">${invoiced ? '✓ חשבונית הופקה' : 'טרם חויב'}</span>
+            </div>
+
+            <div class="pv-section">
+                <h3><i class="fa-solid fa-comments text-accent"></i> ההתכתבות <span class="cnt">(תכנון + תמחור)</span></h3>
+                ${convo ? `<div class="pv-chat">${convo}</div>` : '<div class="pv-empty">אין התכתבות שמורה בפרויקט זה.</div>'}
+            </div>
+
+            <div class="pv-section">
+                <h3><i class="fa-solid fa-list-check text-accent"></i> רכיבים וחומרים <span class="cnt">(${mats.length})</span></h3>
+                ${mats.length ? `<table class="pv-items"><tbody>${matRows}</tbody></table>` : '<div class="pv-empty">לא נבחרו חומרים.</div>'}
+            </div>
+
+            <div class="pv-section">
+                <h3><i class="fa-solid fa-file-invoice-dollar text-accent"></i> פירוט ההצעה</h3>
+                ${items.length ? `<table class="pv-items"><thead><tr><th>סעיף</th><th class="pv-price">מחיר</th></tr></thead><tbody>${itemRows}</tbody></table>` : '<div class="pv-empty">אין סעיפים בהצעה.</div>'}
+                <div class="pv-total"><span>סה"כ סופי</span><span class="v">${(Number(qd.finalPrice) || 0).toLocaleString('he-IL')} ₪</span></div>
+            </div>
+
+            <div class="pv-actions">
+                <button class="btn btn-secondary" onclick="closeProjectView()">סגור</button>
+                <button class="btn btn-accent" onclick="closeProjectView(); loadProject('${proj.id}'); switchTab('create');"><i class="fa-solid fa-pen"></i> פתח לעריכה</button>
+            </div>
+        </div>`;
+    box.addEventListener('click', (e) => { if (e.target === box) closeProjectView(); });
+    document.body.appendChild(box);
+}
+function closeProjectView() {
+    const m = document.getElementById('project-view');
+    if (m) m.remove();
 }
 function copyArchiveLink(encodedLink, e) {
     if (e) e.stopPropagation();
