@@ -5603,8 +5603,14 @@ function addSternItemToQuote(dbIndex) {
 // Fails OPEN on any server/network error so infra hiccups never block a real
 // user's deliverable.
 async function checkPdfExportAllowed() {
-    if (isGuestUser() || !googleAccessToken) return { allow: false, reason: 'guest' };
-    if (isAdmin()) return { allow: true };
+    if (isAdmin()) return { allow: true };            // admin is never gated — check FIRST
+    if (isGuestUser()) return { allow: false, reason: 'guest' }; // only a REAL guest is blocked
+    // Signed in but the short-lived OAuth token isn't in memory right now
+    // (expired / not yet refreshed on this load). They are NOT a guest — don't
+    // send them to the sign-in wall. Without a token the server can't meter
+    // them, so fail OPEN: a real user's deliverable beats a rare cap-bypass,
+    // and the server still enforces on every normal (token-present) export.
+    if (!googleAccessToken) return { allow: true };
     try {
         const proj = projectsList.find(p => p.id === activeProjectId);
         const quoteId = activeProjectId
