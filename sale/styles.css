@@ -4505,3 +4505,22 @@ body.boxes-light .card-header { background: linear-gradient(180deg, rgba(37,99,2
     .pipeline-board { grid-auto-flow: column; grid-auto-columns: 80%; grid-template-columns: none; overflow-x: auto; padding-bottom: 6px; }
     .pipe-col { min-height: 220px; }
 }
+
+/* ==========================================================================
+   v5.1 — admin registered-users accordion (each user → their projects)
+   ========================================================================== */
+.admin-user { border: 1px solid var(--border-color); border-radius: 9px; overflow: hidden; background: var(--bg-input); }
+.admin-user-head {
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 11px;
+    background: transparent; border: none; cursor: pointer; text-align: start; color: var(--text-primary);
+}
+.admin-user-head:hover { background: rgba(240,192,64,0.06); }
+.au-caret { color: var(--text-muted); transition: transform .15s ease; flex-shrink: 0; font-size: 0.8rem; }
+.admin-user.open .au-caret { transform: rotate(180deg); }
+.au-email { font-weight: 700; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; }
+.au-meta { margin-inline-start: auto; color: var(--text-muted); font-size: 0.76rem; white-space: nowrap; flex-shrink: 0; }
+.admin-user-body { padding: 4px 11px 11px; border-top: 1px solid var(--border-color); }
+.au-tier { font-size: 0.8rem; color: var(--text-secondary); margin: 8px 0; }
+.au-proj { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px dashed var(--border-color); }
+.au-proj-name { font-size: 0.84rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.au-proj-meta { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; font-size: 0.8rem; color: var(--text-secondary); }

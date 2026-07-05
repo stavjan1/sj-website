@@ -191,20 +191,67 @@ function _applyAdminImport(report) {
     showToast(`${added} פריטים נוספו — עכשיו נתח ופרסם`);
 }
 
-function adminRefreshUserList() {
+// Registered-users list — real accounts from the cloud (KV `user:*`), admin
+// only. Each row expands to that user's projects, fetched lazily on open.
+async function adminRefreshUserList() {
     const container = document.getElementById('admin-users-list');
     if (!container) return;
-    const users = JSON.parse(localStorage.getItem('sj_app_users') || '[]');
-    if (users.length === 0) {
-        container.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">אין משתמשים רשומים.</p>';
+    if (!isAdmin() || !googleAccessToken) {
+        container.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">התחבר כמנהל כדי לראות משתמשים.</p>';
         return;
     }
-    container.innerHTML = users.map(u => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg-input);border-radius:8px;font-size:0.85rem;">
-            <span>${u.username}</span>
-            <span style="color:var(--text-muted);">${u.profession || '—'}</span>
-        </div>
-    `).join('');
+    container.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">טוען…</p>';
+    try {
+        const res = await fetch('/api/admin-users', { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
+        const d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        const users = d.users || [];
+        if (users.length === 0) {
+            container.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">אין משתמשים רשומים עדיין.</p>';
+            return;
+        }
+        container.innerHTML = users.map(u => {
+            const last = u.lastUpdated ? new Date(u.lastUpdated).toLocaleDateString('he-IL') : '—';
+            return `<div class="admin-user" data-email="${escapeHtml(u.email)}">
+                <button class="admin-user-head" onclick="adminToggleUser(this)">
+                    <span class="au-caret"><i class="fa-solid fa-chevron-down"></i></span>
+                    <span class="au-email" dir="ltr">${escapeHtml(u.email)}</span>
+                    <span class="au-meta">${u.projects} פרויקטים · עודכן ${last}</span>
+                </button>
+                <div class="admin-user-body" style="display:none;"></div>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        container.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה: ${e.message}</p>`;
+    }
+}
+
+async function adminToggleUser(btn) {
+    const wrap = btn.closest('.admin-user');
+    const body = wrap.querySelector('.admin-user-body');
+    const email = wrap.dataset.email;
+    const isOpen = body.style.display !== 'none';
+    wrap.classList.toggle('open', !isOpen);
+    if (isOpen) { body.style.display = 'none'; return; }
+    body.style.display = 'block';
+    if (body.dataset.loaded) return; // fetched once, cached
+    body.innerHTML = '<p class="input-help" style="margin:6px 0;">טוען פרויקטים…</p>';
+    try {
+        const res = await fetch('/api/admin-users?user=' + encodeURIComponent(email), { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
+        const d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        const projects = d.projects || [];
+        const nis = (n) => n ? '₪' + Math.round(n).toLocaleString('he-IL') : '—';
+        body.innerHTML = `<div class="au-tier">מסלול: <b>${escapeHtml(d.tier || 'free')}</b></div>` + (projects.length
+            ? projects.map(p => `<div class="au-proj">
+                    <span class="au-proj-name">${escapeHtml(p.name)}</span>
+                    <span class="au-proj-meta"><span class="status-badge status-badge-${escapeHtml(p.status)}">${escapeHtml(p.status)}</span> ${nis(p.amount)}</span>
+                </div>`).join('')
+            : '<p class="input-help" style="margin:6px 0;">אין פרויקטים.</p>');
+        body.dataset.loaded = '1';
+    } catch (e) {
+        body.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה: ${e.message}</p>`;
+    }
 }
 
 function toggleManualLogin() {
