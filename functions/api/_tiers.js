@@ -85,9 +85,32 @@ export async function getTierForEmail(env, email) {
   }
 }
 
-// Verify a Google OAuth access token → account email (null if invalid).
+// Our Google OAuth client id (public). Used to validate the audience of ID
+// tokens so a token minted for another app can't be replayed here.
+export const GOOGLE_CLIENT_ID = '4351198135-oltod8jremuq7pgn2e5bad4ahkupufkp.apps.googleusercontent.com';
+
+// Verify a Google credential → account email (null if invalid). Accepts BOTH:
+//  • an ID token (JWT, header.payload.signature — what silent FedCM auth yields)
+//    verified via the tokeninfo endpoint with an audience check, and
+//  • a legacy OAuth access token (ya29…, from the interactive login) via userinfo.
 export async function verifyGoogleEmail(token) {
   if (!token) return null;
+  // A JWT has exactly three dot-separated segments; access tokens do not.
+  if (token.split('.').length === 3) {
+    try {
+      const res = await fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token));
+      if (!res.ok) return null;
+      const info = await res.json();
+      // Signature/expiry are validated by the endpoint; we check the audience
+      // and that the email is verified.
+      if (info && info.email && info.aud === GOOGLE_CLIENT_ID && info.email_verified !== 'false') {
+        return info.email;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
   try {
     const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { Authorization: 'Bearer ' + token },

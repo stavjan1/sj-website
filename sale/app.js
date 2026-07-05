@@ -6005,13 +6005,45 @@ function checkGoogleSession() {
     // Sync with the saved token. If it's expired the GET 401s and
     // handleExpiredCloudToken() clears it and re-arms the gesture refresh below.
     if (savedToken) cloudLoadAndMerge(true);
-    // GIS access tokens live ~1h with no refresh token, and minting a new one
-    // opens a popup that the browser BLOCKS unless it's triggered by a user
-    // gesture. So we re-mint the token on the user's FIRST interaction whenever
-    // we don't currently hold one — restoring cloud sync automatically (no
-    // "reconnect" button to hunt for). Without this, a returning user has no
-    // valid token → sync never runs → every browser is a local-only island.
+    // PRIMARY fix for cross-device sync: silently mint a fresh Google ID token
+    // (FedCM/iframe — no popup, no gesture) and use it as the identity bearer.
+    // Access tokens can only be refreshed via a popup (blocked on load), which
+    // is why returning users had no token → sync never ran → each browser was a
+    // local-only island. The server verifies ID tokens too (see _tiers.js).
+    silentIdTokenAuth();
+    // Fallback: if the silent path can't run (cooldown / unsupported), a fresh
+    // access token is minted on the user's first click.
     armGoogleTokenRefreshOnGesture();
+}
+
+// Silent, popup-free identity refresh via Google Identity Services. For a
+// returning, consented user this returns an ID token (JWT) with no UI, which we
+// send as the bearer to /api/* — the server verifies it via tokeninfo.
+let _idAuthTried = 0;
+function silentIdTokenAuth() {
+    if (isGuestUser()) return;
+    const clientId = localStorage.getItem('sj_global_google_client_id');
+    if (!clientId) return;
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
+        if (_idAuthTried++ < 10) setTimeout(silentIdTokenAuth, 500); // GIS loads async
+        return;
+    }
+    try {
+        google.accounts.id.initialize({
+            client_id: clientId,
+            auto_select: true,
+            callback: (resp) => {
+                if (resp && resp.credential) {
+                    googleAccessToken = resp.credential; // ID token (JWT) as the bearer
+                    localStorage.setItem(getStorageKey('sj_drive_access_token'), googleAccessToken);
+                    updateDriveStatus(true);
+                    refreshTierInfo();
+                    cloudLoadAndMerge(true); // pull + union-merge + push → devices converge
+                }
+            },
+        });
+        google.accounts.id.prompt(); // auto-selects silently for a single returning account
+    } catch (e) { /* fall back to the gesture path */ }
 }
 
 // One-time (per need) first-gesture handler that mints a fresh Google access

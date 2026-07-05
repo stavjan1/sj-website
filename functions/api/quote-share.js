@@ -8,6 +8,8 @@
 //   → stores under KV key `share:<token>` and returns { token }.
 // GET ?t=<token> (public): returns { data } for the viewer page (/q/).
 
+import { verifyGoogleEmail } from './_tiers.js';
+
 const MAX_PAYLOAD = 300 * 1024; // logo included only if small; no watermark
 
 export async function onRequest(context) {
@@ -57,19 +59,6 @@ function randomToken(len) {
   let out = '';
   for (const b of buf) out += chars[b % chars.length];
   return out;
-}
-
-async function verifyGoogleEmail(token) {
-  try {
-    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: 'Bearer ' + token },
-    });
-    if (!res.ok) return null;
-    const info = await res.json();
-    return info && info.email ? info.email : null;
-  } catch {
-    return null;
-  }
 }
 
 function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }

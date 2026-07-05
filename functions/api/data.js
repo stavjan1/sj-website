@@ -18,7 +18,7 @@
 // keeps everything locally (PDF export still works) and shows the upgrade
 // screen. Counted by history-entry IDs that don't exist in the stored blob.
 
-import { loadTierConfig, getTierForEmail, monthKey } from './_tiers.js';
+import { loadTierConfig, getTierForEmail, monthKey, verifyGoogleEmail } from './_tiers.js';
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -107,19 +107,6 @@ export async function onRequest(context) {
   return json({ error: { message: 'מתודה לא נתמכת.' } }, 405);
 }
 
-// Verify the access token directly with Google and return the account email.
-async function verifyGoogleEmail(token) {
-  try {
-    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: 'Bearer ' + token },
-    });
-    if (!res.ok) return null;
-    const info = await res.json();
-    return info && info.email ? info.email : null;
-  } catch {
-    return null;
-  }
-}
 
 function isEmptyDb(db) {
   if (!db) return true;
