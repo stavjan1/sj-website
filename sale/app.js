@@ -1363,6 +1363,94 @@ function switchTab(tabId) {
     if (tabId === 'catalog') {
         renderPriceCatalog();
     }
+    if (tabId === 'archive') {
+        renderClientArchive();
+    }
+}
+
+// ==========================================================================
+// Client archive — every project grouped by client, with quotes, statuses,
+// totals and the permanent share link. One place to see a client's history.
+// ==========================================================================
+function _clientKey(name) {
+    return String(name || '').trim().toLowerCase().replace(/\s+/g, ' ') || '—';
+}
+function renderClientArchive() {
+    const box = document.getElementById('archive-list');
+    if (!box) return;
+    const q = (document.getElementById('archive-search')?.value || '').trim().toLowerCase();
+
+    // Group active projects by client. Each project carries its quote + status.
+    const groups = {};
+    (projectsList || []).forEach(p => {
+        const qd = p.quoteData || {};
+        const client = (qd.clientName || p.name || '—').trim();
+        const key = _clientKey(client);
+        if (!groups[key]) groups[key] = { client, contact: qd.clientSub || '', quotes: [] };
+        if (!groups[key].contact && qd.clientSub) groups[key].contact = qd.clientSub;
+        groups[key].quotes.push({
+            projectId: p.id,
+            number: qd.quoteNumber || '',
+            subject: qd.subject || p.name || '',
+            date: qd.date || p.created || '',
+            total: Number(qd.finalPrice) || 0,
+            status: p.status || 'טיוטה',
+            shareLink: p.shareLink || '',
+        });
+    });
+
+    let list = Object.values(groups);
+    if (q) list = list.filter(g => g.client.toLowerCase().includes(q) || (g.contact || '').toLowerCase().includes(q));
+    // Most recent client first (by their newest quote date).
+    list.sort((a, b) => (b.quotes[0]?.date || '').localeCompare(a.quotes[0]?.date || ''));
+
+    if (list.length === 0) {
+        box.innerHTML = `<div class="archive-empty">${q ? 'לא נמצא לקוח בשם הזה.' : 'עדיין אין לקוחות בארכיון. כל פרויקט שתיצור יופיע כאן, מקובץ לפי לקוח.'}</div>`;
+        return;
+    }
+
+    box.innerHTML = list.map(g => {
+        const totalSum = g.quotes.reduce((s, x) => s + x.total, 0);
+        const badge = (st) => `<span class="status-badge status-badge-${st}">${st}</span>`;
+        const rows = g.quotes.map(x => `
+            <div class="arch-quote">
+                <div class="arch-q-main" onclick="openProjectFromArchive('${x.projectId}')" title="פתח את הפרויקט">
+                    <span class="arch-q-subject">${escapeHtml(x.subject || 'ללא נושא')}</span>
+                    <span class="arch-q-meta">${x.number ? 'מס\' ' + escapeHtml(x.number) + ' · ' : ''}${x.date ? formatHebrewDate(x.date) : ''} · ${x.total ? x.total.toLocaleString('he-IL') + ' ₪' : '—'}</span>
+                </div>
+                <div class="arch-q-side">
+                    ${badge(x.status)}
+                    ${x.shareLink ? `<button class="btn btn-secondary btn-small" onclick="copyArchiveLink('${encodeURIComponent(x.shareLink)}', event)" title="העתק קישור ללקוח"><i class="fa-solid fa-link"></i></button>` : ''}
+                </div>
+            </div>`).join('');
+        return `<div class="archive-card">
+            <div class="arch-head">
+                <div class="arch-client">
+                    <i class="fa-solid fa-user"></i>
+                    <div>
+                        <div class="arch-name">${escapeHtml(g.client)}</div>
+                        ${g.contact ? `<div class="arch-contact">${escapeHtml(g.contact)}</div>` : ''}
+                    </div>
+                </div>
+                <div class="arch-stats">
+                    <span>${g.quotes.length} ${g.quotes.length === 1 ? 'הצעה' : 'הצעות'}</span>
+                    <span class="arch-total">${totalSum.toLocaleString('he-IL')} ₪</span>
+                </div>
+            </div>
+            <div class="arch-quotes">${rows}</div>
+        </div>`;
+    }).join('');
+}
+function openProjectFromArchive(projectId) {
+    loadProject(projectId, false);
+    switchTab('wizard');
+}
+function copyArchiveLink(encodedLink, e) {
+    if (e) e.stopPropagation();
+    const link = decodeURIComponent(encodedLink);
+    navigator.clipboard.writeText(link)
+        .then(() => showToast('הקישור הועתק 📋'))
+        .catch(() => showToast('לא ניתן להעתיק — ' + link, 'error'));
 }
 
 // ==========================================================================
