@@ -965,6 +965,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const vatSel = document.getElementById('form-vat-type');
         if (vatSel) vatSel.addEventListener('change', () => rememberQuotePref('vatType', vatSel.value));
         markActivePdfTemplate(); // highlight the saved design template pill
+        setProjectsView(localStorage.getItem('sj_projects_view') || 'list'); // restore list/grid choice
         syncTopNav('projects'); // seed the desktop top-bar world + sub-tab row
         setTimeout(showWelcomeOnboarding, 900); // first-run walkthrough (once)
     }
@@ -1970,9 +1971,38 @@ function updateActiveProjectBanner(proj) {
     if (navName) navName.textContent = proj ? proj.name : '';
 }
 
+// Sort state: which field ('date'|'name') and direction ('desc'|'asc').
+// Two toggle buttons drive it; clicking the active field flips the direction.
+let projectSort = { field: 'date', dir: 'desc' };
+function toggleProjectSort(field) {
+    if (projectSort.field === field) {
+        projectSort.dir = projectSort.dir === 'desc' ? 'asc' : 'desc';
+    } else {
+        projectSort.field = field;
+        projectSort.dir = 'desc';
+    }
+    document.querySelectorAll('.sort-toggle').forEach((b) => {
+        const on = b.dataset.field === projectSort.field;
+        b.classList.toggle('active', on);
+        const arrow = b.querySelector('.sort-arrow');
+        if (arrow) arrow.className = 'fa-solid sort-arrow ' + (on && projectSort.dir === 'asc' ? 'fa-arrow-up-long' : 'fa-arrow-down-long');
+    });
+    filterProjectsList();
+}
+
+// List rows vs. a compact grid of cards.
+let projectsView = 'list';
+function setProjectsView(view) {
+    projectsView = view === 'grid' ? 'grid' : 'list';
+    localStorage.setItem('sj_projects_view', projectsView);
+    document.querySelectorAll('.view-toggle').forEach((b) => b.classList.toggle('active', b.dataset.view === projectsView));
+    const c = document.getElementById('projects-list-container');
+    if (c) c.classList.toggle('grid-view', projectsView === 'grid');
+    filterProjectsList();
+}
+
 function filterProjectsList() {
     const q = (document.getElementById('project-search-q')?.value || '').trim().toLowerCase();
-    const sort = document.getElementById('project-sort')?.value || 'newest';
     const statusFilter = document.getElementById('project-status-filter')?.value || 'all';
 
     let filtered = projectsList.slice();
@@ -1980,10 +2010,9 @@ function filterProjectsList() {
     if (q) filtered = filtered.filter(p => p.name.toLowerCase().includes(q));
     if (statusFilter !== 'all') filtered = filtered.filter(p => (p.status || 'טיוטה') === statusFilter);
 
-    if (sort === 'newest')    filtered.sort((a, b) => new Date(b.created) - new Date(a.created));
-    else if (sort === 'oldest')   filtered.sort((a, b) => new Date(a.created) - new Date(b.created));
-    else if (sort === 'name-asc') filtered.sort((a, b) => a.name.localeCompare(b.name, 'he'));
-    else if (sort === 'name-desc') filtered.sort((a, b) => b.name.localeCompare(a.name, 'he'));
+    const dir = projectSort.dir === 'asc' ? 1 : -1;
+    if (projectSort.field === 'name') filtered.sort((a, b) => dir * a.name.localeCompare(b.name, 'he'));
+    else filtered.sort((a, b) => dir * (new Date(a.created) - new Date(b.created)));
 
     renderProjectsList(filtered);
     updateMetricsDashboard();
@@ -2208,20 +2237,10 @@ function renderProjectsList(list) {
 
         card.innerHTML = `
             <div class="project-info">
-                <div class="project-title">${p.name}</div>
+                <div class="project-title">${escapeHtml(p.name)}</div>
                 <div class="project-meta">
                     <span><i class="fa-solid fa-calendar"></i> ${formatHebrewDate(p.created)}</span>
                 </div>
-            </div>
-            <div class="project-actions">
-                <button class="btn btn-danger btn-small" onclick="deleteProject('${p.id}', event)">
-                    <i class="fa-solid fa-trash-can"></i>
-                </button>
-            </div>
-            <div class="project-badge-row">
-                <span class="project-status-badge status-badge-${status}"
-                      onclick="cycleProjectStatus('${p.id}', event)"
-                      title="לחץ לשינוי סטטוס">${status}</span>
             </div>
             <div class="stage-chain" title="שרשרת העבודה של הפרויקט">
                 <button class="stage-step ${stepCls(0)}" onclick="openProjectStage('${p.id}','plan',event)">
@@ -2234,6 +2253,14 @@ function renderProjectsList(list) {
                 <span class="stage-arrow">←</span>
                 <button class="stage-step ${stepCls(2)}" onclick="openProjectStage('${p.id}','draft',event)">
                     <i class="fa-solid fa-file-pdf"></i> הכנת טיוטה
+                </button>
+            </div>
+            <div class="project-endcap">
+                <span class="project-status-badge status-badge-${status}"
+                      onclick="cycleProjectStatus('${p.id}', event)"
+                      title="לחץ לשינוי סטטוס">${status}</span>
+                <button class="btn btn-danger btn-small" onclick="deleteProject('${p.id}', event)" title="מחק פרויקט">
+                    <i class="fa-solid fa-trash-can"></i>
                 </button>
             </div>
         `;

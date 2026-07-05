@@ -3224,6 +3224,15 @@ body.light-theme {
     --color-accent-glow: rgba(37, 99, 235, 0.12);
 }
 
+/* The base .section-card / .card-header use a HARDCODED dark gradient that the
+   theme vars don't touch — so in light mode every card stayed dark. Override. */
+body.light-theme .section-card {
+    background: #ffffff;
+}
+body.light-theme .card-header {
+    background: #f1f5f9;
+}
+
 body.light-theme .sidebar {
     background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
     border-left: 1px solid #cbd5e1;
@@ -4148,4 +4157,59 @@ body:not(.in-project) .proj-tab { display: none !important; }
     #panel-wizard .split-view, #panel-create .split-view { height: 100%; }
     #panel-create .control-side { height: 100%; }
     #panel-create .preview-side { height: 100%; }
+}
+
+/* ==========================================================================
+   v4.30 — project row layout, sort/view toggles, grid view, light-mode cards
+   ========================================================================== */
+
+/* Row: info (RTL start / right) | stage-chain (center) | endcap (left) */
+.project-card {
+    display: flex; flex-direction: row; align-items: center; flex-wrap: nowrap;
+    gap: 14px; padding: 8px 14px;
+}
+.project-card .project-info { flex-shrink: 0; min-width: 0; }
+.project-card .stage-chain { flex: 1; justify-content: center; margin: 0; width: auto; }
+.project-endcap { flex-shrink: 0; display: flex; align-items: center; gap: 8px; }
+.project-endcap .btn-danger { padding: 6px 9px; }
+
+/* Sort toggles (תאריך / שם) */
+.sort-toggles { display: flex; gap: 4px; flex-shrink: 0; }
+.sort-toggle {
+    padding: 7px 12px; border: 1px solid var(--border-color); background: var(--bg-input);
+    color: var(--text-secondary); border-radius: 8px; font-family: inherit; font-size: 0.85rem;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+    transition: all 0.15s ease;
+}
+.sort-toggle:hover { border-color: var(--border-hover); }
+.sort-toggle.active { border-color: var(--color-accent); box-shadow: 0 0 0 2px var(--color-accent-glow); color: var(--text-primary); font-weight: 700; }
+.sort-toggle .sort-arrow { font-size: 0.7rem; opacity: 0; transition: opacity 0.15s; }
+.sort-toggle.active .sort-arrow { opacity: 1; color: var(--color-accent); }
+
+/* View toggles (list / grid) */
+.view-toggles { display: flex; gap: 4px; flex-shrink: 0; }
+.view-toggle {
+    width: 34px; height: 34px; border: 1px solid var(--border-color); background: var(--bg-input);
+    color: var(--text-muted); border-radius: 8px; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; transition: all 0.15s ease;
+}
+.view-toggle:hover { border-color: var(--border-hover); }
+.view-toggle.active { border-color: var(--color-accent); color: var(--color-accent); box-shadow: 0 0 0 2px var(--color-accent-glow); }
+
+/* Grid ("cubes") view */
+.projects-list.grid-view { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; align-content: start; }
+.projects-list.grid-view .project-card { flex-direction: column; align-items: stretch; gap: 8px; }
+.projects-list.grid-view .project-card .stage-chain { flex: 0; }
+.projects-list.grid-view .project-endcap { justify-content: space-between; }
+
+@media (min-width: 861px) {
+    /* Fill the column to the bottom so the list scrolls the FULL page height
+       (was hugging content and leaving dead space + a cut-off scroll). */
+    .projects-main { height: 100%; max-height: none; }
+}
+@media (max-width: 768px) {
+    /* Phone: let the row wrap so nothing is clipped */
+    .project-card { flex-wrap: wrap; }
+    .project-card .stage-chain { flex-basis: 100%; order: 3; }
+    .project-endcap { margin-inline-start: auto; }
 }
