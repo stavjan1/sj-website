@@ -89,14 +89,30 @@ export async function getTierForEmail(env, email) {
 // tokens so a token minted for another app can't be replayed here.
 export const GOOGLE_CLIENT_ID = '4351198135-oltod8jremuq7pgn2e5bad4ahkupufkp.apps.googleusercontent.com';
 
+// Is this a Google ID token (JWT)? A JWT is exactly 3 dot-separated segments
+// AND its first segment base64url-decodes to a header object with `alg`. This
+// is critical: OAuth access tokens (ya29.a0Af…) can ALSO contain two dots, so a
+// naive segment count misclassifies them as JWTs and routes them to id_token
+// verification, which rejects them → the caller is wrongly treated as a guest
+// (broke auth + cloud sync intermittently).
+function looksLikeJwt(token) {
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  try {
+    const hdr = JSON.parse(atob(parts[0].replace(/-/g, '+').replace(/_/g, '/')));
+    return !!(hdr && (hdr.alg || hdr.typ === 'JWT'));
+  } catch {
+    return false; // first segment isn't a JSON header → not a JWT (e.g. ya29…)
+  }
+}
+
 // Verify a Google credential → account email (null if invalid). Accepts BOTH:
 //  • an ID token (JWT, header.payload.signature — what silent FedCM auth yields)
 //    verified via the tokeninfo endpoint with an audience check, and
 //  • a legacy OAuth access token (ya29…, from the interactive login) via userinfo.
 export async function verifyGoogleEmail(token) {
   if (!token) return null;
-  // A JWT has exactly three dot-separated segments; access tokens do not.
-  if (token.split('.').length === 3) {
+  if (looksLikeJwt(token)) {
     try {
       const res = await fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token));
       if (!res.ok) return null;
