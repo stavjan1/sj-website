@@ -147,21 +147,30 @@ export function isPublicHttpUrl(raw) {
   try { u = new URL(raw); } catch { return false; }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
   const host = u.hostname.toLowerCase();
+  if (!host) return false;
+  // Named-host blocklist.
   if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.internal') || host.endsWith('.local')) return false;
-  if (host === '169.254.169.254' || host === 'metadata' || host.endsWith('.metadata.google.internal')) return false;
-  // Bare IPv6 or loopback
-  if (host === '::1' || host === '[::1]' || host.startsWith('[')) return false;
-  // Non-standard IP encodings (integer 2130706433, hex 0x7f..., octal 0177...)
-  // can smuggle a loopback/private address past the dotted-quad check below.
-  if (/^\d+$/.test(host) || /^0x/i.test(host) || /(^|\.)0\d/.test(host)) return false;
-  // Private / loopback / link-local IPv4 ranges
-  const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (m) {
-    const [a, b] = [parseInt(m[1], 10), parseInt(m[2], 10)];
-    if (a === 127 || a === 10 || a === 0) return false;
+  if (host === 'metadata' || host.endsWith('.metadata.google.internal')) return false;
+  // Any IPv6 literal (incl. [::1], [::ffff:127.0.0.1]) — reject outright.
+  if (host.startsWith('[') || host.includes(':')) return false;
+  // If the host has a letter it's a domain name — real suppliers are named
+  // sites (arkha.co.il …). If it has NO letter it's an IP in SOME encoding, and
+  // the ONLY form we accept is a strict, public dotted-quad. This closes every
+  // smuggled-loopback trick at once: 127.1, 2130706433, 0x7f000001, 0177.0.0.1,
+  // 127.0.1 — none are a clean 4-octet decimal, so all are rejected.
+  if (!/[a-z]/i.test(host)) {
+    const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!m) return false;
+    const oct = m.slice(1);
+    if (oct.some((s) => s.length > 1 && s[0] === '0')) return false; // octal-ambiguous
+    const o = oct.map((n) => parseInt(n, 10));
+    if (o.some((n) => n > 255)) return false;
+    const [a, b] = o;
+    if (a === 0 || a === 127 || a === 10 || a >= 224) return false; // loopback / private-A / multicast+reserved
     if (a === 172 && b >= 16 && b <= 31) return false;
     if (a === 192 && b === 168) return false;
     if (a === 169 && b === 254) return false;
+    if (a === 100 && b >= 64 && b <= 127) return false; // carrier-grade NAT (100.64/10)
   }
   return true;
 }
