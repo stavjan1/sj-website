@@ -5991,15 +5991,61 @@ function importHistoryData(event) {
 // Google Drive Integration
 // ==========================================================================
 function checkGoogleSession() {
+    if (isGuestUser()) return;
     const savedToken = getSessionOrLocalStorageItem(getStorageKey('sj_drive_access_token'));
-    if (savedToken && !isGuestUser()) {
+    if (savedToken) {
+        // Optimistic: show "connected" immediately using the saved token.
         googleAccessToken = savedToken;
         updateDriveStatus(true);
-        refreshTierInfo(); // plan may differ now that we're authenticated
-        // Pull this account's cloud (KV) copy on startup. The saved OAuth token
-        // may have expired (Google tokens are short-lived); if so this fails
-        // silently and the local copy is kept until the user signs in again.
-        setTimeout(() => { cloudLoadAndMerge(true); }, 800);
+    }
+    // The saved token is almost always expired — GIS access tokens live ~1h and
+    // there is NO refresh token in the implicit flow. So on every load we
+    // silently mint a FRESH one; without this, cloud sync never runs for a
+    // returning user and every browser stays a local-only island (the data
+    // never converges across devices). THIS is the cross-device sync fix.
+    silentGoogleTokenRefresh((ok) => {
+        if (ok) return; // fresh token obtained → it already kicked a cloud merge
+        refreshTierInfo();
+        // No silent token (Google session lapsed / cookies blocked). Try the old
+        // token once; a 401 clears it and the UI shows "reconnect".
+        if (savedToken) setTimeout(() => cloudLoadAndMerge(true), 400);
+    });
+}
+
+// GIS access tokens are short-lived (~1h) with no refresh token, so on every
+// load we silently request a fresh one (prompt:'none'). With an active Google
+// session + prior consent this returns a token with NO popup. onDone(true) =
+// got a fresh token and kicked a full cloud pull+merge+push.
+let _silentTokenRetry = 0;
+function silentGoogleTokenRefresh(onDone) {
+    if (isGuestUser()) { if (onDone) onDone(false); return; }
+    const clientId = localStorage.getItem('sj_global_google_client_id');
+    if (!clientId) { if (onDone) onDone(false); return; }
+    // GIS script loads async — retry a few times before giving up.
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+        if (_silentTokenRetry++ < 8) setTimeout(() => silentGoogleTokenRefresh(onDone), 500);
+        else if (onDone) onDone(false);
+        return;
+    }
+    try {
+        const tc = google.accounts.oauth2.initTokenClient({
+            client_id: clientId,
+            scope: 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+            callback: (resp) => {
+                if (resp && resp.access_token) {
+                    googleAccessToken = resp.access_token;
+                    localStorage.setItem(getStorageKey('sj_drive_access_token'), googleAccessToken);
+                    updateDriveStatus(true);
+                    refreshTierInfo();
+                    cloudLoadAndMerge(true); // pull + union-merge + push → converges every device
+                    if (onDone) onDone(true);
+                } else if (onDone) { onDone(false); }
+            },
+            error_callback: () => { if (onDone) onDone(false); },
+        });
+        tc.requestAccessToken({ prompt: 'none' });
+    } catch (e) {
+        if (onDone) onDone(false);
     }
 }
 
