@@ -1540,6 +1540,9 @@ function switchTab(tabId) {
     if (tabId === 'accounting') {
         renderAccounting();
     }
+    if (tabId === 'wizard') {
+        try { renderPricingEngine(); } catch (e) {}
+    }
     // Keep the top-bar world + sub-tab row in sync with whatever panel is shown.
     syncTopNav(tabId);
     // Refresh the in-project rail's active step (desktop stage nav).
@@ -4094,6 +4097,240 @@ function getSternLaborPromptBlock() {
 ${lines.join('\n')}`;
 }
 
+// ==========================================================================
+// Pricing engine (Stav's method): price = materials×(1+markup) + labor, where
+// labor = hours × rate × complexity × urgency, OR a direct "target profit".
+// Defaults (markup, rate presets, multipliers) are set ONCE in settings.pricingRules.
+// ==========================================================================
+function getPricingRules() {
+    const d = { materialMarkup: 20, defaultRate: 300, ratePresets: [200, 300, 500], complexityMult: 1.3, urgencyUrgent: 1.5, urgencyRush: 2, riskPct: 10, defaultDailyTarget: 1500 };
+    const r = (appState.settings && appState.settings.pricingRules) || {};
+    const merged = { ...d, ...r };
+    if (!Array.isArray(merged.ratePresets) || !merged.ratePresets.length) merged.ratePresets = d.ratePresets;
+    return merged;
+}
+function pricingNis(n) { return '₪' + Math.round(Number(n) || 0).toLocaleString('he-IL'); }
+function projectMaterialsCost(proj) {
+    return ((proj && proj.materials) || []).filter(m => m && m.checked !== false)
+        .reduce((s, m) => s + (Number(m.price) || 0), 0);
+}
+function ensureProjectPricing(proj) {
+    const rules = getPricingRules();
+    if (!proj.pricing) proj.pricing = {};
+    const p = proj.pricing;
+    if (p.markup == null) p.markup = rules.materialMarkup;
+    if (p.rate == null) p.rate = rules.defaultRate;
+    if (p.complexity == null) p.complexity = 'regular';
+    if (p.urgency == null) p.urgency = 'normal';
+    if (p.dailyTarget == null) p.dailyTarget = rules.defaultDailyTarget;
+    if (p.noAdvance == null) p.noAdvance = false;
+    // Materials cost tracks the AI materials list until the user edits it.
+    if (!p._matEdited) p.materialsCost = projectMaterialsCost(proj);
+    if (p.materialsCost == null) p.materialsCost = 0;
+    if (p.hours == null) p.hours = Number(proj.laborHours) || 0;
+    // Work-days default from hours (8h/day) until the user edits them.
+    if (!p._daysEdited) p.days = Math.max(1, Math.ceil((Number(p.hours) || 8) / 8));
+    return p;
+}
+// Both labor methods computed together so the user sees a RANGE:
+//  A) hours × rate × complexity × urgency   B) daily-profit-target × work-days.
+// Materials (cost×markup) are shared; a risk premium applies to the whole total
+// when it's a high-exposure job with no advance payment.
+function pricingCalc(proj) {
+    const rules = getPricingRules();
+    const p = ensureProjectPricing(proj);
+    const matPrice = (Number(p.materialsCost) || 0) * (1 + (Number(p.markup) || 0) / 100);
+    const cx = p.complexity === 'complex' ? Number(rules.complexityMult) || 1 : 1;
+    const urg = p.urgency === 'rush' ? (Number(rules.urgencyRush) || 1) : (p.urgency === 'urgent' ? (Number(rules.urgencyUrgent) || 1) : 1);
+    const laborA = (Number(p.hours) || 0) * (Number(p.rate) || 0) * cx * urg;
+    const laborB = (Number(p.dailyTarget) || 0) * (Number(p.days) || 0);
+    const riskMult = p.noAdvance ? 1 + (Number(rules.riskPct) || 0) / 100 : 1;
+    const totalA = (matPrice + laborA) * riskMult;
+    const totalB = (matPrice + laborB) * riskMult;
+    return { matPrice, laborA, laborB, riskMult, totalA, totalB, lo: Math.min(totalA, totalB), hi: Math.max(totalA, totalB) };
+}
+
+function renderPricingEngine() {
+    const box = document.getElementById('pricing-engine-card');
+    if (!box) return;
+    const proj = projectsList.find(x => x.id === activeProjectId);
+    if (!proj) { box.innerHTML = ''; return; }
+    const rules = getPricingRules();
+    const p = ensureProjectPricing(proj);
+    const c = pricingCalc(proj);
+    const ratePills = rules.ratePresets.map(r =>
+        `<button class="pe-pill ${Number(p.rate) === Number(r) ? 'on' : ''}" onclick="setPricing('rate',${Number(r)})">${r}</button>`).join('');
+    box.innerHTML = `
+        <div class="pe-head">
+            <span class="pe-title"><i class="fa-solid fa-sliders text-accent"></i> מנוע תמחור</span>
+            <button class="pe-gear" onclick="togglePricingDefaults()" title="הגדרות ברירת מחדל"><i class="fa-solid fa-gear"></i></button>
+        </div>
+        <div id="pe-defaults" class="pe-defaults" style="display:none;"></div>
+
+        <div class="pe-row">
+            <label>עלות חומרים ₪</label>
+            <input type="number" step="10" value="${Math.round(Number(p.materialsCost) || 0)}" oninput="pricingInput('materialsCost', this.value)">
+            <button class="pe-mini" title="רענן מרשימת החומרים" onclick="pricingRefreshMaterials()"><i class="fa-solid fa-rotate"></i></button>
+        </div>
+        <div class="pe-row">
+            <label>תוספת רווח %</label>
+            <input type="number" step="1" value="${Math.round(Number(p.markup) || 0)}" oninput="pricingInput('markup', this.value)">
+            <span class="pe-out">מחיר חומרים: <b id="pe-matprice">${pricingNis(c.matPrice)}</b></span>
+        </div>
+
+        <div class="pe-methods">
+            <div class="pe-method">
+                <div class="pe-method-h"><i class="fa-solid fa-clock"></i> לפי שעות</div>
+                <div class="pe-row"><label>שעות</label>
+                    <input type="number" step="0.5" value="${Number(p.hours) || 0}" oninput="pricingInput('hours', this.value)"></div>
+                <div class="pe-lbl">תעריף/שעה</div>
+                <div class="pe-pills">${ratePills}<input class="pe-rate-custom" type="number" placeholder="אחר" value="${rules.ratePresets.includes(Number(p.rate)) ? '' : (Number(p.rate) || '')}" oninput="pricingInput('rate', this.value)"></div>
+                <div class="pe-method-total">עבודה: <b id="pe-laborA">${pricingNis(c.laborA)}</b></div>
+            </div>
+            <div class="pe-method">
+                <div class="pe-method-h"><i class="fa-solid fa-sun"></i> לפי רווח ליום</div>
+                <div class="pe-row"><label>₪ ליום</label>
+                    <input type="number" step="50" value="${Math.round(Number(p.dailyTarget) || 0)}" oninput="pricingInput('dailyTarget', this.value)"></div>
+                <div class="pe-row"><label>ימי עבודה</label>
+                    <input type="number" step="0.5" value="${Number(p.days) || 0}" oninput="pricingInput('days', this.value)"></div>
+                <div class="pe-method-total">עבודה: <b id="pe-laborB">${pricingNis(c.laborB)}</b></div>
+            </div>
+        </div>
+
+        <div class="pe-two">
+            <div><div class="pe-lbl">סוג עבודה</div><div class="pe-pills">
+                <button class="pe-pill ${p.complexity === 'regular' ? 'on' : ''}" onclick="setPricing('complexity','regular')">רגילה</button>
+                <button class="pe-pill ${p.complexity === 'complex' ? 'on' : ''}" onclick="setPricing('complexity','complex')">מורכבת ×${rules.complexityMult}</button>
+            </div></div>
+            <div><div class="pe-lbl">דחיפות</div><div class="pe-pills">
+                <button class="pe-pill ${p.urgency === 'normal' ? 'on' : ''}" onclick="setPricing('urgency','normal')">רגיל</button>
+                <button class="pe-pill ${p.urgency === 'urgent' ? 'on' : ''}" onclick="setPricing('urgency','urgent')">דחוף ×${rules.urgencyUrgent}</button>
+                <button class="pe-pill ${p.urgency === 'rush' ? 'on' : ''}" onclick="setPricing('urgency','rush')">בהול ×${rules.urgencyRush}</button>
+            </div></div>
+        </div>
+        <label class="pe-risk">
+            <input type="checkbox" ${p.noAdvance ? 'checked' : ''} onclick="setPricing('noAdvance', this.checked)">
+            <span>פרויקט בסיכון — ללא מקדמה (פרמיית סיכון +${rules.riskPct}%)</span>
+        </label>
+
+        <div class="pe-range">
+            <span>הטווח שלך (לפני מע"מ)</span>
+            <b><span id="pe-lo">${pricingNis(c.lo)}</span> – <span id="pe-hi">${pricingNis(c.hi)}</span></b>
+        </div>
+        <div class="pe-final">
+            <label>מחיר להצעה ₪</label>
+            <input type="number" id="pe-final-input" step="10" value="${Math.round(Number(p.finalPrice) || c.hi)}" oninput="pricingInput('finalPrice', this.value)">
+            <button class="pe-mini" title="לפי שעות" onclick="pricingSnap('A')">שעות</button>
+            <button class="pe-mini" title="לפי יום" onclick="pricingSnap('B')">יום</button>
+            <button class="pe-mini" title="אמצע הטווח" onclick="pricingSnap('mid')">אמצע</button>
+        </div>
+        <button class="btn btn-accent pe-apply" onclick="pricingApplyToQuote()"><i class="fa-solid fa-file-export"></i> החל על ההצעה</button>
+        <p class="pe-note">איכות/השקעה כבר משוקללת בתעריף שאתה בוחר לשעה.</p>`;
+    if (_pricingDefaultsOpen) { const d = document.getElementById('pe-defaults'); if (d) { d.style.display = 'block'; renderPricingDefaults(); } }
+}
+function pricingUpdateTotals() {
+    const proj = projectsList.find(x => x.id === activeProjectId);
+    if (!proj) return;
+    const c = pricingCalc(proj);
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('pe-matprice', pricingNis(c.matPrice));
+    set('pe-laborA', pricingNis(c.laborA));
+    set('pe-laborB', pricingNis(c.laborB));
+    set('pe-lo', pricingNis(c.lo));
+    set('pe-hi', pricingNis(c.hi));
+}
+function pricingInput(field, value) {
+    const proj = projectsList.find(x => x.id === activeProjectId);
+    if (!proj) return;
+    ensureProjectPricing(proj);
+    const num = parseFloat(value);
+    proj.pricing[field] = Number.isFinite(num) ? num : 0;
+    if (field === 'materialsCost') proj.pricing._matEdited = true;
+    if (field === 'days') proj.pricing._daysEdited = true;
+    saveProjects();
+    if (field !== 'finalPrice') pricingUpdateTotals();
+}
+function setPricing(field, value) {
+    const proj = projectsList.find(x => x.id === activeProjectId);
+    if (!proj) return;
+    ensureProjectPricing(proj);
+    proj.pricing[field] = value;
+    saveProjects();
+    renderPricingEngine();
+}
+function pricingSnap(which) {
+    const proj = projectsList.find(x => x.id === activeProjectId);
+    if (!proj) return;
+    const c = pricingCalc(proj);
+    const val = which === 'A' ? c.totalA : which === 'B' ? c.totalB : (c.lo + c.hi) / 2;
+    proj.pricing.finalPrice = Math.round(val);
+    saveProjects();
+    const inp = document.getElementById('pe-final-input');
+    if (inp) inp.value = Math.round(val);
+}
+function pricingRefreshMaterials() {
+    const proj = projectsList.find(x => x.id === activeProjectId);
+    if (!proj) return;
+    ensureProjectPricing(proj);
+    proj.pricing.materialsCost = projectMaterialsCost(proj);
+    proj.pricing._matEdited = false;
+    saveProjects();
+    renderPricingEngine();
+    showToast('עלות החומרים עודכנה מהרשימה');
+}
+function pricingApplyToQuote() {
+    const proj = projectsList.find(x => x.id === activeProjectId);
+    if (!proj) return;
+    const c = pricingCalc(proj);
+    const price = Math.round(Number(proj.pricing.finalPrice) || c.hi);
+    proj.pricing.finalPrice = price;
+    const base = document.getElementById('form-base-price');
+    if (base) { base.value = price; if (typeof calculateTotal === 'function') calculateTotal(); }
+    proj.laborPrice = Math.round((c.laborA + c.laborB) / 2);
+    saveProjects();
+    showToast('המחיר הוחל על ההצעה — עבור ל"עורך ההצעה" 📝');
+}
+
+// Defaults editor (set once): markup, rate presets, multipliers.
+let _pricingDefaultsOpen = false;
+function togglePricingDefaults() { _pricingDefaultsOpen = !_pricingDefaultsOpen; renderPricingEngine(); }
+function renderPricingDefaults() {
+    const box = document.getElementById('pe-defaults');
+    if (!box) return;
+    const r = getPricingRules();
+    box.innerHTML = `
+        <div class="pe-def-title">ברירות מחדל (נשמר לכל ההצעות)</div>
+        <div class="pe-def-grid">
+            <label>תוספת חומרים %<input type="number" id="pd-markup" value="${r.materialMarkup}"></label>
+            <label>תעריף ברירת מחדל<input type="number" id="pd-rate" value="${r.defaultRate}"></label>
+            <label>תעריפים מהירים (פסיקים)<input type="text" id="pd-presets" dir="ltr" value="${r.ratePresets.join(',')}"></label>
+            <label>רווח יעד ליום ₪<input type="number" id="pd-daily" value="${r.defaultDailyTarget}"></label>
+            <label>מקדם מורכבות<input type="number" step="0.1" id="pd-cx" value="${r.complexityMult}"></label>
+            <label>מקדם דחוף<input type="number" step="0.1" id="pd-urgent" value="${r.urgencyUrgent}"></label>
+            <label>מקדם בהול<input type="number" step="0.1" id="pd-rush" value="${r.urgencyRush}"></label>
+            <label>פרמיית סיכון %<input type="number" id="pd-risk" value="${r.riskPct}"></label>
+        </div>
+        <button class="btn btn-secondary btn-small" onclick="savePricingDefaults()"><i class="fa-solid fa-check"></i> שמור ברירות מחדל</button>`;
+}
+function savePricingDefaults() {
+    const num = (id, def) => { const v = parseFloat(document.getElementById(id)?.value); return Number.isFinite(v) ? v : def; };
+    const presets = (document.getElementById('pd-presets')?.value || '').split(',').map(s => parseInt(s.trim(), 10)).filter(n => n > 0);
+    appState.settings.pricingRules = {
+        materialMarkup: num('pd-markup', 20),
+        defaultRate: num('pd-rate', 300),
+        ratePresets: presets.length ? presets : [200, 300, 500],
+        defaultDailyTarget: num('pd-daily', 1500),
+        complexityMult: num('pd-cx', 1.3),
+        urgencyUrgent: num('pd-urgent', 1.5),
+        urgencyRush: num('pd-rush', 2),
+        riskPct: num('pd-risk', 10),
+    };
+    persistSettings();
+    _pricingDefaultsOpen = false;
+    renderPricingEngine();
+    showToast('ברירות המחדל של התמחור נשמרו');
+}
+
 // The personal catalog cap comes from the plan (free: 10 items; Pro: 1,000).
 function personalCatalogCap() {
     if (isAdmin()) return PERSONAL_CATALOG_MAX;
@@ -5998,6 +6235,8 @@ function applyMaterialsFromResponse(activeProject, responseText) {
             const laborEl = document.getElementById('wizard-labor-price');
             if (laborEl) laborEl.value = activeProject.laborPrice;
         }
+        // Labor HOURS estimate feeds the pricing engine (hours × your rate).
+        if (parsed.laborHoursEstimate != null) activeProject.laborHours = Number(parsed.laborHoursEstimate) || 0;
 
         if (Array.isArray(parsed.materials) && parsed.materials.length > 0) {
             const existingMaterials = activeProject.materials || [];
@@ -6036,6 +6275,7 @@ function applyMaterialsFromResponse(activeProject, responseText) {
         }
 
         saveProjects();
+        renderPricingEngine(); // refresh materials cost / hours in the engine
     } catch (e) {
         console.error("Failed to parse JSON block from AI response", e);
     }
@@ -8032,12 +8272,13 @@ function getProfessionSystemInstruction() {
 # פלט JSON לעדכון הדשבורד הצדדי (רק כשרלוונטי)
 המערכת מציגה בצד 3 כרטיסיות שמתמלאות מהשיחה: "אפיון הפרויקט", "כתב כמויות" (חומרים+עבודה) ו"ארגז הכלים". כדי לעדכן אותן, סיים את התשובה בגוש JSON בתוך בלוק \`\`\`json ... \`\`\` — אך ורק כשיש לך תוכן רלוונטי:
 - בשלב 1 (שאלות בלבד) — אל תוסיף JSON כלל.
-- בשלב 2 (תמחור) — כלול scope (תגיות אפיון), materials, laborPriceEstimate, blindSpots.
+- בשלב 2 (תמחור) — כלול scope (תגיות אפיון), materials, laborPriceEstimate, laborHoursEstimate, blindSpots.
 - בשלב 3 (כלים) — כלול tools.
 שלח רק את השדות הרלוונטיים לשלב הנוכחי. המבנה:
 {
   "scope": ["לוח שקוע", "36 מודול", "כולל חציבה"],        // תגיות אפיון קצרות (אופציונלי)
   "laborPriceEstimate": 1500,                              // מחיר עבודה מוערך בלבד (מספר)
+  "laborHoursEstimate": 5,                                 // שעות עבודה מוערכות (מספר) — למנוע התמחור
   "blindSpots": ["נקודת עיוורון ראשונה", "נקודת עיוורון שנייה"],
   "materials": [
     { "name": "שם החומר/האביזר", "price": 25, "details": "כמות והערה (למשל: 15 מטר)", "checked": true }
