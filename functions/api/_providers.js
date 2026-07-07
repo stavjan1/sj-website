@@ -25,6 +25,14 @@ export const PROVIDERS = {
       { key: 'sandbox', label: 'מצב בדיקות (Sandbox)', type: 'checkbox', optional: true },
     ],
   },
+  ezcount: {
+    id: 'ezcount', name: 'EZcount (חשבונית אונליין)', status: 'active',
+    note: 'החיסכוני: הדבק API Key + אימייל מפתח מחשבון EZcount (הגדרות → API).',
+    fields: [
+      { key: 'apiKey', label: 'API Key' },
+      { key: 'developerEmail', label: 'אימייל מפתח (Developer email)' },
+    ],
+  },
   icount: {
     id: 'icount', name: 'iCount', status: 'active',
     note: 'חיבור עצמי: מזהה חברה (cid) + משתמש וסיסמה. מומלץ ליצור משתמש API ייעודי ב-iCount (הגדרות → משתמשים) ולא את הכניסה הראשית.',

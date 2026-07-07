@@ -16,6 +16,7 @@ import { smartbeeAuth, smartbeeCall, sbVatOption, SB_MAX_DOC } from './_smartbee
 import { getUserBilling, isProviderActive, providerMeta } from './_providers.js';
 import { giCreateDocument } from './_greeninvoice.js';
 import { icCreateDocument } from './_icount.js';
+import { ezCreateDocument } from './_ezcount.js';
 
 async function requirePayingUser(context) {
   const email = await verifyGoogleEmail(bearerToken(context.request));
@@ -121,9 +122,9 @@ export async function onRequestPost(context) {
 
   // ---- Synchronous adapters (Green Invoice / iCount) → number + PDF immediately ----
   const genericDoc = { docType, customer, items: paymentItems, vatType: body.vatType, receiptDetails, comments: body.comments };
-  if (billing.provider === 'greeninvoice' || billing.provider === 'icount') {
-    const create = billing.provider === 'icount' ? icCreateDocument : giCreateDocument;
-    const out = await create(billing.credentials, genericDoc);
+  const SYNC_ADAPTERS = { greeninvoice: giCreateDocument, icount: icCreateDocument, ezcount: ezCreateDocument };
+  if (SYNC_ADAPTERS[billing.provider]) {
+    const out = await SYNC_ADAPTERS[billing.provider](billing.credentials, genericDoc);
     if (!out.ok) return jsonResponse({ error: { message: out.error || 'יצירת המסמך נכשלה.' }, status: out.status, detail: out.detail }, 502);
     return jsonResponse({ ok: true, created: true, docNumber: out.docNumber, pdfUrl: out.pdfUrl });
   }
