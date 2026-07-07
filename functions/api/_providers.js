@@ -17,8 +17,8 @@ export const PROVIDERS = {
     fields: [{ key: 'token', label: 'providerUserToken (אישי, לא חובה)', optional: true }],
   },
   greeninvoice: {
-    id: 'greeninvoice', name: 'Green Invoice (morning)', status: 'soon',
-    note: 'חיבור עצמי: הדבק API Key + Secret מהגדרות המפתחים ב-morning.',
+    id: 'greeninvoice', name: 'Green Invoice (morning)', status: 'active',
+    note: 'חיבור עצמי: הדבק API Key + Secret מהגדרות המפתחים ב-morning (הגדרות → כלי מפתחים).',
     fields: [{ key: 'apiKey', label: 'API Key' }, { key: 'apiSecret', label: 'API Secret' }],
   },
   icount: {

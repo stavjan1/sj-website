@@ -2730,9 +2730,14 @@ async function acctSubmitDocument() {
         });
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || 'ההפקה נכשלה');
+        // Green Invoice returns the document synchronously (created:true + number +
+        // PDF); SmartBee returns an apiMessageId to poll for.
+        const synchronous = d.created === true;
         const doc = {
             id: 'inv' + Date.now(), docType, customer, items, total,
-            status: 'pending', apiMessageId: d.apiMessageId || null,
+            status: synchronous ? 'created' : 'pending',
+            apiMessageId: d.apiMessageId || null,
+            docNumber: d.docNumber || '', pdfUrl: d.pdfUrl || '',
             projectId: acctDraftProjectId || '', createdAt: Date.now(),
             paid: sbIsPaidType(docType),
         };
@@ -2740,8 +2745,8 @@ async function acctSubmitDocument() {
         saveInvoices();
         acctItems = []; acctDraftProjectId = ''; acctVatBasis = 'exclude';
         switchAcctSection('documents');
-        showToast('המסמך נשלח להפקה ב-SmartBee ⏳');
-        if (doc.apiMessageId) setTimeout(() => acctPollDocument(doc.id), 2500);
+        showToast(synchronous ? 'המסמך הופק ✓' : 'המסמך נשלח להפקה ⏳');
+        if (!synchronous && doc.apiMessageId) setTimeout(() => acctPollDocument(doc.id), 2500);
     } catch (e) {
         showToast('שגיאה: ' + e.message, 'error');
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> הפק ב-SmartBee'; }

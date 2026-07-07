@@ -14,6 +14,7 @@ import {
 } from './_tiers.js';
 import { smartbeeAuth, smartbeeCall, sbVatOption, SB_MAX_DOC } from './_smartbee.js';
 import { getUserBilling, isProviderActive, providerMeta } from './_providers.js';
+import { giCreateDocument } from './_greeninvoice.js';
 
 async function requirePayingUser(context) {
   const email = await verifyGoogleEmail(bearerToken(context.request));
@@ -75,10 +76,6 @@ export async function onRequestPost(context) {
       return jsonResponse({ error: { message: `החיבור ל-${name} עדיין בבנייה. בחר SmartBee בהגדרות הספק בינתיים.`, code: 'PROVIDER_SOON' } }, 501);
     }
   }
-  // Per-user SmartBee token if the user stored one; else the system master token.
-  const providerUserToken = (billing.credentials && billing.credentials.token) || env.SMARTBEE_TOKEN;
-  if (!providerUserToken) return jsonResponse({ error: { message: 'חסר טוקן ספק (SmartBee) בשרת/במשתמש.' } }, 501);
-
   const customer = body.customer || {};
   if (!customer.name || String(customer.name).trim().length < 2) {
     return jsonResponse({ error: { message: 'חסר שם לקוח בחשבונית.' } }, 400);
@@ -120,6 +117,19 @@ export async function onRequestPost(context) {
       taxWithholding: Number(rd.taxWithholding) || undefined,
     };
   }
+
+  // ---- Green Invoice adapter (synchronous create → number + PDF immediately) ----
+  if (billing.provider === 'greeninvoice') {
+    const gi = await giCreateDocument(billing.credentials, {
+      docType, customer, items: paymentItems, vatType: body.vatType, receiptDetails, comments: body.comments,
+    });
+    if (!gi.ok) return jsonResponse({ error: { message: gi.error || 'יצירת המסמך נכשלה.' }, status: gi.status, detail: gi.detail }, 502);
+    return jsonResponse({ ok: true, created: true, docNumber: gi.docNumber, pdfUrl: gi.pdfUrl });
+  }
+
+  // ---- SmartBee adapter (async queue) ----
+  const providerUserToken = (billing.credentials && billing.credentials.token) || env.SMARTBEE_TOKEN;
+  if (!providerUserToken) return jsonResponse({ error: { message: 'חסר טוקן ספק (SmartBee) בשרת/במשתמש.' } }, 501);
 
   const nowIso = new Date().toISOString();
   const payload = {
