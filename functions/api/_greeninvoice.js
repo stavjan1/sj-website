@@ -8,6 +8,12 @@
 // Verified against the public API/SDK enums. All secrets stay server-side.
 
 const GI_BASE = 'https://api.greeninvoice.co.il/api/v1';
+const GI_SANDBOX = 'https://sandbox.d.greeninvoice.co.il/api/v1';
+// Truthy sandbox flag on the user's creds → use Green Invoice's test environment.
+function giBase(creds) {
+  const s = creds && creds.sandbox;
+  return (s === true || s === 'yes' || s === '1' || s === 'on') ? GI_SANDBOX : GI_BASE;
+}
 
 // Our internal docType → Green Invoice numeric type code.
 const GI_DOC_TYPE = {
@@ -21,11 +27,11 @@ const GI_DOC_TYPE = {
 // Our receipt payment method → Green Invoice payment type code.
 const GI_PAY_TYPE = { cash: 1, check: 2, creditCard: 3, wireTransfer: 4, other: 11 };
 
-async function giAuth(creds) {
+async function giAuth(creds, base) {
   if (!creds || !creds.apiKey || !creds.apiSecret) return { error: 'חסרים API Key / Secret של Green Invoice.' };
   let res, data;
   try {
-    res = await fetch(GI_BASE + '/account/token', {
+    res = await fetch(base + '/account/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ id: creds.apiKey, secret: creds.apiSecret }),
@@ -43,7 +49,8 @@ async function giAuth(creds) {
 function giLineVat(vatType) { return vatType === 'exempt' ? 1 : 0; }
 
 export async function giCreateDocument(creds, doc) {
-  const auth = await giAuth(creds);
+  const base = giBase(creds);
+  const auth = await giAuth(creds, base);
   if (auth.error) return { ok: false, error: auth.error, status: auth.status, detail: auth.detail };
 
   const type = GI_DOC_TYPE[doc.docType] || 300;
@@ -93,7 +100,7 @@ export async function giCreateDocument(creds, doc) {
 
   let res, data;
   try {
-    res = await fetch(GI_BASE + '/documents', {
+    res = await fetch(base + '/documents', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: 'Bearer ' + auth.token },
       body: JSON.stringify(payload),

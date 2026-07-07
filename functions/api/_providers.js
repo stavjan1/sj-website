@@ -19,7 +19,11 @@ export const PROVIDERS = {
   greeninvoice: {
     id: 'greeninvoice', name: 'Green Invoice (morning)', status: 'active',
     note: 'חיבור עצמי: הדבק API Key + Secret מהגדרות המפתחים ב-morning (הגדרות → כלי מפתחים).',
-    fields: [{ key: 'apiKey', label: 'API Key' }, { key: 'apiSecret', label: 'API Secret' }],
+    fields: [
+      { key: 'apiKey', label: 'API Key' },
+      { key: 'apiSecret', label: 'API Secret' },
+      { key: 'sandbox', label: 'מצב בדיקות (Sandbox)', type: 'checkbox', optional: true },
+    ],
   },
   icount: {
     id: 'icount', name: 'iCount', status: 'soon',

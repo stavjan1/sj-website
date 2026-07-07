@@ -2851,8 +2851,10 @@ function acctRenderProvider(current) {
     }).join('');
     const selMeta = (_acctProviders || []).find(p => p.id === _acctProviderSel);
     const isSecret = (k) => /secret|token|key|password/i.test(k);
-    const fields = ((selMeta && selMeta.fields) || []).map(f =>
-        `<label class="prov-field">${escapeHtml(f.label)}<input id="prov-${f.key}" type="${isSecret(f.key) ? 'password' : 'text'}" dir="ltr" placeholder="${f.optional ? 'לא חובה' : ''}"></label>`).join('');
+    const fields = ((selMeta && selMeta.fields) || []).map(f => {
+        if (f.type === 'checkbox') return `<label class="prov-field prov-check"><input type="checkbox" id="prov-${f.key}"> ${escapeHtml(f.label)}</label>`;
+        return `<label class="prov-field">${escapeHtml(f.label)}<input id="prov-${f.key}" type="${isSecret(f.key) ? 'password' : 'text'}" dir="ltr" placeholder="${f.optional ? 'לא חובה' : ''}"></label>`;
+    }).join('');
     root.innerHTML = `
         <div class="acct-sub">בחר ספק חשבוניות</div>
         <div class="prov-cards">${cards}</div>
@@ -2864,7 +2866,12 @@ function acctSelectProvider(id) { _acctProviderSel = id; acctRenderProvider(null
 async function acctSaveProvider() {
     const selMeta = (_acctProviders || []).find(p => p.id === _acctProviderSel);
     const credentials = {};
-    ((selMeta && selMeta.fields) || []).forEach(f => { const v = (document.getElementById('prov-' + f.key)?.value || '').trim(); if (v) credentials[f.key] = v; });
+    ((selMeta && selMeta.fields) || []).forEach(f => {
+        const el = document.getElementById('prov-' + f.key);
+        if (!el) return;
+        if (f.type === 'checkbox') { if (el.checked) credentials[f.key] = 'yes'; }
+        else { const v = (el.value || '').trim(); if (v) credentials[f.key] = v; }
+    });
     try {
         const res = await fetch('/api/billing', {
             method: 'POST',
