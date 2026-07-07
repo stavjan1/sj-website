@@ -2850,7 +2850,7 @@ function acctRenderProvider(current) {
         </button>`;
     }).join('');
     const selMeta = (_acctProviders || []).find(p => p.id === _acctProviderSel);
-    const isSecret = (k) => /secret|token|key|password/i.test(k);
+    const isSecret = (k) => /secret|token|key|pass|pin/i.test(k);
     const fields = ((selMeta && selMeta.fields) || []).map(f => {
         if (f.type === 'checkbox') return `<label class="prov-field prov-check"><input type="checkbox" id="prov-${f.key}"> ${escapeHtml(f.label)}</label>`;
         return `<label class="prov-field">${escapeHtml(f.label)}<input id="prov-${f.key}" type="${isSecret(f.key) ? 'password' : 'text'}" dir="ltr" placeholder="${f.optional ? 'לא חובה' : ''}"></label>`;

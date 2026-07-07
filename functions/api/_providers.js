@@ -26,9 +26,13 @@ export const PROVIDERS = {
     ],
   },
   icount: {
-    id: 'icount', name: 'iCount', status: 'soon',
-    note: 'חיבור עצמי: הדבק את ה-API Key מחשבון iCount שלך.',
-    fields: [{ key: 'apiKey', label: 'API Key' }],
+    id: 'icount', name: 'iCount', status: 'active',
+    note: 'חיבור עצמי: מזהה חברה (cid) + משתמש וסיסמה. מומלץ ליצור משתמש API ייעודי ב-iCount (הגדרות → משתמשים) ולא את הכניסה הראשית.',
+    fields: [
+      { key: 'cid', label: 'מזהה חברה (cid)' },
+      { key: 'user', label: 'שם משתמש (API)' },
+      { key: 'pass', label: 'סיסמה' },
+    ],
   },
 };
 

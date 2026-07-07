@@ -15,6 +15,7 @@ import {
 import { smartbeeAuth, smartbeeCall, sbVatOption, SB_MAX_DOC } from './_smartbee.js';
 import { getUserBilling, isProviderActive, providerMeta } from './_providers.js';
 import { giCreateDocument } from './_greeninvoice.js';
+import { icCreateDocument } from './_icount.js';
 
 async function requirePayingUser(context) {
   const email = await verifyGoogleEmail(bearerToken(context.request));
@@ -118,13 +119,13 @@ export async function onRequestPost(context) {
     };
   }
 
-  // ---- Green Invoice adapter (synchronous create → number + PDF immediately) ----
-  if (billing.provider === 'greeninvoice') {
-    const gi = await giCreateDocument(billing.credentials, {
-      docType, customer, items: paymentItems, vatType: body.vatType, receiptDetails, comments: body.comments,
-    });
-    if (!gi.ok) return jsonResponse({ error: { message: gi.error || 'יצירת המסמך נכשלה.' }, status: gi.status, detail: gi.detail }, 502);
-    return jsonResponse({ ok: true, created: true, docNumber: gi.docNumber, pdfUrl: gi.pdfUrl });
+  // ---- Synchronous adapters (Green Invoice / iCount) → number + PDF immediately ----
+  const genericDoc = { docType, customer, items: paymentItems, vatType: body.vatType, receiptDetails, comments: body.comments };
+  if (billing.provider === 'greeninvoice' || billing.provider === 'icount') {
+    const create = billing.provider === 'icount' ? icCreateDocument : giCreateDocument;
+    const out = await create(billing.credentials, genericDoc);
+    if (!out.ok) return jsonResponse({ error: { message: out.error || 'יצירת המסמך נכשלה.' }, status: out.status, detail: out.detail }, 502);
+    return jsonResponse({ ok: true, created: true, docNumber: out.docNumber, pdfUrl: out.pdfUrl });
   }
 
   // ---- SmartBee adapter (async queue) ----
