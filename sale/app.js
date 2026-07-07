@@ -4097,6 +4097,33 @@ function getSternLaborPromptBlock() {
 ${lines.join('\n')}`;
 }
 
+// The "third engine" — a strategic pricing MIND injected into the pricing agent
+// (alongside the Stern labor book + material catalog). Cost is the floor; this
+// teaches the AI to reason UP toward the value-based, game-theoretic ideal price.
+function getPricingInstinctPromptBlock() {
+    return `\n\n# מנוע 3 — תחושת התמחור (חשיבה אסטרטגית, לא רק חישוב עלות)
+העלות (חומרים + עבודה) היא רצפת המחיר — לא המחיר. המחיר האמיתי = הערך ללקוח + הסיכון והאחריות שאתה נושא + נדירות המיומנות שלך. עבודת חשמל היא כמו ביטוח: טעות שורפת בית, ולכן ביטחון ומחיר יציב משדרים מקצוענות, ומחיר נמוך מדי מפחיד דווקא לקוחות טובים ומשדר חוסר ניסיון. אף פעם אל תהיה הזול ביותר — תהיה זה שסומכים עליו.
+
+קרא את הסיגנלים ומקם את ההצעה בתוך/מעל הטווח שהמנוע חישב:
+• דחיפות/חירום → ה-BATNA של הלקוח גרוע, נטה כלפי מעלה.
+• מורכבות/פיקודים/מומחיות שמעטים יודעים לגעת בה → פרמיית נדירות (זה החפיר שלך).
+• סימני כושר-תשלום (שכונה, נכס, גימור קיים) → מותר גבוה יותר.
+• לקוח חד-פעמי / בלי מקדמה / חשיפה כספית גבוהה → פרמיית סיכון.
+• לקוח חוזר / מקור הפניות / עבודה פשוטה ששומרת קשר → הוגן-אך-תקיף, שמור על הקשר לטווח ארוך.
+• אתה עמוס → תמחר לפי עלות ההזדמנות (מה אתה *לא* עושה אם תיקח את זה).
+
+טקטיקות (תורת המשחקים והתנהגות):
+• עיגון: הצג קודם את ההיקף/הסכום הגבוה, ואז המחיר הסופי מרגיש סביר.
+• טוב · טוב יותר · הכי טוב: כשמתאים, הצע 3 רמות (בסיס / מומלץ / פרימיום). רוב הלקוחות בוחרים באמצע; הפרימיום מעגן את המומלץ. תכנן שה"מומלץ" יהיה מה שאתה באמת רוצה למכור.
+• מסגור הימנעות מהפסד: מכור בטיחות והסרת-סיכון (תקן, ביטוח, כשל חשמלי) — לא "פיצ'רים". מסגר מול העלות של עבודה גרועה / בדק חוזר / שריפה.
+• החזק את המחיר: אם לוחצים — הורד היקף, לא מחיר. זה שומר על התעריף ומחנך שהאיכות עולה כסף.
+• רצפת עבודה מינימלית: ביקור קטן חייב לכסות נסיעה + התארגנות + עלות הזדמנות. אל תעשה עבודה של ₪50 ב-₪50.
+• מכירה נלווית: כשאתה כבר בשטח והביקור שולם — כל תיקון סמוך נמכר בקלות. הצע "כשאני כבר כאן…".
+• משחק חוזר: השוק קטן (פה-לאוזן, קבוצות וואטסאפ). מחיר הוגן-אך-תקיף ובר-קיימא בונה מוניטין; זול מדי מאמן את השוק לצפות לזול, יקר-חמדני שורף.
+
+בכל תשובת תמחור, בנוסף לחישוב, הוסף בסוף שורת **"המלצת תמחור אסטרטגית"**: היכן למקם את המחיר (מספר או נטייה בטווח) + משפט נימוק אחד + טיפ הצגה קצר (איך להגיד את המחיר בביטחון, עם סיבת-ערך, בלי להתנצל). ואם החישוב מבוסס-העלות נראה נמוך מדי מול הערך/הסיכון — אמור זאת במפורש והמלץ להרים.`;
+}
+
 // ==========================================================================
 // Pricing engine (Stav's method): price = materials×(1+markup) + labor, where
 // labor = hours × rate × complexity × urgency, OR a direct "target profit".
@@ -6164,7 +6191,7 @@ async function runPricingAgent(activeProject, promptChars) {
     const recentUserText = (activeProject.chatHistory || [])
         .filter(m => m.role === 'user').slice(-2)
         .map(m => (m.parts && m.parts[0] && m.parts[0].text) || '').join(' ');
-    const systemInstructionText = getProfessionSystemInstruction() + getSternLaborPromptBlock() + getPriceCatalogPromptBlock(recentUserText);
+    const systemInstructionText = getProfessionSystemInstruction() + getSternLaborPromptBlock() + getPriceCatalogPromptBlock(recentUserText) + getPricingInstinctPromptBlock();
     const _t0 = performance.now();
     setQuotaCharging(true);
     try {
