@@ -4728,3 +4728,14 @@ body.boxes-light .card-header { background: linear-gradient(180deg, rgba(37,99,2
 .pe-def-grid label { font-size: 0.74rem; color: var(--text-muted); display: flex; flex-direction: column; gap: 3px; }
 .pe-def-grid input { padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 7px; background: var(--bg-input); color: var(--text-primary); font-size: 0.82rem; }
 @media (max-width: 700px) { .pe-methods, .pe-two, .pe-def-grid { grid-template-columns: 1fr; } }
+
+/* v5.10 — invoicing provider selection */
+.prov-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.prov-card { text-align: start; padding: 12px 14px; border-radius: 11px; border: 1px solid var(--border-color); background: var(--bg-card); cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.prov-card:hover { border-color: var(--color-accent); }
+.prov-card.sel { border-color: var(--color-accent); box-shadow: 0 0 0 1px var(--color-accent) inset; background: rgba(77,142,240,0.06); }
+.prov-name { font-weight: 800; color: var(--text-primary); font-size: 0.92rem; }
+.prov-soon { font-size: 0.66rem; font-weight: 700; color: #f0c040; background: rgba(240,192,64,0.15); border-radius: 999px; padding: 1px 7px; }
+.prov-note { font-size: 0.76rem; color: var(--text-muted); line-height: 1.4; }
+.prov-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 8px; }
+.prov-field input { padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-input); color: var(--text-primary); font-size: 0.85rem; }

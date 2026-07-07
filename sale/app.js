@@ -2398,6 +2398,7 @@ function renderAccounting() {
         { id: 'documents', label: 'מסמכים',  icon: 'fa-file-invoice' },
         { id: 'create',    label: 'הפק מסמך', icon: 'fa-plus' },
         { id: 'clients',   label: 'לקוחות',  icon: 'fa-users' },
+        { id: 'provider',  label: 'ספק',     icon: 'fa-plug' },
     ];
     const bar = tabs.map(t => `<button class="acct-tab ${t.id === acctSection ? 'active' : ''}" onclick="switchAcctSection('${t.id}')"><i class="fa-solid ${t.icon}"></i> ${t.label}</button>`).join('');
     let body = '';
@@ -2405,8 +2406,10 @@ function renderAccounting() {
     else if (acctSection === 'documents') body = acctDocumentsHtml();
     else if (acctSection === 'create') body = acctCreateHtml();
     else if (acctSection === 'clients') body = acctClientsHtml();
+    else if (acctSection === 'provider') body = '<div id="acct-provider-root" class="acct-form"><p class="input-help">טוען…</p></div>';
     root.innerHTML = `<div class="acct-tabbar">${bar}</div><div class="acct-body">${body}</div>`;
     if (acctSection === 'create') acctRenderItems();
+    if (acctSection === 'provider') acctLoadProvider();
 }
 
 // ---- Cash flow (by month / by year) --------------------------------------
@@ -2810,6 +2813,64 @@ function acctAddClient() {
     saveClients();
     renderAccounting();
     showToast('הלקוח נוסף');
+}
+
+// ---- Provider selection (connect your own invoicing service) --------------
+let _acctProviders = null;
+let _acctProviderSel = null;
+async function acctLoadProvider() {
+    const root = document.getElementById('acct-provider-root');
+    if (!root) return;
+    if (!googleAccessToken) { root.innerHTML = '<p class="input-help">מתחבר… נסה שוב עוד רגע.</p>'; return; }
+    try {
+        const res = await fetch('/api/billing', { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
+        const d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        _acctProviders = d.providers || [];
+        _acctProviderSel = (d.current && d.current.provider) || 'smartbee';
+        acctRenderProvider(d.current);
+    } catch (e) {
+        root.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה: ${e.message}</p>`;
+    }
+}
+function acctRenderProvider(current) {
+    const root = document.getElementById('acct-provider-root');
+    if (!root) return;
+    const cards = (_acctProviders || []).map(p => {
+        const sel = p.id === _acctProviderSel;
+        const soon = p.status !== 'active' ? ' <span class="prov-soon">בקרוב</span>' : '';
+        return `<button class="prov-card ${sel ? 'sel' : ''}" onclick="acctSelectProvider('${p.id}')">
+            <span class="prov-name">${escapeHtml(p.name)}${soon}</span>
+            <span class="prov-note">${escapeHtml(p.note || '')}</span>
+        </button>`;
+    }).join('');
+    const selMeta = (_acctProviders || []).find(p => p.id === _acctProviderSel);
+    const isSecret = (k) => /secret|token|key|password/i.test(k);
+    const fields = ((selMeta && selMeta.fields) || []).map(f =>
+        `<label class="prov-field">${escapeHtml(f.label)}<input id="prov-${f.key}" type="${isSecret(f.key) ? 'password' : 'text'}" dir="ltr" placeholder="${f.optional ? 'לא חובה' : ''}"></label>`).join('');
+    root.innerHTML = `
+        <div class="acct-sub">בחר ספק חשבוניות</div>
+        <div class="prov-cards">${cards}</div>
+        ${selMeta ? `<div class="acct-sub" style="margin-top:14px;">פרטי חיבור — ${escapeHtml(selMeta.name)}</div>${fields || '<p class="input-help">אין צורך בפרטים — משתמשים בחשבון המערכת.</p>'}` : ''}
+        ${current && current.hasCredentials ? '<p class="input-help" style="color:#22c984;margin-top:6px;">✓ פרטי חיבור שמורים</p>' : ''}
+        <button class="btn btn-accent btn-small" style="margin-top:12px;" onclick="acctSaveProvider()"><i class="fa-solid fa-check"></i> שמור ספק</button>`;
+}
+function acctSelectProvider(id) { _acctProviderSel = id; acctRenderProvider(null); }
+async function acctSaveProvider() {
+    const selMeta = (_acctProviders || []).find(p => p.id === _acctProviderSel);
+    const credentials = {};
+    ((selMeta && selMeta.fields) || []).forEach(f => { const v = (document.getElementById('prov-' + f.key)?.value || '').trim(); if (v) credentials[f.key] = v; });
+    try {
+        const res = await fetch('/api/billing', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({ provider: _acctProviderSel, credentials }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        showToast('הספק נשמר: ' + (selMeta ? selMeta.name : _acctProviderSel));
+        acctLoadProvider();
+    } catch (e) { showToast('שגיאה: ' + e.message, 'error'); }
 }
 
 function updateMetricsDashboard() {

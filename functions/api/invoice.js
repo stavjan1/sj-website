@@ -13,6 +13,7 @@ import {
   ADMIN_EMAIL, getTierForEmail, verifyGoogleEmail, bearerToken, jsonResponse,
 } from './_tiers.js';
 import { smartbeeAuth, smartbeeCall, sbVatOption, SB_MAX_DOC } from './_smartbee.js';
+import { getUserBilling, isProviderActive, providerMeta } from './_providers.js';
 
 async function requirePayingUser(context) {
   const email = await verifyGoogleEmail(bearerToken(context.request));
@@ -65,8 +66,18 @@ export async function onRequestPost(context) {
   let body;
   try { body = await request.json(); } catch { return jsonResponse({ error: { message: 'JSON שגוי.' } }, 400); }
 
-  const providerUserToken = env.SMARTBEE_TOKEN;
-  if (!providerUserToken) return jsonResponse({ error: { message: 'חסר SMARTBEE_TOKEN בשרת.' } }, 501);
+  // Route to the user's chosen invoicing provider. SmartBee is the only wired
+  // adapter for now; others are chooseable but not yet live.
+  const billing = await getUserBilling(env, gate.email);
+  if (billing.provider !== 'smartbee') {
+    if (!isProviderActive(billing.provider)) {
+      const name = (providerMeta(billing.provider) || {}).name || billing.provider;
+      return jsonResponse({ error: { message: `החיבור ל-${name} עדיין בבנייה. בחר SmartBee בהגדרות הספק בינתיים.`, code: 'PROVIDER_SOON' } }, 501);
+    }
+  }
+  // Per-user SmartBee token if the user stored one; else the system master token.
+  const providerUserToken = (billing.credentials && billing.credentials.token) || env.SMARTBEE_TOKEN;
+  if (!providerUserToken) return jsonResponse({ error: { message: 'חסר טוקן ספק (SmartBee) בשרת/במשתמש.' } }, 501);
 
   const customer = body.customer || {};
   if (!customer.name || String(customer.name).trim().length < 2) {
