@@ -17,6 +17,7 @@ import { getUserBilling, isProviderActive, providerMeta } from './_providers.js'
 import { giCreateDocument } from './_greeninvoice.js';
 import { icCreateDocument } from './_icount.js';
 import { ezCreateDocument } from './_ezcount.js';
+import { sumitCreateDocument } from './_sumit.js';
 
 async function requirePayingUser(context) {
   const email = await verifyGoogleEmail(bearerToken(context.request));
@@ -122,7 +123,7 @@ export async function onRequestPost(context) {
 
   // ---- Synchronous adapters (Green Invoice / iCount) → number + PDF immediately ----
   const genericDoc = { docType, customer, items: paymentItems, vatType: body.vatType, receiptDetails, comments: body.comments };
-  const SYNC_ADAPTERS = { greeninvoice: giCreateDocument, icount: icCreateDocument, ezcount: ezCreateDocument };
+  const SYNC_ADAPTERS = { greeninvoice: giCreateDocument, icount: icCreateDocument, ezcount: ezCreateDocument, sumit: sumitCreateDocument };
   if (SYNC_ADAPTERS[billing.provider]) {
     const out = await SYNC_ADAPTERS[billing.provider](billing.credentials, genericDoc);
     if (!out.ok) return jsonResponse({ error: { message: out.error || 'יצירת המסמך נכשלה.' }, status: out.status, detail: out.detail }, 502);

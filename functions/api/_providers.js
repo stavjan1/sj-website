@@ -33,6 +33,14 @@ export const PROVIDERS = {
       { key: 'developerEmail', label: 'אימייל מפתח (Developer email)' },
     ],
   },
+  sumit: {
+    id: 'sumit', name: 'SUMIT', status: 'active',
+    note: 'חיבור עצמי: מזהה חברה (CompanyID) + API Key מחשבון SUMIT (מפתחים → API).',
+    fields: [
+      { key: 'companyId', label: 'מזהה חברה (CompanyID)' },
+      { key: 'apiKey', label: 'API Key' },
+    ],
+  },
   icount: {
     id: 'icount', name: 'iCount', status: 'active',
     note: 'חיבור עצמי: מזהה חברה (cid) + משתמש וסיסמה. מומלץ ליצור משתמש API ייעודי ב-iCount (הגדרות → משתמשים) ולא את הכניסה הראשית.',
