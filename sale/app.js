@@ -1722,7 +1722,7 @@ function copyArchiveLink(encodedLink, e) {
     if (e) e.stopPropagation();
     const link = decodeURIComponent(encodedLink);
     navigator.clipboard.writeText(link)
-        .then(() => showToast('הקישור הועתק 📋'))
+        .then(() => showToast('הקישור הועתק'))
         .catch(() => showToast('לא ניתן להעתיק — ' + link, 'error'));
 }
 
@@ -2342,7 +2342,7 @@ function pipelineAdvance(projectId, to, e) {
     p.statusChangedAt = Date.now();
     saveProjects();
     renderStatistics();
-    showToast(to === 'paid' ? 'סומן כשולם 💰' : 'הועבר לממתין לתשלום');
+    showToast(to === 'paid' ? 'סומן כשולם' : 'הועבר לממתין לתשלום');
 }
 
 // ==========================================================================
@@ -2745,7 +2745,7 @@ async function acctSubmitDocument() {
         saveInvoices();
         acctItems = []; acctDraftProjectId = ''; acctVatBasis = 'exclude';
         switchAcctSection('documents');
-        showToast(synchronous ? 'המסמך הופק ✓' : 'המסמך נשלח להפקה ⏳');
+        showToast(synchronous ? 'המסמך הופק' : 'המסמך נשלח להפקה — ממתין לאישור הספק');
         if (!synchronous && doc.apiMessageId) setTimeout(() => acctPollDocument(doc.id), 2500);
     } catch (e) {
         showToast('שגיאה: ' + e.message, 'error');
@@ -2782,7 +2782,7 @@ function acctMarkPaid(docId) {
     const doc = invoicesList.find(x => x.id === docId);
     if (!doc) return;
     doc.paid = true; saveInvoices(); renderAccounting();
-    showToast('סומן כשולם 💰');
+    showToast('סומן כשולם');
 }
 
 // ---- Clients --------------------------------------------------------------
@@ -2969,7 +2969,7 @@ function snoozeFollowup(projectId, days, e) {
     if (e) e.stopPropagation();
     localStorage.setItem(_snoozeKey(projectId), String(Date.now() + days * 24 * 60 * 60 * 1000));
     renderFollowupReminders();
-    showToast(days >= 30 ? 'סומן כטופל 👍' : 'אזכיר שוב מחר');
+    showToast(days >= 30 ? 'סומן כטופל' : 'אזכיר שוב מחר');
 }
 
 function _followupMessage(proj) {
@@ -3761,7 +3761,7 @@ let _designMoveFrom = null;
 function openQuoteDesigner() {
     // Desktop-only feature (mobile uses the one-tap templates).
     if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) {
-        showToast('העיצוב הידני זמין במחשב. בנייד — בחר תבנית מוכנה בעורך ההצעה 🙂');
+        showToast('העיצוב הידני זמין במחשב. בנייד — בחר תבנית מוכנה בעורך ההצעה');
         return;
     }
     closeQuoteDesigner();
@@ -4395,7 +4395,7 @@ function pricingApplyToQuote() {
     if (base) { base.value = price; if (typeof calculateTotal === 'function') calculateTotal(); }
     proj.laborPrice = Math.round((c.laborA + c.laborB) / 2);
     saveProjects();
-    showToast('המחיר הוחל על ההצעה — עבור ל"עורך ההצעה" 📝');
+    showToast('המחיר הוחל על ההצעה — עבור ל"עורך ההצעה"');
 }
 
 // Defaults editor (set once): markup, rate presets, multipliers.
@@ -5623,7 +5623,7 @@ function downloadReportPDF() {
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'legacy'] }
     }).from(el).save()
-        .then(() => { restoreSheet(); refreshReportPreview(); showToast('הדוח הורד בהצלחה 🎉'); saveReportToList(false); })
+        .then(() => { restoreSheet(); refreshReportPreview(); showToast('הדוח הורד'); saveReportToList(false); })
         .catch(err => { restoreSheet(); refreshReportPreview(); console.error('Report PDF error:', err); showToast('שגיאה ביצירת הדוח', 'error'); });
 }
 
@@ -5804,7 +5804,7 @@ async function shareQuoteLink() {
         saveProjects();
         try {
             await navigator.clipboard.writeText(link);
-            showToast('הקישור הועתק 📋 — שלח ללקוח בוואטסאפ');
+            showToast('הקישור הועתק — שלח ללקוח בוואטסאפ');
         } catch (e) {
             prompt('העתק את הקישור ושלח ללקוח:', link);
         }
@@ -5889,7 +5889,7 @@ function saveQuoteSignature() {
     syncCurrentQuoteToProject();
     renderQuoteSignature();
     closeSignatureModal();
-    showToast('ההצעה נחתמה ✍️ — החתימה תופיע ב-PDF');
+    showToast('ההצעה נחתמה — החתימה תופיע ב-PDF');
 }
 
 // Show the captured signature inside the PDF sheet's client-signature slot.
@@ -5965,7 +5965,7 @@ function setChatMode(mode, projOverride) {
     if (!proj) return;
     const stage = getProjectStage(proj);
     if (mode === 'price' && STAGE_ORDER[stage] < 1) {
-        showToast('קודם מסיימים את תכנון העבודה — ואז עוברים לתמחור 🙂', 'error');
+        showToast('קודם מסיימים את תכנון העבודה — ואז עוברים לתמחור', 'error');
         mode = 'plan';
     }
     activeChatMode = mode;
@@ -6152,7 +6152,7 @@ async function approvePlanAndPrice() {
     saveProjects();
     setChatMode('price', proj);
     filterProjectsList(); // refresh stage chain on the project card
-    showToast('עוברים לתמחור — הרשימה המלאה נשלחה לסוכן 💪');
+    showToast('עוברים לתמחור — הרשימה המלאה נשלחה לסוכן');
     await runPricingAgent(proj);
 }
 
@@ -6171,7 +6171,7 @@ function goToDraft() {
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (!proj) return;
     if (STAGE_ORDER[getProjectStage(proj)] < 1) {
-        showToast('קודם תכנון ותמחור — ואז מכינים טיוטה 🙂', 'error');
+        showToast('קודם תכנון ותמחור — ואז מכינים טיוטה', 'error');
         return;
     }
     proj.stage = 'draft';
@@ -6192,7 +6192,7 @@ function openProjectStage(projectId, step, e) {
         switchTab('wizard');
         setChatMode('plan', proj);
     } else if (step === 'price') {
-        if (STAGE_ORDER[stage] < 1) { showToast('קודם מסיימים את התכנון 🙂', 'error'); switchTab('wizard'); setChatMode('plan', proj); return; }
+        if (STAGE_ORDER[stage] < 1) { showToast('קודם מסיימים את התכנון', 'error'); switchTab('wizard'); setChatMode('plan', proj); return; }
         switchTab('wizard');
         setChatMode('price', proj);
     } else if (step === 'draft') {
@@ -8855,8 +8855,8 @@ async function completeGoogleLogin(email, profession, token, rememberMe) {
             const saved = await cloudSaveNow();
             hideAuthLoadingAfterMin(2000);
             // Only promise a cloud backup if it actually succeeded.
-            showToast(saved ? 'עבודתך נשמרה לחשבון Google ✓'
-                            : 'התחברת ✓ — העבודה נשמרת במכשיר; גיבוי הענן יתעדכן כשהחיבור יתייצב');
+            showToast(saved ? 'עבודתך נשמרה לחשבון Google'
+                            : 'התחברת — העבודה נשמרת במכשיר; גיבוי הענן יתעדכן כשהחיבור יתייצב');
             return;
         }
     }

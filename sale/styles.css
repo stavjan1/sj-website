@@ -2780,16 +2780,14 @@ textarea#ai-input {
     color: var(--color-accent);
     margin-bottom: 15px;
     display: inline-block;
-    filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.3));
+    filter: none;
 }
 
 .lock-logo h2 {
-    font-size: 1.6rem;
+    font-size: 1.75rem;
     font-weight: 800;
     margin-bottom: 5px;
-    background: linear-gradient(135deg, #fff 0%, var(--color-accent) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: #fff;
 }
 
 .lock-logo p {
@@ -2823,7 +2821,7 @@ textarea#ai-input {
 .lock-tab-btn.active {
     background: var(--color-accent);
     color: #fff;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+    box-shadow: 0 4px 12px var(--color-accent-glow);
 }
 
 .lock-form {
@@ -2863,7 +2861,7 @@ textarea#ai-input {
 
 .lock-form input:focus, .lock-form select:focus {
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    box-shadow: 0 0 0 3px var(--color-accent-glow);
     outline: none;
 }
 
