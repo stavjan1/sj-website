@@ -8,6 +8,10 @@
 <meta property="og:title" content="כמה לתמחר? שאל את ה-AI של זרם">
 <meta property="og:description" content="תאר עבודת חשמל וקבל הערכת מחיר תוך שניות — חומרים + עבודה + מה שאנשים שוכחים לתמחר.">
 <meta property="og:type" content="website">
+<meta property="og:image" content="https://www.sj-eng.co.il/assets/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/sale/icons/icon-192.png">
 <style>
   :root{
@@ -45,6 +49,11 @@
   .msg.ai{background:var(--panel); border:1px solid var(--line); align-self:flex-start; border-bottom-right-radius:5px}
   .msg.me{background:var(--me); align-self:flex-end; border-bottom-left-radius:5px}
   .msg.ai b{color:#8fd0ff}
+  .msg-actions{align-self:flex-start; display:flex; gap:8px; margin:-4px 2px 2px}
+  .msg-act{font-size:.76rem; font-weight:700; color:var(--sub); background:var(--panel);
+    border:1px solid var(--line); border-radius:8px; padding:5px 11px; cursor:pointer; display:inline-flex; align-items:center; gap:5px}
+  .msg-act:hover{border-color:var(--accent); color:var(--ink)}
+  .msg-act.wa{color:#25d366; border-color:rgba(37,211,102,.4)}
   .typing{align-self:flex-start; color:var(--muted); font-size:.9rem; padding:6px 4px}
   .cta-card{align-self:stretch; background:var(--panel); border:1px solid var(--accent);
     border-radius:14px; padding:14px 16px; text-align:center}
@@ -110,6 +119,7 @@ const sendBtn = document.getElementById('send');
 let history = [];
 let busy = false;
 let ctaShown = false;
+let lastJob = '';
 
 function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 function md(s){ return esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'\n'); }
@@ -119,8 +129,24 @@ function addMsg(role, text){
   el.className = 'msg ' + (role==='user'?'me':'ai');
   el.innerHTML = role==='user' ? esc(text) : md(text);
   wrap.appendChild(el);
+  if (role !== 'user') addActions(text);
   feed.scrollTop = feed.scrollHeight;
   return el;
+}
+
+function addActions(answer){
+  const row = document.createElement('div'); row.className='msg-actions';
+  const copyBtn = document.createElement('button'); copyBtn.className='msg-act'; copyBtn.innerHTML='⧉ העתק';
+  copyBtn.onclick = ()=>{ navigator.clipboard.writeText(answer).then(()=>{ copyBtn.innerHTML='✓ הועתק'; setTimeout(()=>copyBtn.innerHTML='⧉ העתק',1500); }); };
+  const waBtn = document.createElement('button'); waBtn.className='msg-act wa'; waBtn.innerHTML='שתף בוואטסאפ';
+  waBtn.onclick = ()=>{
+    const priceLine = (answer.split('\n').find(l=>/\d/.test(l)) || answer).replace(/\*\*/g,'').slice(0,140);
+    const job = lastJob ? '"' + lastJob.slice(0,60) + '" — ' : '';
+    const txt = `כמה לתמחר? ${job}ה-AI של זרם ענה: ${priceLine}\nתנסה בעצמך (בלי הרשמה): https://sj-eng.co.il/ask/`;
+    window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+  };
+  row.appendChild(copyBtn); row.appendChild(waBtn);
+  wrap.appendChild(row);
 }
 function addTyping(){
   const el = document.createElement('div'); el.className='typing'; el.id='typing'; el.textContent='מחשב מחיר…';
@@ -140,6 +166,7 @@ async function send(text){
   busy = true; sendBtn.disabled = true;
   const intro = document.getElementById('intro'); if (intro) intro.remove();
   input.value=''; input.style.height='auto';
+  lastJob = text;
   addMsg('user', text);
   history.push({ role:'user', content:text });
   const typing = addTyping();
