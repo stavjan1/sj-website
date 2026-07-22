@@ -3274,7 +3274,7 @@ function loadSettings() {
             // Apply saved theme (explicit user choice wins; otherwise follow the OS)
             applySystemTheme(appState.settings.theme || defaultThemeByOS());
             applyBoxTheme(appState.settings.boxTheme || 'auto');
-            applySystemBackground(appState.settings.selectedBackground || 'none');
+            applySystemBackground('none'); // cinematic backgrounds retired — always solid
             updatePdfCustomStyles();
         } catch (e) {
             console.error('Error loading settings', e);
@@ -3328,71 +3328,44 @@ window.addEventListener('resize', () => {
 function defaultThemeByOS() {
     return 'light';
 }
+// Three page themes: light (בוקר) · mid (אמצע — slate/dim) · dark (לילה).
+const THEME_META = {
+    light: { cls: 'light-theme', icon: 'fa-sun',   label: 'LIGHT MODE', name: 'מצב בהיר' },
+    mid:   { cls: 'mid-theme',   icon: 'fa-adjust', label: 'DIM MODE',   name: 'מצב אמצע' },
+    dark:  { cls: 'dark-theme',  icon: 'fa-moon',   label: 'DARK MODE',  name: 'מצב כהה' },
+};
 function applySystemTheme(theme) {
-    if (theme === 'light') {
-        document.body.classList.add('light-theme');
-        document.body.classList.remove('dark-theme');
-    } else {
-        document.body.classList.add('dark-theme');
-        document.body.classList.remove('light-theme');
-    }
-    
-    // Update active button classes in Settings UI
-    const btnDark = document.getElementById('theme-btn-dark');
-    const btnLight = document.getElementById('theme-btn-light');
-    if (btnDark && btnLight) {
-        if (theme === 'light') {
-            btnLight.classList.add('active');
-            btnLight.style.backgroundColor = 'var(--color-accent)';
-            btnLight.style.color = '#fff';
-            
-            btnDark.classList.remove('active');
-            btnDark.style.backgroundColor = '';
-            btnDark.style.color = '';
-        } else {
-            btnDark.classList.add('active');
-            btnDark.style.backgroundColor = 'var(--color-accent)';
-            btnDark.style.color = '#fff';
-            
-            btnLight.classList.remove('active');
-            btnLight.style.backgroundColor = '';
-            btnLight.style.color = '';
-        }
-    }
+    if (!THEME_META[theme]) theme = 'dark';
+    document.body.classList.remove('light-theme', 'mid-theme', 'dark-theme');
+    document.body.classList.add(THEME_META[theme].cls);
 
-    // Update global sidebar Sun/Moon icon toggle
+    // Settings buttons (light / mid / dark).
+    [['theme-btn-light', 'light'], ['theme-btn-mid', 'mid'], ['theme-btn-dark', 'dark']].forEach(([id, t]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const on = t === theme;
+        el.classList.toggle('active', on);
+        el.style.backgroundColor = on ? 'var(--color-accent)' : '';
+        el.style.color = on ? '#fff' : '';
+    });
+
+    // Sidebar icon (shows where the next tap goes) + top-bar flip (shows current).
     const toggleIcon = document.getElementById('theme-toggle-icon');
-    if (toggleIcon) {
-        if (theme === 'light') {
-            toggleIcon.className = 'fa-solid fa-moon';
-        } else {
-            toggleIcon.className = 'fa-solid fa-sun';
-        }
-    }
-
-    // Top-bar toggle: shows the CURRENT mode (icon + label swap on switch).
+    if (toggleIcon) toggleIcon.className = 'fa-solid ' + (theme === 'dark' ? 'fa-sun' : theme === 'light' ? 'fa-adjust' : 'fa-moon');
     const flipIcon = document.getElementById('theme-flip-icon');
     const flipLabel = document.getElementById('theme-flip-label');
     const flip = document.getElementById('theme-flip');
-    if (flipIcon) flipIcon.className = theme === 'light' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
-    if (flipLabel) flipLabel.textContent = theme === 'light' ? 'LIGHT MODE' : 'DARK MODE';
-    if (flip) {
-        flip.classList.toggle('is-dark', theme !== 'light');
-        flip.setAttribute('aria-label', theme === 'light' ? 'עבור למצב כהה (DARK MODE)' : 'עבור למצב בהיר (LIGHT MODE)');
-    }
+    if (flipIcon) flipIcon.className = 'fa-solid ' + THEME_META[theme].icon;
+    if (flipLabel) flipLabel.textContent = THEME_META[theme].label;
+    if (flip) { flip.classList.toggle('is-dark', theme !== 'light'); flip.setAttribute('aria-label', 'החלף מצב תצוגה (בהיר / אמצע / כהה)'); }
 }
 
-// Top-bar theme toggle (kept simple per Stav — label swaps between modes).
-function flipTheme() {
-    toggleSystemTheme();
-}
-
+// Top-bar toggle cycles light → mid → dark → light.
+function flipTheme() { toggleSystemTheme(); }
 function toggleSystemTheme() {
-    // Read the VISIBLE state, not the saved setting — with no saved choice the
-    // app defaults to light, and assuming 'dark' here made the first click a no-op.
-    const current = document.body.classList.contains('light-theme') ? 'light' : 'dark';
-    const next = current === 'dark' ? 'light' : 'dark';
-    setSystemTheme(next);
+    const cur = document.body.classList.contains('light-theme') ? 'light'
+        : document.body.classList.contains('mid-theme') ? 'mid' : 'dark';
+    setSystemTheme({ light: 'mid', mid: 'dark', dark: 'light' }[cur]);
 }
 
 function setSystemTheme(theme) {
@@ -3400,7 +3373,7 @@ function setSystemTheme(theme) {
     appState.settings.theme = theme;
     applySystemTheme(theme);
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
-    showToast(theme === 'light' ? 'עבר למצב בהיר' : 'עבר למצב כהה');
+    showToast('עבר ל' + (THEME_META[theme] ? THEME_META[theme].name : 'מצב כהה'));
 }
 
 // Independent box/surface theme, layered on top of the page theme:

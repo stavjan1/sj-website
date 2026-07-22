@@ -3232,6 +3232,31 @@ body.light-theme .card-header {
     background: #f1f5f9;
 }
 
+/* ===== Mid Theme (אמצע) — a slate/twilight between בוקר (light) and לילה (dark).
+   Comfortable dim palette: easier on the eyes than full-dark, not as bright as light. */
+body.mid-theme {
+    --bg-main: #1a2032;
+    --bg-card: #232c40;
+    --bg-card-header: #2a3450;
+    --bg-input: #2a3450;
+    --border-color: #3a4560;
+    --border-hover: #4f5c7a;
+
+    --text-primary: #eef2fb;
+    --text-secondary: #c4cddf;
+    --text-muted: #94a1ba;
+}
+body.mid-theme .section-card {
+    background: linear-gradient(180deg, #263049 0%, #202940 100%);
+}
+body.mid-theme .card-header {
+    background: #2a3450;
+}
+body.mid-theme .sidebar {
+    background: linear-gradient(180deg, #1d2439 0%, #161d30 100%);
+    border-left: 1px solid #3a4560;
+}
+
 body.light-theme .sidebar {
     background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
     border-left: 1px solid #cbd5e1;
