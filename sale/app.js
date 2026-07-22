@@ -1531,9 +1531,6 @@ function switchTab(tabId) {
     if (tabId === 'catalog') {
         renderPriceCatalog();
     }
-    if (tabId === 'archive') {
-        renderClientArchive();
-    }
     if (tabId === 'statistics') {
         renderStatistics();
     }
