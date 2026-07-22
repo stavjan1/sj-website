@@ -34,8 +34,8 @@ export const PROVIDERS = {
     ],
   },
   sumit: {
-    id: 'sumit', name: 'SUMIT', status: 'active',
-    note: 'חיבור עצמי: מזהה חברה (CompanyID) + API Key מחשבון SUMIT (מפתחים → API).',
+    id: 'sumit', name: 'SUMIT', status: 'active', badge: 'בונוס וואטסאפ',
+    note: 'בונוס: חיבור ל-SUMIT מפעיל אצלם סוכן וואטסאפ חינמי (לכל החיים, ללא הגבלה) — מצלמים קבלת הוצאה ונשלחת בוואטסאפ, ונכנסת אוטומטית לקטגוריית ההוצאות שלך. חיבור: מזהה חברה (CompanyID) + API Key מחשבון SUMIT (מפתחים → API).',
     fields: [
       { key: 'companyId', label: 'מזהה חברה (CompanyID)' },
       { key: 'apiKey', label: 'API Key' },
@@ -59,7 +59,7 @@ export function isProviderActive(id) { const p = PROVIDERS[id]; return !!(p && p
 
 // Public metadata for the client (no secrets) — the provider cards + fields.
 export function publicProviderList() {
-  return Object.values(PROVIDERS).map((p) => ({ id: p.id, name: p.name, status: p.status, note: p.note, fields: p.fields }));
+  return Object.values(PROVIDERS).map((p) => ({ id: p.id, name: p.name, status: p.status, note: p.note, fields: p.fields, badge: p.badge }));
 }
 
 // The calling user's billing config from KV (falls back to the default provider).

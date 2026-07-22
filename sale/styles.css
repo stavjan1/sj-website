@@ -4739,3 +4739,4 @@ body.boxes-light .card-header { background: linear-gradient(180deg, rgba(37,99,2
 .prov-field input { padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-input); color: var(--text-primary); font-size: 0.85rem; }
 .prov-field.prov-check { flex-direction: row; align-items: center; gap: 8px; }
 .prov-field.prov-check input { width: 16px; height: 16px; }
+.prov-badge{font-size:.62rem;font-weight:800;color:#25d366;background:rgba(37,211,102,.14);border-radius:999px;padding:1px 8px;white-space:nowrap}

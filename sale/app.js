@@ -2844,8 +2844,9 @@ function acctRenderProvider(current) {
     const cards = (_acctProviders || []).map(p => {
         const sel = p.id === _acctProviderSel;
         const soon = p.status !== 'active' ? ' <span class="prov-soon">בקרוב</span>' : '';
+        const badge = p.badge ? ` <span class="prov-badge">${escapeHtml(p.badge)}</span>` : '';
         return `<button class="prov-card ${sel ? 'sel' : ''}" onclick="acctSelectProvider('${p.id}')">
-            <span class="prov-name">${escapeHtml(p.name)}${soon}</span>
+            <span class="prov-name">${escapeHtml(p.name)}${soon}${badge}</span>
             <span class="prov-note">${escapeHtml(p.note || '')}</span>
         </button>`;
     }).join('');
