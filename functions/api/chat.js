@@ -15,7 +15,7 @@
 import { generate } from './_ai.js';
 import {
   ADMIN_EMAIL, MODEL_CLASS, loadTierConfig, getTierForEmail,
-  verifyGoogleEmail, bearerToken, dayKey,
+  verifyGoogleEmail, bearerToken, dayKey, rateLimit,
 } from './_tiers.js';
 
 export async function onRequestPost(context) {
@@ -34,6 +34,13 @@ export async function onRequestPost(context) {
 
   const email = await verifyGoogleEmail(bearerToken(request));
   const isAdmin = !!email && email.toLowerCase() === ADMIN_EMAIL;
+
+  // Per-minute BURST guard (on top of the per-day quota below) — protects the
+  // now-public /ask/ AI endpoint from spam / cost bombs. 12/min per IP is far
+  // above real use; admin exempt. Fails open if KV isn't bound.
+  if (!isAdmin && !(await rateLimit(env, request, 'chat', 12))) {
+    return json({ error: { code: 'RATE', message: 'יותר מדי בקשות בזמן קצר — המתן דקה ונסה שוב.' } }, 429);
+  }
   const tier = await getTierForEmail(env, email);
   const config = await loadTierConfig(env);
   const limits = config[tier] || config.free;
