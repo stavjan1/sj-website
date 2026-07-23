@@ -82,6 +82,15 @@ export async function onRequestPost(context) {
     model = body.model || model;
   }
 
+  // Optional Gemini thinking control (client-set, clamped). The public /ask/
+  // funnel sends 0 to disable thinking → snappy replies with no mid-word
+  // truncation from thinking eating the maxOutputTokens budget. Gemini-only;
+  // ignored by the other providers.
+  let thinkingBudget;
+  if (body.thinkingBudget != null && Number.isFinite(Number(body.thinkingBudget))) {
+    thinkingBudget = Math.max(0, Math.min(4096, Math.floor(Number(body.thinkingBudget))));
+  }
+
   return generate(env, {
     provider,
     model,
@@ -92,6 +101,7 @@ export async function onRequestPost(context) {
     response_format: body.response_format,
     temperature: body.temperature,
     max_tokens: body.max_tokens,
+    thinkingBudget,
     stream: body.stream === true,
   });
 }

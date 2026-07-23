@@ -128,6 +128,11 @@ export function toGemini(messages, opts = {}) {
   if (opts.response_format && opts.response_format.type === 'json_object') gc.responseMimeType = 'application/json';
   if (typeof opts.temperature === 'number') gc.temperature = opts.temperature;
   if (opts.max_tokens) gc.maxOutputTokens = opts.max_tokens;
+  // Gemini 2.5 models "think", and thinking tokens are counted INSIDE
+  // maxOutputTokens — so a low max_tokens can be fully consumed by thinking and
+  // truncate the visible answer mid-word. thinkingBudget:0 disables thinking
+  // (2.5-flash only) → faster replies and the whole budget goes to the answer.
+  if (opts.thinkingBudget != null) gc.thinkingConfig = { thinkingBudget: opts.thinkingBudget };
   if (Object.keys(gc).length) body.generationConfig = gc;
   return body;
 }

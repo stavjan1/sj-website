@@ -187,7 +187,7 @@ async function send(text){
   try{
     const res = await fetch('/api/chat', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ modelClass:'basic', stream:false, max_tokens:700,
+      body: JSON.stringify({ modelClass:'basic', stream:false, max_tokens:1200, thinkingBudget:0,
         messages: [{ role:'system', content:SYSTEM }, ...history] })
     });
     const d = await res.json();
