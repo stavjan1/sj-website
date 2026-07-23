@@ -73,6 +73,19 @@
   .send:disabled{opacity:.5; cursor:default}
   .foot-note{text-align:center; font-size:.68rem; color:var(--muted); margin-top:7px}
   .foot-note a{color:var(--muted)}
+  .intro p b{color:var(--ink); font-weight:700}
+  .wave{display:inline-block; animation:wave 2.2s ease-in-out infinite; transform-origin:70% 70%}
+  @keyframes wave{0%,60%,100%{transform:rotate(0)}70%{transform:rotate(14deg)}80%{transform:rotate(-8deg)}90%{transform:rotate(10deg)}}
+  .chip-hint{font-size:.8rem; color:var(--muted); margin-top:18px}
+  .trust{font-size:.76rem; color:var(--muted); margin-top:18px}
+  .trust b{color:var(--sub); font-weight:700}
+  .send:hover{background:var(--accent-hover,#3a83ea)}
+  .send:active{transform:scale(.94)}
+  @media (max-width:600px){
+    .intro h1{font-size:1.25rem}
+    .chip{font-size:.9rem; padding:9px 15px}   /* thumb-friendly tap targets */
+    textarea{font-size:16px}                    /* prevents iOS zoom-on-focus */
+  }
 </style>
 </head>
 <body>
@@ -88,14 +101,16 @@
   <main id="feed">
     <div class="wrap" id="wrap">
       <div class="intro" id="intro">
-        <h1>תאר עבודה — ואגיד לך כמה לתמחר</h1>
-        <p>הערכת מחיר תוך שניות: חומרים, עבודה, ומה שאנשים שוכחים לתמחר. בלי הרשמה.</p>
+        <h1>כמה לתמחר את העבודה? <span class="wave">👋</span></h1>
+        <p>תאר לי עבודת חשמל <b>במילים שלך</b> — גם קיצורים וסלנג של השטח. תוך שניות תקבל טווח מחיר, מה זה כולל, ומה שאנשים שוכחים לתמחר. בלי הרשמה.</p>
+        <div class="chip-hint">רוצה לנסות? לחץ על דוגמה:</div>
         <div class="chips" id="chips">
           <span class="chip">התקנת עמדת טעינה 15 מטר מהלוח</span>
           <span class="chip">החלפת לוח חשמל בדירת 4 חדרים</span>
           <span class="chip">הוספת 6 נקודות חשמל בסלון</span>
           <span class="chip">בדיקת תקלה — קצר במעגל</span>
         </div>
+        <div class="trust">מבית <b>SJ הנדסת חשמל</b> · בסמכות מהנדס חשמל מורשה</div>
       </div>
     </div>
   </main>
