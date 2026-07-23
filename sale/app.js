@@ -1020,6 +1020,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setProjectsView(localStorage.getItem('sj_projects_view') || 'list'); // restore list/grid choice
         syncTopNav('projects'); // seed the desktop top-bar world + sub-tab row
         setTimeout(showWelcomeOnboarding, 900); // first-run walkthrough (once)
+        setTimeout(checkAskHandoff, 1100); // continue a job from the /ask/ quick-chat
     }
     hideAppSplash();
 });
@@ -1933,6 +1934,64 @@ function createNewProject() {
     switchTab('wizard'); // Auto switch to pricing chat
     // First project ever → one soft, skippable nudge to fill business details.
     if (projectsList.length === 1) setTimeout(maybeShowBizGate, 1200);
+}
+
+// ── Handoff from the public /ask/ quick-chat ──────────────────────────────
+// The no-signup chat at /ask/ saves the described job to localStorage (same
+// origin). After the user signs in here, we offer to continue that exact job as
+// a full project — the whole point of the funnel ("quick chat → into the app").
+const ASK_HANDOFF_KEY = 'zerem_handoff';
+function checkAskHandoff() {
+    let raw = null;
+    try { raw = localStorage.getItem(ASK_HANDOFF_KEY); } catch { return; }
+    if (!raw) return;
+    let h;
+    try { h = JSON.parse(raw); } catch { try { localStorage.removeItem(ASK_HANDOFF_KEY); } catch {} return; }
+    // Only a fresh, real job (expires after 2h so stale funnels don't nag).
+    if (!h || !h.job || !h.ts || (Date.now() - Number(h.ts)) > 2 * 60 * 60 * 1000) {
+        try { localStorage.removeItem(ASK_HANDOFF_KEY); } catch {}
+        return;
+    }
+    const box = document.getElementById('ask-handoff-banner');
+    if (!box) return;
+    const jobShort = String(h.job).slice(0, 90);
+    box.innerHTML = `
+        <div class="ask-handoff">
+            <div class="ask-handoff-ic"><i class="fa-solid fa-bolt"></i></div>
+            <div class="ask-handoff-txt">
+                <b>המשך מהצ'אט המהיר</b>
+                <span>«${escapeHtml(jobShort)}» — נמשיך את זה כפרויקט מלא ואבנה לך רשימת מוצרים והצעת מחיר.</span>
+            </div>
+            <button class="btn btn-accent ask-handoff-go" onclick="createProjectFromHandoff()"><i class="fa-solid fa-arrow-left"></i> המשך כפרויקט</button>
+            <button class="ask-handoff-x" title="בטל" onclick="dismissAskHandoff()"><i class="fa-solid fa-xmark"></i></button>
+        </div>`;
+}
+function dismissAskHandoff() {
+    try { localStorage.removeItem(ASK_HANDOFF_KEY); } catch {}
+    const box = document.getElementById('ask-handoff-banner');
+    if (box) box.innerHTML = '';
+}
+function createProjectFromHandoff() {
+    let h = null;
+    try { h = JSON.parse(localStorage.getItem(ASK_HANDOFF_KEY) || 'null'); } catch {}
+    if (!h || !h.job) { dismissAskHandoff(); return; }
+    const job = String(h.job).trim();
+    // Reuse the tested creation path: seed the name input, then createNewProject().
+    const nameInput = document.getElementById('new-project-name');
+    if (!nameInput) return;
+    nameInput.value = job.slice(0, 45);
+    createNewProject(); // creates + loads + switches to the wizard (planning stage)
+    dismissAskHandoff();
+    // Prefill the planning chat with the exact job so one tap continues the flow.
+    setTimeout(() => {
+        const inp = document.getElementById('chat-user-input');
+        if (inp) {
+            inp.value = job;
+            inp.dispatchEvent(new Event('input'));
+            inp.focus();
+        }
+        showToast('המשכנו מהצ\'אט המהיר — לחץ שלח ואבנה את רשימת המוצרים');
+    }, 500);
 }
 
 function loadProject(id, navigate = true) {

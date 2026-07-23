@@ -152,10 +152,19 @@ function addTyping(){
   const el = document.createElement('div'); el.className='typing'; el.id='typing'; el.textContent='מחשב מחיר…';
   wrap.appendChild(el); feed.scrollTop = feed.scrollHeight; return el;
 }
+// Carry the described job across to the full app (same origin → shared
+// localStorage). /sale/ reads this after sign-in and offers to continue it as a
+// real project — the funnel's whole point: quick chat → into the platform.
+function saveHandoff(reply){
+  try{
+    const priceLine = ((reply||'').split('\n').find(l=>/\d/.test(l)) || '').replace(/\*\*/g,'').slice(0,160);
+    localStorage.setItem('zerem_handoff', JSON.stringify({ job:lastJob, price:priceLine, ts:Date.now() }));
+  }catch(e){}
+}
 function showCTA(){
   if (ctaShown) return; ctaShown = true;
   const c = document.createElement('div'); c.className='cta-card';
-  c.innerHTML = '<p>אהבת? זו רק הקצה. במערכת המלאה תבנה הצעה מלאה, תשלח PDF ללקוח, ותפיק חשבונית.</p><a href="/sale/">כניסה חינם לזרם ←</a>';
+  c.innerHTML = '<p>אהבת? זו רק ההתחלה. במערכת המלאה נמשיך <b>בדיוק את העבודה הזו</b> — רשימת מוצרים, הצעת PDF ללקוח וחשבונית.</p><a href="/sale/">המשך את זה במערכת (חינם) ←</a>';
   wrap.appendChild(c); feed.scrollTop = feed.scrollHeight;
 }
 
@@ -185,6 +194,7 @@ async function send(text){
       const reply = d.choices && d.choices[0] ? d.choices[0].message.content : 'לא התקבלה תשובה — נסה שוב.';
       addMsg('ai', reply);
       history.push({ role:'assistant', content:reply });
+      saveHandoff(reply);
       setTimeout(showCTA, 400);
     }
   }catch(e){

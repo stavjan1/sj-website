@@ -3257,6 +3257,32 @@ body.mid-theme .sidebar {
     border-left: 1px solid #3a4560;
 }
 
+/* Handoff banner — continue a job that started in the public /ask/ quick-chat */
+.ask-handoff {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--color-accent-glow, rgba(37,99,235,.12));
+    border: 1px solid var(--color-accent); border-radius: 12px;
+    padding: 12px 14px; margin-bottom: 14px;
+}
+.ask-handoff-ic {
+    flex-shrink: 0; width: 38px; height: 38px; border-radius: 10px;
+    background: var(--color-accent); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 1.05rem;
+}
+.ask-handoff-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.ask-handoff-txt b { font-size: .95rem; color: var(--text-primary); }
+.ask-handoff-txt span { font-size: .82rem; color: var(--text-secondary); line-height: 1.45; }
+.ask-handoff-go { flex-shrink: 0; white-space: nowrap; }
+.ask-handoff-x {
+    flex-shrink: 0; background: transparent; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 1rem; padding: 6px; border-radius: 8px;
+}
+.ask-handoff-x:hover { background: rgba(127,127,127,.15); color: var(--text-primary); }
+@media (max-width: 640px) {
+    .ask-handoff { flex-wrap: wrap; }
+    .ask-handoff-go { width: 100%; justify-content: center; }
+}
+
 body.light-theme .sidebar {
     background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
     border-left: 1px solid #cbd5e1;
