@@ -55,6 +55,11 @@
   .msg.ai{background:var(--panel); border:1px solid var(--line); align-self:flex-start; border-bottom-right-radius:5px}
   .msg.me{background:var(--me); align-self:flex-end; border-bottom-left-radius:5px}
   .msg.ai b{color:#8fd0ff}
+  .price-line{display:block; font-size:1.15rem; font-weight:800; color:#8fd0ff;
+    background:rgba(43,116,219,.12); border:1px solid rgba(43,116,219,.35);
+    border-radius:10px; padding:8px 12px; margin-bottom:8px}
+  .typing .dots::after{content:''; animation:dots 1.4s steps(4,end) infinite}
+  @keyframes dots{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
   .msg-actions{align-self:flex-start; display:flex; gap:8px; margin:-4px 2px 2px}
   .msg-act{font-size:.76rem; font-weight:700; color:var(--sub); background:var(--panel);
     border:1px solid var(--line); border-radius:8px; padding:5px 11px; cursor:pointer; display:inline-flex; align-items:center; gap:5px}
@@ -148,7 +153,12 @@ let ctaShown = false;
 let lastJob = '';
 
 function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
-function md(s){ return esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'\n'); }
+function md(s){
+  let h = esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+  // Make the price line POP — the one thing every visitor came for.
+  h = h.replace(/^(.*?(?:מחיר משוער|טווח מחיר)[^\n]*)/, '<span class="price-line">$1</span>');
+  return h;
+}
 
 function addMsg(role, text){
   const el = document.createElement('div');
@@ -175,7 +185,17 @@ function addActions(answer){
   wrap.appendChild(row);
 }
 function addTyping(){
-  const el = document.createElement('div'); el.className='typing'; el.id='typing'; el.textContent='מחשב מחיר…';
+  const el = document.createElement('div'); el.className='typing'; el.id='typing';
+  el.innerHTML = '<span id="typing-txt">מחשב מחיר</span><span class="dots"></span>';
+  const steps = ['מחשב מחיר','בודק עוגני שוק','מפרק לחומרים ועבודה','מלטש את ההערכה'];
+  let i = 0;
+  el._iv = setInterval(()=>{
+    i = Math.min(i+1, steps.length-1);
+    const t = document.getElementById('typing-txt'); if (t) t.textContent = steps[i];
+    if (i === steps.length-1) clearInterval(el._iv);
+  }, 1800);
+  const _rm = el.remove.bind(el);
+  el.remove = ()=>{ clearInterval(el._iv); _rm(); };
   wrap.appendChild(el); feed.scrollTop = feed.scrollHeight; return el;
 }
 // Carry the described job across to the full app (same origin → shared
