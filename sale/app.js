@@ -191,6 +191,49 @@ function _applyAdminImport(report) {
     showToast(`${added} פריטים נוספו — עכשיו נתח ופרסם`);
 }
 
+// ── Pricing knowledge map editor (admin) — the "DB" behind every pricing chat.
+// GET/POST /api/pricing-map; saving takes effect immediately (KV), no deploy.
+function _pmapStatus(msg) {
+    const el = document.getElementById('admin-pricing-map-status');
+    if (el) el.textContent = msg;
+}
+async function adminLoadPricingMap() {
+    const ta = document.getElementById('admin-pricing-map');
+    if (!ta || !isAdmin() || !googleAccessToken) return;
+    _pmapStatus('טוען…');
+    try {
+        const res = await fetch('/api/pricing-map', { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
+        const d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        ta.value = d.map || '';
+        _pmapStatus(d.isCustom ? 'מפה מותאמת (KV) פעילה.' : 'ברירת המחדל מהקוד פעילה.');
+    } catch (e) { _pmapStatus('שגיאה בטעינה: ' + e.message); }
+}
+async function adminSavePricingMap() {
+    const ta = document.getElementById('admin-pricing-map');
+    if (!ta || !isAdmin() || !googleAccessToken) return;
+    _pmapStatus('שומר…');
+    try {
+        const res = await fetch('/api/pricing-map', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({ map: ta.value }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        _pmapStatus(d.isCustom ? 'נשמר — המפה המותאמת פעילה מעכשיו בכל צ\'אט.' : 'נשמר.');
+        showToast('מפת התמחור עודכנה');
+    } catch (e) { _pmapStatus('שגיאה בשמירה: ' + e.message); }
+}
+async function adminRevertPricingMap() {
+    if (!confirm('לחזור לברירת המחדל מהקוד? המפה המותאמת תימחק.')) return;
+    const ta = document.getElementById('admin-pricing-map');
+    if (!ta) return;
+    ta.value = '';
+    await adminSavePricingMap();   // empty map = server deletes the KV override
+    await adminLoadPricingMap();   // reload the default for editing
+}
+
 // Registered-users list — real accounts from the cloud (KV `user:*`), admin
 // only. Each row expands to that user's projects, fetched lazily on open.
 async function adminRefreshUserList() {
@@ -1518,6 +1561,7 @@ function switchTab(tabId) {
     }
     if (tabId === 'admin') {
         try { renderAdminStats(); } catch (e) {}
+        try { adminLoadPricingMap(); } catch (e) {}
     }
     if (tabId === 'reports') {
         initReportsPanel();
