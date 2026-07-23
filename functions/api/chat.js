@@ -13,6 +13,7 @@
 // honored only for the admin — everyone else gets their class mapping.
 
 import { generate } from './_ai.js';
+import { getPricingMap } from './_pricing_map.js';
 import {
   ADMIN_EMAIL, MODEL_CLASS, loadTierConfig, getTierForEmail,
   verifyGoogleEmail, bearerToken, dayKey, rateLimit,
@@ -91,13 +92,21 @@ export async function onRequestPost(context) {
     thinkingBudget = Math.max(0, Math.min(4096, Math.floor(Number(body.thinkingBudget))));
   }
 
+  // Field pricing knowledge map (server-owned DATA block): real group-sourced
+  // scenario tables + itemized formulas. KV `pricing:map` overrides the default
+  // without a deploy. Appended as a system block so every pricing chat (guest
+  // /ask/ and the in-app engine) conditions on infrastructure factors instead
+  // of quoting flat numbers.
+  const pricingMap = await getPricingMap(env);
+  const messages = [...body.messages, { role: 'system', content: pricingMap }];
+
   return generate(env, {
     provider,
     model,
     // Paying plans draw from the separate paid Gemini key when configured
     // (GEMINI_API_KEY_PAID) — free users can't drain the paid pool.
     paidTier: isAdmin || tier === 'pro' || tier === 'business',
-    messages: body.messages,
+    messages,
     response_format: body.response_format,
     temperature: body.temperature,
     max_tokens: body.max_tokens,
