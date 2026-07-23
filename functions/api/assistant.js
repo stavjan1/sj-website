@@ -5,6 +5,7 @@
 // DeepSeek → Grok).
 
 import { generate } from './_ai.js';
+import { rateLimit } from './_tiers.js';
 
 const PUBLIC_PROMPT = `אתה "העוזר ההנדסי של SJ" — עוזר חכם מבית SJ הנדסת חשמל, משרד תכנון, ייעוץ ושרטוט מערכות חשמל בישראל בסמכות מהנדס חשמל מורשה.
 
@@ -79,6 +80,13 @@ export async function onRequestPost(context) {
 
   if (turns.length === 0) {
     return json({ error: { message: 'אין הודעה לשלוח.' } }, 400);
+  }
+
+  // Public, unauthenticated LLM endpoint — rate-limit per IP so it can't be
+  // hammered to burn Gemini tokens. 12/min is far above real chat use. Fails
+  // open if KV isn't bound (same idiom as /api/chat).
+  if (!(await rateLimit(env, request, 'assistant', 12))) {
+    return json({ error: { message: 'יותר מדי בקשות בזמן קצר — המתן דקה ונסה שוב.' } }, 429);
   }
 
   const systemPrompt = body.mode === 'sale' ? SALE_PROMPT : PUBLIC_PROMPT;
