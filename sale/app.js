@@ -6161,7 +6161,9 @@ async function runPlanningAgent(activeProject) {
     try {
         const response = await callAI(effectiveModel, {
             messages: historyToMessages(getPlanningSystemInstruction(), activeProject.planChatHistory),
-            max_tokens: 2000,
+            // 3000 (was 2000): gemini-2.5 thinking shares this budget, and a full
+            // product list is long — headroom prevents mid-list truncation.
+            max_tokens: 3000,
             stream: true
         });
         if (!response.ok) throw new Error(await readAIError(response));

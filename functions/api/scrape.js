@@ -93,6 +93,8 @@ export async function onRequestPost(context) {
       response_format: { type: 'json_object' },
       temperature: 0,
       max_tokens: 1500,
+      thinkingBudget: 0, // structured JSON extraction — disable thinking so it
+                         // can't consume the budget and truncate into invalid JSON.
       stream: false,
     });
     const data = await aiRes.json();

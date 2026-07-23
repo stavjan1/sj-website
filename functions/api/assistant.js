@@ -89,6 +89,8 @@ export async function onRequestPost(context) {
     messages: [{ role: 'system', content: systemPrompt }, ...turns],
     temperature: 0.4,
     max_tokens: 700,
+    thinkingBudget: 0, // short helper answers — disable Gemini thinking so it
+                       // doesn't eat the 700-token budget and truncate mid-word.
     stream: true,
   });
 }

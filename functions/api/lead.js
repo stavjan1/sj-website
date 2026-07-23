@@ -57,6 +57,8 @@ export async function onRequestPost(context) {
       ],
       temperature: 0.5,
       max_tokens: 500,
+      thinkingBudget: 0, // short follow-up draft — no thinking, so the 500-token
+                         // budget isn't consumed by reasoning and truncated.
       stream: false,
     });
     const data = await res.json();
