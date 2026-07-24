@@ -2,3 +2,9 @@
 # CF Pages serves .html files and index.html in subdirs automatically.
 
 /app    /sale/    301
+
+# Case tolerance for the shared /ask/ link (people type it by hand from WhatsApp)
+/ASK    /ask/    301
+/ASK/*  /ask/    301
+/Ask    /ask/    301
+/Ask/*  /ask/    301
