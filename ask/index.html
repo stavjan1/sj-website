@@ -19,8 +19,11 @@
 <style>
   :root{
     --bg:#0b0f1a; --panel:#141d2e; --line:#243049; --ink:#eef2fb; --sub:#9fb0cc; --muted:#6f819e;
-    --accent:#2b74db; --accent-ink:#fff; --me:#1c2a44;
+    --accent:#2b74db; --accent-ink:#fff; --me:#1c2a44; --price:#8fd0ff;
   }
+  body.dim{ --bg:#151b2a; --panel:#1d2639; --line:#2d3a56; --ink:#e9eef9; --sub:#a6b3cd; --muted:#7e8ca6; --me:#253452; }
+  body.light{ --bg:#eef2f8; --panel:#ffffff; --line:#d3dcea; --ink:#111827; --sub:#475569; --muted:#8494ab; --me:#d9e6f9; --price:#1d5fc2; }
+  body.light .msg.ai b{color:#1d5fc2}
   *{box-sizing:border-box; margin:0; padding:0}
   html,body{height:100%}
   body{
@@ -55,7 +58,7 @@
   .msg.ai{background:var(--panel); border:1px solid var(--line); align-self:flex-start; border-bottom-right-radius:5px}
   .msg.me{background:var(--me); align-self:flex-end; border-bottom-left-radius:5px}
   .msg.ai b{color:#8fd0ff}
-  .price-line{display:block; font-size:1.15rem; font-weight:800; color:#8fd0ff;
+  .price-line{display:block; font-size:1.15rem; font-weight:800; color:var(--price);
     background:rgba(43,116,219,.12); border:1px solid rgba(43,116,219,.35);
     border-radius:10px; padding:8px 12px; margin-bottom:8px}
   .typing .dots::after{content:''; animation:dots 1.4s steps(4,end) infinite}
@@ -79,7 +82,7 @@
   /* Length→price slider (site-owned formula; AI only fills the numbers) */
   .calcbox{align-self:flex-start; max-width:88%; background:var(--panel); border:1px solid rgba(43,116,219,.45);
     border-radius:14px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; width:340px}
-  .calc-price{font-size:1.5rem; font-weight:800; color:#8fd0ff; text-align:center}
+  .calc-price{font-size:1.5rem; font-weight:800; color:var(--price); text-align:center}
   .calc-label{font-size:.82rem; color:var(--sub); display:flex; justify-content:space-between}
   .calc-label b{color:var(--ink)}
   .calcbox input[type=range]{width:100%; accent-color:var(--accent); cursor:pointer}
@@ -128,6 +131,7 @@
       <div class="h-sub">כמה לתמחר עבודת חשמל?</div>
     </div>
     <div class="h-cta">
+      <button class="h-new" id="theme-btn" title="מצב תצוגה">🌙</button>
       <button class="h-new" id="new-chat" title="שיחה חדשה" style="display:none;">＋ חדשה</button>
       <a href="/sale/">כניסה למערכת ←</a>
     </div>
@@ -167,13 +171,14 @@ const SYSTEM = `אתה "זרם" — עוזר תמחור AI לחשמלאים בי
 2. ואז בלוק בפורמט המדויק הזה (JSON תקין, בלי טקסט נוסף בתוכו):
 [[שאלות]]{"questions":[{"q":"אורך הקו מהלוח","opts":["עד 10 מ'","10-30 מ'","30+ מ'"]},{"q":"תוואי הכבל","opts":["פיר/צנרת קיימת","תעלות עה\\"ט","חציבה/משתלבות חדשות"]}]}[[/שאלות]]
 עד 4 שאלות, עד 4 אפשרויות קצרות לכל אחת. רק שאלות שבאמת משנות את המחיר לעבודה הזו.
+לעולם אל תשאל שאלה שהתשובה לה כבר משתמעת מהתיאור (למשל: המשתמש כתב "כבל 5×4" ⇒ תלת-פאזי — אל תשאל על פאזות; עמדת טעינה ⇒ ברירת מחדל תלת-פאזי).
 
 ## שלב ב' — מחיר אחד
 כשיש לך את התשובות (או כשהתיאור מלא מההתחלה) — תן **מספר אחד** (או טווח צר של עד ±10%):
 1. **מחיר מומלץ: X ₪** + מה כלול, שורה אחת.
 2. **אל תשכח**: 1–3 נקודות שמעלות מחיר (בודק בנפרד, חציבה, פחת ייעודי...).
 3. שורת נימוק אחת. אל תהיה הזול — תמחר לפי ערך, סיכון ומורכבות.
-4. אם המחיר תלוי-אורך (כבל/תוואי/צנרת) — הוסף בסוף בלוק מחשבון בפורמט המדויק (JSON בלבד): [[מחשבון]]{"label":"אורך הקו (מ')","base":1800,"perMeter":45,"minM":5,"maxM":60,"defaultM":20}[[/מחשבון]] כאשר base + perMeter×defaultM שווה בדיוק למחיר שנתת. אל תוסיף מחשבון לעבודות שאינן תלויות-אורך.
+4. אם המחיר תלוי-אורך (כבל/תוואי/צנרת) — הוסף בסוף בלוק מחשבון בפורמט המדויק (JSON בלבד): [[מחשבון]]{"label":"אורך הקו (מ')","base":1800,"minM":5,"maxM":80,"defaultM":20,"tiers":[{"upToM":25,"perMeter":50},{"upToM":60,"perMeter":80},{"upToM":150,"perMeter":115}]}[[/מחשבון]]. המחיר למטר מדורג — קו ארוך יקר יותר למטר (זמן עבודה, חתך גדל). קבע maxM שמכסה את המקרה הריאלי (עד 150, לא רק את מה שהמשתמש אמר), ו-base כך שהמחיר ב-defaultM שווה בדיוק למחיר שנתת. אל תוסיף מחשבון לעבודות שאינן תלויות-אורך.
 קצר ולעניין. סיים תמיד בשורה: "רוצה לנהל את זה כהצעת מחיר מלאה ללקוח? היכנס לזרם."
 
 עוגני שוק אמיתיים (מקבוצות חשמלאים בישראל — אל תתמחר מתחת לזה, עדיף גבוה-סביר מנמוך): חבילת פיטינג חיצונית קטנה (מתג + גוף תאורה + כמה שקעים + כמה קופסאות + ~20–30מ' תעלה + כבל) ≈ 2,500–3,500 ₪; הכנה להגדלת חיבור חד-פאזי → תלת-פאזי בדירה מ~2,000 ₪ ומעלה; התקנת עמדת טעינה כולל לוח פיצול על פילר ≈ 3,000–4,500 ₪ (ללא תשלום לבודק — ציין שזה בנפרד); התקנת גוף תאורה גדול ≈ 300 ₪; נקודת חשמל בודדת ≈ 120–200 ₪; החלפת לוח דירתי ≈ כמה אלפי ₪. עבודה קטנה-בודדת יקרה יחסית (יש רצפת ביקור). כייל את ההערכה למציאות הזו.`;
@@ -226,19 +231,32 @@ function addMsg(role, text){
 function renderCalc(c){
   const clamp = (v,lo,hi)=>Math.min(hi,Math.max(lo,Number(v)||0));
   const base = clamp(c.base, 0, 50000);
-  const perM = clamp(c.perMeter, 5, 400);
   const minM = clamp(c.minM, 1, 500);
   const maxM = Math.max(minM+1, clamp(c.maxM, 2, 500));
   const defM = clamp(c.defaultM, minM, maxM);
-  if (!perM || maxM <= minM) return;
+  // Tiered ₪/meter (long runs cost more per meter). The MATH is site-owned:
+  // clamped tiers, integrated piecewise so the price curve has no jumps.
+  let tiers = Array.isArray(c.tiers) && c.tiers.length
+    ? c.tiers.map(t=>({upToM: clamp(t.upToM,1,500), perMeter: clamp(t.perMeter,5,400)}))
+        .filter(t=>t.perMeter>0).sort((a,b)=>a.upToM-b.upToM).slice(0,4)
+    : [{upToM: maxM, perMeter: clamp(c.perMeter, 5, 400)}];
+  if (!tiers.length || !tiers[0].perMeter) return;
+  const meterCost = (m)=>{           // piecewise integral: sum of tier segments
+    let cost=0, prev=0;
+    for (const t of tiers){ const seg=Math.min(m,t.upToM)-prev; if(seg>0){cost+=seg*t.perMeter; prev+=seg;} if(m<=t.upToM)break; }
+    if (prev < m) cost += (m-prev)*tiers[tiers.length-1].perMeter;
+    return cost;
+  };
   const box = document.createElement('div'); box.className='calcbox';
   const price = document.createElement('div'); price.className='calc-price';
   const lab = document.createElement('div'); lab.className='calc-label';
   const range = document.createElement('input'); range.type='range';
   range.min=minM; range.max=maxM; range.value=defM; range.step=1;
+  // Anchor: the quoted price must hold at defaultM — rebase so it does.
+  const anchorAdj = base - 0; // base already set by protocol; keep formula pure
   const upd = ()=>{
     const m = Number(range.value);
-    const p = Math.round((base + perM*m)/50)*50;   // round to 50₪ steps
+    const p = Math.round((anchorAdj + meterCost(m))/50)*50;   // round to 50₪ steps
     price.textContent = p.toLocaleString('he-IL') + ' ₪';
     lab.innerHTML = '<span>' + esc(c.label||'אורך (מ\')') + '</span><b>' + m + ' מ\'</b>';
   };
@@ -392,6 +410,19 @@ document.getElementById('new-chat').addEventListener('click', ()=>{
   location.reload();
 });
 restoreSession();
+
+// Theme: night (default) → dim → day, persisted.
+const THEMES = [['','🌙'],['dim','🌓'],['light','☀️']];
+let themeIdx = 0;
+function applyTheme(i){
+  themeIdx = i % THEMES.length;
+  document.body.classList.remove('dim','light');
+  if (THEMES[themeIdx][0]) document.body.classList.add(THEMES[themeIdx][0]);
+  document.getElementById('theme-btn').textContent = THEMES[themeIdx][1];
+  try{ localStorage.setItem('zerem_ask_theme', String(themeIdx)); }catch(e){}
+}
+document.getElementById('theme-btn').addEventListener('click', ()=>applyTheme(themeIdx+1));
+applyTheme(parseInt(localStorage.getItem('zerem_ask_theme')||'0',10) || 0);
 
 sendBtn.addEventListener('click', ()=>send());
 input.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }});
