@@ -6738,6 +6738,9 @@ function renderChatHistory(chatHistory) {
         let text = msg.parts[0].text;
         text = text.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
         text = text.replace(/({[\s\S]*?})/, '').trim();
+        // /ask/-protocol machine blocks (questions/calculator) have no renderer
+        // here — strip them so they never show as raw JSON in the app chat.
+        text = text.replace(/\[\[(?:שאלות|מחשבון)\]\][\s\S]*?\[\[\/(?:שאלות|מחשבון)\]\]/g, '').trim();
 
         let html = formatChatMarkdown(text);
         // Attached site photos render as thumbnails inside the user's bubble.
