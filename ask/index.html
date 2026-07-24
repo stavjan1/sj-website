@@ -159,7 +159,7 @@
       <textarea id="input" rows="1" placeholder="לדוגמה: התקנת עמדת טעינה 15 מטר מהלוח, קיר בלוק…" enterkeyhint="send"></textarea>
       <button class="send" id="send" aria-label="שלח">↑</button>
     </div>
-    <div class="foot-note">מבוסס AI — הערכה בלבד, לא תחליף לשיקול דעת מקצועי. <a href="/sale/">זרם — מערכת הצעות המחיר לחשמלאים ←</a></div>
+    <div class="foot-note"><span id="quota-note"></span>מבוסס AI — הערכה בלבד, לא תחליף לשיקול דעת מקצועי. <a href="/sale/">זרם — מערכת הצעות המחיר לחשמלאים ←</a></div>
   </footer>
 
 <script>
@@ -378,6 +378,7 @@ async function send(text){
       const reply = d.choices && d.choices[0] ? d.choices[0].message.content : 'לא התקבלה תשובה — נסה שוב.';
       addMsg('ai', reply);
       history.push({ role:'assistant', content:reply });
+      bumpQuota();
       saveSession();
       saveHandoff(reply);
       setTimeout(showCTA, 400);
@@ -389,6 +390,19 @@ async function send(text){
     busy = false; sendBtn.disabled = false; input.focus();
   }
 }
+
+// Transparent guest quota: count today's questions locally (10/day server-side)
+// so the 429 never surprises anyone. Approximate by design (per-browser).
+const GUEST_DAILY = 10;
+function quotaKey(){ return 'zerem_ask_q_' + new Date().toISOString().slice(0,10); }
+function bumpQuota(){ try{ localStorage.setItem(quotaKey(), String(usedToday()+1)); }catch(e){} updateQuotaNote(); }
+function usedToday(){ try{ return parseInt(localStorage.getItem(quotaKey())||'0',10)||0; }catch(e){ return 0; } }
+function updateQuotaNote(){
+  const el = document.getElementById('quota-note'); if (!el) return;
+  const left = Math.max(0, GUEST_DAILY - usedToday());
+  el.textContent = usedToday() ? ('נשארו לך ~' + left + ' שאלות חינם היום · ') : '';
+}
+updateQuotaNote();
 
 // Session continuity — a returning visitor finds their conversation (24h TTL).
 const SESS_KEY = 'zerem_ask_session';
