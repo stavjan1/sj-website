@@ -76,6 +76,14 @@
     padding:9px 18px; font-size:.9rem; font-weight:800; cursor:pointer; font-family:inherit; margin-top:2px}
   .q-go:disabled{opacity:.45; cursor:default}
   .qbox.done{opacity:.55; pointer-events:none}
+  /* Length→price slider (site-owned formula; AI only fills the numbers) */
+  .calcbox{align-self:flex-start; max-width:88%; background:var(--panel); border:1px solid rgba(43,116,219,.45);
+    border-radius:14px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; width:340px}
+  .calc-price{font-size:1.5rem; font-weight:800; color:#8fd0ff; text-align:center}
+  .calc-label{font-size:.82rem; color:var(--sub); display:flex; justify-content:space-between}
+  .calc-label b{color:var(--ink)}
+  .calcbox input[type=range]{width:100%; accent-color:var(--accent); cursor:pointer}
+  .calc-note{font-size:.7rem; color:var(--muted); text-align:center}
   .msg-actions{align-self:flex-start; display:flex; gap:8px; margin:-4px 2px 2px}
   .msg-act{font-size:.76rem; font-weight:700; color:var(--sub); background:var(--panel);
     border:1px solid var(--line); border-radius:8px; padding:5px 11px; cursor:pointer; display:inline-flex; align-items:center; gap:5px}
@@ -165,6 +173,7 @@ const SYSTEM = `אתה "זרם" — עוזר תמחור AI לחשמלאים בי
 1. **מחיר מומלץ: X ₪** + מה כלול, שורה אחת.
 2. **אל תשכח**: 1–3 נקודות שמעלות מחיר (בודק בנפרד, חציבה, פחת ייעודי...).
 3. שורת נימוק אחת. אל תהיה הזול — תמחר לפי ערך, סיכון ומורכבות.
+4. אם המחיר תלוי-אורך (כבל/תוואי/צנרת) — הוסף בסוף בלוק מחשבון בפורמט המדויק (JSON בלבד): [[מחשבון]]{"label":"אורך הקו (מ')","base":1800,"perMeter":45,"minM":5,"maxM":60,"defaultM":20}[[/מחשבון]] כאשר base + perMeter×defaultM שווה בדיוק למחיר שנתת. אל תוסיף מחשבון לעבודות שאינן תלויות-אורך.
 קצר ולעניין. סיים תמיד בשורה: "רוצה לנהל את זה כהצעת מחיר מלאה ללקוח? היכנס לזרם."
 
 עוגני שוק אמיתיים (מקבוצות חשמלאים בישראל — אל תתמחר מתחת לזה, עדיף גבוה-סביר מנמוך): חבילת פיטינג חיצונית קטנה (מתג + גוף תאורה + כמה שקעים + כמה קופסאות + ~20–30מ' תעלה + כבל) ≈ 2,500–3,500 ₪; הכנה להגדלת חיבור חד-פאזי → תלת-פאזי בדירה מ~2,000 ₪ ומעלה; התקנת עמדת טעינה כולל לוח פיצול על פילר ≈ 3,000–4,500 ₪ (ללא תשלום לבודק — ציין שזה בנפרד); התקנת גוף תאורה גדול ≈ 300 ₪; נקודת חשמל בודדת ≈ 120–200 ₪; החלפת לוח דירתי ≈ כמה אלפי ₪. עבודה קטנה-בודדת יקרה יחסית (יש רצפת ביקור). כייל את ההערכה למציאות הזו.`;
@@ -187,13 +196,18 @@ function md(s){
 }
 
 function addMsg(role, text){
-  let questions = null;
+  let questions = null, calc = null;
   if (role !== 'user'){
     // Phase-1 protocol: extract the machine block, show the rest as text.
     const m = /\[\[שאלות\]\]([\s\S]*?)\[\[\/שאלות\]\]/.exec(text);
     if (m){
       try{ questions = (JSON.parse(m[1]).questions || []).slice(0,4); }catch(e){}
       text = text.replace(m[0], '').trim();
+    }
+    const c = /\[\[מחשבון\]\]([\s\S]*?)\[\[\/מחשבון\]\]/.exec(text);
+    if (c){
+      try{ calc = JSON.parse(c[1]); }catch(e){}
+      text = text.replace(c[0], '').trim();
     }
   }
   const el = document.createElement('div');
@@ -202,8 +216,37 @@ function addMsg(role, text){
   wrap.appendChild(el);
   if (role !== 'user' && !questions) addActions(text);
   if (questions && questions.length) renderQuestions(questions);
+  if (calc) renderCalc(calc);
   feed.scrollTop = feed.scrollHeight;
   return el;
+}
+
+// Length→price slider. The FORMULA lives here (site code, clamped); the AI only
+// supplies the numbers — so the math can never go rogue.
+function renderCalc(c){
+  const clamp = (v,lo,hi)=>Math.min(hi,Math.max(lo,Number(v)||0));
+  const base = clamp(c.base, 0, 50000);
+  const perM = clamp(c.perMeter, 5, 400);
+  const minM = clamp(c.minM, 1, 500);
+  const maxM = Math.max(minM+1, clamp(c.maxM, 2, 500));
+  const defM = clamp(c.defaultM, minM, maxM);
+  if (!perM || maxM <= minM) return;
+  const box = document.createElement('div'); box.className='calcbox';
+  const price = document.createElement('div'); price.className='calc-price';
+  const lab = document.createElement('div'); lab.className='calc-label';
+  const range = document.createElement('input'); range.type='range';
+  range.min=minM; range.max=maxM; range.value=defM; range.step=1;
+  const upd = ()=>{
+    const m = Number(range.value);
+    const p = Math.round((base + perM*m)/50)*50;   // round to 50₪ steps
+    price.textContent = p.toLocaleString('he-IL') + ' ₪';
+    lab.innerHTML = '<span>' + esc(c.label||'אורך (מ\')') + '</span><b>' + m + ' מ\'</b>';
+  };
+  range.oninput = upd; upd();
+  const note = document.createElement('div'); note.className='calc-note';
+  note.textContent = 'גרור לשינוי האורך — המחיר מתעדכן מיד';
+  box.appendChild(price); box.appendChild(range); box.appendChild(lab); box.appendChild(note);
+  wrap.appendChild(box);
 }
 
 // Interactive clarifying questions: chips + optional free text, ONE send.
