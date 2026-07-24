@@ -3,28 +3,38 @@
 Goal: a wildly-accessible viral pricing platform for electricians. Instant no-signup
 pricing chat pulls people in → full ZEREM (projects, quotes, invoicing) retains them.
 
-## Now / in progress
-- [x] `/ask/` — no-signup instant pricing chat (viral entry), share/copy + OG image. LIVE.
-- [x] Pricing prompt: direct request → price now (was stuck in characterization). v5.18 — **verify live**.
-- [ ] SUMIT selling point: "connect SUMIT → free WhatsApp receipts agent, forever, auto-files to expenses" — surface it in the provider UI.
-- [ ] Chat → project handoff: carry the `/ask/` conversation into `/sale/` (prefill a project) so the CTA is seamless.
+## Done this cycle (night 23-24/07)
+- [x] `/ask/` — no-signup pricing chat LIVE: dedicated OG card, session continuity (24h),
+      price chip, live thinking indicator, theme modes (night/dim/day), guest-quota note,
+      case-tolerant /ASK redirect, mobile-solid.
+- [x] **Two-phase pricing UX**: Gemini picks 2-4 smart clarifying questions per job →
+      tappable CHIPS (+free text) → ONE final price (±10%). Live-verified.
+- [x] **Length slider**: site-owned tiered formula (base + tiered ₪/m, clamped, anchored to
+      the quoted price); AI only fills numbers. Live-verified.
+- [x] **Pricing knowledge map** (functions/api/_pricing_map.js): injected server-side into every
+      chat; KV `pricing:map` overrides via admin card "מפת התמחור (DB)" — no deploy.
+      Contains: WhatsApp field anchors (both groups), panel-replacement formula, EV scenarios,
+      hard cable rules (3×/5×; 6+ cores = control only; EV=3ph default), tiered ₪/m.
+- [x] Adversarial training round 1: 5 traps → 2 fails → correct-mistakes-first rule shipped.
+- [x] Chat→project handoff (/ask/ → banner in /sale/ → prefilled project).
+- [x] Truncation bug class killed everywhere (thinkingBudget); /api/assistant rate-limited.
+- [x] Launch-gate: GO (secrets ✅, hardening ✅, de-slop ✅, GEO ✅ incl. llms.txt).
 
-## Pricing core — the ongoing refine/test loop (Stav's priority)
-- [ ] Live-test the REAL Gemini pricing agent (not Fable sim) across phrasings: typos, slang, sparse
-      detail, verbose/messy, missing facts. Score: material completeness, scope characterization,
-      does it reach price+JSON. Iterate the prompt. (First finding fixed in v5.18.)
-- [ ] **Price books into the system DB** — Stern (מחירון שטרן, already in stern-pricing.json) + **Dekel
-      (מחירון דקל)** + others Stav has. Need: (a) the actual price-book data from Stav, (b) a generalized
-      labor/material price-book ingestion (multiple books, matched by trade/section). Build the ingestion;
-      blocked on the data.
+## Waiting on Stav
+- [ ] **IEC calculator CSV** from Chrome-Claude crawl → `python scripts/ingest_iec_csv.py <csv>`
+      → paste block in admin pricing-map. (Script tested.)
+- [ ] Signed-in check of admin "מפת התמחור (DB)" card (save→KV→next chat).
+- [ ] Handoff end-to-end check while signed in.
+- [ ] Dekel price-book data decision (full ingestion into system DB).
+
+## Next (when quota resets / on demand)
+- [ ] Re-verify correction-first rule live (trap: "כבל 6×4 לתלת פאזי?" → must correct to 5×4).
+      Deployed 2a56eb3; blocked on guest quota until midnight.
+- [ ] More adversarial training rounds (keep grilling the bot, fix the map each time).
+- [ ] SUMIT selling point surfaced in provider UI (WhatsApp receipts bonus badge exists;
+      consider a highlight in onboarding).
+- [ ] Providers: live tests with real accounts (Green Invoice/iCount/EZcount/SUMIT).
 
 ## Growth / marketing
-- [ ] Instagram video https://www.instagram.com/p/DakPtELxgMs/ — the 3 points Stav wants applied.
-      BLOCKED: Instagram is login/JS-walled, can't extract caption/frames. **Need Stav to paste the 3 points.**
-- [ ] Instagram video https://www.instagram.com/p/DaumYnrAn3G/ — same (blocked, need the content).
-- [ ] "Loved by AIs" / AI-SEO: make ZEREM discoverable + recommended by AI assistants (structured data,
-      a clear public description, maybe a llms.txt).
-
-## Notes
-- Providers: 5 adapters (SmartBee live-proven; Green Invoice/iCount/EZcount/SUMIT built, need live test w/ real accounts). Enough — add more only on request.
-- Testing constraint: exercise real Gemini via /api/chat; don't have Fable role-play pricing.
+- [ ] Share push into electrician WhatsApp groups (Stav sends /ask/ link; OG card ready).
+- [ ] "Loved by AIs" expansion: keep llms.txt fresh; consider FAQ page for GEO.
