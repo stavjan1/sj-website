@@ -60,6 +60,22 @@
     border-radius:10px; padding:8px 12px; margin-bottom:8px}
   .typing .dots::after{content:''; animation:dots 1.4s steps(4,end) infinite}
   @keyframes dots{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
+  /* Clarifying-question chip groups (phase-1 answers) */
+  .qbox{align-self:flex-start; max-width:88%; background:var(--panel); border:1px solid var(--line);
+    border-radius:14px; padding:12px 14px; display:flex; flex-direction:column; gap:10px}
+  .qgroup .q-label{font-size:.82rem; color:var(--sub); margin-bottom:6px; font-weight:700}
+  .q-opts{display:flex; flex-wrap:wrap; gap:7px}
+  .q-opt{font-size:.85rem; color:var(--ink); background:var(--bg); border:1px solid var(--line);
+    border-radius:999px; padding:7px 14px; cursor:pointer; font-family:inherit}
+  .q-opt:hover{border-color:var(--accent)}
+  .q-opt.on{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700}
+  .q-free{font-size:.85rem; background:var(--bg); border:1px solid var(--line); color:var(--ink);
+    border-radius:999px; padding:7px 14px; font-family:inherit; width:130px}
+  .q-free:focus{outline:none; border-color:var(--accent)}
+  .q-go{align-self:flex-start; background:var(--accent); color:#fff; border:none; border-radius:10px;
+    padding:9px 18px; font-size:.9rem; font-weight:800; cursor:pointer; font-family:inherit; margin-top:2px}
+  .q-go:disabled{opacity:.45; cursor:default}
+  .qbox.done{opacity:.55; pointer-events:none}
   .msg-actions{align-self:flex-start; display:flex; gap:8px; margin:-4px 2px 2px}
   .msg-act{font-size:.76rem; font-weight:700; color:var(--sub); background:var(--panel);
     border:1px solid var(--line); border-radius:8px; padding:5px 11px; cursor:pointer; display:inline-flex; align-items:center; gap:5px}
@@ -135,11 +151,21 @@
   </footer>
 
 <script>
-const SYSTEM = `אתה "זרם" — עוזר תמחור AI לחשמלאים בישראל. חשמלאי מתאר עבודה בקצרה, ואתה נותן תשובת תמחור מהירה, בטוחה וברורה בעברית:
-1. **מחיר משוער**: טווח ₪ (חומרים + עבודה יחד). אל תהיה הזול — תמחר לפי ערך, סיכון, ומורכבות.
-2. **אל תשכח**: 1–3 נקודות עיוורון / דברים שמעלים מחיר שאנשים שוכחים (תיאום חברת חשמל, חציבה, מפסק מגן, הארקה, עבודה בגובה, מרחק בפועל וכו').
-3. שורת נימוק אחת קצרה.
-אם חסר פרט קריטי — הנח הנחה מקצועית סבירה וכתוב אותה בשורה, במקום לשאול. קצר ולעניין (עד ~120 מילים). התחל תמיד עם המחיר. סיים בשורה: "רוצה לנהל את זה כהצעת מחיר מלאה ללקוח? היכנס לזרם."
+const SYSTEM = `אתה "זרם" — עוזר תמחור AI לחשמלאים בישראל. חשמלאי מתאר עבודה בקצרה, ואתה מוביל אותו למחיר מדויק בשני שלבים:
+
+## שלב א' — שאלות חכמות (כשחסרים פרטים שמשנים את המחיר)
+אם בתיאור חסרים 1–4 פרטים שמזיזים את המחיר משמעותית (אורך תוואי, סוג תוואי, נגישות, מצב לוח, גובה, חד/תלת פאזי...) — אל תיתן מחיר סופי. חשוב בעצמך: מהם הגורמים שהכי משנים את המחיר בעבודה *הזאת*? החזר:
+1. שורה אחת: "טווח גס: X–Y ₪ — כדי לדייק, ענה על כמה שאלות:"
+2. ואז בלוק בפורמט המדויק הזה (JSON תקין, בלי טקסט נוסף בתוכו):
+[[שאלות]]{"questions":[{"q":"אורך הקו מהלוח","opts":["עד 10 מ'","10-30 מ'","30+ מ'"]},{"q":"תוואי הכבל","opts":["פיר/צנרת קיימת","תעלות עה\\"ט","חציבה/משתלבות חדשות"]}]}[[/שאלות]]
+עד 4 שאלות, עד 4 אפשרויות קצרות לכל אחת. רק שאלות שבאמת משנות את המחיר לעבודה הזו.
+
+## שלב ב' — מחיר אחד
+כשיש לך את התשובות (או כשהתיאור מלא מההתחלה) — תן **מספר אחד** (או טווח צר של עד ±10%):
+1. **מחיר מומלץ: X ₪** + מה כלול, שורה אחת.
+2. **אל תשכח**: 1–3 נקודות שמעלות מחיר (בודק בנפרד, חציבה, פחת ייעודי...).
+3. שורת נימוק אחת. אל תהיה הזול — תמחר לפי ערך, סיכון ומורכבות.
+קצר ולעניין. סיים תמיד בשורה: "רוצה לנהל את זה כהצעת מחיר מלאה ללקוח? היכנס לזרם."
 
 עוגני שוק אמיתיים (מקבוצות חשמלאים בישראל — אל תתמחר מתחת לזה, עדיף גבוה-סביר מנמוך): חבילת פיטינג חיצונית קטנה (מתג + גוף תאורה + כמה שקעים + כמה קופסאות + ~20–30מ' תעלה + כבל) ≈ 2,500–3,500 ₪; הכנה להגדלת חיבור חד-פאזי → תלת-פאזי בדירה מ~2,000 ₪ ומעלה; התקנת עמדת טעינה כולל לוח פיצול על פילר ≈ 3,000–4,500 ₪ (ללא תשלום לבודק — ציין שזה בנפרד); התקנת גוף תאורה גדול ≈ 300 ₪; נקודת חשמל בודדת ≈ 120–200 ₪; החלפת לוח דירתי ≈ כמה אלפי ₪. עבודה קטנה-בודדת יקרה יחסית (יש רצפת ביקור). כייל את ההערכה למציאות הזו.`;
 
@@ -156,18 +182,66 @@ function esc(s){ const d=document.createElement('div'); d.textContent=s; return 
 function md(s){
   let h = esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
   // Make the price line POP — the one thing every visitor came for.
-  h = h.replace(/^(.*?(?:מחיר משוער|טווח מחיר)[^\n]*)/, '<span class="price-line">$1</span>');
+  h = h.replace(/^(.*?(?:מחיר מומלץ|מחיר משוער|טווח מחיר|טווח גס)[^\n]*)/, '<span class="price-line">$1</span>');
   return h;
 }
 
 function addMsg(role, text){
+  let questions = null;
+  if (role !== 'user'){
+    // Phase-1 protocol: extract the machine block, show the rest as text.
+    const m = /\[\[שאלות\]\]([\s\S]*?)\[\[\/שאלות\]\]/.exec(text);
+    if (m){
+      try{ questions = (JSON.parse(m[1]).questions || []).slice(0,4); }catch(e){}
+      text = text.replace(m[0], '').trim();
+    }
+  }
   const el = document.createElement('div');
   el.className = 'msg ' + (role==='user'?'me':'ai');
   el.innerHTML = role==='user' ? esc(text) : md(text);
   wrap.appendChild(el);
-  if (role !== 'user') addActions(text);
+  if (role !== 'user' && !questions) addActions(text);
+  if (questions && questions.length) renderQuestions(questions);
   feed.scrollTop = feed.scrollHeight;
   return el;
+}
+
+// Interactive clarifying questions: chips + optional free text, ONE send.
+function renderQuestions(questions){
+  const box = document.createElement('div'); box.className='qbox';
+  const answers = {};
+  questions.forEach((q,qi)=>{
+    const g = document.createElement('div'); g.className='qgroup';
+    const lab = document.createElement('div'); lab.className='q-label'; lab.textContent = q.q;
+    const opts = document.createElement('div'); opts.className='q-opts';
+    (q.opts||[]).slice(0,4).forEach(op=>{
+      const b = document.createElement('button'); b.className='q-opt'; b.textContent = op;
+      b.onclick = ()=>{
+        opts.querySelectorAll('.q-opt').forEach(x=>x.classList.remove('on'));
+        b.classList.add('on'); answers[qi] = op; free.value='';
+        go.disabled = Object.keys(answers).length === 0;
+      };
+      opts.appendChild(b);
+    });
+    const free = document.createElement('input'); free.className='q-free'; free.placeholder='אחר…';
+    free.oninput = ()=>{
+      if (free.value.trim()){ opts.querySelectorAll('.q-opt').forEach(x=>x.classList.remove('on')); answers[qi] = free.value.trim(); }
+      else delete answers[qi];
+      go.disabled = Object.keys(answers).length === 0;
+    };
+    opts.appendChild(free);
+    g.appendChild(lab); g.appendChild(opts); box.appendChild(g);
+  });
+  const go = document.createElement('button'); go.className='q-go'; go.disabled = true;
+  go.textContent = 'חשב מחיר מדויק ←';
+  go.onclick = ()=>{
+    const parts = questions.map((q,qi)=> answers[qi] ? (q.q + ': ' + answers[qi]) : null).filter(Boolean);
+    box.classList.add('done');
+    send(parts.join(' | '));
+  };
+  box.appendChild(go);
+  wrap.appendChild(box);
+  feed.scrollTop = feed.scrollHeight;
 }
 
 function addActions(answer){
