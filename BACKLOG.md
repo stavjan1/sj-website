@@ -20,20 +20,20 @@ pricing chat pulls people in → full ZEREM (projects, quotes, invoicing) retain
 - [x] Truncation bug class killed everywhere (thinkingBudget); /api/assistant rate-limited.
 - [x] Launch-gate: GO (secrets ✅, hardening ✅, de-slop ✅, GEO ✅ incl. llms.txt).
 
-## Waiting on Stav
-- [ ] **IEC calculator CSV** from Chrome-Claude crawl → `python scripts/ingest_iec_csv.py <csv>`
-      → paste block in admin pricing-map. (Script tested.)
-- [ ] Signed-in check of admin "מפת התמחור (DB)" card (save→KV→next chat).
-- [ ] Handoff end-to-end check while signed in.
-- [ ] Dekel price-book data decision (full ingestion into system DB).
+## Verified complete (Stav-tested 25/07: "עובד מדהים")
+- [x] IEC calculator DB: 786-combo crawl → data/iec_full.json + digest in DEFAULT_PRICING_MAP.
+      Live-verified: exact fee quoted (3X25→3X80 = 8,459₪), separated from labor.
+- [x] Correction-first rule live-verified (6×4 trap → "כבל פיקוד, צריך 5×4" before questions).
+- [x] All 5 training traps pass. Admin pricing-map card, handoff, chips+slider — Stav-approved.
 
-## Next (when quota resets / on demand)
-- [ ] Re-verify correction-first rule live (trap: "כבל 6×4 לתלת פאזי?" → must correct to 5×4).
-      Deployed 2a56eb3; blocked on guest quota until midnight.
-- [ ] More adversarial training rounds (keep grilling the bot, fix the map each time).
-- [ ] SUMIT selling point surfaced in provider UI (WhatsApp receipts bonus badge exists;
-      consider a highlight in onboarding).
+## Next (on demand)
+- [ ] Ingest full Dekel book into the system catalog (data already local in
+      "הקמת תשתית/כתב כמויות" — dekel_clean_perfect.xlsx). Highest-value remaining data work.
+- [ ] More adversarial training rounds (periodic — keep grilling the bot, fix the map each time).
+- [ ] SUMIT selling point surfaced in provider UI (badge exists; consider onboarding highlight).
 - [ ] Providers: live tests with real accounts (Green Invoice/iCount/EZcount/SUMIT).
+- [ ] Optional Chrome-Claude crawl: supplier material catalog (e.g. big wholesaler) to seed
+      system material prices — only if Stav wants; users can also feed via the scrape tab.
 
 ## Growth / marketing
 - [ ] Share push into electrician WhatsApp groups (Stav sends /ask/ link; OG card ready).
