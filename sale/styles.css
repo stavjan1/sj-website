@@ -3717,6 +3717,15 @@ body:not(.in-project) .proj-tab { display: none !important; }
    ========================================================================== */
 
 /* --- Theme toggle (top bar, far left): shows the CURRENT mode ----------- */
+/* Shared list-cards component (assets/listcards.js) mapped to the app palette.
+   Declared on body so the light-theme variable overrides above are picked up. */
+body {
+    --zlc-bg: var(--bg-main); --zlc-panel: var(--bg-card); --zlc-line: var(--border-color);
+    --zlc-ink: var(--text-primary); --zlc-sub: var(--text-secondary);
+    --zlc-muted: var(--text-muted); --zlc-accent: var(--color-accent);
+}
+.chat-listcards { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; margin: 4px 0 6px; }
+
 /* Quick-mode (/ask/) jump — the platform's compact face, one click away. */
 .quick-mode-link {
     display: inline-flex; align-items: center; gap: 6px;

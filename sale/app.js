@@ -6736,6 +6736,14 @@ function renderChatHistory(chatHistory) {
         bubble.className = `chat-bubble ${role}`;
 
         let text = msg.parts[0].text;
+        // The /ask/ lists block renders as the shared designed cards (same
+        // component as the quick chat) — extract BEFORE the generic JSON strips.
+        let listsData = null;
+        const lm = /\[\[רשימות\]\]([\s\S]*?)\[\[\/רשימות\]\]/.exec(text);
+        if (lm) {
+            try { listsData = JSON.parse(lm[1]); } catch (e) { /* malformed → just strip */ }
+            text = text.replace(lm[0], '').trim();
+        }
         text = text.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
         text = text.replace(/({[\s\S]*?})/, '').trim();
         // /ask/-protocol machine blocks (questions/calculator) have no renderer
@@ -6752,7 +6760,15 @@ function renderChatHistory(chatHistory) {
             html = `<div class="chat-bubble-photos">${thumbs}</div>` + html;
         }
         bubble.innerHTML = html;
-        log.appendChild(bubble);
+        if (text || (Array.isArray(msg.images) && msg.images.length) || !listsData) log.appendChild(bubble);
+        if (listsData && window.ZeremListCards) {
+            const holder = document.createElement('div');
+            holder.className = 'chat-listcards';
+            log.appendChild(holder);
+            const proj = (typeof projectsList !== 'undefined' && Array.isArray(projectsList))
+                ? projectsList.find(p => p.id === activeProjectId) : null;
+            ZeremListCards.render(holder, listsData, { job: proj ? (proj.name || '') : '' });
+        }
     });
 
     log.scrollTop = log.scrollHeight;
