@@ -51,6 +51,13 @@
     border:1px solid var(--line); border-radius:8px; padding:6px 11px; white-space:nowrap; font-family:inherit}
   .h-new:hover{color:var(--ink); border-color:var(--accent)}
   .h-new.on{color:var(--accent); border-color:var(--accent); font-weight:800}
+  /* Quick ⇄ full platform toggle — /ask/ is the compact face of the same system. */
+  .mode-tg{display:flex; border:1px solid var(--line); border-radius:999px; overflow:hidden}
+  .mt-opt{font-size:.75rem; font-weight:700; padding:6px 11px; color:var(--sub);
+    text-decoration:none; white-space:nowrap}
+  .mt-opt.cur{background:var(--accent); color:#fff}
+  a.mt-opt:hover{color:var(--ink)}
+  @media (max-width:430px){ .h-cta{gap:6px} .mt-opt{padding:6px 8px} }
   main{flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px}
   .wrap{width:100%; max-width:720px; margin:0 auto; display:flex; flex-direction:column; gap:12px}
   .intro{text-align:center; color:var(--sub); padding:22px 8px 6px}
@@ -140,7 +147,10 @@
       <button class="h-new" id="theme-btn" title="מצב תצוגה">🌙</button>
       <button class="h-new" id="new-chat" title="שיחה חדשה" style="display:none;">＋ חדשה</button>
       <button class="h-new" id="acct-btn" title="התחברות עם Google — מכסה יומית מוגדלת">התחבר</button>
-      <a href="/sale/">כניסה למערכת ←</a>
+      <nav class="mode-tg" title="אותה פלטפורמה — שני מצבים">
+        <span class="mt-opt cur">⚡ מהיר</span>
+        <a class="mt-opt" href="/sale/">מערכת מלאה</a>
+      </nav>
     </div>
   </header>
 
