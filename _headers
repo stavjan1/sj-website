@@ -38,3 +38,12 @@
 
 /assistant.js
   Cache-Control: no-cache
+
+/ask/
+  Cache-Control: no-cache
+
+/ask/index.html
+  Cache-Control: no-cache
+
+/assets/listcards.js
+  Cache-Control: no-cache

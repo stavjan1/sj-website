@@ -39,7 +39,7 @@
   .zlc-row.done .zlc-chk{background:var(--zlc-accent,#2b74db); border-color:var(--zlc-accent,#2b74db)}
   .zlc-row.done .zlc-chk::after{content:'✓'}
   .zlc-row.done .zlc-name{text-decoration:line-through; opacity:.5}
-  .zlc-row.done .zlc-qty,.zlc-row.done + .zlc-note,.zlc-row.done .zlc-note{opacity:.4}
+  .zlc-row.done .zlc-qty,.zlc-row.done .zlc-note{opacity:.4}
   .zlc-actions{display:flex; gap:8px; align-self:flex-start; margin-top:-4px}
   .zlc-act{font-size:.76rem; font-weight:700; color:var(--zlc-sub,#9fb0cc);
     background:var(--zlc-panel,#141d2e); border:1px solid var(--zlc-line,#243049);

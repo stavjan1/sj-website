@@ -26,14 +26,25 @@ pricing chat pulls people in → full ZEREM (projects, quotes, invoicing) retain
 - [x] Correction-first rule live-verified (6×4 trap → "כבל פיקוד, צריך 5×4" before questions).
 - [x] All 5 training traps pass. Admin pricing-map card, handoff, chips+slider — Stav-approved.
 
-## In design (Stav vision, 31/07) — equipment/tools list UX + field simulation
-- [ ] **Designed equipment-list & tools-list view**: redesign how the site looks when someone
-      generates a רשימת ציוד + רשימת כלים (the data already exists — planning chat builds the
-      product/materials list, toolkit card exists). Scope/placement under grilling now.
-- [ ] **Field simulation button (future, recorded verbatim)**: a button that generates a
-      simulation of how the job looks in the field — how the route runs, like a תוכנית חד קווית;
-      next to each segment: which conduit it is and which cable passes inside it; junction boxes
-      annotated with contents, e.g. "5 מהדקי שוקולד בפנים".
+## Built this cycle (31/07) — /ask/ as the platform's compact face  🟡 awaiting Stav's live check
+- [x] **Equipment & tools list bubbles**: "🧰 רשימת ציוד וכלים" button after every price →
+      two designed checklist cards (ציוד וחומרים + ארגז כלים) with tappable shopping-list rows,
+      per-item notes ("5 מהדקי שוקולד בפנים"), qty badges, copy + WhatsApp share.
+      Shared component assets/listcards.js, themed per host.
+- [x] **Account connection on /ask/** (Stav: "גם וגם — פלטפורמה מצומצמת"): Google sign-in in the
+      header, plan-aware daily quota (server counts per-account), and a same-origin bridge that
+      reuses the full app's token — signed into ZEREM = signed into /ask/.
+- [x] **Quick ⇄ full toggle both ways**: segmented switch in /ask/, "⚡ מצב מהיר" pill in the app
+      topnav, no-signup chat link on the lock screen. v5.28, SW shell v59, cache headers set.
+- [x] App chat renders [[רשימות]] with the same shared cards (instead of stripping).
+- [ ] Next on this thread: let the app's planning agent EMIT [[רשימות]] too (button in project
+      chat) — kept out of this round so the pricing agent's JSON protocol stays untouched.
+
+## Future vision (recorded verbatim, 31/07)
+- [ ] **Field simulation button**: a button that generates a simulation of how the job looks in
+      the field — how the route runs, like a תוכנית חד קווית; next to each segment: which conduit
+      it is and which cable passes inside it; junction boxes annotated with contents,
+      e.g. "5 מהדקי שוקולד בפנים".
 
 ## Next (on demand)
 - [ ] Ingest full Dekel book into the system catalog (data already local in
