@@ -26,10 +26,20 @@ pricing chat pulls people in → full ZEREM (projects, quotes, invoicing) retain
 - [x] Correction-first rule live-verified (6×4 trap → "כבל פיקוד, צריך 5×4" before questions).
 - [x] All 5 training traps pass. Admin pricing-map card, handoff, chips+slider — Stav-approved.
 
+## In design (Stav vision, 31/07) — equipment/tools list UX + field simulation
+- [ ] **Designed equipment-list & tools-list view**: redesign how the site looks when someone
+      generates a רשימת ציוד + רשימת כלים (the data already exists — planning chat builds the
+      product/materials list, toolkit card exists). Scope/placement under grilling now.
+- [ ] **Field simulation button (future, recorded verbatim)**: a button that generates a
+      simulation of how the job looks in the field — how the route runs, like a תוכנית חד קווית;
+      next to each segment: which conduit it is and which cable passes inside it; junction boxes
+      annotated with contents, e.g. "5 מהדקי שוקולד בפנים".
+
 ## Next (on demand)
 - [ ] Ingest full Dekel book into the system catalog (data already local in
       "הקמת תשתית/כתב כמויות" — dekel_clean_perfect.xlsx). Highest-value remaining data work.
-- [ ] More adversarial training rounds (periodic — keep grilling the bot, fix the map each time).
+- [ ] More adversarial training rounds — waiting for Stav's time: he feeds real examples,
+      we check the model's guesses, fix the map each round.
 - [ ] SUMIT selling point surfaced in provider UI (badge exists; consider onboarding highlight).
 - [ ] Providers: live tests with real accounts (Green Invoice/iCount/EZcount/SUMIT).
 - [ ] Optional Chrome-Claude crawl: supplier material catalog (e.g. big wholesaler) to seed
