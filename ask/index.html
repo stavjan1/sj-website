@@ -50,6 +50,7 @@
   .h-new{font-size:.78rem; font-weight:700; color:var(--sub); background:none; cursor:pointer;
     border:1px solid var(--line); border-radius:8px; padding:6px 11px; white-space:nowrap; font-family:inherit}
   .h-new:hover{color:var(--ink); border-color:var(--accent)}
+  .h-new.on{color:var(--accent); border-color:var(--accent); font-weight:800}
   main{flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px}
   .wrap{width:100%; max-width:720px; margin:0 auto; display:flex; flex-direction:column; gap:12px}
   .intro{text-align:center; color:var(--sub); padding:22px 8px 6px}
@@ -138,6 +139,7 @@
     <div class="h-cta">
       <button class="h-new" id="theme-btn" title="מצב תצוגה">🌙</button>
       <button class="h-new" id="new-chat" title="שיחה חדשה" style="display:none;">＋ חדשה</button>
+      <button class="h-new" id="acct-btn" title="התחברות עם Google — מכסה יומית מוגדלת">התחבר</button>
       <a href="/sale/">כניסה למערכת ←</a>
     </div>
   </header>
@@ -404,8 +406,10 @@ async function send(text, opts){
   document.getElementById('new-chat').style.display = '';
   const typing = addTyping(opts.lists ? 'lists' : '');
   try{
+    const headers = {'Content-Type':'application/json'};
+    if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
     const res = await fetch('/api/chat', {
-      method:'POST', headers:{'Content-Type':'application/json'},
+      method:'POST', headers,
       body: JSON.stringify({ modelClass:'basic', stream:false, max_tokens: opts.lists ? 2000 : 1200, thinkingBudget:0,
         messages: [{ role:'system', content:SYSTEM }, ...history.map(m=>({ role:m.role, content:m.content }))] })
     });
@@ -431,14 +435,121 @@ async function send(text, opts){
   }
 }
 
-// Transparent guest quota: count today's questions locally (10/day server-side)
-// so the 429 never surprises anyone. Approximate by design (per-browser).
+// ---- Account connection — the same Google identity as the full app. ----
+// Signed-in visitors get their plan's daily quota (instead of the guest 10)
+// and the server counts them per-account, not per-IP. /ask/ stays a compact
+// front of the very same platform.
+const TOKEN_KEY = 'zerem_ask_token';
+const GOOGLE_CLIENT_ID = '4351198135-oltod8jremuq7pgn2e5bad4ahkupufkp.apps.googleusercontent.com';
+const TIER_NAMES = { guest:'אורח', free:'חינם', pro:'Pro', business:'עסקי' };
+let authToken = null;
+let me = null;        // /api/me answer for the connected account
+let meDelta = 0;      // questions asked since the last /api/me fetch
+
+function jwtExp(t){
+  try{
+    const p = JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    return (p.exp || 0) * 1000;
+  }catch(e){ return 0; }
+}
+// Same-origin bridge: signed into the full app in this browser? Reuse its
+// stored Google token — no second sign-in on /ask/.
+function zeremAppToken(){
+  try{
+    const u = localStorage.getItem('sj_logged_in_user');
+    if (!u || u.indexOf('@') === -1) return null;
+    const t = localStorage.getItem('sj_user_' + u.toLowerCase() + '_sj_drive_access_token');
+    if (!t) return null;
+    const exp = jwtExp(t);                       // 0 → opaque access token; /api/me will validate
+    if (exp && exp < Date.now() + 60000) return null;
+    return t;
+  }catch(e){ return null; }
+}
+async function fetchMe(){
+  if (!authToken) return;
+  try{
+    const r = await fetch('/api/me', { headers:{ 'Authorization':'Bearer ' + authToken } });
+    const d = await r.json();
+    if (d && d.email){
+      me = d; meDelta = 0;
+      try{ localStorage.setItem(TOKEN_KEY, JSON.stringify({ token:authToken, ts:Date.now() })); }catch(e){}
+    } else {
+      me = null; authToken = null;               // token expired/invalid → back to guest
+      try{ localStorage.removeItem(TOKEN_KEY); }catch(e){}
+    }
+  }catch(e){ /* offline — keep whatever we had */ }
+  renderAcct(); updateQuotaNote();
+}
+function loadGis(cb){
+  if (window.google && google.accounts && google.accounts.oauth2) return cb();
+  const s = document.createElement('script');
+  s.src = 'https://accounts.google.com/gsi/client';
+  s.onload = cb;
+  document.head.appendChild(s);
+}
+function connectAccount(){
+  loadGis(()=>{
+    try{
+      const tc = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+        callback: (resp)=>{ if (resp && resp.access_token){ authToken = resp.access_token; fetchMe(); } },
+      });
+      tc.requestAccessToken({ prompt: '' });
+    }catch(e){}
+  });
+}
+function renderAcct(){
+  const b = document.getElementById('acct-btn'); if (!b) return;
+  if (me && me.email){
+    const name = me.email.split('@')[0];
+    b.textContent = '⚡ ' + (name.length > 12 ? name.slice(0,12) + '…' : name);
+    b.title = me.email + ' · מסלול ' + (TIER_NAMES[me.tier] || me.tier) + ' — לחץ להתנתקות';
+    b.classList.add('on');
+  } else {
+    b.textContent = 'התחבר';
+    b.title = 'התחברות עם Google — מכסה יומית מוגדלת';
+    b.classList.remove('on');
+  }
+}
+document.getElementById('acct-btn').addEventListener('click', ()=>{
+  if (me && me.email){
+    if (!confirm('להתנתק מהחשבון? השיחה נשארת.')) return;
+    me = null; authToken = null; meDelta = 0;
+    try{ localStorage.removeItem(TOKEN_KEY); }catch(e){}
+    renderAcct(); updateQuotaNote();
+  } else {
+    connectAccount();
+  }
+});
+(function initAuth(){
+  try{
+    const saved = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null');
+    if (saved && saved.token) authToken = saved.token;
+  }catch(e){}
+  if (!authToken) authToken = zeremAppToken();
+  if (authToken) fetchMe();
+})();
+
+// Transparent quota note: guests count locally (10/day server-side, per-IP);
+// connected accounts show the real plan numbers from /api/me.
 const GUEST_DAILY = 10;
 function quotaKey(){ return 'zerem_ask_q_' + new Date().toISOString().slice(0,10); }
-function bumpQuota(){ try{ localStorage.setItem(quotaKey(), String(usedToday()+1)); }catch(e){} updateQuotaNote(); }
+function bumpQuota(){
+  if (me && me.email){ meDelta++; updateQuotaNote(); return; }
+  try{ localStorage.setItem(quotaKey(), String(usedToday()+1)); }catch(e){}
+  updateQuotaNote();
+}
 function usedToday(){ try{ return parseInt(localStorage.getItem(quotaKey())||'0',10)||0; }catch(e){ return 0; } }
 function updateQuotaNote(){
   const el = document.getElementById('quota-note'); if (!el) return;
+  if (me && me.email){
+    const lim = me.limits && me.limits.aiDaily;
+    if (lim === -1){ el.textContent = 'מחובר · שאלות ללא הגבלה · '; return; }
+    const left = Math.max(0, (lim || 0) - ((me.usage && me.usage.aiToday) || 0) - meDelta);
+    el.textContent = 'מחובר · נשארו ~' + left + ' שאלות היום · ';
+    return;
+  }
   const left = Math.max(0, GUEST_DAILY - usedToday());
   el.textContent = usedToday() ? ('נשארו לך ~' + left + ' שאלות חינם היום · ') : '';
 }
