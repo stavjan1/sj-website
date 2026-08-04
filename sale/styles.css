@@ -4791,3 +4791,84 @@ body.boxes-light .card-header { background: linear-gradient(180deg, rgba(37,99,2
 .prov-field.prov-check { flex-direction: row; align-items: center; gap: 8px; }
 .prov-field.prov-check input { width: 16px; height: 16px; }
 .prov-badge{font-size:.62rem;font-weight:800;color:#25d366;background:rgba(37,211,102,.14);border-radius:999px;padding:1px 8px;white-space:nowrap}
+
+/* ==========================================================================
+   Periodic service (שירות תקופתי) — panel-checkups
+   Uses the theme variables only, so it works in light / mid / dark.
+   ========================================================================== */
+
+.ck-stats { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.ck-stat {
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: var(--border-radius); padding: 10px 16px; min-width: 108px;
+}
+.ck-stat b { font-size: 1.3rem; display: block; color: var(--text-primary); }
+.ck-stat span { color: var(--text-muted); font-size: 0.75rem; }
+.ck-stat.ck-red b { color: var(--color-danger); }
+.ck-stat.ck-amber b { color: #e8a020; }
+.ck-stat.ck-green b { color: var(--color-success); }
+
+.ck-toolbar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+.ck-toolbar .search-bar { flex: 1; min-width: 170px; }
+
+.ck-list { display: flex; flex-direction: column; gap: 8px; }
+.ck-row {
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: var(--border-radius); padding: 12px 14px;
+    display: grid; grid-template-columns: 10px 1.4fr 1fr 1fr auto; gap: 12px; align-items: center;
+}
+.ck-dot { width: 10px; height: 10px; border-radius: 50%; }
+.ck-dot.ck-red { background: var(--color-danger); box-shadow: 0 0 8px rgba(240, 82, 82, 0.5); }
+.ck-dot.ck-amber { background: #e8a020; box-shadow: 0 0 8px rgba(232, 160, 32, 0.45); }
+.ck-dot.ck-green { background: var(--color-success); }
+.ck-name { font-weight: 500; color: var(--text-primary); }
+.ck-name small { display: block; color: var(--text-muted); font-weight: 400; font-size: 0.75rem; }
+.ck-interval { font-size: 0.85rem; color: var(--text-secondary); }
+.ck-interval small, .ck-due small { color: var(--text-muted); font-size: 0.72rem; }
+.ck-due b { display: block; font-size: 0.9rem; color: var(--text-primary); }
+.ck-due b.ck-due-overdue { color: var(--color-danger); }
+.ck-due b.ck-due-soon { color: #e8a020; }
+
+.ck-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.ck-icon-btn {
+    border: 1px solid var(--border-color); background: transparent; color: var(--text-muted);
+    border-radius: 8px; width: 32px; height: 32px; font-size: 0.9rem; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: all var(--transition-speed);
+}
+.ck-icon-btn:hover { color: var(--text-primary); border-color: var(--border-hover); }
+.ck-icon-btn.ck-synced { color: var(--color-success); border-color: var(--color-success); }
+.ck-icon-btn.ck-wa { color: #25d366; }
+.ck-icon-btn.ck-danger:hover { color: var(--color-danger); border-color: var(--color-danger); }
+
+.ck-empty {
+    text-align: center; color: var(--text-muted); padding: 48px 16px;
+    border: 1px dashed var(--border-color); border-radius: var(--border-radius); font-size: 0.9rem;
+}
+
+.ck-dialog {
+    background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color);
+    border-radius: var(--border-radius); padding: 22px; width: min(480px, 92vw); margin: auto;
+}
+.ck-dialog::backdrop { background: rgba(2, 6, 23, 0.65); }
+.ck-dialog h3 { font-size: 1rem; margin-bottom: 14px; color: var(--text-primary); }
+.ck-field { margin-bottom: 10px; }
+.ck-field label { display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px; }
+.ck-field input, .ck-field select, .ck-field textarea, .ck-dialog textarea {
+    width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px;
+    padding: 8px 10px; color: var(--text-primary); font-size: 0.88rem; font-family: inherit;
+}
+.ck-field input:focus, .ck-field select:focus, .ck-field textarea:focus, .ck-dialog textarea:focus {
+    outline: none; border-color: var(--color-accent);
+}
+.ck-field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ck-dlg-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.ck-hint { font-size: 0.72rem; color: var(--text-muted); margin-top: 3px; }
+
+@media (max-width: 720px) {
+    .ck-row { grid-template-columns: 10px 1fr auto; }
+    .ck-interval { display: none; }
+    .ck-due { text-align: left; }
+    .ck-actions { grid-column: 2 / -1; justify-content: flex-start; }
+    .ck-field-pair { grid-template-columns: 1fr; }
+}
