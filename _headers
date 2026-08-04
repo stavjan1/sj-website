@@ -38,3 +38,12 @@
 
 /assistant.js
   Cache-Control: no-cache
+
+/checkups/
+  Cache-Control: no-cache
+
+/checkups/index.html
+  Cache-Control: no-cache
+
+/checkups/app.js
+  Cache-Control: no-cache

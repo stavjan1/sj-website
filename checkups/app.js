@@ -1,0 +1,549 @@
+// בדיקות תקופתיות — client tracker with Google Calendar / ICS reminders.
+//
+// Data lives locally (localStorage) and, when signed in with Google, syncs to
+// the site's KV via /api/checkups — same identity model as the ZEREM app, so
+// any Google account gets its own private list.
+//
+// Reminders are delegated to the calendar: a recurring Google Calendar event
+// (or downloadable ICS for Apple Calendar) with alerts 28/7/1 days before the
+// due date. The calendar then does the emailing/phone-notifying forever — no
+// server cron needed.
+
+'use strict';
+
+const STORAGE_KEY = 'sj_checkups_v1';
+const TOKEN_KEY = 'sj_checkups_token';
+const CAL_TOKEN_KEY = 'sj_checkups_cal_token';
+const CLIENT_ID_KEY = 'sj_global_google_client_id';
+const DEFAULT_CLIENT_ID = '4351198135-oltod8jremuq7pgn2e5bad4ahkupufkp.apps.googleusercontent.com';
+const SOON_DAYS = 60;
+
+let clients = [];
+let authToken = null;
+let authEmail = null;
+let saveTimer = null;
+
+// ---------- boot ----------
+
+init();
+
+function init() {
+    if (!localStorage.getItem(CLIENT_ID_KEY)) localStorage.setItem(CLIENT_ID_KEY, DEFAULT_CLIENT_ID);
+    try { clients = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { clients = []; }
+    if (!Array.isArray(clients)) clients = [];
+    render();
+
+    const saved = safeParse(localStorage.getItem(TOKEN_KEY));
+    if (saved && saved.token && saved.exp > Date.now()) {
+        authToken = saved.token;
+        authEmail = saved.email;
+        renderAuth();
+        cloudLoad();
+    }
+}
+
+// ---------- dates ----------
+
+function todayStr() {
+    const d = new Date();
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+function pad(n) { return String(n).padStart(2, '0'); }
+
+// Add months to YYYY-MM-DD, clamping the day (31.1 + 1mo → 28.2, not 3.3).
+function addMonths(dateStr, months) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const t = new Date(y, m - 1 + months, 1);
+    const lastDay = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
+    t.setDate(Math.min(d, lastDay));
+    return t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate());
+}
+
+// The date the next checkup is due: explicit override wins, else last + interval.
+function nextDue(c) {
+    if (c.next) return c.next;
+    if (c.last && c.months) return addMonths(c.last, c.months);
+    return null;
+}
+
+function daysUntil(dateStr) {
+    return Math.round((new Date(dateStr + 'T00:00:00') - new Date(todayStr() + 'T00:00:00')) / 86400000);
+}
+
+function fmtDate(dateStr) {
+    const [y, m, d] = dateStr.split('-');
+    return d + '.' + m + '.' + y;
+}
+
+function intervalLabel(months) {
+    if (months === 12) return 'כל שנה';
+    if (months === 24) return 'כל שנתיים';
+    if (months % 12 === 0) return 'כל ' + (months / 12) + ' שנים';
+    return 'כל ' + months + ' חודשים';
+}
+
+// ---------- rendering ----------
+
+function statusOf(c) {
+    const due = nextDue(c);
+    if (!due) return 'missing';
+    const days = daysUntil(due);
+    if (days < 0) return 'overdue';
+    if (days <= SOON_DAYS) return 'soon';
+    return 'ok';
+}
+
+function render() {
+    const q = (document.getElementById('search').value || '').trim().toLowerCase();
+    const list = document.getElementById('list');
+
+    const visible = clients.filter((c) =>
+        !q || [c.name, c.phone, c.site, c.type].some((v) => (v || '').toLowerCase().includes(q)));
+
+    // Most urgent first: missing dates, then by due date ascending.
+    visible.sort((a, b) => {
+        const da = nextDue(a), db = nextDue(b);
+        if (!da && !db) return (a.name || '').localeCompare(b.name || '');
+        if (!da) return -1;
+        if (!db) return 1;
+        return da.localeCompare(db);
+    });
+
+    const counts = { overdue: 0, soon: 0, ok: 0, missing: 0 };
+    clients.forEach((c) => counts[statusOf(c)]++);
+    document.getElementById('stats').innerHTML = `
+        <div class="stat"><b>${clients.length}</b><span>לקוחות במעקב</span></div>
+        <div class="stat overdue"><b>${counts.overdue + counts.missing}</b><span>באיחור / חסר תאריך</span></div>
+        <div class="stat soon"><b>${counts.soon}</b><span>קרובים (${SOON_DAYS} יום)</span></div>
+        <div class="stat ok"><b>${counts.ok}</b><span>בסדר</span></div>`;
+
+    if (visible.length === 0) {
+        list.innerHTML = `<div class="empty">${clients.length === 0
+            ? 'אין עדיין לקוחות במעקב.<br>הוסף לקוח ראשון או ייבא רשימה מאקסל.'
+            : 'לא נמצאו תוצאות לחיפוש.'}</div>`;
+        return;
+    }
+
+    list.innerHTML = visible.map((c) => {
+        const due = nextDue(c);
+        const st = statusOf(c);
+        const dotCls = st === 'overdue' || st === 'missing' ? 'red' : st === 'soon' ? 'amber' : 'green';
+        let dueHtml;
+        if (!due) {
+            dueHtml = '<b class="overdue">חסר תאריך</b><small>קבע מועד בדיקה</small>';
+        } else {
+            const days = daysUntil(due);
+            const label = days < 0 ? 'באיחור של ' + Math.abs(days) + ' יום'
+                : days === 0 ? 'היום!' : 'בעוד ' + days + ' יום';
+            dueHtml = `<b class="${st === 'overdue' ? 'overdue' : st === 'soon' ? 'soon' : ''}">${fmtDate(due)}</b><small>${label}</small>`;
+        }
+        return `
+        <div class="row">
+            <div class="dot ${dotCls}"></div>
+            <div class="name">${esc(c.name)}<small>${esc([c.type, c.site].filter(Boolean).join(' · '))}</small></div>
+            <div class="interval">${intervalLabel(c.months)}${c.last ? `<br><small>אחרונה: ${fmtDate(c.last)}</small>` : ''}</div>
+            <div class="due">${dueHtml}</div>
+            <div class="actions">
+                <button class="icon-btn cal ${c.eventId ? 'synced' : ''}" title="${c.eventId ? 'מסונכרן ליומן Google — לחץ לעדכון' : 'הוסף תזכורת ליומן Google'}" onclick="syncCalendar('${c.id}')">📅</button>
+                <button class="icon-btn" title="הורדת תזכורת לאייפון / Apple Calendar (קובץ ICS)" onclick="downloadIcs('${c.id}')">⬇</button>
+                ${c.phone ? `<button class="icon-btn" title="וואטסאפ ללקוח" style="color:#25d366" onclick="whatsapp('${c.id}')">💬</button>` : ''}
+                <button class="icon-btn" title="הבדיקה בוצעה — קדם לתאריך הבא" onclick="markDone('${c.id}')">✔</button>
+                <button class="icon-btn" title="עריכה" onclick="openEditor('${c.id}')">✏</button>
+                <button class="icon-btn danger" title="מחיקה" onclick="removeClient('${c.id}')">✕</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function esc(s) {
+    return String(s || '').replace(/[&<>"']/g, (ch) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+// ---------- CRUD ----------
+
+let editingId = null;
+
+function openEditor(id) {
+    editingId = id || null;
+    const c = clients.find((x) => x.id === id) || {};
+    document.getElementById('editor-title').textContent = id ? 'עריכת לקוח' : 'לקוח חדש';
+    document.getElementById('f-name').value = c.name || '';
+    document.getElementById('f-phone').value = c.phone || '';
+    document.getElementById('f-type').value = c.type || 'בדיקה תקופתית';
+    document.getElementById('f-site').value = c.site || '';
+    const months = c.months || 12;
+    const preset = [12, 24, 36, 60].includes(months);
+    document.getElementById('f-months').value = preset ? String(months) : 'custom';
+    document.getElementById('f-custom-wrap').style.display = preset ? 'none' : '';
+    document.getElementById('f-custom').value = preset ? 6 : months;
+    document.getElementById('f-last').value = c.last || '';
+    document.getElementById('f-next').value = c.next || '';
+    document.getElementById('f-notes').value = c.notes || '';
+    document.getElementById('editor').showModal();
+}
+
+function saveClient(ev) {
+    ev.preventDefault();
+    const monthsSel = document.getElementById('f-months').value;
+    const months = monthsSel === 'custom'
+        ? Math.max(1, Math.min(120, parseInt(document.getElementById('f-custom').value, 10) || 12))
+        : parseInt(monthsSel, 10);
+    const rec = {
+        name: document.getElementById('f-name').value.trim(),
+        phone: document.getElementById('f-phone').value.trim(),
+        type: document.getElementById('f-type').value,
+        site: document.getElementById('f-site').value.trim(),
+        months,
+        last: document.getElementById('f-last').value || null,
+        next: document.getElementById('f-next').value || null,
+        notes: document.getElementById('f-notes').value.trim(),
+        updatedAt: Date.now(),
+    };
+    if (!rec.name) return;
+    if (editingId) {
+        const c = clients.find((x) => x.id === editingId);
+        Object.assign(c, rec);
+    } else {
+        clients.push({ id: 'c' + Date.now() + Math.random().toString(36).slice(2, 7), eventId: null, ...rec });
+    }
+    document.getElementById('editor').close();
+    persist();
+    render();
+}
+
+function markDone(id) {
+    const c = clients.find((x) => x.id === id);
+    if (!c) return;
+    c.last = todayStr();
+    c.next = null; // back to computed: today + interval
+    c.updatedAt = Date.now();
+    persist();
+    render();
+    toast('עודכן — הבדיקה הבאה: ' + fmtDate(nextDue(c)) +
+        (c.eventId ? '. כדאי ללחוץ 📅 לעדכן גם את היומן' : ''));
+}
+
+function removeClient(id) {
+    const c = clients.find((x) => x.id === id);
+    if (!c) return;
+    if (!confirm('למחוק את "' + c.name + '" מהמעקב?')) return;
+    const eventId = c.eventId;
+    clients = clients.filter((x) => x.id !== id);
+    persist();
+    render();
+    if (eventId && confirm('למחוק גם את התזכורת מיומן Google?')) {
+        ensureCalendarToken().then((token) =>
+            fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events/' + eventId, {
+                method: 'DELETE', headers: { Authorization: 'Bearer ' + token },
+            })
+        ).then(() => toast('התזכורת נמחקה מהיומן')).catch(() => toast('מחיקת האירוע מהיומן נכשלה'));
+    }
+}
+
+// ---------- persistence: local + cloud ----------
+
+function persist() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(clients));
+    if (!authToken) return;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(cloudSave, 1500);
+}
+
+async function cloudSave() {
+    if (!authToken) return;
+    try {
+        const res = await fetch('/api/checkups', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
+            body: JSON.stringify({ data: { clients } }),
+        });
+        if (res.status === 401) { logoutLocal(); toast('פג תוקף החיבור ל-Google — התחבר שוב'); }
+    } catch { /* offline — local copy is intact, next change retries */ }
+}
+
+async function cloudLoad() {
+    if (!authToken) return;
+    try {
+        const res = await fetch('/api/checkups', { headers: { Authorization: 'Bearer ' + authToken } });
+        if (res.status === 401) { logoutLocal(); return; }
+        const body = await res.json();
+        const cloud = body && body.data && Array.isArray(body.data.clients) ? body.data.clients : [];
+        // Union-merge by id, newer updatedAt wins — devices converge.
+        const byId = new Map(clients.map((c) => [c.id, c]));
+        for (const cc of cloud) {
+            const local = byId.get(cc.id);
+            if (!local || (cc.updatedAt || 0) > (local.updatedAt || 0)) byId.set(cc.id, cc);
+        }
+        clients = [...byId.values()];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(clients));
+        render();
+        cloudSave();
+    } catch { /* offline */ }
+}
+
+// ---------- Google sign-in (identity, email scope only) ----------
+
+function loginGoogle() {
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+        toast('Google עדיין נטען — נסה שוב עוד רגע');
+        return;
+    }
+    const tc = google.accounts.oauth2.initTokenClient({
+        client_id: localStorage.getItem(CLIENT_ID_KEY),
+        scope: 'https://www.googleapis.com/auth/userinfo.email',
+        callback: async (resp) => {
+            if (!resp || !resp.access_token) return;
+            authToken = resp.access_token;
+            try {
+                const info = await (await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                    headers: { Authorization: 'Bearer ' + authToken },
+                })).json();
+                authEmail = info.email || null;
+            } catch { authEmail = null; }
+            localStorage.setItem(TOKEN_KEY, JSON.stringify({
+                token: authToken, email: authEmail,
+                exp: Date.now() + (parseInt(resp.expires_in, 10) || 3600) * 1000,
+            }));
+            renderAuth();
+            cloudLoad();
+        },
+    });
+    tc.requestAccessToken({ prompt: '' });
+}
+
+function logoutLocal() {
+    authToken = null; authEmail = null;
+    localStorage.removeItem(TOKEN_KEY);
+    renderAuth();
+}
+
+function renderAuth() {
+    const box = document.getElementById('auth-box');
+    if (authToken) {
+        box.innerHTML = `<span class="email">${esc(authEmail || 'מחובר')}</span>
+            <span title="הרשימה מסונכרנת לענן" style="color:var(--green)">●</span>`;
+    } else {
+        box.innerHTML = '<button class="btn" id="btn-login" onclick="loginGoogle()">התחברות Google</button>';
+    }
+}
+
+// ---------- Google Calendar reminders ----------
+
+// A calendar-scoped token is minted only when actually adding a reminder, so
+// the everyday sign-in stays minimal (email only).
+function ensureCalendarToken() {
+    const saved = safeParse(localStorage.getItem(CAL_TOKEN_KEY));
+    if (saved && saved.token && saved.exp > Date.now() + 60000) return Promise.resolve(saved.token);
+    return new Promise((resolve, reject) => {
+        if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+            reject(new Error('gsi-not-loaded')); return;
+        }
+        const tc = google.accounts.oauth2.initTokenClient({
+            client_id: localStorage.getItem(CLIENT_ID_KEY),
+            scope: 'https://www.googleapis.com/auth/calendar.events',
+            callback: (resp) => {
+                if (resp && resp.access_token) {
+                    localStorage.setItem(CAL_TOKEN_KEY, JSON.stringify({
+                        token: resp.access_token,
+                        exp: Date.now() + (parseInt(resp.expires_in, 10) || 3600) * 1000,
+                    }));
+                    resolve(resp.access_token);
+                } else reject(new Error('no-token'));
+            },
+            error_callback: () => reject(new Error('denied')),
+        });
+        tc.requestAccessToken({ prompt: '' });
+    });
+}
+
+function rruleFor(months) {
+    return months % 12 === 0
+        ? 'RRULE:FREQ=YEARLY;INTERVAL=' + (months / 12)
+        : 'RRULE:FREQ=MONTHLY;INTERVAL=' + months;
+}
+
+function eventBody(c) {
+    const due = nextDue(c);
+    return {
+        summary: '⚡ ' + (c.type || 'בדיקה תקופתית') + ' — ' + c.name,
+        location: c.site || undefined,
+        description: [
+            c.phone ? 'טלפון: ' + c.phone : '',
+            'תדירות: ' + intervalLabel(c.months),
+            c.notes || '',
+            '(נוצר אוטומטית ממעקב הבדיקות של SJ הנדסת חשמל)',
+        ].filter(Boolean).join('\n'),
+        start: { date: due },
+        end: { date: addDays(due, 1) },
+        recurrence: [rruleFor(c.months)],
+        // Calendar does the reminding: email a month ahead (to book the visit),
+        // then email a week ahead, then a popup the day before.
+        reminders: {
+            useDefault: false,
+            overrides: [
+                { method: 'email', minutes: 28 * 1440 },
+                { method: 'email', minutes: 7 * 1440 },
+                { method: 'popup', minutes: 1440 },
+            ],
+        },
+    };
+}
+
+function addDays(dateStr, n) {
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+
+async function syncCalendar(id) {
+    const c = clients.find((x) => x.id === id);
+    if (!c) return;
+    if (!nextDue(c)) { toast('קודם קבע תאריך בדיקה (עריכה ✏)'); return; }
+    let token;
+    try { token = await ensureCalendarToken(); }
+    catch { toast('נדרש אישור גישה ליומן Google'); return; }
+
+    const base = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+    const body = JSON.stringify(eventBody(c));
+    const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+    try {
+        let res;
+        if (c.eventId) {
+            res = await fetch(base + '/' + c.eventId, { method: 'PATCH', headers, body });
+            if (res.status === 404 || res.status === 410) res = null; // event was deleted by hand — recreate
+        }
+        if (!res) res = await fetch(base, { method: 'POST', headers, body });
+        if (res.status === 401 || res.status === 403) {
+            localStorage.removeItem(CAL_TOKEN_KEY);
+            toast('ההרשאה ליומן פגה — לחץ שוב על 📅');
+            return;
+        }
+        const ev = await res.json();
+        if (!res.ok || !ev.id) throw new Error('calendar-error');
+        c.eventId = ev.id;
+        c.updatedAt = Date.now();
+        persist();
+        render();
+        toast('תזכורת חוזרת נקבעה ביומן Google (' + fmtDate(nextDue(c)) + ')');
+    } catch {
+        toast('הוספת התזכורת ליומן נכשלה — נסה שוב');
+    }
+}
+
+// ---------- ICS (iPhone / Apple Calendar / Outlook) ----------
+
+function downloadIcs(id) {
+    const c = clients.find((x) => x.id === id);
+    if (!c) return;
+    const due = nextDue(c);
+    if (!due) { toast('קודם קבע תאריך בדיקה (עריכה ✏)'); return; }
+    const dt = due.replace(/-/g, '');
+    const summary = ((c.type || 'בדיקה תקופתית') + ' — ' + c.name).replace(/[,;\\]/g, ' ');
+    const desc = [c.phone ? 'טלפון: ' + c.phone : '', c.notes || ''].filter(Boolean).join('\\n');
+    const ics = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//SJ Electrical Engineering//Checkups//HE',
+        'BEGIN:VEVENT',
+        'UID:' + c.id + '@sj-eng.co.il',
+        'DTSTAMP:' + dt + 'T000000Z',
+        'DTSTART;VALUE=DATE:' + dt,
+        'DTEND;VALUE=DATE:' + addDays(due, 1).replace(/-/g, ''),
+        rruleFor(c.months),
+        'SUMMARY:' + summary,
+        c.site ? 'LOCATION:' + c.site.replace(/[,;\\]/g, ' ') : '',
+        desc ? 'DESCRIPTION:' + desc : '',
+        'BEGIN:VALARM', 'TRIGGER:-P28D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
+        'BEGIN:VALARM', 'TRIGGER:-P7D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
+        'END:VEVENT',
+        'END:VCALENDAR',
+    ].filter(Boolean).join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+    a.download = 'checkup-' + (c.name || 'client').replace(/[^\w֐-׿-]+/g, '_') + '.ics';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('באייפון: פתח את הקובץ והוא ייכנס ליומן עם התראות');
+}
+
+// ---------- WhatsApp ----------
+
+function whatsapp(id) {
+    const c = clients.find((x) => x.id === id);
+    if (!c || !c.phone) return;
+    let digits = c.phone.replace(/\D/g, '');
+    if (digits.startsWith('0')) digits = '972' + digits.slice(1);
+    const due = nextDue(c);
+    const msg = 'שלום, כאן סתיו מ-SJ הנדסת חשמל. מתקרב מועד הבדיקה התקופתית למתקן החשמל אצלכם' +
+        (due ? ' (' + fmtDate(due) + ')' : '') + ' — אשמח שנתאם מועד שנוח לכם.';
+    window.open('https://wa.me/' + digits + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
+// ---------- Excel import / CSV export ----------
+
+function openImport() { document.getElementById('importer').showModal(); }
+
+function runImport() {
+    const text = document.getElementById('import-text').value.trim();
+    if (!text) return;
+    let added = 0, skipped = 0;
+    for (const line of text.split(/\r?\n/)) {
+        if (!line.trim()) continue;
+        // Excel pastes tab-separated; a hand-typed line may use commas.
+        const parts = (line.includes('\t') ? line.split('\t') : line.split(',')).map((s) => s.trim());
+        const [name, phone, site, monthsRaw, lastRaw] = parts;
+        if (!name) { skipped++; continue; }
+        const months = Math.max(1, Math.min(120, parseInt(monthsRaw, 10) || 12));
+        clients.push({
+            id: 'c' + Date.now() + Math.random().toString(36).slice(2, 7),
+            name, phone: phone || '', site: site || '', type: 'בדיקה תקופתית',
+            months, last: parseAnyDate(lastRaw), next: null, notes: '', eventId: null,
+            updatedAt: Date.now(),
+        });
+        added++;
+    }
+    document.getElementById('importer').close();
+    document.getElementById('import-text').value = '';
+    persist();
+    render();
+    toast('יובאו ' + added + ' לקוחות' + (skipped ? ' (' + skipped + ' שורות דולגו)' : ''));
+}
+
+function parseAnyDate(s) {
+    if (!s) return null;
+    s = s.trim();
+    let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (m) return m[1] + '-' + pad(+m[2]) + '-' + pad(+m[3]);
+    m = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{2,4})$/);
+    if (m) {
+        const y = m[3].length === 2 ? '20' + m[3] : m[3];
+        return y + '-' + pad(+m[2]) + '-' + pad(+m[1]);
+    }
+    return null;
+}
+
+function exportCsv() {
+    const header = 'שם,טלפון,כתובת,סוג בדיקה,תדירות (חודשים),בדיקה אחרונה,בדיקה הבאה';
+    const rows = clients.map((c) => [
+        c.name, c.phone, c.site, c.type, c.months, c.last || '', nextDue(c) || '',
+    ].map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(','));
+    const a = document.createElement('a');
+    // BOM so Excel opens the Hebrew correctly.
+    a.href = URL.createObjectURL(new Blob(['﻿' + [header, ...rows].join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'checkups-' + todayStr() + '.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+// ---------- misc ----------
+
+function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }

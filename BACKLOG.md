@@ -27,6 +27,9 @@ pricing chat pulls people in → full ZEREM (projects, quotes, invoicing) retain
 - [x] All 5 training traps pass. Admin pricing-map card, handoff, chips+slider — Stav-approved.
 
 ## Next (on demand)
+- [ ] `/checkups/` v2 ideas: productize into ZEREM as an office tab (electricians also
+      track periodic-inspection clients — retention feature); bulk "add ALL to calendar";
+      auto-WhatsApp drafts a month before due.
 - [ ] Ingest full Dekel book into the system catalog (data already local in
       "הקמת תשתית/כתב כמויות" — dekel_clean_perfect.xlsx). Highest-value remaining data work.
 - [ ] More adversarial training rounds (periodic — keep grilling the bot, fix the map each time).
