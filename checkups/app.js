@@ -117,6 +117,8 @@ function render() {
         <div class="stat soon"><b>${counts.soon}</b><span>קרובים (${SOON_DAYS} יום)</span></div>
         <div class="stat ok"><b>${counts.ok}</b><span>בסדר</span></div>`;
 
+    renderDueStrip();
+
     if (visible.length === 0) {
         list.innerHTML = `<div class="empty">${clients.length === 0
             ? 'אין עדיין לקוחות במעקב.<br>הוסף לקוח ראשון או ייבא רשימה מאקסל.'
@@ -147,6 +149,7 @@ function render() {
                 <button class="icon-btn cal ${c.eventId ? 'synced' : ''}" title="${c.eventId ? 'מסונכרן ליומן Google — לחץ לעדכון' : 'הוסף תזכורת ליומן Google'}" onclick="syncCalendar('${c.id}')">📅</button>
                 <button class="icon-btn" title="הורדת תזכורת לאייפון / Apple Calendar (קובץ ICS)" onclick="downloadIcs('${c.id}')">⬇</button>
                 ${c.phone ? `<button class="icon-btn" title="וואטסאפ ללקוח" style="color:#25d366" onclick="whatsapp('${c.id}')">💬</button>` : ''}
+                ${c.email ? `<button class="icon-btn" title="טיוטת מייל ללקוח" onclick="mailto('${c.id}')">✉</button>` : ''}
                 <button class="icon-btn" title="הבדיקה בוצעה — קדם לתאריך הבא" onclick="markDone('${c.id}')">✔</button>
                 <button class="icon-btn" title="עריכה" onclick="openEditor('${c.id}')">✏</button>
                 <button class="icon-btn danger" title="מחיקה" onclick="removeClient('${c.id}')">✕</button>
@@ -170,6 +173,7 @@ function openEditor(id) {
     document.getElementById('editor-title').textContent = id ? 'עריכת לקוח' : 'לקוח חדש';
     document.getElementById('f-name').value = c.name || '';
     document.getElementById('f-phone').value = c.phone || '';
+    document.getElementById('f-email').value = c.email || '';
     document.getElementById('f-type').value = c.type || 'בדיקה תקופתית';
     document.getElementById('f-site').value = c.site || '';
     const months = c.months || 12;
@@ -192,6 +196,7 @@ function saveClient(ev) {
     const rec = {
         name: document.getElementById('f-name').value.trim(),
         phone: document.getElementById('f-phone').value.trim(),
+        email: document.getElementById('f-email').value.trim(),
         type: document.getElementById('f-type').value,
         site: document.getElementById('f-site').value.trim(),
         months,
@@ -492,12 +497,12 @@ function runImport() {
         if (!line.trim()) continue;
         // Excel pastes tab-separated; a hand-typed line may use commas.
         const parts = (line.includes('\t') ? line.split('\t') : line.split(',')).map((s) => s.trim());
-        const [name, phone, site, monthsRaw, lastRaw] = parts;
+        const [name, phone, site, monthsRaw, lastRaw, email] = parts;
         if (!name) { skipped++; continue; }
         const months = Math.max(1, Math.min(120, parseInt(monthsRaw, 10) || 12));
         clients.push({
             id: 'c' + Date.now() + Math.random().toString(36).slice(2, 7),
-            name, phone: phone || '', site: site || '', type: 'בדיקה תקופתית',
+            name, phone: phone || '', email: email || '', site: site || '', type: 'בדיקה תקופתית',
             months, last: parseAnyDate(lastRaw), next: null, notes: '', eventId: null,
             updatedAt: Date.now(),
         });
@@ -524,9 +529,9 @@ function parseAnyDate(s) {
 }
 
 function exportCsv() {
-    const header = 'שם,טלפון,כתובת,סוג בדיקה,תדירות (חודשים),בדיקה אחרונה,בדיקה הבאה';
+    const header = 'שם,טלפון,אימייל,כתובת,סוג בדיקה,תדירות (חודשים),בדיקה אחרונה,בדיקה הבאה';
     const rows = clients.map((c) => [
-        c.name, c.phone, c.site, c.type, c.months, c.last || '', nextDue(c) || '',
+        c.name, c.phone, c.email || '', c.site, c.type, c.months, c.last || '', nextDue(c) || '',
     ].map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(','));
     const a = document.createElement('a');
     // BOM so Excel opens the Hebrew correctly.
@@ -547,3 +552,48 @@ function toast(msg) {
 }
 
 function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
+
+// ---------- reminders-to-send strip + email draft ----------
+
+// Clients whose due date entered the reminder window (28 days, matching the
+// first calendar alert) — surfaced at the top so a glance says who to nudge.
+function renderDueStrip() {
+    const el = document.getElementById('due-strip');
+    if (!el) return;
+    const due = clients
+        .filter((c) => { const d = nextDue(c); return d && daysUntil(d) <= 28; })
+        .sort((a, b) => nextDue(a).localeCompare(nextDue(b)));
+    if (due.length === 0) { el.innerHTML = ''; return; }
+    el.innerHTML = `
+        <div class="strip">
+            <div class="strip-title">🔔 תזכורות לשליחה — הבדיקה מתקרבת</div>
+            <div class="strip-chips">
+                ${due.slice(0, 8).map((c) => {
+                    const days = daysUntil(nextDue(c));
+                    const when = days < 0 ? 'באיחור ' + Math.abs(days) + ' יום' : days === 0 ? 'היום' : 'בעוד ' + days + ' יום';
+                    return `<span class="chip">
+                        <b>${esc(c.name)}</b><small>${when}</small>
+                        ${c.phone ? `<button title="וואטסאפ" class="chip-btn" style="color:#25d366" onclick="whatsapp('${c.id}')">💬</button>` : ''}
+                        ${c.email ? `<button title="מייל" class="chip-btn" onclick="mailto('${c.id}')">✉</button>` : ''}
+                    </span>`;
+                }).join('')}
+                ${due.length > 8 ? `<span class="chip"><small>+${due.length - 8} נוספים ברשימה</small></span>` : ''}
+            </div>
+        </div>`;
+}
+
+function reminderText(c) {
+    const due = nextDue(c);
+    return 'שלום, כאן סתיו מ-SJ הנדסת חשמל. מתקרב מועד הבדיקה התקופתית למתקן החשמל אצלכם' +
+        (due ? ' (' + fmtDate(due) + ')' : '') + ' — אשמח שנתאם מועד שנוח לכם.';
+}
+
+function mailto(id) {
+    const c = clients.find((x) => x.id === id);
+    if (!c || !c.email) return;
+    const subject = 'תיאום ' + (c.type || 'בדיקה תקופתית') + ' — מתקן החשמל';
+    const body = reminderText(c) + '\n\nבברכה,\nSJ הנדסת חשמל';
+    // Opens the mail app with a ready draft — review and send manually.
+    window.location.href = 'mailto:' + encodeURIComponent(c.email) +
+        '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+}

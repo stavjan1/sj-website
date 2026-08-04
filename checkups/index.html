@@ -127,6 +127,24 @@
         .dlg-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
         .hint { font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
 
+        .strip {
+            background: var(--card); border: 1px solid var(--amber); border-radius: var(--radius);
+            padding: 12px 14px; margin-bottom: 14px;
+        }
+        .strip-title { font-size: 0.85rem; font-weight: 600; color: var(--amber); margin-bottom: 8px; }
+        .strip-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+        .chip {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: var(--bg); border: 1px solid var(--border); border-radius: 999px;
+            padding: 5px 12px; font-size: 0.8rem;
+        }
+        .chip small { color: var(--muted); font-size: 0.72rem; }
+        .chip-btn {
+            border: none; background: transparent; color: var(--muted); cursor: pointer;
+            font-size: 0.9rem; padding: 2px 3px;
+        }
+        .chip-btn:hover { color: var(--text); }
+
         #toast {
             position: fixed; bottom: 18px; right: 50%; transform: translateX(50%);
             background: var(--card-hover); border: 1px solid var(--border); color: var(--text);
@@ -159,6 +177,8 @@
 
     <div class="stats" id="stats"></div>
 
+    <div id="due-strip"></div>
+
     <div class="toolbar">
         <button class="btn primary" onclick="openEditor()">+ לקוח חדש</button>
         <input type="search" id="search" placeholder="חיפוש לפי שם, טלפון או כתובת..." oninput="render()">
@@ -181,6 +201,12 @@
                     <input id="f-phone" maxlength="20" inputmode="tel" placeholder="050-0000000">
                 </div>
                 <div class="field">
+                    <label>אימייל</label>
+                    <input id="f-email" type="email" maxlength="120" placeholder="client@mail.com">
+                </div>
+            </div>
+            <div class="field-pair">
+                <div class="field">
                     <label>סוג בדיקה</label>
                     <select id="f-type">
                         <option>בדיקה תקופתית</option>
@@ -190,10 +216,10 @@
                         <option>אחר</option>
                     </select>
                 </div>
-            </div>
-            <div class="field">
-                <label>כתובת / מיקום המתקן</label>
-                <input id="f-site" maxlength="160">
+                <div class="field">
+                    <label>כתובת / מיקום המתקן</label>
+                    <input id="f-site" maxlength="160">
+                </div>
             </div>
             <div class="field-pair">
                 <div class="field">
@@ -237,7 +263,7 @@
         <h2>ייבוא מאקסל</h2>
         <p style="font-size:0.8rem;color:var(--muted);margin-bottom:10px">
             העתק שורות מהאקסל והדבק כאן. סדר העמודות:<br>
-            <b style="color:var(--text)">שם · טלפון · כתובת · תדירות בחודשים · תאריך בדיקה אחרונה</b><br>
+            <b style="color:var(--text)">שם · טלפון · כתובת · תדירות בחודשים · תאריך בדיקה אחרונה · אימייל</b><br>
             (רק השם חובה. תאריך בפורמט 31/12/2025 או 2025-12-31)
         </p>
         <textarea id="import-text" rows="8" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:0.82rem" placeholder="מוסך רם-לוי	050-1234567	החרושת 12, בת ים	12	15/03/2026"></textarea>
@@ -250,6 +276,6 @@
     <div id="toast"></div>
 </div>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="app.js?v=1"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>

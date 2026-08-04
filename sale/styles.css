@@ -4872,3 +4872,24 @@ body.boxes-light .card-header { background: linear-gradient(180deg, rgba(37,99,2
     .ck-actions { grid-column: 2 / -1; justify-content: flex-start; }
     .ck-field-pair { grid-template-columns: 1fr; }
 }
+
+/* Periodic service — reminders-to-send strip */
+.ck-strip {
+    background: var(--bg-card); border: 1px solid #e8a020; border-radius: var(--border-radius);
+    padding: 12px 14px; margin-bottom: 14px;
+}
+.ck-strip-title { font-size: 0.85rem; font-weight: 600; color: #e8a020; margin-bottom: 8px; }
+.ck-strip-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.ck-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 999px;
+    padding: 5px 12px; font-size: 0.8rem; color: var(--text-primary);
+}
+.ck-chip small { color: var(--text-muted); font-size: 0.72rem; }
+.ck-chip-btn {
+    border: none; background: transparent; color: var(--text-muted); cursor: pointer;
+    font-size: 0.9rem; padding: 2px 3px; display: inline-flex; align-items: center;
+}
+.ck-chip-btn:hover { color: var(--text-primary); }
+.ck-chip-btn.ck-wa { color: #25d366; }
+.ck-chip-more { color: var(--text-muted); }

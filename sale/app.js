@@ -9256,6 +9256,8 @@ function ckRender() {
         <div class="ck-stat ck-amber"><b>${counts.soon}</b><span>קרובים (${CK_SOON_DAYS} יום)</span></div>
         <div class="ck-stat ck-green"><b>${counts.ok}</b><span>בסדר</span></div>`;
 
+    ckRenderDueStrip();
+
     if (visible.length === 0) {
         listEl.innerHTML = `<div class="ck-empty">${ckClients.length === 0
             ? 'אין עדיין לקוחות במעקב.<br>הוסף לקוח ראשון או ייבא רשימה מאקסל.'
@@ -9287,6 +9289,8 @@ function ckRender() {
                 <button class="ck-icon-btn ${c.eventId ? 'ck-synced' : ''}" title="${c.eventId ? 'מסונכרן ליומן Google — לחץ לעדכון' : 'הוסף תזכורת ליומן Google'}" onclick="ckSyncCalendar('${c.id}')"><i class="fa-solid fa-calendar-plus"></i></button>
                 <button class="ck-icon-btn" title="הורדת תזכורת לאייפון / Apple Calendar (קובץ ICS)" onclick="ckDownloadIcs('${c.id}')"><i class="fa-solid fa-download"></i></button>
                 ${c.phone ? `<button class="ck-icon-btn ck-wa" title="וואטסאפ ללקוח" onclick="ckWhatsapp('${c.id}')"><i class="fa-brands fa-whatsapp"></i></button>` : ''}
+                ${c.email ? `<button class="ck-icon-btn" title="טיוטת מייל ללקוח" onclick="ckMailto('${c.id}')"><i class="fa-solid fa-envelope"></i></button>` : ''}
+                <button class="ck-icon-btn" title="צור הצעת מחיר ללקוח (אחרי שאישר)" onclick="ckCreateQuote('${c.id}')"><i class="fa-solid fa-file-invoice-dollar"></i></button>
                 <button class="ck-icon-btn" title="הבדיקה בוצעה — קדם לתאריך הבא" onclick="ckMarkDone('${c.id}')"><i class="fa-solid fa-check"></i></button>
                 <button class="ck-icon-btn" title="עריכה" onclick="ckOpenEditor('${c.id}')"><i class="fa-solid fa-pen"></i></button>
                 <button class="ck-icon-btn ck-danger" title="מחיקה" onclick="ckRemoveClient('${c.id}')"><i class="fa-solid fa-xmark"></i></button>
@@ -9303,6 +9307,7 @@ function ckOpenEditor(id) {
     document.getElementById('ck-editor-title').textContent = id ? 'עריכת לקוח' : 'לקוח חדש';
     document.getElementById('ck-f-name').value = c.name || '';
     document.getElementById('ck-f-phone').value = c.phone || '';
+    document.getElementById('ck-f-email').value = c.email || '';
     document.getElementById('ck-f-type').value = c.type || 'בדיקה תקופתית';
     document.getElementById('ck-f-site').value = c.site || '';
     const months = c.months || 12;
@@ -9325,6 +9330,7 @@ function ckSaveClient(ev) {
     const rec = {
         name: document.getElementById('ck-f-name').value.trim(),
         phone: document.getElementById('ck-f-phone').value.trim(),
+        email: document.getElementById('ck-f-email').value.trim(),
         type: document.getElementById('ck-f-type').value,
         site: document.getElementById('ck-f-site').value.trim(),
         months,
@@ -9577,12 +9583,12 @@ function ckRunImport() {
         if (!line.trim()) continue;
         // Excel pastes tab-separated; a hand-typed line may use commas.
         const parts = (line.includes('\t') ? line.split('\t') : line.split(',')).map((s) => s.trim());
-        const [name, phone, site, monthsRaw, lastRaw] = parts;
+        const [name, phone, site, monthsRaw, lastRaw, email] = parts;
         if (!name) { skipped++; continue; }
         const months = Math.max(1, Math.min(120, parseInt(monthsRaw, 10) || 12));
         ckClients.push({
             id: 'c' + Date.now() + Math.random().toString(36).slice(2, 7),
-            name, phone: phone || '', site: site || '', type: 'בדיקה תקופתית',
+            name, phone: phone || '', email: email || '', site: site || '', type: 'בדיקה תקופתית',
             months, last: ckParseDate(lastRaw), next: null, notes: '', eventId: null,
             updatedAt: Date.now(),
         });
@@ -9609,9 +9615,9 @@ function ckParseDate(s) {
 }
 
 function ckExportCsv() {
-    const header = 'שם,טלפון,כתובת,סוג בדיקה,תדירות (חודשים),בדיקה אחרונה,בדיקה הבאה';
+    const header = 'שם,טלפון,אימייל,כתובת,סוג בדיקה,תדירות (חודשים),בדיקה אחרונה,בדיקה הבאה';
     const rows = ckClients.map((c) => [
-        c.name, c.phone, c.site, c.type, c.months, c.last || '', ckNextDue(c) || '',
+        c.name, c.phone, c.email || '', c.site, c.type, c.months, c.last || '', ckNextDue(c) || '',
     ].map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(','));
     const a = document.createElement('a');
     // ﻿ BOM so Excel opens the Hebrew correctly.
@@ -9619,4 +9625,90 @@ function ckExportCsv() {
     a.download = 'checkups-' + ckToday() + '.csv';
     a.click();
     URL.revokeObjectURL(a.href);
+}
+
+// ---------- reminders-to-send strip + email draft + quote handoff ----------
+
+// Clients whose due date entered the reminder window (28 days, matching the
+// first calendar alert) — surfaced at the top so a glance at the tab says
+// exactly who to nudge today.
+function ckDueSoonClients() {
+    return ckClients
+        .filter((c) => { const d = ckNextDue(c); return d && ckDaysUntil(d) <= 28; })
+        .sort((a, b) => ckNextDue(a).localeCompare(ckNextDue(b)));
+}
+
+function ckRenderDueStrip() {
+    const el = document.getElementById('ck-due-strip');
+    if (!el) return;
+    const due = ckDueSoonClients();
+    if (due.length === 0) { el.innerHTML = ''; return; }
+    el.innerHTML = `
+        <div class="ck-strip">
+            <div class="ck-strip-title"><i class="fa-solid fa-bell"></i> תזכורות לשליחה — הבדיקה מתקרבת</div>
+            <div class="ck-strip-chips">
+                ${due.slice(0, 8).map((c) => {
+                    const days = ckDaysUntil(ckNextDue(c));
+                    const when = days < 0 ? 'באיחור ' + Math.abs(days) + ' יום' : days === 0 ? 'היום' : 'בעוד ' + days + ' יום';
+                    return `<span class="ck-chip">
+                        <b>${escapeHtml(c.name)}</b><small>${when}</small>
+                        ${c.phone ? `<button title="וואטסאפ" class="ck-chip-btn ck-wa" onclick="ckWhatsapp('${c.id}')"><i class="fa-brands fa-whatsapp"></i></button>` : ''}
+                        ${c.email ? `<button title="מייל" class="ck-chip-btn" onclick="ckMailto('${c.id}')"><i class="fa-solid fa-envelope"></i></button>` : ''}
+                    </span>`;
+                }).join('')}
+                ${due.length > 8 ? `<span class="ck-chip ck-chip-more">+${due.length - 8} נוספים ברשימה</span>` : ''}
+            </div>
+        </div>`;
+}
+
+function ckReminderText(c) {
+    const due = ckNextDue(c);
+    const biz = (appState.settings && appState.settings.businessName) || '';
+    return 'שלום, ' + (biz ? 'כאן ' + biz + '. ' : '') +
+        'מתקרב מועד ה' + (c.type === 'בדיקה תקופתית' ? 'בדיקה התקופתית' : (c.type || 'בדיקה')) +
+        ' למתקן החשמל אצלכם' + (due ? ' (' + ckFmtDate(due) + ')' : '') +
+        ' — אשמח שנתאם מועד שנוח לכם.';
+}
+
+function ckMailto(id) {
+    const c = ckClients.find((x) => x.id === id);
+    if (!c || !c.email) return;
+    const biz = (appState.settings && appState.settings.businessName) || '';
+    const subject = 'תיאום ' + (c.type || 'בדיקה תקופתית') + ' — מתקן החשמל';
+    const body = ckReminderText(c) + '\n\n' + 'בברכה,' + (biz ? '\n' + biz : '');
+    // mailto opens the user's own mail app with a ready draft — he reviews and
+    // hits send himself (no server, no surprises).
+    window.location.href = 'mailto:' + encodeURIComponent(c.email) +
+        '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+}
+
+// After the client CONFIRMED the periodic service → one click opens a fresh
+// project for them, client details prefilled, straight into the normal
+// plan→price→draft flow.
+function ckCreateQuote(id) {
+    const c = ckClients.find((x) => x.id === id);
+    if (!c) return;
+    const nameInput = document.getElementById('new-project-name');
+    if (!nameInput) return;
+    nameInput.value = ((c.type || 'בדיקה תקופתית') + ' - ' + c.name).slice(0, 60);
+    const prevActive = activeProjectId;
+    createNewProject(); // reuses the tested path: creates + loads + opens the wizard
+    // createNewProject bails on the plan gate (upgrade modal) — patch only the
+    // NEW project, detected by the active id actually changing.
+    if (!activeProjectId || activeProjectId === prevActive) return;
+    const proj = projectsList.find((p) => p.id === activeProjectId);
+    if (!proj) return;
+    proj.quoteData.clientName = c.name;
+    proj.quoteData.clientSub = [c.site, c.phone, c.email].filter(Boolean).join(' · ');
+    proj.quoteData.subject = (c.type || 'בדיקה תקופתית') + (c.site ? ' — ' + c.site : '');
+    saveProjects();
+    // Prefill the planning chat so one tap starts the product list.
+    setTimeout(() => {
+        const inp = document.getElementById('chat-user-input');
+        if (inp) {
+            inp.value = (c.type || 'בדיקה תקופתית') + ' למתקן חשמל' + (c.site ? ' ב' + c.site : '') + (c.notes ? '. הערות: ' + c.notes : '');
+            inp.dispatchEvent(new Event('input'));
+        }
+    }, 500);
+    showToast('נפתח פרויקט חדש עבור ' + c.name);
 }

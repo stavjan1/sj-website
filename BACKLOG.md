@@ -29,8 +29,11 @@ pricing chat pulls people in → full ZEREM (projects, quotes, invoicing) retain
 ## Next (on demand)
 - [x] Periodic-service tracker productized into ZEREM — 4th tab "שירות תקופתי" in the
       projects world (shares /api/checkups data with the standalone /checkups/ page).
-- [ ] Periodic-service v2: bulk "add ALL to calendar"; auto-WhatsApp drafts a month
-      before due; in-app due list surfaced on the projects dashboard.
+- [x] Periodic-service v2 (Stav-approved 04/08): email field + mailto draft button,
+      "reminders to send" strip (28-day window, one-click WhatsApp/email), and
+      client→quote handoff button that opens a prefilled project.
+- [ ] Periodic-service v3: bulk "add ALL to calendar"; surface due checkups on the
+      projects dashboard too.
 - [ ] Ingest full Dekel book into the system catalog (data already local in
       "הקמת תשתית/כתב כמויות" — dekel_clean_perfect.xlsx). Highest-value remaining data work.
 - [ ] More adversarial training rounds (periodic — keep grilling the bot, fix the map each time).
