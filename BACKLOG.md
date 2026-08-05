@@ -42,6 +42,13 @@ pricing chat pulls people in → full ZEREM (projects, quotes, invoicing) retain
 - [ ] Optional Chrome-Claude crawl: supplier material catalog (e.g. big wholesaler) to seed
       system material prices — only if Stav wants; users can also feed via the scrape tab.
 
+- [x] "Perfect site" compliance pass (04/08): accessibility statement + privacy policy
+      pages, footer legal links sitewide, discreet cookie/measurement notice bar with
+      Clarity opt-out, branded 404, signup tracking (firstSeen + email-on-new-signup +
+      admin counters).
+- [ ] bebusy365.com research — blocked by session network policy; needs Stav to allow
+      the domain in the environment settings or share screenshots.
+
 ## Growth / marketing
 - [ ] Share push into electrician WhatsApp groups (Stav sends /ask/ link; OG card ready).
 - [ ] "Loved by AIs" expansion: keep llms.txt fresh; consider FAQ page for GEO.

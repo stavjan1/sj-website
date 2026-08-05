@@ -75,9 +75,17 @@ export async function onRequest(context) {
       }
     }
 
+    // New-user detection: first-ever cloud write for this email. Stamp the
+    // signup date (kept forever in the blob) and notify the admin by email.
+    const isNewUser = !existing;
+    const firstSeen = (existing && existing.firstSeen) || Date.now();
+    if (isNewUser) {
+      context.waitUntil(notifyNewSignup(email).catch(() => {}));
+    }
+
     // The full backup ALWAYS saves (settings, projects, catalog, history) — the
     // cloud is the source of truth across devices, so we never reject a sync.
-    const payload = JSON.stringify({ ...incoming, lastUpdated: incoming.lastUpdated || Date.now() });
+    const payload = JSON.stringify({ ...incoming, firstSeen, lastUpdated: incoming.lastUpdated || Date.now() });
     // KV value hard limit is 25 MB; cap far below that to stay sane.
     if (payload.length > 5 * 1024 * 1024) {
       return json({ error: { message: 'הנתונים גדולים מדי לאחסון בענן.' } }, 413);
@@ -119,6 +127,23 @@ export async function onRequest(context) {
   return json({ error: { message: 'מתודה לא נתמכת.' } }, 405);
 }
 
+
+// Fire-and-forget "new user signed up" email to the admin (web3forms — the
+// same no-setup channel the lead form uses).
+const WEB3FORMS_KEY = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
+async function notifyNewSignup(email) {
+  await fetch('https://api.web3forms.com/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      access_key: WEB3FORMS_KEY,
+      subject: '⚡ נרשם חדש בזרם: ' + email,
+      from_name: 'זרם — הרשמות',
+      message: 'משתמש חדש התחבר ושמר לראשונה במערכת זרם:\n\n' + email +
+        '\n\nאפשר לראות את הפעילות שלו בלשונית Admin.',
+    }),
+  });
+}
 
 function isEmptyDb(db) {
   if (!db) return true;

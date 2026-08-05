@@ -64,6 +64,7 @@ export async function onRequestGet(context) {
         projects: db && Array.isArray(db.projects) ? db.projects.length : 0,
         history: db && Array.isArray(db.history) ? db.history.length : 0,
         lastUpdated: (db && db.lastUpdated) || null,
+        firstSeen: (db && db.firstSeen) || null,
       });
     }
   } while (cursor && users.length < 500);
