@@ -24,6 +24,21 @@
     })(window, document, 'clarity', 'script', CLARITY_ID);
   }
 
+  // ---- Google Analytics 4 (visitor counts over time — Clarity doesn't keep
+  // long-term traffic history). OFF until a measurement ID is pasted here:
+  // analytics.google.com → צור נכס → Web stream for sj-eng.co.il → copy 'G-XXXXXXXXXX'.
+  var GA_ID = ''; // e.g. 'G-ABC123XYZ0'
+  if (GA_ID && !TRACKING_OFF && MODE !== 'sale' && window.location.pathname.indexOf('/sale') !== 0) {
+    var gs = document.createElement('script');
+    gs.async = true;
+    gs.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+    document.head.appendChild(gs);
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { window.dataLayer.push(arguments); };
+    window.gtag('js', new Date());
+    window.gtag('config', GA_ID, { anonymize_ip: true });
+  }
+
   // ---- One-time cookie/measurement notice (marketing pages only) ----
   // Discreet dismissible bar, not a blocking consent wall: Israeli-audience
   // site, disclosure + opt-out link is the professional standard here.
