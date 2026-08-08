@@ -13,13 +13,59 @@
   // the PUBLIC marketing pages — never inside /sale, so business/client data
   // in the quote tool is never recorded.
   var CLARITY_ID = 'xgux1eczkt'; // clarity.microsoft.com → project SJ
-  if (CLARITY_ID && MODE !== 'sale' && window.location.pathname.indexOf('/sale') !== 0) {
+  // Users can opt out on privacy.html (localStorage sj_no_track).
+  var TRACKING_OFF = false;
+  try { TRACKING_OFF = localStorage.getItem('sj_no_track') === '1'; } catch (e) {}
+  if (CLARITY_ID && !TRACKING_OFF && MODE !== 'sale' && window.location.pathname.indexOf('/sale') !== 0) {
     (function (c, l, a, r, i, t, y) {
       c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
       t = l.createElement(r); t.async = 1; t.src = 'https://www.clarity.ms/tag/' + i;
       y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
     })(window, document, 'clarity', 'script', CLARITY_ID);
   }
+
+  // ---- Google Analytics 4 (visitor counts over time — Clarity doesn't keep
+  // long-term traffic history). OFF until a measurement ID is pasted here:
+  // analytics.google.com → צור נכס → Web stream for sj-eng.co.il → copy 'G-XXXXXXXXXX'.
+  var GA_ID = ''; // e.g. 'G-ABC123XYZ0'
+  if (GA_ID && !TRACKING_OFF && MODE !== 'sale' && window.location.pathname.indexOf('/sale') !== 0) {
+    var gs = document.createElement('script');
+    gs.async = true;
+    gs.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+    document.head.appendChild(gs);
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { window.dataLayer.push(arguments); };
+    window.gtag('js', new Date());
+    window.gtag('config', GA_ID, { anonymize_ip: true });
+  }
+
+  // ---- One-time cookie/measurement notice (marketing pages only) ----
+  // Discreet dismissible bar, not a blocking consent wall: Israeli-audience
+  // site, disclosure + opt-out link is the professional standard here.
+  try {
+    if (MODE !== 'sale' && window.location.pathname.indexOf('/sale') !== 0 &&
+        !localStorage.getItem('sj_cookie_ok')) {
+      document.addEventListener('DOMContentLoaded', function () {
+        var bar = document.createElement('div');
+        bar.id = 'sj-cookie-bar';
+        bar.setAttribute('dir', 'rtl');
+        bar.style.cssText = 'position:fixed;bottom:0;right:0;left:0;z-index:9998;' +
+          'background:rgba(20,20,25,0.97);border-top:1px solid rgba(255,255,255,0.1);' +
+          'color:#e4e4e7;font-size:13px;padding:10px 16px;display:flex;gap:12px;' +
+          'align-items:center;justify-content:center;flex-wrap:wrap;font-family:inherit;';
+        bar.innerHTML =
+          '<span>האתר משתמש בעוגיות ובמדידה אנונימית לשיפור החוויה. ' +
+          '<a href="/privacy.html" style="color:#4ea8ff">למדיניות הפרטיות ולביטול המדידה</a></span>' +
+          '<button id="sj-cookie-ok" style="background:#2b74db;color:#fff;border:none;' +
+          'border-radius:8px;padding:6px 16px;font-size:13px;cursor:pointer;font-family:inherit">הבנתי</button>';
+        document.body.appendChild(bar);
+        document.getElementById('sj-cookie-ok').onclick = function () {
+          try { localStorage.setItem('sj_cookie_ok', '1'); } catch (e) {}
+          bar.remove();
+        };
+      });
+    }
+  } catch (e) { /* never break the page over a notice bar */ }
 
   var CONFIG = {
     phone: '053-530-2887',

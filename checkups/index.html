@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>בדיקות תקופתיות | SJ הנדסת חשמל</title>
+    <meta name="robots" content="noindex">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Rubik:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='none' stroke='%232b74db' stroke-width='6'/%3E%3Cpath d='M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z' fill='%23ffaa00'/%3E%3C/svg%3E">
+    <style>
+        :root {
+            --bg: #09090b;
+            --card: #141418;
+            --card-hover: #1d1d24;
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #ffffff;
+            --muted: #a1a1aa;
+            --blue: #2b74db;
+            --amber: #ffaa00;
+            --red: #f4504e;
+            --green: #2ebd6b;
+            --radius: 12px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Rubik', 'Heebo', sans-serif;
+            min-height: 100vh;
+            padding-bottom: 60px;
+        }
+        a { color: inherit; }
+        button { font-family: inherit; cursor: pointer; }
+        input, select, textarea { font-family: inherit; }
+
+        .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+
+        header {
+            display: flex; align-items: center; gap: 12px;
+            padding: 16px 0; border-bottom: 1px solid var(--border);
+            margin-bottom: 18px; flex-wrap: wrap;
+        }
+        header .logo { width: 34px; height: 34px; flex-shrink: 0; }
+        header h1 { font-size: 1.15rem; font-weight: 700; }
+        header .sub { color: var(--muted); font-size: 0.8rem; }
+        header .spacer { flex: 1; }
+        .auth-box { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
+        .auth-box .email { color: var(--muted); direction: ltr; }
+
+        .btn {
+            border: 1px solid var(--border); background: var(--card); color: var(--text);
+            border-radius: 8px; padding: 8px 14px; font-size: 0.85rem;
+            transition: background 0.15s;
+        }
+        .btn:hover { background: var(--card-hover); }
+        .btn.primary { background: var(--blue); border-color: var(--blue); font-weight: 500; }
+        .btn.primary:hover { background: #3a83ea; }
+        .btn.small { padding: 5px 10px; font-size: 0.78rem; }
+        .btn.danger:hover { border-color: var(--red); color: var(--red); }
+
+        .stats { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+        .stat {
+            background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 10px 16px; min-width: 108px;
+        }
+        .stat b { font-size: 1.3rem; display: block; }
+        .stat span { color: var(--muted); font-size: 0.75rem; }
+        .stat.overdue b { color: var(--red); }
+        .stat.soon b { color: var(--amber); }
+        .stat.ok b { color: var(--green); }
+
+        .toolbar { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+        .toolbar input[type="search"] {
+            flex: 1; min-width: 160px; background: var(--card); border: 1px solid var(--border);
+            border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 0.85rem;
+        }
+        .toolbar input[type="search"]:focus { outline: none; border-color: var(--blue); }
+
+        .list { display: flex; flex-direction: column; gap: 8px; }
+        .row {
+            background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 12px 14px;
+            display: grid; grid-template-columns: 10px 1.4fr 1fr 1fr auto; gap: 12px; align-items: center;
+        }
+        .row .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .dot.red { background: var(--red); box-shadow: 0 0 8px rgba(244,80,78,0.6); }
+        .dot.amber { background: var(--amber); box-shadow: 0 0 8px rgba(255,170,0,0.5); }
+        .dot.green { background: var(--green); }
+        .row .name { font-weight: 500; }
+        .row .name small { display: block; color: var(--muted); font-weight: 400; font-size: 0.75rem; }
+        .row .due b { display: block; font-size: 0.9rem; }
+        .row .due small, .row .interval small { color: var(--muted); font-size: 0.72rem; }
+        .row .due b.overdue { color: var(--red); }
+        .row .due b.soon { color: var(--amber); }
+        .row .interval { font-size: 0.85rem; }
+        .actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+        .icon-btn {
+            border: 1px solid var(--border); background: transparent; color: var(--muted);
+            border-radius: 8px; width: 32px; height: 32px; font-size: 0.95rem;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .icon-btn:hover { color: var(--text); background: var(--card-hover); }
+        .icon-btn.cal.synced { color: var(--green); border-color: rgba(46,189,107,0.4); }
+
+        .empty {
+            text-align: center; color: var(--muted); padding: 48px 16px;
+            border: 1px dashed var(--border); border-radius: var(--radius); font-size: 0.9rem;
+        }
+
+        dialog {
+            background: var(--card); color: var(--text); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 22px; width: min(480px, 92vw);
+            margin: auto;
+        }
+        dialog::backdrop { background: rgba(0,0,0,0.65); }
+        dialog h2 { font-size: 1rem; margin-bottom: 14px; }
+        .field { margin-bottom: 10px; }
+        .field label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; }
+        .field input, .field select, .field textarea {
+            width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+            padding: 8px 10px; color: var(--text); font-size: 0.88rem;
+        }
+        .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--blue); }
+        .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .dlg-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+        .hint { font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
+
+        .strip {
+            background: var(--card); border: 1px solid var(--amber); border-radius: var(--radius);
+            padding: 12px 14px; margin-bottom: 14px;
+        }
+        .strip-title { font-size: 0.85rem; font-weight: 600; color: var(--amber); margin-bottom: 8px; }
+        .strip-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+        .chip {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: var(--bg); border: 1px solid var(--border); border-radius: 999px;
+            padding: 5px 12px; font-size: 0.8rem;
+        }
+        .chip small { color: var(--muted); font-size: 0.72rem; }
+        .chip-btn {
+            border: none; background: transparent; color: var(--muted); cursor: pointer;
+            font-size: 0.9rem; padding: 2px 3px;
+        }
+        .chip-btn:hover { color: var(--text); }
+
+        #toast {
+            position: fixed; bottom: 18px; right: 50%; transform: translateX(50%);
+            background: var(--card-hover); border: 1px solid var(--border); color: var(--text);
+            padding: 10px 18px; border-radius: 10px; font-size: 0.85rem; z-index: 99;
+            opacity: 0; pointer-events: none; transition: opacity 0.25s;
+        }
+        #toast.show { opacity: 1; }
+
+        @media (max-width: 720px) {
+            .row { grid-template-columns: 10px 1fr auto; }
+            .row .interval { display: none; }
+            .row .due { text-align: left; }
+            .actions { grid-column: 2 / -1; justify-content: flex-start; }
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <header>
+        <svg class="logo" viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#2b74db" stroke-width="6"/><path d="M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z" fill="#ffaa00"/></svg>
+        <div>
+            <h1>בדיקות תקופתיות</h1>
+            <div class="sub">מעקב לקוחות ותזכורות · SJ הנדסת חשמל</div>
+        </div>
+        <div class="spacer"></div>
+        <div class="auth-box" id="auth-box">
+            <button class="btn" id="btn-login" onclick="loginGoogle()">התחברות Google</button>
+        </div>
+    </header>
+
+    <div class="stats" id="stats"></div>
+
+    <div id="due-strip"></div>
+
+    <div class="toolbar">
+        <button class="btn primary" onclick="openEditor()">+ לקוח חדש</button>
+        <input type="search" id="search" placeholder="חיפוש לפי שם, טלפון או כתובת..." oninput="render()">
+        <button class="btn small" onclick="openImport()">ייבוא מאקסל</button>
+        <button class="btn small" onclick="exportCsv()">ייצוא CSV</button>
+    </div>
+
+    <div class="list" id="list"></div>
+
+    <dialog id="editor">
+        <h2 id="editor-title">לקוח חדש</h2>
+        <form method="dialog" onsubmit="saveClient(event)">
+            <div class="field">
+                <label>שם הלקוח / המתקן *</label>
+                <input id="f-name" required maxlength="120" placeholder='למשל: מוסך רם-לוי בע"מ'>
+            </div>
+            <div class="field-pair">
+                <div class="field">
+                    <label>טלפון</label>
+                    <input id="f-phone" maxlength="20" inputmode="tel" placeholder="050-0000000">
+                </div>
+                <div class="field">
+                    <label>אימייל</label>
+                    <input id="f-email" type="email" maxlength="120" placeholder="client@mail.com">
+                </div>
+            </div>
+            <div class="field-pair">
+                <div class="field">
+                    <label>סוג בדיקה</label>
+                    <select id="f-type">
+                        <option>בדיקה תקופתית</option>
+                        <option>בדיקת הארקות</option>
+                        <option>בדיקה טרמוגרפית</option>
+                        <option>בדיקת מתקן פוטו-וולטאי</option>
+                        <option>אחר</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>כתובת / מיקום המתקן</label>
+                    <input id="f-site" maxlength="160">
+                </div>
+            </div>
+            <div class="field-pair">
+                <div class="field">
+                    <label>תדירות *</label>
+                    <select id="f-months" onchange="document.getElementById('f-custom-wrap').style.display = this.value === 'custom' ? '' : 'none'">
+                        <option value="12">כל שנה</option>
+                        <option value="24">כל שנתיים</option>
+                        <option value="36">כל 3 שנים</option>
+                        <option value="60">כל 5 שנים</option>
+                        <option value="custom">אחר...</option>
+                    </select>
+                </div>
+                <div class="field" id="f-custom-wrap" style="display:none">
+                    <label>מספר חודשים</label>
+                    <input id="f-custom" type="number" min="1" max="120" value="6">
+                </div>
+            </div>
+            <div class="field-pair">
+                <div class="field">
+                    <label>תאריך הבדיקה האחרונה</label>
+                    <input id="f-last" type="date">
+                </div>
+                <div class="field">
+                    <label>או: מועד הבדיקה הבאה</label>
+                    <input id="f-next" type="date">
+                    <div class="hint">מלא אחד מהשניים — השני יחושב לבד</div>
+                </div>
+            </div>
+            <div class="field">
+                <label>הערות</label>
+                <textarea id="f-notes" rows="2" maxlength="500"></textarea>
+            </div>
+            <div class="dlg-actions">
+                <button type="button" class="btn" onclick="document.getElementById('editor').close()">ביטול</button>
+                <button type="submit" class="btn primary">שמירה</button>
+            </div>
+        </form>
+    </dialog>
+
+    <dialog id="importer">
+        <h2>ייבוא מאקסל</h2>
+        <p style="font-size:0.8rem;color:var(--muted);margin-bottom:10px">
+            העתק שורות מהאקסל והדבק כאן. סדר העמודות:<br>
+            <b style="color:var(--text)">שם · טלפון · כתובת · תדירות בחודשים · תאריך בדיקה אחרונה · אימייל</b><br>
+            (רק השם חובה. תאריך בפורמט 31/12/2025 או 2025-12-31)
+        </p>
+        <textarea id="import-text" rows="8" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:0.82rem" placeholder="מוסך רם-לוי	050-1234567	החרושת 12, בת ים	12	15/03/2026"></textarea>
+        <div class="dlg-actions">
+            <button type="button" class="btn" onclick="document.getElementById('importer').close()">ביטול</button>
+            <button type="button" class="btn primary" onclick="runImport()">ייבוא</button>
+        </div>
+    </dialog>
+
+    <div id="toast"></div>
+</div>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="app.js?v=2"></script>
+</body>
+</html>

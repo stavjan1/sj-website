@@ -1,6 +1,14 @@
 # Only non-obvious redirects live here.
 # CF Pages serves .html files and index.html in subdirs automatically.
 
+# Internal working docs + analytics data live in the repo root (the deploy
+# root) — serve 404 instead of exposing them. robots.txt entries would only
+# advertise the paths; this actually blocks them.
+/ANALYTICS.md         /404.html   404
+/BACKLOG.md           /404.html   404
+/PRODUCT_OVERVIEW.md  /404.html   404
+/data/clarity/*       /404.html   404
+
 /app    /sale/    301
 
 # Case tolerance for the shared /ask/ link (people type it by hand from WhatsApp)

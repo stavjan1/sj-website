@@ -1,0 +1,42 @@
+# Pulls Microsoft Clarity UX metrics through the site's /api/clarity relay
+# every 3 days and commits them into the repo, where the site-analyst routine
+# (Claude) reads them — its own environment can't reach clarity.ms directly.
+name: Clarity data pull
+
+on:
+  schedule:
+    - cron: '0 5 */3 * *' # an hour before the analyst routine runs
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch Clarity metrics via the site relay
+        id: fetch
+        run: |
+          RESP=$(curl -sS --max-time 60 "https://www.sj-eng.co.il/api/clarity" || echo '{}')
+          OK=$(echo "$RESP" | jq -r '.ok // false')
+          if [ "$OK" != "true" ]; then
+            echo "No data available yet ($(echo "$RESP" | jq -r '.error // "unknown"')) — nothing to commit."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mkdir -p data/clarity
+          echo "$RESP" | jq '.' > data/clarity/latest.json
+          echo "$RESP" | jq -c '{fetchedAt: .fetchedAt, data: .data}' >> data/clarity/history.jsonl
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Commit history
+        if: steps.fetch.outputs.skip == 'false'
+        run: |
+          git config user.name "clarity-data-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/clarity
+          git diff --cached --quiet || git commit -m "Clarity data pull ($(date -u +%F))"
+          git push
