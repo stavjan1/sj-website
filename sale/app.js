@@ -9719,3 +9719,30 @@ function ckCreateQuote(id) {
     }, 500);
     showToast('נפתח פרויקט חדש עבור ' + c.name);
 }
+
+// ---------- Clarity token (admin) — feeds the automated analyst routine ----------
+
+async function adminSaveClarityToken() {
+    const input = document.getElementById('admin-clarity-token');
+    const status = document.getElementById('admin-clarity-status');
+    const token = (input.value || '').trim();
+    if (!token) { showToast('הדבק את הטוקן קודם', 'error'); return; }
+    if (!googleAccessToken) { showToast('התחבר עם Google קודם', 'error'); return; }
+    status.textContent = 'שומר…';
+    try {
+        const res = await fetch('/api/clarity', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({ token }),
+        });
+        const d = await res.json();
+        if (!res.ok || !d.ok) throw new Error((d.error && d.error.message) || res.status);
+        input.value = '';
+        status.textContent = 'נשמר ✓ — מעכשיו הנתונים נמשכים אוטומטית';
+        status.style.color = 'var(--color-success)';
+        showToast('טוקן Clarity נשמר בשרת');
+    } catch (e) {
+        status.textContent = 'שגיאה: ' + e.message;
+        status.style.color = 'var(--color-danger)';
+    }
+}
