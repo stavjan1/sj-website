@@ -46,7 +46,47 @@ pricing chat pulls people in → full ZEREM (projects, quotes, invoicing) retain
       it is and which cable passes inside it; junction boxes annotated with contents,
       e.g. "5 מהדקי שוקולד בפנים".
 
-## Security review (08/08) — code audit of the server layer
+## Security review round 2 (08/08) — full audit, server + client
+Triggered by Stav asking about Strix (autonomous pentest agent). Strix could not
+run here (no LLM key in the environment, live site unreachable through the proxy),
+so the equivalent was done against the source, which we own — 3 parallel deep
+audits: public share viewer, client XSS sinks, remaining API endpoints.
+Fixed & pushed:
+- [x] 🔴 **Stored XSS in /q/ (the public quote link)** — `safeImg()` was anchored
+      only at the start, so `data:image/gif;base64,<valid>" onload="..." x="`
+      passed through verbatim into `src="..."`. Verified exploitable end-to-end:
+      any signed-in user → arbitrary JS on sj-eng.co.il in the customer's (or
+      Stav's) browser, with access to localStorage (Google token, all business
+      data). Fixed: full-string base64 match + escaped at the sink.
+- [x] 🔴 **Stored XSS via AI material list** — model output (name/details/price)
+      went raw into innerHTML and is persisted to the cloud; reachable by prompt
+      injection through a scraped supplier catalog name. Escaped + clamped.
+- [x] 🟠 `escapeHtml` didn't escape quotes while being used inside quoted
+      attributes in 6 places (latent breakout). Now escapes quotes.
+- [x] 🟠 blindSpots list + Google Drive folder names (third-party data) escaped.
+- [x] 🟠 **Token audience never checked** for opaque access tokens — a token
+      minted for ANY other Google OAuth app was accepted, including at the admin
+      gates. Now verified via tokeninfo with an `aud` check.
+- [x] 🟠 catalog.js carried its own weaker copy of the auth check → imports the
+      shared hardened one (also fixes: FedCM-signed admin couldn't publish).
+- [x] 🟠 /api/assistant let anyone pick the paid advanced model on our key.
+- [x] 🟠 /api/quote-share: no server-side validation and no plan enforcement.
+- [x] 🟡 /api/pdf monthly quota bypass via a constant client-supplied quoteId.
+- [x] 🟡 /api/stats: free-text profession minted unbounded KV buckets (would
+      eventually break the admin dashboard); rate limit moved before auth call.
+- [x] 🟢 CSP added in **Report-Only** mode (allowlist from the real client hosts).
+Open on this thread:
+- [ ] 🟠 **Stav: verify CSP then flip it on.** Use the app for one full round
+      (sign in → quote → PDF → open a share link) with DevTools console open. No
+      red CSP messages ⇒ tell Claude to rename the header in `_headers` from
+      `Content-Security-Policy-Report-Only` to `Content-Security-Policy`.
+- [ ] 🟢 /api/stats dedup key `stats:seen:<quoteId>` is a global namespace, so a
+      crafted id can suppress someone else's sample. Anonymous aggregate data
+      only, display still off — low impact, worth namespacing when stats go live.
+- [ ] 🟢 Run Strix against the LIVE site from a machine with network access (it
+      catches deploy/config issues a code audit cannot). Needs Docker + an LLM key.
+
+## Security review round 1 (08/08) — code audit of the server layer
 Fixed & pushed this cycle:
 - [x] SSRF-via-redirect in /api/scrape: fetch followed redirects past the SSRF
       allowlist → now manual-follow, re-validating each hop.
