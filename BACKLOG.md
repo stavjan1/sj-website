@@ -46,6 +46,30 @@ pricing chat pulls people in → full ZEREM (projects, quotes, invoicing) retain
       it is and which cable passes inside it; junction boxes annotated with contents,
       e.g. "5 מהדקי שוקולד בפנים".
 
+## Security review (08/08) — code audit of the server layer
+Fixed & pushed this cycle:
+- [x] SSRF-via-redirect in /api/scrape: fetch followed redirects past the SSRF
+      allowlist → now manual-follow, re-validating each hop.
+- [x] web3forms key was hardcoded in a PUBLIC repo (lead.js, share-catalog.js) →
+      reads env WEB3FORMS_KEY with fallback.
+- [x] /api/quote-share public GET leaked the owner's Google email → stripped.
+- [x] Security headers added (nosniff, X-Frame-Options, Referrer-Policy, HSTS,
+      Permissions-Policy).
+Stav's actions / decisions:
+- [ ] 🔴 **Rotate the web3forms key** and set it as WEB3FORMS_KEY env var in
+      Cloudflare (the old one is public in git history — rotation kills it).
+- [ ] 🟠 /api/lead email abuse: once RESEND_API_KEY is on, the endpoint can send
+      SJ-branded mail to an attacker-chosen address (rate-limited 3/min). Before
+      enabling Resend — decide on a guard (confirm-link / tighter limit).
+- [ ] 🟢 Content-Security-Policy: add after testing against inline scripts + GIS +
+      html2pdf CDN + Gemini (deferred — would break the app if added blind).
+- [ ] 🟢 Optional: run Strix (external black-box pentest) against the LIVE site
+      from a session with open network — complements the code audit above.
+Reviewed and found solid: Google token verification (audience-checked), admin
+gating (server-side ADMIN_EMAIL on every admin endpoint), per-user KV keying
+(no IDOR — keys derive from the verified email), invoicing credentials
+(per-user, never returned to client), rate limiting on public AI endpoints.
+
 ## Next (on demand)
 - [ ] Ingest full Dekel book into the system catalog (data already local in
       "הקמת תשתית/כתב כמויות" — dekel_clean_perfect.xlsx). Highest-value remaining data work.
