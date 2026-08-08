@@ -28,3 +28,25 @@ rather than by whether the request succeeded.
 
 **Run these after adding any new third-party call**, then update `connect-src` /
 `script-src` in `_headers` accordingly.
+
+## Stored-XSS regression (public quote viewer)
+
+```bash
+node scripts/security/xss-quote-viewer-e2e.js
+```
+
+Serves the real `q/index.html`, mocks `/api/quote-share` with an attacker's
+stored payload (a valid GIF data-URL followed by an `onload=` attribute
+breakout) and checks in a real browser whether the injected code ran. Three
+cases, all must pass:
+
+1. **Control** — the original vulnerable code reconstructed. The exploit *must*
+   fire, otherwise the test proves nothing. It sets `document.title` to `PWNED`.
+2. **Shipped** — the code as it ships. The exploit must not fire.
+3. **Regression** — a legitimate base64 logo and signature must still render,
+   so the hardening didn't break real quotes.
+
+Keep the control case working. When the first version of this test was written
+it only swapped the loose regex back in and left the new `esc()` wrapper at the
+sink, so the "vulnerable" build passed too — a green run that proved nothing.
+A control that cannot reproduce the bug is not a test.

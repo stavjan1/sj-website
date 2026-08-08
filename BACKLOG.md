@@ -52,6 +52,10 @@ run here (no LLM key in the environment, live site unreachable through the proxy
 so the equivalent was done against the source, which we own — 3 parallel deep
 audits: public share viewer, client XSS sinks, remaining API endpoints.
 Fixed & pushed:
+- [x] 🔴 **Proven end-to-end in a real browser** (`scripts/security/xss-quote-viewer-e2e.js`):
+      the exploit fires on the old code (title becomes "PWNED") and is dead on the
+      shipped code, while a legitimate logo + signature still render. Committed as
+      a permanent regression test so the hole cannot quietly come back.
 - [x] 🔴 **Stored XSS in /q/ (the public quote link)** — `safeImg()` was anchored
       only at the start, so `data:image/gif;base64,<valid>" onload="..." x="`
       passed through verbatim into `src="..."`. Verified exploitable end-to-end:
