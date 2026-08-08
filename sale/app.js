@@ -253,13 +253,20 @@ async function adminRefreshUserList() {
             container.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">אין משתמשים רשומים עדיין.</p>';
             return;
         }
-        container.innerHTML = users.map(u => {
+        // Signup summary strip: total + new registrations this calendar month.
+        const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+        const newThisMonth = users.filter(u => u.firstSeen && u.firstSeen >= monthStart.getTime()).length;
+        const summary = `<p style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 10px;">
+            סה"כ <b>${users.length}</b> נרשמים · <b>${newThisMonth}</b> חדשים החודש
+            <span style="color:var(--text-muted)">(על כל נרשם חדש נשלח אליך מייל אוטומטי)</span></p>`;
+        container.innerHTML = summary + users.map(u => {
             const last = u.lastUpdated ? new Date(u.lastUpdated).toLocaleDateString('he-IL') : '—';
+            const joined = u.firstSeen ? new Date(u.firstSeen).toLocaleDateString('he-IL') : null;
             return `<div class="admin-user" data-email="${escapeHtml(u.email)}">
                 <button class="admin-user-head" onclick="adminToggleUser(this)">
                     <span class="au-caret"><i class="fa-solid fa-chevron-down"></i></span>
                     <span class="au-email" dir="ltr">${escapeHtml(u.email)}</span>
-                    <span class="au-meta">${u.projects} פרויקטים · עודכן ${last}</span>
+                    <span class="au-meta">${joined ? 'נרשם ' + joined + ' · ' : ''}${u.projects} פרויקטים · עודכן ${last}</span>
                 </button>
                 <div class="admin-user-body" style="display:none;"></div>
             </div>`;
@@ -1467,6 +1474,7 @@ const NAV_WORLDS = {
         { id: 'projects',   label: 'פרויקטים',        icon: 'fa-list-check' },
         { id: 'statistics', label: 'סטטיסטיקה',       icon: 'fa-chart-column' },
         { id: 'history',    label: 'היסטוריית הצעות', icon: 'fa-clock-rotate-left' },
+        { id: 'checkups',   label: 'שירות תקופתי',    icon: 'fa-calendar-check' },
     ] },
     accounting: { label: 'הנהלת חשבונות', icon: 'fa-file-invoice-dollar', bee: true, tabs: [
         { id: 'accounting', label: 'חשבוניות וסליקה', icon: 'fa-receipt' },
@@ -1479,7 +1487,7 @@ const NAV_WORLDS = {
 };
 const TAB_WORLD = {
     projects: 'projects', wizard: 'projects', create: 'projects', reports: 'projects',
-    history: 'projects', statistics: 'projects',
+    history: 'projects', statistics: 'projects', checkups: 'projects',
     accounting: 'accounting',
     business: 'prefs', catalog: 'prefs', settings: 'prefs', admin: 'prefs',
 };
@@ -1578,6 +1586,9 @@ function switchTab(tabId) {
     }
     if (tabId === 'statistics') {
         renderStatistics();
+    }
+    if (tabId === 'checkups') {
+        renderCheckups();
     }
     if (tabId === 'accounting') {
         renderAccounting();
@@ -9172,3 +9183,609 @@ async function recoverDriveBackup() {
 
 
 
+
+// ==========================================================================
+// Periodic service (שירות תקופתי) — clients due for recurring inspections.
+// Reminders are delegated to the calendar (no server cron): a recurring
+// Google Calendar event with email/popup alerts, or a downloadable ICS for
+// iPhone/Apple Calendar. Shares data with the standalone /checkups/ page:
+// same /api/checkups backend and record shape, so both stay in sync per
+// Google account.
+// ==========================================================================
+
+const CK_CAL_TOKEN_KEY = 'sj_checkups_cal_token';
+const CK_SOON_DAYS = 60;
+
+let ckClients = [];
+let ckLoaded = false;
+let ckCloudPulled = false;
+let ckEditingId = null;
+let ckSaveTimer = null;
+
+function ckStorageKey() { return getStorageKey('sj_checkups_v1'); }
+
+function renderCheckups() {
+    if (!ckLoaded) {
+        try { ckClients = JSON.parse(localStorage.getItem(ckStorageKey()) || '[]'); } catch { ckClients = []; }
+        if (!Array.isArray(ckClients)) ckClients = [];
+        ckLoaded = true;
+    }
+    ckRender();
+    if (!ckCloudPulled) ckCloudLoad();
+}
+
+// ---------- dates ----------
+
+function ckToday() {
+    const d = new Date();
+    return d.getFullYear() + '-' + ckPad(d.getMonth() + 1) + '-' + ckPad(d.getDate());
+}
+function ckPad(n) { return String(n).padStart(2, '0'); }
+
+// Add months to YYYY-MM-DD, clamping the day (31.1 + 1mo → 28.2, not 3.3).
+function ckAddMonths(dateStr, months) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const t = new Date(y, m - 1 + months, 1);
+    const lastDay = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
+    t.setDate(Math.min(d, lastDay));
+    return t.getFullYear() + '-' + ckPad(t.getMonth() + 1) + '-' + ckPad(t.getDate());
+}
+function ckAddDays(dateStr, n) {
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + n);
+    return d.getFullYear() + '-' + ckPad(d.getMonth() + 1) + '-' + ckPad(d.getDate());
+}
+
+// The date the next checkup is due: explicit override wins, else last + interval.
+function ckNextDue(c) {
+    if (c.next) return c.next;
+    if (c.last && c.months) return ckAddMonths(c.last, c.months);
+    return null;
+}
+function ckDaysUntil(dateStr) {
+    return Math.round((new Date(dateStr + 'T00:00:00') - new Date(ckToday() + 'T00:00:00')) / 86400000);
+}
+function ckFmtDate(dateStr) {
+    const [y, m, d] = dateStr.split('-');
+    return d + '.' + m + '.' + y;
+}
+function ckIntervalLabel(months) {
+    if (months === 12) return 'כל שנה';
+    if (months === 24) return 'כל שנתיים';
+    if (months % 12 === 0) return 'כל ' + (months / 12) + ' שנים';
+    return 'כל ' + months + ' חודשים';
+}
+function ckStatusOf(c) {
+    const due = ckNextDue(c);
+    if (!due) return 'missing';
+    const days = ckDaysUntil(due);
+    if (days < 0) return 'overdue';
+    if (days <= CK_SOON_DAYS) return 'soon';
+    return 'ok';
+}
+
+// ---------- rendering ----------
+
+function ckRender() {
+    const listEl = document.getElementById('ck-list');
+    if (!listEl) return;
+    const q = (document.getElementById('ck-search')?.value || '').trim().toLowerCase();
+
+    const visible = ckLive().filter((c) =>
+        !q || [c.name, c.phone, c.site, c.type].some((v) => (v || '').toLowerCase().includes(q)));
+
+    // Most urgent first: missing dates, then by due date ascending.
+    visible.sort((a, b) => {
+        const da = ckNextDue(a), db = ckNextDue(b);
+        if (!da && !db) return (a.name || '').localeCompare(b.name || '');
+        if (!da) return -1;
+        if (!db) return 1;
+        return da.localeCompare(db);
+    });
+
+    const counts = { overdue: 0, soon: 0, ok: 0, missing: 0 };
+    ckLive().forEach((c) => counts[ckStatusOf(c)]++);
+    const statsEl = document.getElementById('ck-stats');
+    if (statsEl) statsEl.innerHTML = `
+        <div class="ck-stat"><b>${ckLive().length}</b><span>לקוחות במעקב</span></div>
+        <div class="ck-stat ck-red"><b>${counts.overdue + counts.missing}</b><span>באיחור / חסר תאריך</span></div>
+        <div class="ck-stat ck-amber"><b>${counts.soon}</b><span>קרובים (${CK_SOON_DAYS} יום)</span></div>
+        <div class="ck-stat ck-green"><b>${counts.ok}</b><span>בסדר</span></div>`;
+
+    ckRenderDueStrip();
+
+    if (visible.length === 0) {
+        listEl.innerHTML = `<div class="ck-empty">${ckLive().length === 0
+            ? 'אין עדיין לקוחות במעקב.<br>הוסף לקוח ראשון או ייבא רשימה מאקסל.'
+            : 'לא נמצאו תוצאות לחיפוש.'}</div>`;
+        return;
+    }
+
+    listEl.innerHTML = visible.map((c) => {
+        const due = ckNextDue(c);
+        const st = ckStatusOf(c);
+        const dotCls = st === 'overdue' || st === 'missing' ? 'ck-red' : st === 'soon' ? 'ck-amber' : 'ck-green';
+        let dueHtml;
+        if (!due) {
+            dueHtml = '<b class="ck-due-overdue">חסר תאריך</b><small>קבע מועד בדיקה</small>';
+        } else {
+            const days = ckDaysUntil(due);
+            const label = days < 0 ? 'באיחור של ' + Math.abs(days) + ' יום'
+                : days === 0 ? 'היום!' : 'בעוד ' + days + ' יום';
+            const cls = st === 'overdue' ? 'ck-due-overdue' : st === 'soon' ? 'ck-due-soon' : '';
+            dueHtml = `<b class="${cls}">${ckFmtDate(due)}</b><small>${label}</small>`;
+        }
+        return `
+        <div class="ck-row">
+            <div class="ck-dot ${dotCls}"></div>
+            <div class="ck-name">${escapeHtml(c.name)}<small>${escapeHtml([c.type, c.site].filter(Boolean).join(' · '))}</small></div>
+            <div class="ck-interval">${ckIntervalLabel(c.months)}${c.last ? `<br><small>אחרונה: ${ckFmtDate(c.last)}</small>` : ''}</div>
+            <div class="ck-due">${dueHtml}</div>
+            <div class="ck-actions">
+                <button class="ck-icon-btn ${c.eventId ? 'ck-synced' : ''}" title="${c.eventId ? 'מסונכרן ליומן Google — לחץ לעדכון' : 'הוסף תזכורת ליומן Google'}" onclick="ckSyncCalendar('${c.id}')"><i class="fa-solid fa-calendar-plus"></i></button>
+                <button class="ck-icon-btn" title="הורדת תזכורת לאייפון / Apple Calendar (קובץ ICS)" onclick="ckDownloadIcs('${c.id}')"><i class="fa-solid fa-download"></i></button>
+                ${c.phone ? `<button class="ck-icon-btn ck-wa" title="וואטסאפ ללקוח" onclick="ckWhatsapp('${c.id}')"><i class="fa-brands fa-whatsapp"></i></button>` : ''}
+                ${c.email ? `<button class="ck-icon-btn" title="טיוטת מייל ללקוח" onclick="ckMailto('${c.id}')"><i class="fa-solid fa-envelope"></i></button>` : ''}
+                <button class="ck-icon-btn" title="צור הצעת מחיר ללקוח (אחרי שאישר)" onclick="ckCreateQuote('${c.id}')"><i class="fa-solid fa-file-invoice-dollar"></i></button>
+                <button class="ck-icon-btn" title="הבדיקה בוצעה — קדם לתאריך הבא" onclick="ckMarkDone('${c.id}')"><i class="fa-solid fa-check"></i></button>
+                <button class="ck-icon-btn" title="עריכה" onclick="ckOpenEditor('${c.id}')"><i class="fa-solid fa-pen"></i></button>
+                <button class="ck-icon-btn ck-danger" title="מחיקה" onclick="ckRemoveClient('${c.id}')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ---------- CRUD ----------
+
+function ckOpenEditor(id) {
+    ckEditingId = id || null;
+    const c = ckClients.find((x) => x.id === id) || {};
+    document.getElementById('ck-editor-title').textContent = id ? 'עריכת לקוח' : 'לקוח חדש';
+    document.getElementById('ck-f-name').value = c.name || '';
+    document.getElementById('ck-f-phone').value = c.phone || '';
+    document.getElementById('ck-f-email').value = c.email || '';
+    document.getElementById('ck-f-type').value = c.type || 'בדיקה תקופתית';
+    document.getElementById('ck-f-site').value = c.site || '';
+    const months = c.months || 12;
+    const preset = [12, 24, 36, 60].includes(months);
+    document.getElementById('ck-f-months').value = preset ? String(months) : 'custom';
+    document.getElementById('ck-f-custom-wrap').style.display = preset ? 'none' : '';
+    document.getElementById('ck-f-custom').value = preset ? 6 : months;
+    document.getElementById('ck-f-last').value = c.last || '';
+    document.getElementById('ck-f-next').value = c.next || '';
+    document.getElementById('ck-f-notes').value = c.notes || '';
+    document.getElementById('ck-editor').showModal();
+}
+
+function ckSaveClient(ev) {
+    ev.preventDefault();
+    const monthsSel = document.getElementById('ck-f-months').value;
+    const months = monthsSel === 'custom'
+        ? Math.max(1, Math.min(120, parseInt(document.getElementById('ck-f-custom').value, 10) || 12))
+        : parseInt(monthsSel, 10);
+    const rec = {
+        name: document.getElementById('ck-f-name').value.trim(),
+        phone: document.getElementById('ck-f-phone').value.trim(),
+        email: document.getElementById('ck-f-email').value.trim(),
+        type: document.getElementById('ck-f-type').value,
+        site: document.getElementById('ck-f-site').value.trim(),
+        months,
+        last: document.getElementById('ck-f-last').value || null,
+        next: document.getElementById('ck-f-next').value || null,
+        notes: document.getElementById('ck-f-notes').value.trim(),
+        updatedAt: Date.now(),
+    };
+    if (!rec.name) return;
+    if (ckEditingId) {
+        const c = ckClients.find((x) => x.id === ckEditingId);
+        if (c) Object.assign(c, rec);
+    } else {
+        ckClients.push({ id: 'c' + Date.now() + Math.random().toString(36).slice(2, 7), eventId: null, ...rec });
+    }
+    document.getElementById('ck-editor').close();
+    ckPersist();
+    ckRender();
+}
+
+function ckMarkDone(id) {
+    const c = ckClients.find((x) => x.id === id);
+    if (!c) return;
+    c.last = ckToday();
+    c.next = null; // back to computed: today + interval
+    c.updatedAt = Date.now();
+    ckPersist();
+    ckRender();
+    showToast('עודכן — הבדיקה הבאה: ' + ckFmtDate(ckNextDue(c)) +
+        (c.eventId ? '. כדאי לעדכן גם את היומן (כפתור היומן בשורה)' : ''));
+}
+
+function ckRemoveClient(id) {
+    const c = ckClients.find((x) => x.id === id);
+    if (!c) return;
+    if (!confirm('למחוק את "' + c.name + '" מהמעקב?')) return;
+    const eventId = c.eventId;
+    // Tombstone, not removal: the record stays (hidden) so the deletion wins
+    // the union-merge on every other device instead of being resurrected.
+    c.deleted = Date.now();
+    c.updatedAt = Date.now();
+    ckPersist();
+    ckRender();
+    if (eventId && confirm('למחוק גם את התזכורת מיומן Google?')) {
+        ckEnsureCalToken().then((token) =>
+            fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events/' + eventId, {
+                method: 'DELETE', headers: { Authorization: 'Bearer ' + token },
+            })
+        ).then(() => showToast('התזכורת נמחקה מהיומן')).catch(() => showToast('מחיקת האירוע מהיומן נכשלה', 'error'));
+    }
+}
+
+// ---------- persistence: local + cloud (/api/checkups) ----------
+
+function ckLive() { return ckClients.filter((c) => !c.deleted); }
+
+function ckPersist() {
+    // Purge tombstones after 90 days — by then every device has synced.
+    const cutoff = Date.now() - 90 * 86400000;
+    ckClients = ckClients.filter((c) => !c.deleted || c.deleted > cutoff);
+    localStorage.setItem(ckStorageKey(), JSON.stringify(ckClients));
+    if (isGuestUser() || !googleAccessToken) return;
+    clearTimeout(ckSaveTimer);
+    ckSaveTimer = setTimeout(ckCloudSave, 1500);
+}
+
+async function ckCloudSave() {
+    if (isGuestUser() || !googleAccessToken) return;
+    try {
+        await fetch('/api/checkups', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({ data: { clients: ckClients } }),
+        });
+    } catch { /* offline — local copy is intact, next change retries */ }
+}
+
+async function ckCloudLoad() {
+    if (isGuestUser() || !googleAccessToken) return;
+    ckCloudPulled = true;
+    try {
+        const res = await fetch('/api/checkups', { headers: { Authorization: 'Bearer ' + googleAccessToken } });
+        if (!res.ok) return;
+        const body = await res.json();
+        const cloud = body && body.data && Array.isArray(body.data.clients) ? body.data.clients : [];
+        // Union-merge by id, newer updatedAt wins — devices (and the standalone
+        // /checkups/ page) converge.
+        const byId = new Map(ckClients.map((c) => [c.id, c]));
+        for (const cc of cloud) {
+            const local = byId.get(cc.id);
+            if (!local || (cc.updatedAt || 0) > (local.updatedAt || 0)) byId.set(cc.id, cc);
+        }
+        ckClients = [...byId.values()];
+        localStorage.setItem(ckStorageKey(), JSON.stringify(ckClients));
+        ckRender();
+        ckCloudSave();
+    } catch { /* offline */ }
+}
+
+// ---------- Google Calendar reminders ----------
+
+// A calendar-scoped token is minted only when actually adding a reminder, so
+// the everyday sign-in keeps its minimal scopes.
+function ckEnsureCalToken() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(CK_CAL_TOKEN_KEY) || 'null'); } catch {}
+    if (saved && saved.token && saved.exp > Date.now() + 60000) return Promise.resolve(saved.token);
+    return new Promise((resolve, reject) => {
+        if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+            reject(new Error('gsi-not-loaded')); return;
+        }
+        const tc = google.accounts.oauth2.initTokenClient({
+            client_id: localStorage.getItem('sj_global_google_client_id'),
+            scope: 'https://www.googleapis.com/auth/calendar.events',
+            callback: (resp) => {
+                if (resp && resp.access_token) {
+                    localStorage.setItem(CK_CAL_TOKEN_KEY, JSON.stringify({
+                        token: resp.access_token,
+                        exp: Date.now() + (parseInt(resp.expires_in, 10) || 3600) * 1000,
+                    }));
+                    resolve(resp.access_token);
+                } else reject(new Error('no-token'));
+            },
+            error_callback: () => reject(new Error('denied')),
+        });
+        tc.requestAccessToken({ prompt: '' });
+    });
+}
+
+function ckRrule(months) {
+    return months % 12 === 0
+        ? 'RRULE:FREQ=YEARLY;INTERVAL=' + (months / 12)
+        : 'RRULE:FREQ=MONTHLY;INTERVAL=' + months;
+}
+
+function ckEventBody(c) {
+    const due = ckNextDue(c);
+    return {
+        summary: '⚡ ' + (c.type || 'בדיקה תקופתית') + ' — ' + c.name,
+        location: c.site || undefined,
+        description: [
+            c.phone ? 'טלפון: ' + c.phone : '',
+            'תדירות: ' + ckIntervalLabel(c.months),
+            c.notes || '',
+            '(נוצר אוטומטית מהשירות התקופתי של זרם)',
+        ].filter(Boolean).join('\n'),
+        start: { date: due },
+        end: { date: ckAddDays(due, 1) },
+        recurrence: [ckRrule(c.months)],
+        // Calendar does the reminding: email a month ahead (to book the visit),
+        // then email a week ahead, then a popup the day before.
+        reminders: {
+            useDefault: false,
+            overrides: [
+                { method: 'email', minutes: 28 * 1440 },
+                { method: 'email', minutes: 7 * 1440 },
+                { method: 'popup', minutes: 1440 },
+            ],
+        },
+    };
+}
+
+async function ckSyncCalendar(id) {
+    const c = ckClients.find((x) => x.id === id);
+    if (!c) return;
+    if (!ckNextDue(c)) { showToast('קודם קבע תאריך בדיקה (כפתור העריכה)', 'error'); return; }
+    if (isGuestUser()) { showToast('תזכורות יומן דורשות התחברות עם Google', 'error'); return; }
+    let token;
+    try { token = await ckEnsureCalToken(); }
+    catch { showToast('נדרש אישור גישה ליומן Google', 'error'); return; }
+
+    const base = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+    const body = JSON.stringify(ckEventBody(c));
+    const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+    try {
+        let res = null;
+        if (c.eventId) {
+            res = await fetch(base + '/' + c.eventId, { method: 'PATCH', headers, body });
+            if (res.status === 404 || res.status === 410) res = null; // event deleted by hand — recreate
+        }
+        if (!res) res = await fetch(base, { method: 'POST', headers, body });
+        if (res.status === 401 || res.status === 403) {
+            localStorage.removeItem(CK_CAL_TOKEN_KEY);
+            showToast('ההרשאה ליומן פגה — לחץ שוב על כפתור היומן', 'error');
+            return;
+        }
+        const ev = await res.json();
+        if (!res.ok || !ev.id) throw new Error('calendar-error');
+        c.eventId = ev.id;
+        c.updatedAt = Date.now();
+        ckPersist();
+        ckRender();
+        showToast('תזכורת חוזרת נקבעה ביומן Google (' + ckFmtDate(ckNextDue(c)) + ')');
+    } catch {
+        showToast('הוספת התזכורת ליומן נכשלה — נסה שוב', 'error');
+    }
+}
+
+// ---------- ICS (iPhone / Apple Calendar / Outlook) ----------
+
+// RFC 5545 TEXT escaping — raw newlines/commas/semicolons in a property value
+// make the whole file unparseable for Apple Calendar/Outlook.
+function ckIcsText(s) {
+    return String(s || '').replace(/\\/g, '\\\\').replace(/[,;]/g, (m) => '\\' + m).replace(/\r?\n/g, '\\n');
+}
+
+function ckDownloadIcs(id) {
+    const c = ckClients.find((x) => x.id === id);
+    if (!c) return;
+    const due = ckNextDue(c);
+    if (!due) { showToast('קודם קבע תאריך בדיקה (כפתור העריכה)', 'error'); return; }
+    const dt = due.replace(/-/g, '');
+    const summary = ckIcsText((c.type || 'בדיקה תקופתית') + ' — ' + c.name);
+    const desc = ckIcsText([c.phone ? 'טלפון: ' + c.phone : '', c.notes || ''].filter(Boolean).join('\n'));
+    const ics = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//SJ Electrical Engineering//Checkups//HE',
+        'BEGIN:VEVENT',
+        'UID:' + c.id + '@sj-eng.co.il',
+        'DTSTAMP:' + dt + 'T000000Z',
+        'DTSTART;VALUE=DATE:' + dt,
+        'DTEND;VALUE=DATE:' + ckAddDays(due, 1).replace(/-/g, ''),
+        ckRrule(c.months),
+        'SUMMARY:' + summary,
+        c.site ? 'LOCATION:' + ckIcsText(c.site) : '',
+        desc ? 'DESCRIPTION:' + desc : '',
+        'BEGIN:VALARM', 'TRIGGER:-P28D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
+        'BEGIN:VALARM', 'TRIGGER:-P7D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
+        'END:VEVENT',
+        'END:VCALENDAR',
+    ].filter(Boolean).join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+    a.download = 'checkup-' + (c.name || 'client').replace(/[^\w֐-׿-]+/g, '_') + '.ics';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast('באייפון: פתח את הקובץ והוא ייכנס ליומן עם התראות');
+}
+
+// ---------- WhatsApp ----------
+
+function ckWhatsapp(id) {
+    const c = ckClients.find((x) => x.id === id);
+    if (!c || !c.phone) return;
+    let digits = c.phone.replace(/\D/g, '');
+    if (digits.startsWith('0')) digits = '972' + digits.slice(1);
+    const due = ckNextDue(c);
+    const biz = (appState.settings && appState.settings.businessName) || '';
+    const msg = 'שלום, ' + (biz ? 'כאן ' + biz + '. ' : '') + 'מתקרב מועד הבדיקה התקופתית למתקן החשמל אצלכם' +
+        (due ? ' (' + ckFmtDate(due) + ')' : '') + ' — אשמח שנתאם מועד שנוח לכם.';
+    window.open('https://wa.me/' + digits + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
+// ---------- Excel import / CSV export ----------
+
+function ckOpenImport() { document.getElementById('ck-importer').showModal(); }
+
+function ckRunImport() {
+    const text = document.getElementById('ck-import-text').value.trim();
+    if (!text) return;
+    let added = 0, skipped = 0;
+    for (const line of text.split(/\r?\n/)) {
+        if (!line.trim()) continue;
+        // Excel pastes tab-separated; a hand-typed line may use commas.
+        const parts = (line.includes('\t') ? line.split('\t') : line.split(',')).map((s) => s.trim());
+        const [name, phone, site, monthsRaw, lastRaw, email] = parts;
+        if (!name) { skipped++; continue; }
+        const months = Math.max(1, Math.min(120, parseInt(monthsRaw, 10) || 12));
+        ckClients.push({
+            id: 'c' + Date.now() + Math.random().toString(36).slice(2, 7),
+            name, phone: phone || '', email: email || '', site: site || '', type: 'בדיקה תקופתית',
+            months, last: ckParseDate(lastRaw), next: null, notes: '', eventId: null,
+            updatedAt: Date.now(),
+        });
+        added++;
+    }
+    document.getElementById('ck-importer').close();
+    document.getElementById('ck-import-text').value = '';
+    ckPersist();
+    ckRender();
+    showToast('יובאו ' + added + ' לקוחות' + (skipped ? ' (' + skipped + ' שורות דולגו)' : ''));
+}
+
+function ckParseDate(s) {
+    if (!s) return null;
+    s = s.trim();
+    let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (m) return m[1] + '-' + ckPad(+m[2]) + '-' + ckPad(+m[3]);
+    m = s.match(/^(\d{1,2})[./](\d{1,2})[./](\d{2,4})$/);
+    if (m) {
+        const y = m[3].length === 2 ? '20' + m[3] : m[3];
+        return y + '-' + ckPad(+m[2]) + '-' + ckPad(+m[1]);
+    }
+    return null;
+}
+
+function ckExportCsv() {
+    const header = 'שם,טלפון,אימייל,כתובת,סוג בדיקה,תדירות (חודשים),בדיקה אחרונה,בדיקה הבאה';
+    const rows = ckLive().map((c) => [
+        c.name, c.phone, c.email || '', c.site, c.type, c.months, c.last || '', ckNextDue(c) || '',
+    ].map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(','));
+    const a = document.createElement('a');
+    // ﻿ BOM so Excel opens the Hebrew correctly.
+    a.href = URL.createObjectURL(new Blob(['﻿' + [header, ...rows].join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'checkups-' + ckToday() + '.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+// ---------- reminders-to-send strip + email draft + quote handoff ----------
+
+// Clients whose due date entered the reminder window (28 days, matching the
+// first calendar alert) — surfaced at the top so a glance at the tab says
+// exactly who to nudge today.
+function ckDueSoonClients() {
+    return ckLive()
+        .filter((c) => { const d = ckNextDue(c); return d && ckDaysUntil(d) <= 28; })
+        .sort((a, b) => ckNextDue(a).localeCompare(ckNextDue(b)));
+}
+
+function ckRenderDueStrip() {
+    const el = document.getElementById('ck-due-strip');
+    if (!el) return;
+    const due = ckDueSoonClients();
+    if (due.length === 0) { el.innerHTML = ''; return; }
+    el.innerHTML = `
+        <div class="ck-strip">
+            <div class="ck-strip-title"><i class="fa-solid fa-bell"></i> תזכורות לשליחה — הבדיקה מתקרבת</div>
+            <div class="ck-strip-chips">
+                ${due.slice(0, 8).map((c) => {
+                    const days = ckDaysUntil(ckNextDue(c));
+                    const when = days < 0 ? 'באיחור ' + Math.abs(days) + ' יום' : days === 0 ? 'היום' : 'בעוד ' + days + ' יום';
+                    return `<span class="ck-chip">
+                        <b>${escapeHtml(c.name)}</b><small>${when}</small>
+                        ${c.phone ? `<button title="וואטסאפ" class="ck-chip-btn ck-wa" onclick="ckWhatsapp('${c.id}')"><i class="fa-brands fa-whatsapp"></i></button>` : ''}
+                        ${c.email ? `<button title="מייל" class="ck-chip-btn" onclick="ckMailto('${c.id}')"><i class="fa-solid fa-envelope"></i></button>` : ''}
+                    </span>`;
+                }).join('')}
+                ${due.length > 8 ? `<span class="ck-chip ck-chip-more">+${due.length - 8} נוספים ברשימה</span>` : ''}
+            </div>
+        </div>`;
+}
+
+function ckReminderText(c) {
+    const due = ckNextDue(c);
+    const biz = (appState.settings && appState.settings.businessName) || '';
+    return 'שלום, ' + (biz ? 'כאן ' + biz + '. ' : '') +
+        'מתקרב מועד ה' + (c.type === 'בדיקה תקופתית' ? 'בדיקה התקופתית' : (c.type || 'בדיקה')) +
+        ' למתקן החשמל אצלכם' + (due ? ' (' + ckFmtDate(due) + ')' : '') +
+        ' — אשמח שנתאם מועד שנוח לכם.';
+}
+
+function ckMailto(id) {
+    const c = ckClients.find((x) => x.id === id);
+    if (!c || !c.email) return;
+    const biz = (appState.settings && appState.settings.businessName) || '';
+    const subject = 'תיאום ' + (c.type || 'בדיקה תקופתית') + ' — מתקן החשמל';
+    const body = ckReminderText(c) + '\n\n' + 'בברכה,' + (biz ? '\n' + biz : '');
+    // mailto opens the user's own mail app with a ready draft — he reviews and
+    // hits send himself (no server, no surprises).
+    window.location.href = 'mailto:' + encodeURIComponent(c.email) +
+        '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+}
+
+// After the client CONFIRMED the periodic service → one click opens a fresh
+// project for them, client details prefilled, straight into the normal
+// plan→price→draft flow.
+function ckCreateQuote(id) {
+    const c = ckClients.find((x) => x.id === id);
+    if (!c) return;
+    const nameInput = document.getElementById('new-project-name');
+    if (!nameInput) return;
+    nameInput.value = ((c.type || 'בדיקה תקופתית') + ' - ' + c.name).slice(0, 60);
+    const prevActive = activeProjectId;
+    createNewProject(); // reuses the tested path: creates + loads + opens the wizard
+    // createNewProject bails on the plan gate (upgrade modal) — patch only the
+    // NEW project, detected by the active id actually changing.
+    if (!activeProjectId || activeProjectId === prevActive) return;
+    const proj = projectsList.find((p) => p.id === activeProjectId);
+    if (!proj) return;
+    proj.quoteData.clientName = c.name;
+    proj.quoteData.clientSub = [c.site, c.phone, c.email].filter(Boolean).join(' · ');
+    proj.quoteData.subject = (c.type || 'בדיקה תקופתית') + (c.site ? ' — ' + c.site : '');
+    saveProjects();
+    // Prefill the planning chat so one tap starts the product list.
+    setTimeout(() => {
+        const inp = document.getElementById('chat-user-input');
+        if (inp) {
+            inp.value = (c.type || 'בדיקה תקופתית') + ' למתקן חשמל' + (c.site ? ' ב' + c.site : '') + (c.notes ? '. הערות: ' + c.notes : '');
+            inp.dispatchEvent(new Event('input'));
+        }
+    }, 500);
+    showToast('נפתח פרויקט חדש עבור ' + c.name);
+}
+
+// ---------- Clarity token (admin) — feeds the automated analyst routine ----------
+
+async function adminSaveClarityToken() {
+    const input = document.getElementById('admin-clarity-token');
+    const status = document.getElementById('admin-clarity-status');
+    const token = (input.value || '').trim();
+    if (!token) { showToast('הדבק את הטוקן קודם', 'error'); return; }
+    if (!googleAccessToken) { showToast('התחבר עם Google קודם', 'error'); return; }
+    status.textContent = 'שומר…';
+    try {
+        const res = await fetch('/api/clarity', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({ token }),
+        });
+        const d = await res.json();
+        if (!res.ok || !d.ok) throw new Error((d.error && d.error.message) || res.status);
+        input.value = '';
+        status.textContent = 'נשמר ✓ — מעכשיו הנתונים נמשכים אוטומטית';
+        status.style.color = 'var(--color-success)';
+        showToast('טוקן Clarity נשמר בשרת');
+    } catch (e) {
+        status.textContent = 'שגיאה: ' + e.message;
+        status.style.color = 'var(--color-danger)';
+    }
+}

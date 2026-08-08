@@ -75,14 +75,30 @@ export async function onRequest(context) {
       }
     }
 
+    // New-user detection: first-ever cloud write for this email. Legacy users
+    // (existing blob without the field) keep NO firstSeen rather than a fake
+    // one — the admin shows "—" instead of a wrong signup date.
+    const isNewUser = !existing;
+    const firstSeen = existing ? (existing.firstSeen || null) : Date.now();
+
     // The full backup ALWAYS saves (settings, projects, catalog, history) — the
     // cloud is the source of truth across devices, so we never reject a sync.
-    const payload = JSON.stringify({ ...incoming, lastUpdated: incoming.lastUpdated || Date.now() });
+    const payload = JSON.stringify({
+      ...incoming,
+      ...(firstSeen ? { firstSeen } : {}),
+      lastUpdated: incoming.lastUpdated || Date.now(),
+    });
     // KV value hard limit is 25 MB; cap far below that to stay sane.
     if (payload.length > 5 * 1024 * 1024) {
       return json({ error: { message: 'הנתונים גדולים מדי לאחסון בענן.' } }, 413);
     }
     await env.SJ_DATA.put(key, payload);
+
+    // Notify AFTER the save succeeded — a rejected first sync (413 above) must
+    // not email the admin about a user that has no cloud record.
+    if (isNewUser) {
+      context.waitUntil(notifyNewSignup(env, email).catch(() => {}));
+    }
 
     // ---- Free-plan monthly cloud-quote counter (SOFT — never blocks the save) ----
     // Count quotes that are genuinely new to the cloud this sync. Re-syncing an
@@ -119,6 +135,24 @@ export async function onRequest(context) {
   return json({ error: { message: 'מתודה לא נתמכת.' } }, 405);
 }
 
+
+// Fire-and-forget "new user signed up" email to the admin (web3forms — the
+// same channel the lead form uses; env WEB3FORMS_KEY with the same public
+// fallback lead.js documents, dead once Stav rotates the key).
+const WEB3FORMS_KEY_FALLBACK = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
+async function notifyNewSignup(env, email) {
+  await fetch('https://api.web3forms.com/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      access_key: (env && env.WEB3FORMS_KEY) || WEB3FORMS_KEY_FALLBACK,
+      subject: '⚡ נרשם חדש בזרם: ' + email,
+      from_name: 'זרם — הרשמות',
+      message: 'משתמש חדש התחבר ושמר לראשונה במערכת זרם:\n\n' + email +
+        '\n\nאפשר לראות את הפעילות שלו בלשונית Admin.',
+    }),
+  });
+}
 
 function isEmptyDb(db) {
   if (!db) return true;

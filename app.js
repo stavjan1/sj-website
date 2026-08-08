@@ -190,11 +190,11 @@ function initContactForm() {
             method: 'POST',
             body: formData
         })
-        .then(() => {
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalText;
-            showFeedback('תודה! פנייתך התקבלה בהצלחה. נחזור אליך בהקדם האפשרי 🎉', 'success');
-            form.reset();
+        .then((res) => {
+            if (!res.ok) throw new Error('submit-failed');
+            // Dedicated thank-you page: clearer UX + a clean conversion point
+            // for analytics.
+            window.location.href = '/thanks.html';
         })
         .catch(() => {
             submitBtn.disabled = false;

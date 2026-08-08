@@ -2657,3 +2657,8 @@ section[id], [id].scroll-anchor { scroll-margin-top: 96px; }
 @media (max-width: 820px) {
     .guides-columns { grid-template-columns: 1fr; gap: 18px; }
 }
+
+/* Footer legal links (privacy / accessibility) */
+.footer-copy .legal-links { margin-top: 6px; font-size: 0.78rem; }
+.footer-copy .legal-links a { color: var(--color-text-gray); text-decoration: none; }
+.footer-copy .legal-links a:hover { color: var(--color-text-white); }

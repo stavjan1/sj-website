@@ -111,6 +111,13 @@ gating (server-side ADMIN_EMAIL on every admin endpoint), per-user KV keying
 (per-user, never returned to client), rate limiting on public AI endpoints.
 
 ## Next (on demand)
+- [x] Periodic-service tracker productized into ZEREM — 4th tab "שירות תקופתי" in the
+      projects world (shares /api/checkups data with the standalone /checkups/ page).
+- [x] Periodic-service v2 (Stav-approved 04/08): email field + mailto draft button,
+      "reminders to send" strip (28-day window, one-click WhatsApp/email), and
+      client→quote handoff button that opens a prefilled project.
+- [ ] Periodic-service v3: bulk "add ALL to calendar"; surface due checkups on the
+      projects dashboard too.
 - [ ] Ingest full Dekel book into the system catalog (data already local in
       "הקמת תשתית/כתב כמויות" — dekel_clean_perfect.xlsx). Highest-value remaining data work.
 - [ ] More adversarial training rounds — waiting for Stav's time: he feeds real examples,
@@ -120,6 +127,18 @@ gating (server-side ADMIN_EMAIL on every admin endpoint), per-user KV keying
 - [ ] Optional Chrome-Claude crawl: supplier material catalog (e.g. big wholesaler) to seed
       system material prices — only if Stav wants; users can also feed via the scrape tab.
 
+- [x] "Perfect site" compliance pass (04/08): accessibility statement + privacy policy
+      pages, footer legal links sitewide, discreet cookie/measurement notice bar with
+      Clarity opt-out, branded 404, signup tracking (firstSeen + email-on-new-signup +
+      admin counters).
+- [ ] bebusy365.com research — blocked by session network policy; needs Stav to allow
+      the domain in the environment settings or share screenshots.
+
 ## Growth / marketing
 - [ ] Share push into electrician WhatsApp groups (Stav sends /ask/ link; OG card ready).
 - [ ] "Loved by AIs" expansion: keep llms.txt fresh; consider FAQ page for GEO.
+
+## Tech debt
+- [ ] 🟢 checkups: extract the duplicated periodic-service core (dates/ICS/calendar/
+      import) shared by /checkups/app.js and sale/app.js into one file (found in the
+      pre-deploy review 08/08; both copies fixed identically for now).

@@ -279,6 +279,7 @@
             </div>
             <div class="footer-copy">
                 <p>&copy; 2026 SJ הנדסת חשמל. כל הזכויות שמורות. מבוצע ברישיון מהנדס חשמל מורשה.</p>
+                <p class="legal-links"><a href="privacy.html">מדיניות פרטיות</a> · <a href="accessibility.html">הצהרת נגישות</a></p>
             </div>
         </div>
     </footer>
@@ -344,7 +345,7 @@
             submitBtn.disabled = true;
             const orig = submitBtn.textContent; submitBtn.textContent = 'שולח...';
             fetch('https://api.web3forms.com/submit', { method: 'POST', body: new FormData(form) })
-                .then(() => { submitBtn.disabled = false; submitBtn.textContent = orig; showFeedback('תודה! פנייתך התקבלה. נחזור אליך בהקדם 🎉', 'success'); form.reset(); })
+                .then(res => { if (!res.ok) throw new Error('submit-failed'); window.location.href = '/thanks.html'; })
                 .catch(() => { submitBtn.disabled = false; submitBtn.textContent = orig; showFeedback('שגיאה בשליחה. נסה שוב או התקשר אלינו ישירות.', 'error'); });
         });
     </script>
