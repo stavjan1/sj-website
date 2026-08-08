@@ -36,7 +36,7 @@ const server = http.createServer((req, res) => {
   fs.createReadStream(file).pipe(res);
 });
 
-const PAGES = ['/', '/sale/', '/ask/', '/q/?t=abcdefghij', '/contact.html', '/zerem/', '/services.html', '/calculator.html'];
+const PAGES = ['/', '/sale/', '/ask/', '/q/?t=abcdefghij', '/contact.html', '/zerem/', '/checkups/', '/thanks.html', '/privacy.html', '/accessibility.html', '/404.html'];
 
 (async () => {
   await new Promise((r) => server.listen(PORT, r));

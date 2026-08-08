@@ -26,6 +26,8 @@ const CONNECTS = [
   ['https://oauth2.googleapis.com/tokeninfo', 'token check'],
   ['https://accounts.google.com/gsi/status', 'Google Identity Services'],
   ['https://www.clarity.ms/tag/x', 'Clarity analytics'],
+  ['https://www.googletagmanager.com/gtag/js', 'Google Tag Manager / GA4 loader'],
+  ['https://region1.google-analytics.com/g/collect', 'GA4 event collection'],
   ['https://evil-attacker-domain.test/steal', 'ATTACKER EXFIL — must be BLOCKED'],
 ];
 

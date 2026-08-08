@@ -8,10 +8,16 @@ Both read the live policy straight out of `_headers`, serve the real site files
 locally with that policy applied as *enforcing*, and drive a real Chromium.
 
 ```bash
-npm install playwright          # PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 if Chromium is preinstalled
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install playwright   # drop the flag if Chromium isn't preinstalled
 node scripts/security/csp-page-check.js      # loads every page type, reports violations
 node scripts/security/csp-runtime-check.js   # drives the actual outbound calls
 ```
+
+The scripts resolve `playwright` from the repo root, and point Chromium at
+`/opt/pw-browsers/chromium-1194/...`. On a machine where Chromium sits elsewhere,
+edit `executablePath` (or delete it to use Playwright's own download). If
+`playwright` is installed somewhere else, run with
+`NODE_PATH=/path/to/node_modules node scripts/security/...`.
 
 `csp-page-check.js` catches load-time breakage: inline handlers, stylesheets,
 fonts, the html2pdf CDN.
