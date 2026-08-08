@@ -8,7 +8,13 @@
 // so the namespaces can't collide). Until KV is bound, GET returns an empty
 // catalog and the app simply works without a system baseline.
 
-const ADMIN_EMAIL = 'stavjan19989@gmail.com';
+// Identity + admin checks come from the shared, hardened helper — this file used
+// to carry its OWN copy of verifyGoogleEmail that (a) skipped the ID-token (JWT)
+// path, so an admin signed in via FedCM couldn't publish at all, and (b) never
+// checked the token's audience, so a token minted for another OAuth app was
+// accepted. One implementation only, so hardening it can never miss a caller.
+import { ADMIN_EMAIL, verifyGoogleEmail } from './_tiers.js';
+
 const KEY = 'system:catalog';
 const MAX_ITEMS = 2000; // full supplier imports (e.g. Arkha) can be large;
                         // the client sends the AI only ~150 relevant lines anyway
@@ -57,19 +63,6 @@ export async function onRequest(context) {
   }
 
   return json({ error: { message: 'מתודה לא נתמכת.' } }, 405);
-}
-
-async function verifyGoogleEmail(token) {
-  try {
-    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: 'Bearer ' + token },
-    });
-    if (!res.ok) return null;
-    const info = await res.json();
-    return info && info.email ? info.email : null;
-  } catch {
-    return null;
-  }
 }
 
 function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }

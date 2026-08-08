@@ -4927,12 +4927,18 @@ function fillFormFromState() {
 
 // Escape user/AI text before inserting via innerHTML / attributes, so a quote,
 // "<", or "&" in a title/description can't break the editor or the PDF.
+// Quotes are escaped too: this helper is used inside double-quoted attributes
+// (value="...", title="...", data-email="...") in several places, and without
+// quote-escaping a value like `" onfocus=alert(1) x="` breaks straight out of
+// the attribute without ever needing a "<". In text position `&quot;` simply
+// renders as a normal quote, so escaping it everywhere is free.
 function escapeHtml(s) {
     return String(s == null ? '' : s)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 function escapeAttr(s) {
-    return escapeHtml(s).replace(/"/g, '&quot;');
+    return escapeHtml(s);
 }
 
 // Reorder quote work items with up/down arrows (deliberate: arrows, not
@@ -6453,10 +6459,14 @@ function applyMaterialsFromResponse(activeProject, responseText) {
             const existingMaterials = activeProject.materials || [];
             activeProject.materials = parsed.materials.map(newMat => {
                 const matched = existingMaterials.find(m => m.name === newMat.name);
+                // Clamp types at the trust boundary: this comes from the model,
+                // which can be steered by a hostile catalog/supplier-page name
+                // (prompt injection), and it gets PERSISTED into the project and
+                // the cloud blob. Keep it plain data — never markup, never NaN.
                 return {
-                    name: newMat.name,
-                    price: newMat.price || 0,
-                    details: newMat.details || '',
+                    name: String(newMat.name == null ? '' : newMat.name).slice(0, 200),
+                    price: Number(newMat.price) || 0,
+                    details: String(newMat.details == null ? '' : newMat.details).slice(0, 400),
                     checked: matched ? matched.checked : true
                 };
             });
@@ -6467,7 +6477,7 @@ function applyMaterialsFromResponse(activeProject, responseText) {
             const tipsBox = document.getElementById('wizard-tips-box');
             if (tipsBox) {
                 tipsBox.style.display = 'block';
-                tipsBox.innerHTML = `<strong>נקודות עיוורון שכדאי לבדוק:</strong><ul>` + parsed.blindSpots.map(s => `<li>${s}</li>`).join('') + `</ul>`;
+                tipsBox.innerHTML = `<strong>נקודות עיוורון שכדאי לבדוק:</strong><ul>` + parsed.blindSpots.map(s => `<li>${escapeHtml(s)}</li>`).join('') + `</ul>`;
             }
         }
 
@@ -6736,6 +6746,14 @@ function renderChatHistory(chatHistory) {
         bubble.className = `chat-bubble ${role}`;
 
         let text = msg.parts[0].text;
+        // The /ask/ lists block renders as the shared designed cards (same
+        // component as the quick chat) — extract BEFORE the generic JSON strips.
+        let listsData = null;
+        const lm = /\[\[רשימות\]\]([\s\S]*?)\[\[\/רשימות\]\]/.exec(text);
+        if (lm) {
+            try { listsData = JSON.parse(lm[1]); } catch (e) { /* malformed → just strip */ }
+            text = text.replace(lm[0], '').trim();
+        }
         text = text.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
         text = text.replace(/({[\s\S]*?})/, '').trim();
         // /ask/-protocol machine blocks (questions/calculator) have no renderer
@@ -6752,7 +6770,15 @@ function renderChatHistory(chatHistory) {
             html = `<div class="chat-bubble-photos">${thumbs}</div>` + html;
         }
         bubble.innerHTML = html;
-        log.appendChild(bubble);
+        if (text || (Array.isArray(msg.images) && msg.images.length) || !listsData) log.appendChild(bubble);
+        if (listsData && window.ZeremListCards) {
+            const holder = document.createElement('div');
+            holder.className = 'chat-listcards';
+            log.appendChild(holder);
+            const proj = (typeof projectsList !== 'undefined' && Array.isArray(projectsList))
+                ? projectsList.find(p => p.id === activeProjectId) : null;
+            ZeremListCards.render(holder, listsData, { job: proj ? (proj.name || '') : '' });
+        }
     });
 
     log.scrollTop = log.scrollHeight;
@@ -6799,8 +6825,8 @@ function renderMaterialsChecklist(materials) {
         row.innerHTML = `
             <input type="checkbox" id="mat-chk-${idx}" ${mat.checked ? 'checked' : ''} onchange="toggleMaterialChecked(${idx}, this.checked)">
             <div class="material-check-text">
-                <span class="material-item-name">${mat.name}</span>
-                <span class="material-item-details">(${mat.details}) - <b style="color:var(--color-success)">${mat.price} ₪</b></span>
+                <span class="material-item-name">${escapeHtml(mat.name)}</span>
+                <span class="material-item-details">(${escapeHtml(mat.details)}) - <b style="color:var(--color-success)">${Number(mat.price) || 0} ₪</b></span>
             </div>
         `;
         container.appendChild(row);
@@ -8986,7 +9012,10 @@ async function loadDriveFoldersList() {
             return;
         }
         
-        let options = folders.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+        // Drive folder names are third-party data — the listing includes folders
+        // OTHER people shared with this user, so a folder named
+        // `</option></select><img src=x onerror=…>` would break out of the select.
+        let options = folders.map(f => `<option value="${escapeHtml(f.id)}">${escapeHtml(f.name)}</option>`).join('');
         options = `<option value="auto_sj">SJ הנדסת חשמל > הצעות מחיר (ברירת מחדל)</option>` + options;
         
         container.innerHTML = `

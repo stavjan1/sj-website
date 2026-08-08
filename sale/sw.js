@@ -2,7 +2,7 @@
 // Purpose: make the app installable (PWA) and let the shell open instantly,
 // including offline at a job site (the user's data lives in localStorage
 // anyway). AI calls and cloud sync (/api/*) are ALWAYS network-only.
-const CACHE = 'zerem-shell-v58';
+const CACHE = 'zerem-shell-v59';
 const SHELL = [
   '/sale/',
   '/sale/index.html',
@@ -12,6 +12,7 @@ const SHELL = [
   '/sale/icons/icon-192.png',
   '/sale/icons/icon-512.png',
   '/assistant.js',
+  '/assets/listcards.js',
 ];
 
 self.addEventListener('install', (e) => {
@@ -31,7 +32,7 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;               // never touch writes
   if (url.pathname.startsWith('/api/')) return;          // AI + data: network only
   if (url.origin !== location.origin) return;            // CDN (html2pdf, fonts): browser default
-  if (!url.pathname.startsWith('/sale/') && url.pathname !== '/assistant.js') return;
+  if (!url.pathname.startsWith('/sale/') && url.pathname !== '/assistant.js' && url.pathname !== '/assets/listcards.js') return;
 
   // Network-first with cache fallback: fresh app when online, working shell offline.
   e.respondWith(

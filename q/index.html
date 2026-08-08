@@ -67,10 +67,15 @@
     <script>
         const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         const fmt = (n) => (Number(n) || 0).toLocaleString('he-IL');
-        // Only allow inline data-image sources. Anything else (incl. a crafted
-        // string that tries to break out of the src attribute) is dropped — the
-        // share payload comes from another user's account, so treat it as data.
-        const safeImg = (s) => /^data:image\/(png|jpe?g|gif|webp|svg\+xml);/i.test(String(s || '')) ? String(s) : '';
+        // Only allow inline base64 data-image sources, matched as a COMPLETE
+        // string. The share payload comes from another user's account, so it is
+        // hostile data. NOTE: the previous regex anchored only at the start, so
+        // everything after "data:image/png;" — including a double quote — was
+        // returned verbatim and broke straight out of the src="..." attribute
+        // (stored XSS). The whole value must now be a well-formed base64 data
+        // URL, and the result is escaped at the sink as well. SVG stays allowed:
+        // scripts inside an SVG never execute when it's loaded via <img>.
+        const safeImg = (s) => /^data:image\/(png|jpe?g|gif|webp|svg\+xml);base64,[A-Za-z0-9+/]+=*$/i.test(String(s || '')) ? String(s) : '';
 
         async function load() {
             const t = new URLSearchParams(location.search).get('t') || '';
@@ -103,7 +108,7 @@
                         <div class="sub">${esc(q.clientSub || '')}</div>
                     </div>
                     <div class="qs-biz">
-                        ${safeImg(q.logo) ? `<img src="${safeImg(q.logo)}" alt="">` : ''}
+                        ${safeImg(q.logo) ? `<img src="${esc(safeImg(q.logo))}" alt="">` : ''}
                         <div class="bn">${esc(biz.name || '')}</div>
                         <div class="bo">${esc(biz.owner || '')}</div>
                     </div>
@@ -120,7 +125,7 @@
                 ${q.summary ? `<div class="qs-summary"><strong>פירוט תנאים נוספים:</strong>\n${esc(q.summary)}</div>` : ''}
                 ${q.signature && safeImg(q.signature.img) ? `
                     <div class="qs-signed">
-                        <img src="${safeImg(q.signature.img)}" alt="חתימה">
+                        <img src="${esc(safeImg(q.signature.img))}" alt="חתימה">
                         <span>✓ ההצעה אושרה ונחתמה על ידי <strong>${esc(q.signature.name)}</strong> בתאריך ${esc(q.signature.date)}</span>
                     </div>` : ''}
                 <div class="qs-actions">
