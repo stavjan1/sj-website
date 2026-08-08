@@ -58,14 +58,7 @@ export async function onRequestPost(context) {
       content = (fcData && fcData.data && (fcData.data.markdown || fcData.data.content)) || '';
       if (!content) throw new Error('Firecrawl returned no content');
     } else {
-      const res = await fetch(url, {
-        headers: {
-          // A real-browser UA — many suppliers block anything that looks like a bot.
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'he-IL,he;q=0.9,en;q=0.6',
-        },
-      });
+      const res = await fetchNoSsrfRedirect(url);
       if (res.status === 403 || res.status === 503) throw new Error(`האתר חוסם גישה אוטומטית (${res.status})`);
       if (!res.ok) throw new Error(`האתר החזיר שגיאה ${res.status}`);
       const html = await res.text();
@@ -120,6 +113,30 @@ export async function onRequestPost(context) {
     .slice(0, 200);
 
   return json({ items: clean, source: url, engine, count: clean.length });
+}
+
+// Fetch a page WITHOUT letting redirects defeat the SSRF guard. `fetch` follows
+// redirects by default, so a public URL could 3xx-hop to an internal host after
+// isPublicHttpUrl already passed. We follow manually (max 4 hops) and re-validate
+// every Location against isPublicHttpUrl before each request.
+async function fetchNoSsrfRedirect(startUrl) {
+  const HEADERS = {
+    // A real-browser UA — many suppliers block anything that looks like a bot.
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'he-IL,he;q=0.9,en;q=0.6',
+  };
+  let current = startUrl;
+  for (let hop = 0; hop < 4; hop++) {
+    const res = await fetch(current, { headers: HEADERS, redirect: 'manual' });
+    if (res.status < 300 || res.status >= 400) return res;   // not a redirect → done
+    const loc = res.headers.get('location');
+    if (!loc) return res;
+    const next = new URL(loc, current).toString();           // resolve relative redirects
+    if (!isPublicHttpUrl(next)) throw new Error('הכתובת מפנה ליעד לא ציבורי');
+    current = next;
+  }
+  throw new Error('יותר מדי הפניות');
 }
 
 // Shopify stores expose /collections/<handle>/products.json publicly.

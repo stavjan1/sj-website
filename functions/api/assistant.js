@@ -5,7 +5,7 @@
 // DeepSeek → Grok).
 
 import { generate } from './_ai.js';
-import { rateLimit } from './_tiers.js';
+import { rateLimit, MODEL_CLASS } from './_tiers.js';
 
 const PUBLIC_PROMPT = `אתה "העוזר ההנדסי של SJ" — עוזר חכם מבית SJ הנדסת חשמל, משרד תכנון, ייעוץ ושרטוט מערכות חשמל בישראל בסמכות מהנדס חשמל מורשה.
 
@@ -91,9 +91,14 @@ export async function onRequestPost(context) {
 
   const systemPrompt = body.mode === 'sale' ? SALE_PROMPT : PUBLIC_PROMPT;
 
+  // Model/provider are pinned SERVER-SIDE. This endpoint is public and
+  // unauthenticated, so honoring a client-supplied `provider`/`model` let anyone
+  // curl it into the expensive advanced class (gemini-2.5-pro / deepseek-reasoner)
+  // — the tier-gated "מודל מתקדם ⚡" — on our key, for free. Same rule as
+  // /api/chat: the browser never names a real model.
   return generate(env, {
-    provider: (body.provider || 'gemini').toLowerCase(),
-    model: body.model,
+    provider: MODEL_CLASS.basic.provider,
+    model: MODEL_CLASS.basic.model,
     messages: [{ role: 'system', content: systemPrompt }, ...turns],
     temperature: 0.4,
     max_tokens: 700,

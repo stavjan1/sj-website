@@ -16,6 +16,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://www.sj-eng.co.il/assets/og-ask.jpg">
 <link rel="icon" href="/sale/icons/icon-192.png">
+<script src="/assets/listcards.js"></script>
 <style>
   :root{
     --bg:#0b0f1a; --panel:#141d2e; --line:#243049; --ink:#eef2fb; --sub:#9fb0cc; --muted:#6f819e;
@@ -24,6 +25,10 @@
   body.dim{ --bg:#151b2a; --panel:#1d2639; --line:#2d3a56; --ink:#e9eef9; --sub:#a6b3cd; --muted:#7e8ca6; --me:#253452; }
   body.light{ --bg:#eef2f8; --panel:#ffffff; --line:#d3dcea; --ink:#111827; --sub:#475569; --muted:#8494ab; --me:#d9e6f9; --price:#1d5fc2; }
   body.light .msg.ai b{color:#1d5fc2}
+  /* Map the page theme onto the shared list-cards component (assets/listcards.js)
+     — declared on body so the dim/light overrides above are picked up. */
+  body{--zlc-bg:var(--bg); --zlc-panel:var(--panel); --zlc-line:var(--line);
+    --zlc-ink:var(--ink); --zlc-sub:var(--sub); --zlc-muted:var(--muted); --zlc-accent:var(--accent)}
   *{box-sizing:border-box; margin:0; padding:0}
   html,body{height:100%}
   body{
@@ -45,6 +50,14 @@
   .h-new{font-size:.78rem; font-weight:700; color:var(--sub); background:none; cursor:pointer;
     border:1px solid var(--line); border-radius:8px; padding:6px 11px; white-space:nowrap; font-family:inherit}
   .h-new:hover{color:var(--ink); border-color:var(--accent)}
+  .h-new.on{color:var(--accent); border-color:var(--accent); font-weight:800}
+  /* Quick ⇄ full platform toggle — /ask/ is the compact face of the same system. */
+  .mode-tg{display:flex; border:1px solid var(--line); border-radius:999px; overflow:hidden}
+  .mt-opt{font-size:.75rem; font-weight:700; padding:6px 11px; color:var(--sub);
+    text-decoration:none; white-space:nowrap}
+  .mt-opt.cur{background:var(--accent); color:#fff}
+  a.mt-opt:hover{color:var(--ink)}
+  @media (max-width:430px){ .h-cta{gap:6px} .mt-opt{padding:6px 8px} }
   main{flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px}
   .wrap{width:100%; max-width:720px; margin:0 auto; display:flex; flex-direction:column; gap:12px}
   .intro{text-align:center; color:var(--sub); padding:22px 8px 6px}
@@ -91,6 +104,7 @@
   .msg-act{font-size:.76rem; font-weight:700; color:var(--sub); background:var(--panel);
     border:1px solid var(--line); border-radius:8px; padding:5px 11px; cursor:pointer; display:inline-flex; align-items:center; gap:5px}
   .msg-act:hover{border-color:var(--accent); color:var(--ink)}
+  .msg-act:disabled{opacity:.4; cursor:default; pointer-events:none}
   .msg-act.wa{color:#25d366; border-color:rgba(37,211,102,.4)}
   .typing{align-self:flex-start; color:var(--muted); font-size:.9rem; padding:6px 4px}
   .cta-card{align-self:stretch; background:var(--panel); border:1px solid var(--accent);
@@ -133,7 +147,11 @@
     <div class="h-cta">
       <button class="h-new" id="theme-btn" title="מצב תצוגה">🌙</button>
       <button class="h-new" id="new-chat" title="שיחה חדשה" style="display:none;">＋ חדשה</button>
-      <a href="/sale/">כניסה למערכת ←</a>
+      <button class="h-new" id="acct-btn" title="התחברות עם Google — מכסה יומית מוגדלת">התחבר</button>
+      <nav class="mode-tg" title="אותה פלטפורמה — שני מצבים">
+        <span class="mt-opt cur">⚡ מהיר</span>
+        <a class="mt-opt" href="/sale/">מערכת מלאה</a>
+      </nav>
     </div>
   </header>
 
@@ -141,7 +159,7 @@
     <div class="wrap" id="wrap">
       <div class="intro" id="intro">
         <h1>כמה לתמחר את העבודה? <span class="wave">👋</span></h1>
-        <p>תאר לי עבודת חשמל <b>במילים שלך</b> — גם קיצורים וסלנג של השטח. תוך שניות תקבל טווח מחיר, מה זה כולל, ומה שאנשים שוכחים לתמחר. בלי הרשמה.</p>
+        <p>תאר לי עבודת חשמל <b>במילים שלך</b> — גם קיצורים וסלנג של השטח. תוך שניות תקבל טווח מחיר, מה זה כולל, ומה שאנשים שוכחים לתמחר. ואחרי המחיר — גם <b>רשימת ציוד וכלים</b> לשטח. בלי הרשמה.</p>
         <div class="chip-hint">רוצה לנסות? לחץ על דוגמה:</div>
         <div class="chips" id="chips">
           <span class="chip">התקנת עמדת טעינה 15 מטר מהלוח</span>
@@ -182,6 +200,11 @@ const SYSTEM = `אתה "זרם" — עוזר תמחור AI לחשמלאים בי
 4. אם המחיר תלוי-אורך (כבל/תוואי/צנרת) — הוסף בסוף בלוק מחשבון בפורמט המדויק (JSON בלבד): [[מחשבון]]{"label":"אורך הקו (מ')","base":1800,"minM":5,"maxM":80,"defaultM":20,"tiers":[{"upToM":25,"perMeter":50},{"upToM":60,"perMeter":80},{"upToM":150,"perMeter":115}]}[[/מחשבון]]. המחיר למטר מדורג — קו ארוך יקר יותר למטר (זמן עבודה, חתך גדל). קבע maxM שמכסה את המקרה הריאלי (עד 150, לא רק את מה שהמשתמש אמר), ו-base כך שהמחיר ב-defaultM שווה בדיוק למחיר שנתת. אל תוסיף מחשבון לעבודות שאינן תלויות-אורך.
 קצר ולעניין. סיים תמיד בשורה: "רוצה לנהל את זה כהצעת מחיר מלאה ללקוח? היכנס לזרם."
 
+## רשימת ציוד וכלים (רק כשמתבקש במפורש)
+כשהמשתמש מבקש רשימת ציוד/חומרים/כלים — החזר משפט פתיחה קצר אחד, ואז בלוק בפורמט המדויק הזה (JSON תקין, בלי טקסט נוסף בתוכו):
+[[רשימות]]{"equipment":[{"item":"כבל NYY 5×4","qty":"25 מ'","note":""},{"item":"קופסת הסתעפות CI80","qty":"2","note":"5 מהדקי שוקולד בכל אחת"}],"tools":["מברגה + סט מקדחים לבטון","סרט מדידה"]}[[/רשימות]]
+כללים: equipment = כל מה שקונים לעבודה הזו — ציוד ראשי, אביזרים, חומרי התקנה ומתכלים, כולל הקטנים שנשכחים (דיבלים, ברגים, מהדקים, סופיות כבל, חבקים, סרט בידוד). לכל פריט qty קצר ("3", "25 מ'"); note רק כשיש דגש מקצועי שחשוב בשטח (מה בתוך הקופסה, חתך, דירוג אמפר). tools = כלי העבודה הנדרשים בשטח, בלי כמויות. בלי מחירים בתוך הרשימות. עד 25 פריטי ציוד ועד 15 כלים — רק מה שבאמת צריך.
+
 עוגני שוק אמיתיים (מקבוצות חשמלאים בישראל — אל תתמחר מתחת לזה, עדיף גבוה-סביר מנמוך): חבילת פיטינג חיצונית קטנה (מתג + גוף תאורה + כמה שקעים + כמה קופסאות + ~20–30מ' תעלה + כבל) ≈ 2,500–3,500 ₪; הכנה להגדלת חיבור חד-פאזי → תלת-פאזי בדירה מ~2,000 ₪ ומעלה; התקנת עמדת טעינה כולל לוח פיצול על פילר ≈ 3,000–4,500 ₪ (ללא תשלום לבודק — ציין שזה בנפרד); התקנת גוף תאורה גדול ≈ 300 ₪; נקודת חשמל בודדת ≈ 120–200 ₪; החלפת לוח דירתי ≈ כמה אלפי ₪. עבודה קטנה-בודדת יקרה יחסית (יש רצפת ביקור). כייל את ההערכה למציאות הזו.`;
 
 const feed = document.getElementById('feed');
@@ -192,6 +215,7 @@ let history = [];
 let busy = false;
 let ctaShown = false;
 let lastJob = '';
+let listsMade = false;   // one equipment/tools list per described job
 
 function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 function md(s){
@@ -202,7 +226,7 @@ function md(s){
 }
 
 function addMsg(role, text){
-  let questions = null, calc = null;
+  let questions = null, calc = null, lists = null;
   if (role !== 'user'){
     // Phase-1 protocol: extract the machine block, show the rest as text.
     const m = /\[\[שאלות\]\]([\s\S]*?)\[\[\/שאלות\]\]/.exec(text);
@@ -215,12 +239,26 @@ function addMsg(role, text){
       try{ calc = JSON.parse(c[1]); }catch(e){}
       text = text.replace(c[0], '').trim();
     }
+    const l = /\[\[רשימות\]\]([\s\S]*?)\[\[\/רשימות\]\]/.exec(text);
+    if (l){
+      try{ lists = JSON.parse(l[1]); }catch(e){}
+      text = text.replace(l[0], '').trim();
+    }
   }
-  const el = document.createElement('div');
-  el.className = 'msg ' + (role==='user'?'me':'ai');
-  el.innerHTML = role==='user' ? esc(text) : md(text);
-  wrap.appendChild(el);
-  if (role !== 'user' && !questions) addActions(text);
+  let el = null;
+  if (text){
+    el = document.createElement('div');
+    el.className = 'msg ' + (role==='user'?'me':'ai');
+    el.innerHTML = role==='user' ? esc(text) : md(text);
+    wrap.appendChild(el);
+  }
+  if (lists && window.ZeremListCards){
+    if (ZeremListCards.render(wrap, lists, { job: lastJob })){
+      listsMade = true;
+      document.querySelectorAll('.msg-act.lists').forEach(b=>{ b.disabled = true; });
+    }
+  }
+  if (role !== 'user' && !questions && !lists && text) addActions(text);
   if (questions && questions.length) renderQuestions(questions);
   if (calc) renderCalc(calc);
   feed.scrollTop = feed.scrollHeight;
@@ -318,12 +356,27 @@ function addActions(answer){
     window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
   };
   row.appendChild(copyBtn); row.appendChild(waBtn);
+  // Once a price is on the table, offer the field lists — the "what do I buy,
+  // what do I bring" bubbles (one list per described job).
+  if (/₪/.test(answer) && !listsMade){
+    const listBtn = document.createElement('button'); listBtn.className='msg-act lists';
+    listBtn.innerHTML = '🧰 רשימת ציוד וכלים';
+    listBtn.onclick = ()=>{
+      if (busy || listsMade) return;
+      listBtn.disabled = true;
+      send('צור עבורי עכשיו רשימת ציוד וחומרים ורשימת כלי עבודה מלאה לעבודה שתוארה בשיחה, לפי פורמט [[רשימות]] — משפט פתיחה קצר אחד ואז הבלוק.',
+        { label:'🧰 רשימת ציוד וכלים', lists:true });
+    };
+    row.appendChild(listBtn);
+  }
   wrap.appendChild(row);
 }
-function addTyping(){
+function addTyping(mode){
   const el = document.createElement('div'); el.className='typing'; el.id='typing';
-  el.innerHTML = '<span id="typing-txt">מחשב מחיר</span><span class="dots"></span>';
-  const steps = ['מחשב מחיר','בודק עוגני שוק','מפרק לחומרים ועבודה','מלטש את ההערכה'];
+  const steps = mode === 'lists'
+    ? ['מרכיב את רשימת הציוד','עובר על הקטנים שנשכחים','אורז את ארגז הכלים']
+    : ['מחשב מחיר','בודק עוגני שוק','מפרק לחומרים ועבודה','מלטש את ההערכה'];
+  el.innerHTML = '<span id="typing-txt">' + steps[0] + '</span><span class="dots"></span>';
   let i = 0;
   el._iv = setInterval(()=>{
     i = Math.min(i+1, steps.length-1);
@@ -350,24 +403,29 @@ function showCTA(){
   wrap.appendChild(c); feed.scrollTop = feed.scrollHeight;
 }
 
-async function send(text){
+async function send(text, opts){
   if (busy) return;
+  opts = opts || {};
   text = (text || input.value).trim();
   if (!text) return;
   busy = true; sendBtn.disabled = true;
   const intro = document.getElementById('intro'); if (intro) intro.remove();
   input.value=''; input.style.height='auto';
-  lastJob = text;
-  addMsg('user', text);
-  history.push({ role:'user', content:text });
+  if (!opts.label){ lastJob = text; listsMade = false; }  // a new job resets the one-list gate
+  addMsg('user', opts.label || text);
+  // Hidden instructions (the lists button) keep the full text for the model but
+  // show only a short label bubble — `label` is client-side only, stripped below.
+  history.push(opts.label ? { role:'user', content:text, label:opts.label } : { role:'user', content:text });
   saveSession();
   document.getElementById('new-chat').style.display = '';
-  const typing = addTyping();
+  const typing = addTyping(opts.lists ? 'lists' : '');
   try{
+    const headers = {'Content-Type':'application/json'};
+    if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
     const res = await fetch('/api/chat', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ modelClass:'basic', stream:false, max_tokens:1200, thinkingBudget:0,
-        messages: [{ role:'system', content:SYSTEM }, ...history] })
+      method:'POST', headers,
+      body: JSON.stringify({ modelClass:'basic', stream:false, max_tokens: opts.lists ? 2000 : 1200, thinkingBudget:0,
+        messages: [{ role:'system', content:SYSTEM }, ...history.map(m=>({ role:m.role, content:m.content }))] })
     });
     const d = await res.json();
     typing.remove();
@@ -380,7 +438,7 @@ async function send(text){
       history.push({ role:'assistant', content:reply });
       bumpQuota();
       saveSession();
-      saveHandoff(reply);
+      if (!opts.lists) saveHandoff(reply);   // lists reply is JSON-ish — keep the price handoff
       setTimeout(showCTA, 400);
     }
   }catch(e){
@@ -391,14 +449,121 @@ async function send(text){
   }
 }
 
-// Transparent guest quota: count today's questions locally (10/day server-side)
-// so the 429 never surprises anyone. Approximate by design (per-browser).
+// ---- Account connection — the same Google identity as the full app. ----
+// Signed-in visitors get their plan's daily quota (instead of the guest 10)
+// and the server counts them per-account, not per-IP. /ask/ stays a compact
+// front of the very same platform.
+const TOKEN_KEY = 'zerem_ask_token';
+const GOOGLE_CLIENT_ID = '4351198135-oltod8jremuq7pgn2e5bad4ahkupufkp.apps.googleusercontent.com';
+const TIER_NAMES = { guest:'אורח', free:'חינם', pro:'Pro', business:'עסקי' };
+let authToken = null;
+let me = null;        // /api/me answer for the connected account
+let meDelta = 0;      // questions asked since the last /api/me fetch
+
+function jwtExp(t){
+  try{
+    const p = JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    return (p.exp || 0) * 1000;
+  }catch(e){ return 0; }
+}
+// Same-origin bridge: signed into the full app in this browser? Reuse its
+// stored Google token — no second sign-in on /ask/.
+function zeremAppToken(){
+  try{
+    const u = localStorage.getItem('sj_logged_in_user');
+    if (!u || u.indexOf('@') === -1) return null;
+    const t = localStorage.getItem('sj_user_' + u.toLowerCase() + '_sj_drive_access_token');
+    if (!t) return null;
+    const exp = jwtExp(t);                       // 0 → opaque access token; /api/me will validate
+    if (exp && exp < Date.now() + 60000) return null;
+    return t;
+  }catch(e){ return null; }
+}
+async function fetchMe(){
+  if (!authToken) return;
+  try{
+    const r = await fetch('/api/me', { headers:{ 'Authorization':'Bearer ' + authToken } });
+    const d = await r.json();
+    if (d && d.email){
+      me = d; meDelta = 0;
+      try{ localStorage.setItem(TOKEN_KEY, JSON.stringify({ token:authToken, ts:Date.now() })); }catch(e){}
+    } else {
+      me = null; authToken = null;               // token expired/invalid → back to guest
+      try{ localStorage.removeItem(TOKEN_KEY); }catch(e){}
+    }
+  }catch(e){ /* offline — keep whatever we had */ }
+  renderAcct(); updateQuotaNote();
+}
+function loadGis(cb){
+  if (window.google && google.accounts && google.accounts.oauth2) return cb();
+  const s = document.createElement('script');
+  s.src = 'https://accounts.google.com/gsi/client';
+  s.onload = cb;
+  document.head.appendChild(s);
+}
+function connectAccount(){
+  loadGis(()=>{
+    try{
+      const tc = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE_CLIENT_ID,
+        scope: 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+        callback: (resp)=>{ if (resp && resp.access_token){ authToken = resp.access_token; fetchMe(); } },
+      });
+      tc.requestAccessToken({ prompt: '' });
+    }catch(e){}
+  });
+}
+function renderAcct(){
+  const b = document.getElementById('acct-btn'); if (!b) return;
+  if (me && me.email){
+    const name = me.email.split('@')[0];
+    b.textContent = '⚡ ' + (name.length > 12 ? name.slice(0,12) + '…' : name);
+    b.title = me.email + ' · מסלול ' + (TIER_NAMES[me.tier] || me.tier) + ' — לחץ להתנתקות';
+    b.classList.add('on');
+  } else {
+    b.textContent = 'התחבר';
+    b.title = 'התחברות עם Google — מכסה יומית מוגדלת';
+    b.classList.remove('on');
+  }
+}
+document.getElementById('acct-btn').addEventListener('click', ()=>{
+  if (me && me.email){
+    if (!confirm('להתנתק מהחשבון? השיחה נשארת.')) return;
+    me = null; authToken = null; meDelta = 0;
+    try{ localStorage.removeItem(TOKEN_KEY); }catch(e){}
+    renderAcct(); updateQuotaNote();
+  } else {
+    connectAccount();
+  }
+});
+(function initAuth(){
+  try{
+    const saved = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null');
+    if (saved && saved.token) authToken = saved.token;
+  }catch(e){}
+  if (!authToken) authToken = zeremAppToken();
+  if (authToken) fetchMe();
+})();
+
+// Transparent quota note: guests count locally (10/day server-side, per-IP);
+// connected accounts show the real plan numbers from /api/me.
 const GUEST_DAILY = 10;
 function quotaKey(){ return 'zerem_ask_q_' + new Date().toISOString().slice(0,10); }
-function bumpQuota(){ try{ localStorage.setItem(quotaKey(), String(usedToday()+1)); }catch(e){} updateQuotaNote(); }
+function bumpQuota(){
+  if (me && me.email){ meDelta++; updateQuotaNote(); return; }
+  try{ localStorage.setItem(quotaKey(), String(usedToday()+1)); }catch(e){}
+  updateQuotaNote();
+}
 function usedToday(){ try{ return parseInt(localStorage.getItem(quotaKey())||'0',10)||0; }catch(e){ return 0; } }
 function updateQuotaNote(){
   const el = document.getElementById('quota-note'); if (!el) return;
+  if (me && me.email){
+    const lim = me.limits && me.limits.aiDaily;
+    if (lim === -1){ el.textContent = 'מחובר · שאלות ללא הגבלה · '; return; }
+    const left = Math.max(0, (lim || 0) - ((me.usage && me.usage.aiToday) || 0) - meDelta);
+    el.textContent = 'מחובר · נשארו ~' + left + ' שאלות היום · ';
+    return;
+  }
   const left = Math.max(0, GUEST_DAILY - usedToday());
   el.textContent = usedToday() ? ('נשארו לך ~' + left + ' שאלות חינם היום · ') : '';
 }
@@ -416,7 +581,7 @@ function restoreSession(){
     if (Date.now() - (s.ts||0) > 24*60*60*1000){ localStorage.removeItem(SESS_KEY); return; }
     history = s.history; lastJob = s.lastJob || '';
     const intro = document.getElementById('intro'); if (intro) intro.remove();
-    for (const m of history) addMsg(m.role==='user'?'user':'ai', m.content);
+    for (const m of history) addMsg(m.role==='user'?'user':'ai', m.label || m.content);
     document.getElementById('new-chat').style.display = '';
   }catch(e){}
 }

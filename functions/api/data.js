@@ -80,7 +80,7 @@ export async function onRequest(context) {
     const isNewUser = !existing;
     const firstSeen = (existing && existing.firstSeen) || Date.now();
     if (isNewUser) {
-      context.waitUntil(notifyNewSignup(email).catch(() => {}));
+      context.waitUntil(notifyNewSignup(env, email).catch(() => {}));
     }
 
     // The full backup ALWAYS saves (settings, projects, catalog, history) — the
@@ -129,14 +129,15 @@ export async function onRequest(context) {
 
 
 // Fire-and-forget "new user signed up" email to the admin (web3forms — the
-// same no-setup channel the lead form uses).
-const WEB3FORMS_KEY = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
-async function notifyNewSignup(email) {
+// same channel the lead form uses; env WEB3FORMS_KEY with the same public
+// fallback lead.js documents, dead once Stav rotates the key).
+const WEB3FORMS_KEY_FALLBACK = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
+async function notifyNewSignup(env, email) {
   await fetch('https://api.web3forms.com/submit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify({
-      access_key: WEB3FORMS_KEY,
+      access_key: (env && env.WEB3FORMS_KEY) || WEB3FORMS_KEY_FALLBACK,
       subject: '⚡ נרשם חדש בזרם: ' + email,
       from_name: 'זרם — הרשמות',
       message: 'משתמש חדש התחבר ושמר לראשונה במערכת זרם:\n\n' + email +

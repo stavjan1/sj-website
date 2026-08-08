@@ -9,7 +9,11 @@
 import { generate } from './_ai.js';
 import { rateLimit } from './_tiers.js';
 
-const WEB3FORMS_KEY = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
+// web3forms key: prefer the env var (Cloudflare → Settings → Env vars,
+// WEB3FORMS_KEY). The literal fallback keeps this working until the env var is
+// set, but it's committed in a PUBLIC repo — rotate the key and set the new one
+// as WEB3FORMS_KEY so the exposed value below stops working.
+const WEB3FORMS_KEY_FALLBACK = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
 const SJ_FROM = 'SJ הנדסת חשמל <info@sj-eng.co.il>';
 
 const DRAFT_PROMPT = `אתה כותב בשם SJ הנדסת חשמל מייל קצר, חם ומקצועי בעברית אל מתעניין שדיבר עם העוזר ההנדסי באתר. בהתבסס על תמלול השיחה:
@@ -78,7 +82,7 @@ export async function onRequestPost(context) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({
-        access_key: WEB3FORMS_KEY,
+        access_key: (env && env.WEB3FORMS_KEY) || WEB3FORMS_KEY_FALLBACK,
         subject: `ליד חדש מהעוזר באתר — ${name}`,
         from_name: 'עוזר ה-AI של SJ',
         email,
