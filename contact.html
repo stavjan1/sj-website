@@ -345,7 +345,7 @@
             submitBtn.disabled = true;
             const orig = submitBtn.textContent; submitBtn.textContent = 'שולח...';
             fetch('https://api.web3forms.com/submit', { method: 'POST', body: new FormData(form) })
-                .then(() => { window.location.href = '/thanks.html'; })
+                .then(res => { if (!res.ok) throw new Error('submit-failed'); window.location.href = '/thanks.html'; })
                 .catch(() => { submitBtn.disabled = false; submitBtn.textContent = orig; showFeedback('שגיאה בשליחה. נסה שוב או התקשר אלינו ישירות.', 'error'); });
         });
     </script>

@@ -137,3 +137,8 @@ gating (server-side ADMIN_EMAIL on every admin endpoint), per-user KV keying
 ## Growth / marketing
 - [ ] Share push into electrician WhatsApp groups (Stav sends /ask/ link; OG card ready).
 - [ ] "Loved by AIs" expansion: keep llms.txt fresh; consider FAQ page for GEO.
+
+## Tech debt
+- [ ] 🟢 checkups: extract the duplicated periodic-service core (dates/ICS/calendar/
+      import) shared by /checkups/app.js and sale/app.js into one file (found in the
+      pre-deploy review 08/08; both copies fixed identically for now).

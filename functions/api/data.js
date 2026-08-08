@@ -75,22 +75,30 @@ export async function onRequest(context) {
       }
     }
 
-    // New-user detection: first-ever cloud write for this email. Stamp the
-    // signup date (kept forever in the blob) and notify the admin by email.
+    // New-user detection: first-ever cloud write for this email. Legacy users
+    // (existing blob without the field) keep NO firstSeen rather than a fake
+    // one — the admin shows "—" instead of a wrong signup date.
     const isNewUser = !existing;
-    const firstSeen = (existing && existing.firstSeen) || Date.now();
-    if (isNewUser) {
-      context.waitUntil(notifyNewSignup(env, email).catch(() => {}));
-    }
+    const firstSeen = existing ? (existing.firstSeen || null) : Date.now();
 
     // The full backup ALWAYS saves (settings, projects, catalog, history) — the
     // cloud is the source of truth across devices, so we never reject a sync.
-    const payload = JSON.stringify({ ...incoming, firstSeen, lastUpdated: incoming.lastUpdated || Date.now() });
+    const payload = JSON.stringify({
+      ...incoming,
+      ...(firstSeen ? { firstSeen } : {}),
+      lastUpdated: incoming.lastUpdated || Date.now(),
+    });
     // KV value hard limit is 25 MB; cap far below that to stay sane.
     if (payload.length > 5 * 1024 * 1024) {
       return json({ error: { message: 'הנתונים גדולים מדי לאחסון בענן.' } }, 413);
     }
     await env.SJ_DATA.put(key, payload);
+
+    // Notify AFTER the save succeeded — a rejected first sync (413 above) must
+    // not email the admin about a user that has no cloud record.
+    if (isNewUser) {
+      context.waitUntil(notifyNewSignup(env, email).catch(() => {}));
+    }
 
     // ---- Free-plan monthly cloud-quote counter (SOFT — never blocks the save) ----
     // Count quotes that are genuinely new to the cloud this sync. Re-syncing an

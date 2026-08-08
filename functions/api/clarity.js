@@ -56,15 +56,23 @@ export async function onRequestGet(context) {
     }
   } catch { /* refetch */ }
 
+  // Failure cooldown: Clarity caps ~10 API calls/day, so a broken token must
+  // not let anonymous callers burn the quota with a live upstream hit each.
+  if (await env.SJ_DATA.get('clarity:fail')) {
+    return jsonResponse({ ok: false, error: 'upstream-cooldown' }, 503);
+  }
+
   let res;
   try {
     res = await fetch('https://www.clarity.ms/export-data/api/v1/project-live-insights?numOfDays=3', {
       headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
     });
   } catch {
+    await env.SJ_DATA.put('clarity:fail', '1', { expirationTtl: 900 });
     return jsonResponse({ ok: false, error: 'clarity-unreachable' }, 502);
   }
   if (!res.ok) {
+    await env.SJ_DATA.put('clarity:fail', '1', { expirationTtl: 900 });
     return jsonResponse({ ok: false, error: 'clarity-' + res.status }, 502);
   }
   const data = await res.json();

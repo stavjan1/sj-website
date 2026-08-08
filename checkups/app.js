@@ -97,7 +97,7 @@ function render() {
     const q = (document.getElementById('search').value || '').trim().toLowerCase();
     const list = document.getElementById('list');
 
-    const visible = clients.filter((c) =>
+    const visible = liveClients().filter((c) =>
         !q || [c.name, c.phone, c.site, c.type].some((v) => (v || '').toLowerCase().includes(q)));
 
     // Most urgent first: missing dates, then by due date ascending.
@@ -110,9 +110,9 @@ function render() {
     });
 
     const counts = { overdue: 0, soon: 0, ok: 0, missing: 0 };
-    clients.forEach((c) => counts[statusOf(c)]++);
+    liveClients().forEach((c) => counts[statusOf(c)]++);
     document.getElementById('stats').innerHTML = `
-        <div class="stat"><b>${clients.length}</b><span>לקוחות במעקב</span></div>
+        <div class="stat"><b>${liveClients().length}</b><span>לקוחות במעקב</span></div>
         <div class="stat overdue"><b>${counts.overdue + counts.missing}</b><span>באיחור / חסר תאריך</span></div>
         <div class="stat soon"><b>${counts.soon}</b><span>קרובים (${SOON_DAYS} יום)</span></div>
         <div class="stat ok"><b>${counts.ok}</b><span>בסדר</span></div>`;
@@ -120,7 +120,7 @@ function render() {
     renderDueStrip();
 
     if (visible.length === 0) {
-        list.innerHTML = `<div class="empty">${clients.length === 0
+        list.innerHTML = `<div class="empty">${liveClients().length === 0
             ? 'אין עדיין לקוחות במעקב.<br>הוסף לקוח ראשון או ייבא רשימה מאקסל.'
             : 'לא נמצאו תוצאות לחיפוש.'}</div>`;
         return;
@@ -208,7 +208,7 @@ function saveClient(ev) {
     if (!rec.name) return;
     if (editingId) {
         const c = clients.find((x) => x.id === editingId);
-        Object.assign(c, rec);
+        if (c) Object.assign(c, rec);
     } else {
         clients.push({ id: 'c' + Date.now() + Math.random().toString(36).slice(2, 7), eventId: null, ...rec });
     }
@@ -234,7 +234,10 @@ function removeClient(id) {
     if (!c) return;
     if (!confirm('למחוק את "' + c.name + '" מהמעקב?')) return;
     const eventId = c.eventId;
-    clients = clients.filter((x) => x.id !== id);
+    // Tombstone, not removal: the record stays (hidden) so the deletion wins
+    // the union-merge on every other device instead of being resurrected.
+    c.deleted = Date.now();
+    c.updatedAt = Date.now();
     persist();
     render();
     if (eventId && confirm('למחוק גם את התזכורת מיומן Google?')) {
@@ -248,7 +251,12 @@ function removeClient(id) {
 
 // ---------- persistence: local + cloud ----------
 
+function liveClients() { return clients.filter((c) => !c.deleted); }
+
 function persist() {
+    // Purge tombstones after 90 days — by then every device has synced.
+    const cutoff = Date.now() - 90 * 86400000;
+    clients = clients.filter((c) => !c.deleted || c.deleted > cutoff);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(clients));
     if (!authToken) return;
     clearTimeout(saveTimer);
@@ -438,14 +446,20 @@ async function syncCalendar(id) {
 
 // ---------- ICS (iPhone / Apple Calendar / Outlook) ----------
 
+// RFC 5545 TEXT escaping — raw newlines/commas/semicolons in a property value
+// make the whole file unparseable for Apple Calendar/Outlook.
+function icsText(s) {
+    return String(s || '').replace(/\\/g, '\\\\').replace(/[,;]/g, (m) => '\\' + m).replace(/\r?\n/g, '\\n');
+}
+
 function downloadIcs(id) {
     const c = clients.find((x) => x.id === id);
     if (!c) return;
     const due = nextDue(c);
     if (!due) { toast('קודם קבע תאריך בדיקה (עריכה ✏)'); return; }
     const dt = due.replace(/-/g, '');
-    const summary = ((c.type || 'בדיקה תקופתית') + ' — ' + c.name).replace(/[,;\\]/g, ' ');
-    const desc = [c.phone ? 'טלפון: ' + c.phone : '', c.notes || ''].filter(Boolean).join('\\n');
+    const summary = icsText((c.type || 'בדיקה תקופתית') + ' — ' + c.name);
+    const desc = icsText([c.phone ? 'טלפון: ' + c.phone : '', c.notes || ''].filter(Boolean).join('\n'));
     const ics = [
         'BEGIN:VCALENDAR',
         'VERSION:2.0',
@@ -457,7 +471,7 @@ function downloadIcs(id) {
         'DTEND;VALUE=DATE:' + addDays(due, 1).replace(/-/g, ''),
         rruleFor(c.months),
         'SUMMARY:' + summary,
-        c.site ? 'LOCATION:' + c.site.replace(/[,;\\]/g, ' ') : '',
+        c.site ? 'LOCATION:' + icsText(c.site) : '',
         desc ? 'DESCRIPTION:' + desc : '',
         'BEGIN:VALARM', 'TRIGGER:-P28D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
         'BEGIN:VALARM', 'TRIGGER:-P7D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
@@ -530,7 +544,7 @@ function parseAnyDate(s) {
 
 function exportCsv() {
     const header = 'שם,טלפון,אימייל,כתובת,סוג בדיקה,תדירות (חודשים),בדיקה אחרונה,בדיקה הבאה';
-    const rows = clients.map((c) => [
+    const rows = liveClients().map((c) => [
         c.name, c.phone, c.email || '', c.site, c.type, c.months, c.last || '', nextDue(c) || '',
     ].map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(','));
     const a = document.createElement('a');
@@ -560,7 +574,7 @@ function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
 function renderDueStrip() {
     const el = document.getElementById('due-strip');
     if (!el) return;
-    const due = clients
+    const due = liveClients()
         .filter((c) => { const d = nextDue(c); return d && daysUntil(d) <= 28; })
         .sort((a, b) => nextDue(a).localeCompare(nextDue(b)));
     if (due.length === 0) { el.innerHTML = ''; return; }

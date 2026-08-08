@@ -9271,7 +9271,7 @@ function ckRender() {
     if (!listEl) return;
     const q = (document.getElementById('ck-search')?.value || '').trim().toLowerCase();
 
-    const visible = ckClients.filter((c) =>
+    const visible = ckLive().filter((c) =>
         !q || [c.name, c.phone, c.site, c.type].some((v) => (v || '').toLowerCase().includes(q)));
 
     // Most urgent first: missing dates, then by due date ascending.
@@ -9284,10 +9284,10 @@ function ckRender() {
     });
 
     const counts = { overdue: 0, soon: 0, ok: 0, missing: 0 };
-    ckClients.forEach((c) => counts[ckStatusOf(c)]++);
+    ckLive().forEach((c) => counts[ckStatusOf(c)]++);
     const statsEl = document.getElementById('ck-stats');
     if (statsEl) statsEl.innerHTML = `
-        <div class="ck-stat"><b>${ckClients.length}</b><span>לקוחות במעקב</span></div>
+        <div class="ck-stat"><b>${ckLive().length}</b><span>לקוחות במעקב</span></div>
         <div class="ck-stat ck-red"><b>${counts.overdue + counts.missing}</b><span>באיחור / חסר תאריך</span></div>
         <div class="ck-stat ck-amber"><b>${counts.soon}</b><span>קרובים (${CK_SOON_DAYS} יום)</span></div>
         <div class="ck-stat ck-green"><b>${counts.ok}</b><span>בסדר</span></div>`;
@@ -9295,7 +9295,7 @@ function ckRender() {
     ckRenderDueStrip();
 
     if (visible.length === 0) {
-        listEl.innerHTML = `<div class="ck-empty">${ckClients.length === 0
+        listEl.innerHTML = `<div class="ck-empty">${ckLive().length === 0
             ? 'אין עדיין לקוחות במעקב.<br>הוסף לקוח ראשון או ייבא רשימה מאקסל.'
             : 'לא נמצאו תוצאות לחיפוש.'}</div>`;
         return;
@@ -9404,7 +9404,10 @@ function ckRemoveClient(id) {
     if (!c) return;
     if (!confirm('למחוק את "' + c.name + '" מהמעקב?')) return;
     const eventId = c.eventId;
-    ckClients = ckClients.filter((x) => x.id !== id);
+    // Tombstone, not removal: the record stays (hidden) so the deletion wins
+    // the union-merge on every other device instead of being resurrected.
+    c.deleted = Date.now();
+    c.updatedAt = Date.now();
     ckPersist();
     ckRender();
     if (eventId && confirm('למחוק גם את התזכורת מיומן Google?')) {
@@ -9418,7 +9421,12 @@ function ckRemoveClient(id) {
 
 // ---------- persistence: local + cloud (/api/checkups) ----------
 
+function ckLive() { return ckClients.filter((c) => !c.deleted); }
+
 function ckPersist() {
+    // Purge tombstones after 90 days — by then every device has synced.
+    const cutoff = Date.now() - 90 * 86400000;
+    ckClients = ckClients.filter((c) => !c.deleted || c.deleted > cutoff);
     localStorage.setItem(ckStorageKey(), JSON.stringify(ckClients));
     if (isGuestUser() || !googleAccessToken) return;
     clearTimeout(ckSaveTimer);
@@ -9559,14 +9567,20 @@ async function ckSyncCalendar(id) {
 
 // ---------- ICS (iPhone / Apple Calendar / Outlook) ----------
 
+// RFC 5545 TEXT escaping — raw newlines/commas/semicolons in a property value
+// make the whole file unparseable for Apple Calendar/Outlook.
+function ckIcsText(s) {
+    return String(s || '').replace(/\\/g, '\\\\').replace(/[,;]/g, (m) => '\\' + m).replace(/\r?\n/g, '\\n');
+}
+
 function ckDownloadIcs(id) {
     const c = ckClients.find((x) => x.id === id);
     if (!c) return;
     const due = ckNextDue(c);
     if (!due) { showToast('קודם קבע תאריך בדיקה (כפתור העריכה)', 'error'); return; }
     const dt = due.replace(/-/g, '');
-    const summary = ((c.type || 'בדיקה תקופתית') + ' — ' + c.name).replace(/[,;\\]/g, ' ');
-    const desc = [c.phone ? 'טלפון: ' + c.phone : '', c.notes || ''].filter(Boolean).join('\\n');
+    const summary = ckIcsText((c.type || 'בדיקה תקופתית') + ' — ' + c.name);
+    const desc = ckIcsText([c.phone ? 'טלפון: ' + c.phone : '', c.notes || ''].filter(Boolean).join('\n'));
     const ics = [
         'BEGIN:VCALENDAR',
         'VERSION:2.0',
@@ -9578,7 +9592,7 @@ function ckDownloadIcs(id) {
         'DTEND;VALUE=DATE:' + ckAddDays(due, 1).replace(/-/g, ''),
         ckRrule(c.months),
         'SUMMARY:' + summary,
-        c.site ? 'LOCATION:' + c.site.replace(/[,;\\]/g, ' ') : '',
+        c.site ? 'LOCATION:' + ckIcsText(c.site) : '',
         desc ? 'DESCRIPTION:' + desc : '',
         'BEGIN:VALARM', 'TRIGGER:-P28D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
         'BEGIN:VALARM', 'TRIGGER:-P7D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
@@ -9652,7 +9666,7 @@ function ckParseDate(s) {
 
 function ckExportCsv() {
     const header = 'שם,טלפון,אימייל,כתובת,סוג בדיקה,תדירות (חודשים),בדיקה אחרונה,בדיקה הבאה';
-    const rows = ckClients.map((c) => [
+    const rows = ckLive().map((c) => [
         c.name, c.phone, c.email || '', c.site, c.type, c.months, c.last || '', ckNextDue(c) || '',
     ].map((v) => '"' + String(v).replace(/"/g, '""') + '"').join(','));
     const a = document.createElement('a');
@@ -9669,7 +9683,7 @@ function ckExportCsv() {
 // first calendar alert) — surfaced at the top so a glance at the tab says
 // exactly who to nudge today.
 function ckDueSoonClients() {
-    return ckClients
+    return ckLive()
         .filter((c) => { const d = ckNextDue(c); return d && ckDaysUntil(d) <= 28; })
         .sort((a, b) => ckNextDue(a).localeCompare(ckNextDue(b)));
 }

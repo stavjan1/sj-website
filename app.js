@@ -190,7 +190,8 @@ function initContactForm() {
             method: 'POST',
             body: formData
         })
-        .then(() => {
+        .then((res) => {
+            if (!res.ok) throw new Error('submit-failed');
             // Dedicated thank-you page: clearer UX + a clean conversion point
             // for analytics.
             window.location.href = '/thanks.html';

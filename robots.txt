@@ -2,8 +2,5 @@ User-agent: *
 Allow: /
 Disallow: /sale/
 Disallow: /login
-Disallow: /ANALYTICS.md
-Disallow: /BACKLOG.md
-Disallow: /PRODUCT_OVERVIEW.md
 
 Sitemap: https://www.sj-eng.co.il/sitemap.xml
