@@ -127,13 +127,26 @@ export async function verifyGoogleEmail(token) {
       return null;
     }
   }
+  // Opaque OAuth access token (ya29…). CRITICAL: verify the AUDIENCE, not just
+  // that the token is valid for *some* Google app. /userinfo alone happily
+  // accepts a token minted by ANY OAuth client, so a token leaked from an
+  // unrelated site the user signed into could be replayed here — including
+  // against the admin gates (token substitution / confused deputy). tokeninfo
+  // returns `aud`, so we can bind the token to OUR client id before trusting it.
   try {
-    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: 'Bearer ' + token },
-    });
+    const res = await fetch('https://oauth2.googleapis.com/tokeninfo?access_token=' + encodeURIComponent(token));
     if (!res.ok) return null;
     const info = await res.json();
-    return info && info.email ? info.email : null;
+    if (!info || info.aud !== GOOGLE_CLIENT_ID) return null;   // minted for another app → reject
+    if (info.email_verified === 'false' || info.email_verified === false) return null;
+    if (info.email) return info.email;
+    // Audience is confirmed but this token carries no email claim — fetch it.
+    const ui = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    if (!ui.ok) return null;
+    const profile = await ui.json();
+    return profile && profile.email ? profile.email : null;
   } catch {
     return null;
   }

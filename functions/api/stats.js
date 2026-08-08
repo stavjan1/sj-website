@@ -21,10 +21,24 @@ const SAMPLES_CAP = 1000;     // rolling window kept per bucket
 const LABOR_MIN = 50;         // sanity bounds — ignore obvious junk/typos
 const LABOR_MAX = 100000;
 const JOB_TYPES = ['panel', 'points', 'charger', 'solar', 'inspection', 'fault', 'infra', 'other'];
+// Closed list, mirroring PROFESSIONS in sale/app.js. This write path is PUBLIC,
+// and the bucket key is built from it — accepting free text meant an attacker
+// could mint an unbounded number of KV buckets, and the admin dashboard does one
+// KV read per bucket, so a few thousand junk professions would blow the Worker
+// subrequest limit and break the dashboard for good. Anything unknown → general.
+const PROFESSIONS = [
+  'electrician', 'plumber', 'hvac', 'contractor', 'renovator', 'general',
+  'solar_installer', 'charger_installer',
+];
+
+function normProfession(v) {
+  const p = String(v || 'general').toLowerCase().slice(0, 30);
+  return PROFESSIONS.includes(p) ? p : 'general';
+}
 
 function bucketKey(prof, job) {
   const p = JOB_TYPES.includes(job) ? job : 'other';
-  return `stats:samples:${String(prof || 'general').toLowerCase()}:${p}`;
+  return `stats:samples:${normProfession(prof)}:${p}`;
 }
 
 export async function onRequestPost(context) {
@@ -34,6 +48,13 @@ export async function onRequestPost(context) {
   let body;
   try { body = await request.json(); } catch { return jsonResponse({ error: { message: 'JSON שגוי.' } }, 400); }
 
+  // Rate-limit BEFORE any branch that makes an outbound Google call, so an
+  // unauthenticated flood of {"setLive":true} can't be amplified into one
+  // upstream token-verification request per hit.
+  if (!(await rateLimit(env, request, 'stats', 20))) {
+    return jsonResponse({ ok: false, skipped: 'rate' }, 200);
+  }
+
   // Admin: toggle the public display flag.
   if (typeof body.setLive === 'boolean') {
     const email = await verifyGoogleEmail(bearerToken(request));
@@ -42,16 +63,11 @@ export async function onRequestPost(context) {
     return jsonResponse({ ok: true, live: body.setLive });
   }
 
-  // Record a sample — rate-limited (unauthenticated write path).
-  if (!(await rateLimit(env, request, 'stats', 20))) {
-    return jsonResponse({ ok: false, skipped: 'rate' }, 200);
-  }
-
   const labor = Number(body.labor);
   if (!Number.isFinite(labor) || labor < LABOR_MIN || labor > LABOR_MAX) {
     return jsonResponse({ ok: false, skipped: 'out-of-bounds' }, 200); // silent — never breaks the export
   }
-  const prof = String(body.profession || 'general').toLowerCase().slice(0, 30);
+  const prof = normProfession(body.profession);
   const job = JOB_TYPES.includes(body.jobType) ? body.jobType : 'other';
 
   // Dedup: count a quote once (re-exports/edits don't re-inflate the stats).

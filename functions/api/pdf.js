@@ -42,11 +42,25 @@ export async function onRequestPost(context) {
   const counterKey = `pdfmo:${email.toLowerCase()}:${mo}`;
 
   // Re-export of a quote already counted this month → free (no extra charge).
+  // `quoteId` is client-supplied, so the free pass is capped: without a cap, a
+  // free-tier user could send ONE constant id forever and export unlimited
+  // distinct quotes, since a "repeat" never touches the counter. Allowing a
+  // bounded number of distinct remembered ids keeps genuine revisions free
+  // while making the bypass worthless.
+  const MAX_REMEMBERED = Math.max(1, limit) * 3;
   if (quoteId) {
     const seenKey = `pdfseen:${email.toLowerCase()}:${mo}:${quoteId}`;
+    const seenCountKey = `pdfseenN:${email.toLowerCase()}:${mo}`;
     if (await env.SJ_DATA.get(seenKey)) {
       const used = parseInt((await env.SJ_DATA.get(counterKey)) || '0', 10);
       return jsonResponse({ allow: true, used, limit, repeat: true });
+    }
+    const distinct = parseInt((await env.SJ_DATA.get(seenCountKey)) || '0', 10);
+    if (distinct >= MAX_REMEMBERED) {
+      // Too many distinct quotes this month — stop granting free re-export
+      // passes and fall through to the normal counter path below.
+      const used = parseInt((await env.SJ_DATA.get(counterKey)) || '0', 10);
+      if (used >= limit) return jsonResponse({ allow: false, reason: 'quota', used, limit });
     }
   }
 
@@ -62,6 +76,9 @@ export async function onRequestPost(context) {
   if (quoteId) {
     context.waitUntil(env.SJ_DATA.put(
       `pdfseen:${email.toLowerCase()}:${mo}:${quoteId}`, '1', { expirationTtl: ttl }));
+    const seenCountKey = `pdfseenN:${email.toLowerCase()}:${mo}`;
+    const distinct = parseInt((await env.SJ_DATA.get(seenCountKey)) || '0', 10);
+    context.waitUntil(env.SJ_DATA.put(seenCountKey, String(distinct + 1), { expirationTtl: ttl }));
   }
   return jsonResponse({ allow: true, used: next, limit });
 }
