@@ -74,12 +74,14 @@ Fixed & pushed:
 - [x] 🟡 /api/pdf monthly quota bypass via a constant client-supplied quoteId.
 - [x] 🟡 /api/stats: free-text profession minted unbounded KV buckets (would
       eventually break the admin dashboard); rate limit moved before auth call.
-- [x] 🟢 CSP added in **Report-Only** mode (allowlist from the real client hosts).
-Open on this thread:
-- [ ] 🟠 **Stav: verify CSP then flip it on.** Use the app for one full round
-      (sign in → quote → PDF → open a share link) with DevTools console open. No
-      red CSP messages ⇒ tell Claude to rename the header in `_headers` from
-      `Content-Security-Policy-Report-Only` to `Content-Security-Policy`.
+- [x] 🟢 **CSP now ENFORCING** — verified by Claude in a real Chromium, not by eye:
+      all 8 page types load with zero violations; every destination the client
+      actually calls (web3forms contact forms, Drive, direct Gemini, tokeninfo,
+      GIS, Clarity) confirmed allowed; an attacker domain confirmed BLOCKED; a
+      blob: Worker confirmed allowed for the PDF exporter. The page-load test
+      alone said "clean" while `api.web3forms.com` was still missing from
+      connect-src — the runtime test is what caught it. Repeatable:
+      `scripts/security/` (see its README). Run after adding any 3rd-party call.
 - [ ] 🟢 /api/stats dedup key `stats:seen:<quoteId>` is a global namespace, so a
       crafted id can suppress someone else's sample. Anonymous aggregate data
       only, display still off — low impact, worth namespacing when stats go live.
