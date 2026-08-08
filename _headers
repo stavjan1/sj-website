@@ -3,6 +3,17 @@
 # EVERY browser); the service worker file too. Hashed/versioned assets can
 # cache hard.
 
+# Security headers on every response. These are the non-breaking hardening set;
+# a strict Content-Security-Policy is intentionally NOT here yet — it needs
+# testing against the inline scripts, Google Identity Services, the html2pdf CDN
+# and the Gemini calls before it can go on without breaking the app.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
+
 /
   Cache-Control: no-cache
 

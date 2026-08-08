@@ -7,10 +7,15 @@
 // scopes). A phone number is never available from Google, so the client asks for
 // it optionally and passes it through here.
 
-const WEB3FORMS_KEY = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
+// Read the web3forms key from the environment (Cloudflare → Settings → Env vars,
+// name WEB3FORMS_KEY). The literal fallback keeps lead capture working until the
+// env var is set — but it lives in a PUBLIC repo, so it must be rotated: set the
+// new key as WEB3FORMS_KEY and the exposed one below becomes dead.
+const WEB3FORMS_KEY_FALLBACK = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
 
 export async function onRequestPost(context) {
-  const { request } = context;
+  const { request, env } = context;
+  const WEB3FORMS_KEY = (env && env.WEB3FORMS_KEY) || WEB3FORMS_KEY_FALLBACK;
 
   let body;
   try { body = await request.json(); } catch { return json({ error: { message: 'בקשה לא תקינה.' } }, 400); }
