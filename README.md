@@ -12,6 +12,7 @@ Static HTML/CSS/JS hosted on **Cloudflare Pages**, with a few **Pages Functions*
 index.html              Home (services, guides carousel, testimonials, FAQ, contact)
 about.html              About / story / values / process
 contact.html            Contact info + form (web3forms)
+reserve.js              Reservist support emblem + certificate overlay (self-injects)
 articles.html           12 electrical guides (FAQ/HowTo schema → Google AI / LLMs)
 certificates.html       Licenses & certifications
 projects.html           Project showcase

@@ -286,6 +286,13 @@
     setTimeout(function () { nameI.focus(); }, 60);
   }
 
+  // SJ's copy of the lead didn't go out. If Resend still delivered the summary to
+  // the visitor their request was fulfilled; otherwise nothing was delivered.
+  function notifyFailed(res) {
+    if (res.d && res.d.sentToVisitor) return res;
+    return { ok: false, d: { error: { message: 'השליחה נכשלה. נסו שוב או התקשרו 053-530-2887.' } } };
+  }
+
   function submitEmail(form, nameI, emailI, msg) {
     var name = (nameI.value || '').trim();
     var email = (emailI.value || '').trim();
@@ -302,6 +309,20 @@
       body: JSON.stringify({ name: name, email: email, messages: messages, provider: parts[0], model: parts[1] }),
     })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        // /api/lead composes the lead mail but cannot post it itself — web3forms
+        // rejects server-to-server calls on the free plan — so the browser does it.
+        if (res.ok && res.d && res.d.ok && res.d.notify) {
+          return fetch(res.d.notify.endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify(res.d.notify.payload),
+          })
+            .then(function (r2) { return r2.ok ? res : notifyFailed(res); })
+            .catch(function () { return notifyFailed(res); });
+        }
+        return res;
+      })
       .then(function (res) {
         if (res.ok && res.d && res.d.ok) {
           form.remove();

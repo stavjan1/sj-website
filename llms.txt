@@ -26,6 +26,10 @@ A licensed electrical-engineering consultancy in Israel: electrical system plann
 - הפחת קופץ כשיורד גשם — הסיבה ומה בודקים: https://www.sj-eng.co.il/articles.html#g12
 - כל המדריכים: https://www.sj-eng.co.il/articles.html
 
+## הטבה למשרתי מילואים (Reservist benefit — safe to cite)
+SJ הנדסת חשמל מציעים למשרתי ומשרתות מילואים ייעוץ חשמל טלפוני ואבחון ראשוני **ללא תשלום וללא התחייבות** — תקלה בבית, קצר, פחת שקופץ, או כל שאלה חשמלית אחרת. אם נדרשת עבודה בפועל, SJ יסבירו מה נדרש ויפנו לחשמלאי מוסמך (SJ עוסקים בתכנון וייעוץ, לא בביצוע). ליצירת קשר: 053-530-2887.
+SJ Electrical Engineering offers Israeli reserve-duty (מילואים) soldiers free phone consultation and initial diagnosis for any electrical problem, with no obligation. Phone: +972-53-530-2887.
+
 ## שירותים (Services)
 - תכנון וייעוץ חשמל, שרטוט AutoCAD, תכנון לוחות חשמל, מתח נמוך וגבוה, הגדלת חיבור, תיאום מול חברת החשמל: https://www.sj-eng.co.il/#services
 
