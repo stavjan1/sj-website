@@ -2662,3 +2662,251 @@ section[id], [id].scroll-anchor { scroll-margin-top: 96px; }
 .footer-copy .legal-links { margin-top: 6px; font-size: 0.78rem; }
 .footer-copy .legal-links a { color: var(--color-text-gray); text-decoration: none; }
 .footer-copy .legal-links a:hover { color: var(--color-text-white); }
+/* ==========================================================================
+   Reservist support emblem + certificate (reserve.js)
+   A floating emblem under the header; clicking it opens a translucent
+   certificate overlay with the full commitment. Olive carries the meaning;
+   the bolt keeps it tied to the SJ mark.
+   ========================================================================== */
+.sj-mil-badge {
+    position: fixed;
+    top: 90px;
+    left: 20px; /* physical left on purpose — RTL start would collide with the logo */
+    z-index: 990;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-primary);
+    /* LTR so the emblem stays pinned to the left edge and the label unfurls
+       rightwards — in RTL the emblem itself would slide across on hover. */
+    direction: ltr;
+    filter: drop-shadow(0 5px 14px rgba(0, 0, 0, 0.55));
+    transition: transform .25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sj-mil-badge:hover { transform: translateY(-2px) scale(1.04); }
+.sj-mil-badge:focus-visible { outline: 2px solid #9db35f; outline-offset: 4px; border-radius: 999px; }
+.sj-mil-badge .sj-mil-emblem { width: 54px; height: 66px; flex-shrink: 0; }
+
+/* The label only unfurls on hover, so the resting state is just the mark.
+   Padding animates with the width, otherwise a sliver shows when collapsed. */
+.sj-mil-badge .sj-mil-label {
+    direction: rtl;
+    max-width: 0;
+    padding: 6px 0;
+    overflow: hidden;
+    white-space: nowrap;
+    opacity: 0;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #d3dfa8;
+    background: rgba(12, 13, 10, 0.85);
+    border-radius: 999px;
+    transition: max-width .32s cubic-bezier(0.16, 1, 0.3, 1),
+                padding .32s cubic-bezier(0.16, 1, 0.3, 1),
+                opacity .22s ease;
+}
+.sj-mil-badge:hover .sj-mil-label,
+.sj-mil-badge:focus-visible .sj-mil-label { max-width: 160px; padding: 6px 13px; opacity: 1; }
+
+/* ── Certificate overlay ── */
+.sj-mil-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: flex-start; /* with margin:auto below — centres when it fits, scrolls when it doesn't */
+    justify-content: center;
+    padding: 24px 16px;
+    background: rgba(6, 7, 5, 0.72);
+    backdrop-filter: blur(10px);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .28s ease, visibility .28s;
+    direction: rtl;
+    font-family: var(--font-primary);
+    overflow-y: auto;
+}
+.sj-mil-overlay.open { opacity: 1; visibility: visible; }
+
+.sj-mil-cert {
+    position: relative;
+    width: 100%;
+    max-width: 540px;
+    margin: auto;
+    padding: 28px 38px 26px;
+    text-align: center;
+    color: var(--color-text-white);
+    border-radius: var(--border-radius-md);
+    border: 1px solid rgba(157, 179, 95, 0.38);
+    background:
+        radial-gradient(ellipse at 50% 0%, rgba(157, 179, 95, 0.1), transparent 62%),
+        linear-gradient(165deg, rgba(27, 29, 23, 0.97), rgba(14, 15, 12, 0.98));
+    backdrop-filter: blur(22px);
+    box-shadow: 0 26px 70px rgba(0, 0, 0, 0.6);
+    transform: translateY(14px) scale(0.97);
+    transition: transform .34s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sj-mil-overlay.open .sj-mil-cert { transform: translateY(0) scale(1); }
+/* Inner rule — the classic certificate double frame. */
+.sj-mil-cert::before {
+    content: '';
+    position: absolute;
+    inset: 9px;
+    border: 1px solid rgba(157, 179, 95, 0.2);
+    border-radius: calc(var(--border-radius-md) - 6px);
+    pointer-events: none;
+}
+
+.sj-mil-close {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    color: var(--color-text-gray);
+    cursor: pointer;
+    transition: color .2s ease, background-color .2s ease;
+    z-index: 2;
+}
+.sj-mil-close:hover { color: #fff; background: rgba(255, 255, 255, 0.12); }
+.sj-mil-close svg { width: 15px; height: 15px; }
+
+.sj-mil-cert .sj-mil-emblem { width: 58px; height: 71px; margin: 0 auto 11px; }
+.sj-mil-eyebrow {
+    font-size: 0.68rem;
+    letter-spacing: 3px;
+    font-weight: 700;
+    color: #9db35f;
+    margin-bottom: 8px;
+}
+.sj-mil-cert h2 {
+    font-size: clamp(1.2rem, 3.4vw, 1.42rem);
+    font-weight: 900;
+    line-height: 1.35;
+    margin-bottom: 12px;
+}
+
+.sj-mil-rule {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 0 auto 14px;
+    max-width: 200px;
+}
+.sj-mil-rule::before,
+.sj-mil-rule::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(157, 179, 95, 0.55), transparent);
+}
+.sj-mil-rule span {
+    width: 6px;
+    height: 6px;
+    background: #9db35f;
+    transform: rotate(45deg);
+    flex-shrink: 0;
+}
+
+.sj-mil-body {
+    font-size: 0.94rem;
+    line-height: 1.72;
+    color: #d6d6d2;
+    max-width: 462px;
+    margin: 0 auto 18px;
+}
+
+.sj-mil-points {
+    list-style: none;
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0 auto 18px;
+    max-width: 462px;
+}
+.sj-mil-points li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--color-text-gray);
+}
+.sj-mil-points svg {
+    width: 17px;
+    height: 17px;
+    flex-shrink: 0;
+    margin-top: 3px;
+    color: #9db35f;
+}
+
+.sj-mil-sign {
+    margin-bottom: 17px;
+    padding-top: 13px;
+    border-top: 1px dashed rgba(157, 179, 95, 0.22);
+}
+.sj-mil-sign .who {
+    font-size: 1rem;
+    font-weight: 700;
+    font-style: italic;
+    letter-spacing: 0.01em;
+}
+.sj-mil-sign .role {
+    font-size: 0.8rem;
+    color: var(--color-text-gray);
+    margin-top: 4px;
+}
+
+.sj-mil-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.sj-mil-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 158px;
+    padding: 12px 20px;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.94rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: filter .2s ease, background-color .2s ease;
+}
+.sj-mil-btn svg { width: 16px; height: 16px; }
+.sj-mil-btn.call { background: #6f8535; color: #fff; }
+.sj-mil-btn.call:hover { filter: brightness(1.15); }
+.sj-mil-btn.wa {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--color-text-white);
+}
+.sj-mil-btn.wa:hover { background: rgba(255, 255, 255, 0.12); }
+
+@media (max-width: 900px) {
+    .sj-mil-badge { top: 82px; left: 12px; }
+    .sj-mil-badge .sj-mil-emblem { width: 42px; height: 51px; }
+    .sj-mil-badge .sj-mil-label { display: none; }
+}
+@media (max-width: 480px) {
+    .sj-mil-cert { padding: 34px 22px 28px; }
+    .sj-mil-btn { min-width: 0; flex: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sj-mil-badge, .sj-mil-cert, .sj-mil-overlay, .sj-mil-badge .sj-mil-label { transition: none; }
+}
+
+@media print {
+    .sj-mil-badge, .sj-mil-overlay { display: none; }
+}

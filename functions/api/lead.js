@@ -1,10 +1,17 @@
 // Cloudflare Pages Function — "email me this conversation" for the assistant.
 // Takes the chat transcript + the visitor's name/email, has the AI draft a warm,
 // personalised follow-up in SJ's voice (a light, accurate knowledge demo), then:
-//   1) always emails SJ the lead + draft + transcript (web3forms — no setup), and
+//   1) hands the browser a ready-to-post web3forms payload so SJ gets the lead, and
 //   2) if RESEND_API_KEY is configured, also emails the visitor FROM SJ (Resend).
 // So it works today as lead capture, and upgrades to true auto-send once a Resend
 // key + verified domain (sj-eng.co.il) are added.
+//
+// Why the browser posts to web3forms instead of this function: on the web3forms
+// free plan, server-to-server submissions are rejected with
+// 403 "This method is not allowed. Use our API in client side" — a Worker calling
+// it directly always fails. The key is public by design (it is already a hidden
+// input in the contact forms), so relaying it to the client costs nothing and
+// keeps a single definition of it here.
 
 import { generate } from './_ai.js';
 import { rateLimit } from './_tiers.js';
@@ -13,7 +20,12 @@ import { rateLimit } from './_tiers.js';
 // WEB3FORMS_KEY). The literal fallback keeps this working until the env var is
 // set, but it's committed in a PUBLIC repo — rotate the key and set the new one
 // as WEB3FORMS_KEY so the exposed value below stops working.
+// The key reaches the browser by design: web3forms access keys are public (the
+// contact forms carry one in a hidden input), and the free plan only accepts
+// client-side submissions. Rotation still works — the browser posts whatever
+// key this function hands it.
 const WEB3FORMS_KEY_FALLBACK = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
+const WEB3FORMS_ENDPOINT = 'https://api.web3forms.com/submit';
 const SJ_FROM = 'SJ הנדסת חשמל <info@sj-eng.co.il>';
 
 const DRAFT_PROMPT = `אתה כותב בשם SJ הנדסת חשמל מייל קצר, חם ומקצועי בעברית אל מתעניין שדיבר עם העוזר ההנדסי באתר. בהתבסס על תמלול השיחה:
@@ -75,23 +87,18 @@ export async function onRequestPost(context) {
 
   const fullBody = `${draft}\n\n— — —\nתמלול השיחה המלא:\n\n${transcript}`;
 
-  // 2a) Always notify SJ (lead capture) via web3forms — needs no setup.
-  let sjNotified = false;
-  try {
-    const r = await fetch('https://api.web3forms.com/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        access_key: (env && env.WEB3FORMS_KEY) || WEB3FORMS_KEY_FALLBACK,
-        subject: `ליד חדש מהעוזר באתר — ${name}`,
-        from_name: 'עוזר ה-AI של SJ',
-        email,
-        name,
-        message: `מתעניין/ת: ${name} <${email}>\n\nטיוטת מייל מענה (מוכנה לשליחה):\n${draft}\n\n${'='.repeat(30)}\nתמלול השיחה:\n${transcript}`,
-      }),
-    });
-    sjNotified = r.ok;
-  } catch (e) { /* non-fatal */ }
+  // 2a) Lead capture for SJ — composed here, posted by the browser (see header).
+  const notify = {
+    endpoint: WEB3FORMS_ENDPOINT,
+    payload: {
+      access_key: (env && env.WEB3FORMS_KEY) || WEB3FORMS_KEY_FALLBACK,
+      subject: `ליד חדש מהעוזר באתר — ${name}`,
+      from_name: 'עוזר ה-AI של SJ',
+      email,
+      name,
+      message: `מתעניין/ת: ${name} <${email}>\n\nטיוטת מייל מענה (מוכנה לשליחה):\n${draft}\n\n${'='.repeat(30)}\nתמלול השיחה:\n${transcript}`,
+    },
+  };
 
   // 2b) If Resend is configured, send the email straight to the visitor FROM SJ.
   let sentToVisitor = false;
@@ -112,13 +119,10 @@ export async function onRequestPost(context) {
     } catch (e) { /* non-fatal */ }
   }
 
-  if (!sjNotified && !sentToVisitor) {
-    return json({ error: { message: 'השליחה נכשלה כרגע. אפשר לפנות ישירות: 053-530-2887.' } }, 502);
-  }
-
   return json({
     ok: true,
     sentToVisitor,
+    notify,
     message: sentToVisitor
       ? 'הסיכום נשלח אליך למייל ✓ נשמח לעזור בכל שאלה.'
       : 'קיבלנו את הפנייה ✓ ניצור איתך קשר בהקדם.',

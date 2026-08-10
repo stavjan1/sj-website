@@ -4976,7 +4976,18 @@ async function _postCatalogShare(statusEl, payload, successMsg) {
             body: JSON.stringify(payload)
         });
         const data = await res.json().catch(() => ({}));
-        if (res.ok && data.ok) {
+        // The endpoint formats the mail but cannot post it — web3forms rejects
+        // server-to-server calls on the free plan — so the browser sends it.
+        let delivered = res.ok && data.ok;
+        if (delivered && data.notify) {
+            const w3 = await fetch(data.notify.endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                body: JSON.stringify(data.notify.payload)
+            }).catch(() => null);
+            delivered = !!(w3 && w3.ok);
+        }
+        if (delivered) {
             if (statusEl) { statusEl.style.color = 'var(--color-success)'; statusEl.textContent = successMsg; }
             showToast(successMsg);
         } else {
