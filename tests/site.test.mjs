@@ -130,3 +130,32 @@ test('the fonts and icons survive a deploy and a dead network', () => {
     assert.ok(/res\.type === 'opaque'/.test(sw),
         'opaque CDN responses are rejected, so the icon CSS would never cache');
 });
+
+test('the local snapshots have a door, and restoring is all-or-nothing', () => {
+    const app = read('sale/app.js');
+    const html = read('sale/index.html');
+
+    // The snapshots were correct and complete and reachable only by typing
+    // sjDataRecovery.restore(0) into a browser console — no use to an
+    // electrician whose jobs just vanished.
+    assert.ok(/onclick="toggleRecoveryPanel\(\)"/.test(html),
+        'nothing in the UI opens the recovery panel');
+    assert.ok(html.includes('id="recovery-panel"'), 'the recovery panel is gone');
+    assert.ok(/function renderRecoveryPanel/.test(app), 'renderRecoveryPanel is gone');
+
+    // Written key by key, a quota error partway leaves the snapshot's projects
+    // beside the damaged history — a state that never existed.
+    const restore = app.slice(app.indexOf('restore: function'));
+    const body = restore.slice(0, restore.indexOf('\n    }'));
+    assert.ok(/const previous = writes\.map/.test(body),
+        'restore no longer captures the previous state, so it cannot roll back');
+    assert.ok(/catch \(e2\)/.test(body),
+        'the rollback is unguarded — if it throws, the failure is silent');
+
+    // Promising a safety backup that backupLocalSnapshot will skip is a lie
+    // told at the worst possible moment.
+    const confirmFn = app.slice(app.indexOf('function confirmRecoveryRestore'));
+    const confirmBody = confirmFn.slice(0, confirmFn.indexOf('\n}'));
+    assert.ok(/nothingToLose/.test(confirmBody),
+        'the restore prompt promises a backup even when there is nothing to back up');
+});

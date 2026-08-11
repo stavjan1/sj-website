@@ -1939,7 +1939,83 @@ function guardBeforeShrink(storageKey, newCount, reason) {
     } catch (e) { /* parse/storage issue — non-fatal */ }
 }
 
-// Emergency recovery surface (usable from the browser console if ever needed):
+// Why a snapshot was taken, in words. The stored reason is an English tag
+// written for whoever reads the code; the person who needs to restore is
+// looking for the moment it happened, not the internal name of the operation.
+const SNAPSHOT_REASONS = [
+    [/cloud\(KV\) merge/i, 'לפני סנכרון מהענן'],
+    [/before import/i, 'לפני ייבוא קובץ גיבוי'],
+    [/username migration/i, 'לפני שינוי שם משתמש'],
+    [/recovery restore/i, 'לפני שחזור קודם'],
+    [/manual recover/i, 'לפני שחזור ידני'],
+    [/^shrink:/i, 'לפני פעולה שהקטינה את הנתונים'],
+];
+
+function snapshotReasonText(reason) {
+    const hit = SNAPSHOT_REASONS.find(([re]) => re.test(String(reason || '')));
+    return hit ? hit[1] : 'גיבוי אוטומטי';
+}
+
+// The snapshots exist and are correct; until now the only way in was to type
+// sjDataRecovery.restore(0) into a browser console. Someone whose jobs have
+// just vanished is not going to do that, so the same list gets a door.
+function toggleRecoveryPanel() {
+    const panel = document.getElementById('recovery-panel');
+    if (!panel) return;
+    if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    renderRecoveryPanel();
+}
+
+function renderRecoveryPanel() {
+    const panel = document.getElementById('recovery-panel');
+    if (!panel) return;
+    const snaps = window.sjDataRecovery.list();
+    if (!snaps.length) {
+        panel.innerHTML = '<p class="recovery-empty">אין עדיין גיבויים מקומיים. המערכת שומרת גיבוי אוטומטית לפני כל פעולה שעלולה למחוק נתונים.</p>';
+        return;
+    }
+    panel.innerHTML = '<p class="recovery-intro">'
+        + 'המערכת שומרת גיבוי לפני כל פעולה שעלולה למחוק נתונים. שחזור מחזיר את הפרויקטים, ההצעות והמחירון למצב שבשורה שנבחרה. '
+        + 'המספרים בכל שורה הם בדיוק מה שיהיה לך אחרי השחזור.</p>'
+        + '<div class="recovery-list">' + snaps.map((s) => `
+            <div class="recovery-row">
+                <div class="recovery-when">
+                    <strong>${escapeHtml(s.when)}</strong>
+                    <span class="recovery-reason">${escapeHtml(snapshotReasonText(s.reason))}</span>
+                </div>
+                <div class="recovery-counts">
+                    <span>${s.projects} פרויקטים</span>
+                    <span>${s.history} הצעות</span>
+                    <span>${s.catalog} פריטי מחירון</span>
+                </div>
+                <button type="button" class="btn btn-secondary btn-small" onclick="confirmRecoveryRestore(${s.index})">
+                    <i class="fa-solid fa-rotate-left"></i> שחזר
+                </button>
+            </div>`).join('') + '</div>';
+}
+
+function confirmRecoveryRestore(index) {
+    const snap = window.sjDataRecovery.list()[index];
+    if (!snap) { showToast('הגיבוי כבר לא קיים', 'error'); return; }
+    // backupLocalSnapshot skips when there is nothing worth saving, so promising
+    // that the current state is kept would be a lie exactly when someone is
+    // restoring from an already-empty app — the worst place to be wrong.
+    const nothingToLose = !(projectsList || []).length
+        && !((appState.history) || []).length
+        && !(trashedProjectsList || []).length
+        && !(priceCatalog || []).length;
+
+    const msg = `לשחזר את המצב מ-${snap.when}?\n\n`
+        + `אחרי השחזור יהיו לך ${snap.projects} פרויקטים, ${snap.history} הצעות ו-${snap.catalog} פריטי מחירון.\n`
+        + (nothingToLose
+            ? `כרגע אין נתונים במכשיר, אז אין מה לאבד.`
+            : `המצב הנוכחי יישמר כגיבוי, כך שאפשר לחזור ממנו.`);
+    if (!confirm(msg)) return;
+    if (window.sjDataRecovery.restore(index)) renderRecoveryPanel();
+}
+
+// Emergency recovery surface, also usable from the browser console:
 //   sjDataRecovery.list()        → see available snapshots (newest first)
 //   sjDataRecovery.restore(0)    → restore the newest snapshot
 window.sjDataRecovery = {
@@ -1958,12 +2034,46 @@ window.sjDataRecovery = {
         if (!snap) { console.warn('אין גיבוי במיקום הזה'); return false; }
         // Snapshot the (possibly damaged) current state first, so restore is reversible too.
         backupLocalSnapshot('before recovery restore');
-        if (snap.settings) { appState.settings = snap.settings; localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings)); }
-        if (snap.history) { appState.history = snap.history; localStorage.setItem(getStorageKey('sj_quote_history'), JSON.stringify(appState.history)); }
-        if (snap.projects) { projectsList = snap.projects; localStorage.setItem(getStorageKey('sj_projects'), JSON.stringify(projectsList)); }
-        if (snap.trash) { trashedProjectsList = snap.trash; localStorage.setItem(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList)); }
-        if (snap.catalog) { priceCatalog = snap.catalog; localStorage.setItem(getStorageKey('sj_price_catalog'), JSON.stringify(priceCatalog)); }
-        localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
+
+        // All of it or none of it. Written one key at a time, a quota error
+        // partway through would leave the snapshot's projects sitting beside
+        // the damaged history — a state that never existed and is worse than
+        // the one being escaped. So: write, and put everything back on failure.
+        const writes = [
+            ['sj_quote_settings', snap.settings, (v) => { appState.settings = v; }],
+            ['sj_quote_history', snap.history, (v) => { appState.history = v; }],
+            ['sj_projects', snap.projects, (v) => { projectsList = v; }],
+            ['sj_trash_projects', snap.trash, (v) => { trashedProjectsList = v; }],
+            ['sj_price_catalog', snap.catalog, (v) => { priceCatalog = v; }],
+        ].filter(([, value]) => value);
+
+        const previous = writes.map(([key]) => [key, localStorage.getItem(getStorageKey(key))]);
+        try {
+            for (const [key, value] of writes) {
+                localStorage.setItem(getStorageKey(key), JSON.stringify(value));
+            }
+            localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
+        } catch (e) {
+            // Rolling back writes values that were already in storage, so it
+            // should always fit — but this is the last line of defence for
+            // someone's jobs, and it must not throw its way out of the
+            // handler and leave them staring at nothing.
+            let rolledBack = true;
+            for (const [key, was] of previous) {
+                try {
+                    if (was === null) localStorage.removeItem(getStorageKey(key));
+                    else localStorage.setItem(getStorageKey(key), was);
+                } catch (e2) { rolledBack = false; }
+            }
+            if (typeof showToast === 'function') {
+                showToast(rolledBack
+                    ? 'השחזור נכשל — אין מספיק מקום בזיכרון. שום דבר לא שונה.'
+                    : 'השחזור נכשל והחזרת המצב הקודם נכשלה גם. הגיבויים עדיין שמורים — פנה מקום ונסה שוב.', 'error');
+            }
+            return false;
+        }
+
+        writes.forEach(([, value, assign]) => assign(value));
         try { filterProjectsList(); renderHistoryList(); loadSettings(); } catch (e) {}
         if (typeof showToast === 'function') showToast('הנתונים שוחזרו מהגיבוי המקומי');
         return true;

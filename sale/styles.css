@@ -5378,3 +5378,51 @@ html[data-stage-dir='back']::view-transition-new(root) {
 @media print {
     .page-guide, .page-overflow-warning { display: none !important; }
 }
+
+/* ── Local recovery ──────────────────────────────────────────────────────────
+   The snapshots were always there; this is the door. Someone opening this
+   panel has usually just lost something, so the rows lead with when it
+   happened and what is inside, not with the button. */
+.recovery-panel {
+    margin: 0 0 18px;
+    padding: 14px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--bg-card);
+}
+.recovery-intro, .recovery-empty {
+    margin: 0 0 12px;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: var(--text-secondary);
+}
+.recovery-empty { margin: 0; }
+.recovery-list { display: flex; flex-direction: column; gap: 8px; }
+.recovery-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-secondary, transparent);
+}
+.recovery-when { display: flex; flex-direction: column; gap: 2px; min-width: 170px; }
+.recovery-when strong { font-size: 0.9rem; }
+.recovery-reason { font-size: 0.76rem; color: var(--text-muted); }
+.recovery-counts {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-inline-end: auto;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+.recovery-counts span { white-space: nowrap; }
+
+@media (max-width: 768px) {
+    .recovery-row { align-items: stretch; }
+    .recovery-counts { margin-inline-end: 0; }
+    .recovery-row .btn { width: 100%; }
+}
