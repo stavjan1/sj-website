@@ -172,3 +172,36 @@ test('the page-break guide agrees with the exporter, and never prints', () => {
     assert.ok(/@media print[\s\S]{0,200}\.page-guide/.test(css),
         'the print path does not hide the page guides');
 });
+
+test('every file the user picks either works or says why', () => {
+    // A FileReader with no onerror fails in complete silence: the dialog
+    // closes, nothing changes, nothing to act on. Worst on a backup restore,
+    // where the person is already trying to recover something.
+    const app = readFileSync(join(ROOT, 'sale/app.js'), 'utf8');
+    const readers = [...app.matchAll(/new FileReader\(\)/g)];
+    assert.equal(readers.length, 1,
+        `${readers.length} FileReaders — they should all go through readFileOrExplain`);
+
+    const helper = app.slice(app.indexOf('function readFileOrExplain'));
+    const body = helper.slice(0, helper.indexOf('\n}'));
+    assert.ok(/onerror/.test(body) && /onabort/.test(body),
+        'readFileOrExplain no longer handles failure');
+
+    // An image the browser cannot decode never fires onload — HEIC straight
+    // off an iPhone is the common one.
+    const comp = app.slice(app.indexOf('function _compressImageFile'));
+    const compBody = comp.slice(0, comp.indexOf('\n}\n'));
+    assert.ok(/img\.onerror/.test(compBody), '_compressImageFile ignores undecodable images');
+
+    // A logo may be transparent, and JPEG has no alpha — flattening one puts a
+    // solid box behind the mark on every quote.
+    assert.ok(/isLogo \? \{ max: \d+, mime: 'image\/png' \}/.test(app),
+        'the logo is no longer stored as PNG, so transparency would be flattened');
+
+    // Camera photos must never reach localStorage at full size.
+    const upload = app.slice(app.indexOf('function handleImageUpload'));
+    const uploadBody = upload.slice(0, upload.indexOf('\n}\n'));
+    assert.ok(/_compressImageFile/.test(uploadBody), 'the logo/background path skips compression');
+    assert.ok(!/localStorage\.setItem/.test(uploadBody),
+        'the logo/background path writes storage directly instead of via safeLocalSet');
+});

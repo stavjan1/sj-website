@@ -204,9 +204,10 @@ function adminImportPaste() {
 function adminImportFile(input) {
     const file = input && input.files && input.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { _applyAdminImport(parseCatalogImportText(reader.result)); input.value = ''; };
-    reader.readAsText(file);
+    readFileOrExplain(file, (text) => {
+        _applyAdminImport(parseCatalogImportText(text));
+        input.value = '';
+    }, 'קובץ המאגר');
 }
 
 function _applyAdminImport(report) {
@@ -4951,9 +4952,10 @@ function importCatalogFromText() {
 function importCatalogFromFile(input) {
     const file = input && input.files && input.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { _applyCatalogImport(parseCatalogImportText(reader.result)); input.value = ''; };
-    reader.readAsText(file);
+    readFileOrExplain(file, (text) => {
+        _applyCatalogImport(parseCatalogImportText(text));
+        input.value = '';
+    }, 'קובץ המחירון');
 }
 
 function renderPriceCatalog() {
@@ -5070,16 +5072,16 @@ function shareCatalogFile(input) {
         return;
     }
     const isTextLike = /\.(csv|txt)$/i.test(file.name);
-    const reader = new FileReader();
-    reader.onload = async () => {
-        const fileText = isTextLike ? String(reader.result).slice(0, 60000) : '';
-        await _postCatalogShare(statusEl,
-            { ..._shareSenderDetails(), fileName: file.name, fileText },
-            'תודה! הקובץ נשלח לבדיקה 🙂');
-        input.value = '';
-    };
-    if (isTextLike) reader.readAsText(file);
-    else { reader.onload = null; _postCatalogShare(statusEl, { ..._shareSenderDetails(), fileName: file.name, fileText: '' }, 'תודה! שם הקובץ נשלח — ניצור קשר להעברתו 🙂').then(() => { input.value = ''; }); }
+    if (isTextLike) {
+        readFileOrExplain(file, async (text) => {
+            await _postCatalogShare(statusEl,
+                { ..._shareSenderDetails(), fileName: file.name, fileText: String(text).slice(0, 60000) },
+                'תודה! הקובץ נשלח לבדיקה 🙂');
+            input.value = '';
+        }, 'הקובץ');
+    } else {
+        _postCatalogShare(statusEl, { ..._shareSenderDetails(), fileName: file.name, fileText: '' }, 'תודה! שם הקובץ נשלח — ניצור קשר להעברתו 🙂').then(() => { input.value = ''; });
+    }
 }
 
 function getNextQuoteNumber() {
@@ -5615,6 +5617,7 @@ function reportTableCellPhoto(i, r, c, input) {
     const file = input.files && input.files[0];
     if (!file) return;
     _compressImageFile(file, (dataUrl) => {
+        if (!dataUrl) return;                 // unreadable file — already explained
         const t = reportBlocks[i];
         if (t && t.type === 'table' && t.rows[r]) t.rows[r][c] = { img: dataUrl };
         renderReportBlocks();
@@ -5896,27 +5899,53 @@ function renderReportFindings() {
         </div>`).join('');
 }
 
-// Compress site photos (phone camera shots are 3-8MB) to a small JPEG so a
+// Compress site photos (phone camera shots are 3-8MB) to a small image so a
 // full report stays well inside the localStorage budget.
-function _compressImageFile(file, cb) {
+//
+// opts.mime matters: a logo may have a transparent background, and JPEG has no
+// alpha, so flattening one produces a black or white box behind the mark.
+// PNG for anything that might be transparent, JPEG for photographs.
+function _compressImageFile(file, cb, opts) {
+    const { max = 700, mime = 'image/jpeg', quality = 0.72 } = opts || {};
     const img = new Image();
+    const url = URL.createObjectURL(file);
     img.onload = () => {
-        const MAX = 700;
-        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
         const c = document.createElement('canvas');
         c.width = Math.round(img.width * scale);
         c.height = Math.round(img.height * scale);
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        URL.revokeObjectURL(img.src);
-        cb(c.toDataURL('image/jpeg', 0.72));
+        URL.revokeObjectURL(url);
+        cb(c.toDataURL(mime, quality));
     };
-    img.src = URL.createObjectURL(file);
+    // A file the browser cannot decode — HEIC straight off an iPhone is the
+    // common one — never fires onload. Without this the picker just closes and
+    // nothing happens, which reads as the app being broken.
+    img.onerror = () => {
+        URL.revokeObjectURL(url);
+        showToast('לא הצלחתי לקרוא את התמונה. אם צולמה באייפון, שמור אותה כ-JPG ונסה שוב.', 'error');
+        cb(null);
+    };
+    img.src = url;
+}
+
+// Every file the user picks either works or says why. A FileReader with no
+// onerror fails in complete silence: the dialog closes, nothing changes, and
+// there is nothing to act on — worst of all on a backup restore, where the
+// person is already trying to recover something.
+function readFileOrExplain(file, onText, what) {
+    const reader = new FileReader();
+    reader.onload = () => onText(reader.result);
+    reader.onerror = () => showToast(`לא הצלחתי לקרוא את ${what}. ייתכן שהקובץ פגום או נעול.`, 'error');
+    reader.onabort = () => showToast(`קריאת ${what} הופסקה.`, 'error');
+    reader.readAsText(file);
 }
 
 function onReportPhoto(i, input) {
     const file = input.files && input.files[0];
     if (!file) return;
     _compressImageFile(file, (dataUrl) => {
+        if (!dataUrl) return;                 // unreadable file — already explained
         reportFindings[i].img = dataUrl;
         renderReportFindings();
         scheduleReportPreview();
@@ -7693,6 +7722,7 @@ function onChatPhotoPicked(input) {
         // A touch smaller than report photos — chat images ride inside the
         // conversation blob, and Gemini downscales large inputs anyway.
         _compressImageFile(file, (dataUrl) => {
+            if (!dataUrl) return;             // unreadable file — already explained
             if (pendingChatPhotos.length >= 4) { showToast('אפשר עד 4 תמונות בהודעה', 'error'); return; }
             pendingChatPhotos.push(dataUrl);
             renderChatAttachments();
@@ -8248,29 +8278,27 @@ function handleImageUpload(event, type) {
     const file = event.target.files[0];
     if (!file) return;
     
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const base64Data = e.target.result;
-        
-        if (type === 'logo') {
-            localStorage.setItem(getStorageKey('sj_uploaded_logo'), base64Data);
-            appState.settings.uploadedLogo = base64Data;
-            localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
-            localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
-            renderLogo(base64Data);
-            syncDatabaseToDrive(true);
-            showToast('לוגו העסק עודכן בהצלחה');
-        } else if (type === 'bg') {
-            localStorage.setItem(getStorageKey('sj_uploaded_bg'), base64Data);
-            appState.settings.uploadedBg = base64Data;
-            localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
-            localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
-            renderWatermark(base64Data);
-            syncDatabaseToDrive(true);
-            showToast('תמונת רקע עודכנה בהצלחה');
+    // Straight off a phone this is a 3-8MB photo, and base64 inflates it by a
+    // third — enough to fill the whole local budget with one pick. Downscale
+    // first, as PNG so a logo keeps its transparent background.
+    const isLogo = type === 'logo';
+    _compressImageFile(file, (base64Data) => {
+        if (!base64Data) return;              // unreadable file — already explained
+
+        const imgKey = isLogo ? 'sj_uploaded_logo' : 'sj_uploaded_bg';
+        if (!safeLocalSet(getStorageKey(imgKey), base64Data)) {
+            showToast('אין מספיק מקום בזיכרון המקומי לתמונה הזו — נסה קובץ קטן יותר', 'error');
+            return;                           // nothing half-written
         }
-    };
-    reader.readAsDataURL(file);
+        if (isLogo) appState.settings.uploadedLogo = base64Data;
+        else appState.settings.uploadedBg = base64Data;
+
+        safeLocalSet(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
+        safeLocalSet(getStorageKey('sj_db_last_updated'), Date.now().toString());
+        if (isLogo) renderLogo(base64Data); else renderWatermark(base64Data);
+        syncDatabaseToDrive(true);
+        showToast(isLogo ? 'לוגו העסק עודכן בהצלחה' : 'תמונת רקע עודכנה בהצלחה');
+    }, isLogo ? { max: 600, mime: 'image/png' } : { max: 1400, mime: 'image/jpeg', quality: 0.72 });
 }
 
 function clearUploadedImage(type) {
@@ -8819,10 +8847,9 @@ function importHistoryData(event) {
     const file = event.target.files[0];
     if (!file) return;
     
-    const reader = new FileReader();
-    reader.onload = function(e) {
+    readFileOrExplain(file, function (result) {
         try {
-            const imported = JSON.parse(e.target.result);
+            const imported = JSON.parse(result);
             if (imported.history && Array.isArray(imported.history)) {
                 if (confirm(`נמצאו ${imported.history.length} הצעות מחיר בקובץ.\n\nשים לב: הייבוא יחליף את כל ההיסטוריה והפרויקטים הנוכחיים בקובץ הגיבוי (לא ימוזג). להמשיך?`)) {
                     backupLocalSnapshot('before import');
@@ -8846,8 +8873,7 @@ function importHistoryData(event) {
         } catch (err) {
             showToast('שגיאה בפענוח קובץ הגיבוי', 'error');
         }
-    };
-    reader.readAsText(file);
+    }, 'קובץ הגיבוי');
 }
 
 // ==========================================================================
