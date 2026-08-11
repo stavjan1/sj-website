@@ -60,6 +60,7 @@ body {
     line-height: 1.5;
     width: var(--appvw, 100vw);
     height: var(--appvh, 100vh);
+    height: var(--appvh, 100dvh);
     overflow: hidden;
 }
 
@@ -84,6 +85,7 @@ body {
     display: flex;
     width: var(--appvw, 100vw);
     height: var(--appvh, 100vh);
+    height: var(--appvh, 100dvh);
 }
 
 /* Sidebar Navigation */
@@ -235,6 +237,7 @@ body {
 .main-content {
     flex-grow: 1;
     height: var(--appvh, 100vh);
+    height: var(--appvh, 100dvh);
     overflow-y: auto;
     background-color: var(--bg-main);
     position: relative;
@@ -2246,10 +2249,10 @@ textarea#ai-input {
     /* Chat gets the full window height: slim every bar around it.
        --appvh = the REAL usable viewport height (compensates the 125%-scaling
        counter-zoom, where plain 100vh falls short — set by applyDisplayZoomFix). */
-    #panel-wizard .control-side { height: calc(var(--appvh, 100vh) - 106px) !important; }
+    #panel-wizard .control-side { height: calc(var(--appvh, 100dvh) - 106px) !important; }
     /* The estimate panel matches the chat height; ONE scroll for all its content */
     #panel-wizard .preview-side {
-        height: calc(var(--appvh, 100vh) - 106px);
+        height: calc(var(--appvh, 100dvh) - 106px);
         display: flex; flex-direction: column; overflow: hidden;
     }
     #panel-wizard .preview-side .card-body { flex: 1; min-height: 0; overflow-y: auto; }
@@ -2339,15 +2342,19 @@ textarea#ai-input {
    Mobile Responsive Design (iPhone 16 / Portrait Mobile)
    ========================================================================== */
 @media (max-width: 768px) {
-    body {
-        overflow-y: auto; /* Allow scrolling the whole app on mobile if needed */
-    }
+    /* The phone gets the same shell as the desktop: the app is exactly the
+       height of the screen and does not scroll as a page. Letting the whole
+       app scroll is what cut the last line off and made the composer sit
+       below the fold — a messaging app never does that. Long panels still
+       scroll; the shell around them does not. */
+    body { overflow: hidden; }
 
     .app-container {
         flex-direction: column;
-        height: auto;
-        min-height: 100vh;
-        overflow-y: auto;
+        height: var(--appvh, 100vh);
+        height: var(--appvh, 100dvh);
+        min-height: 0;
+        overflow: hidden;
     }
 
     /* Sidebar as Bottom Navigation Bar — horizontally scrollable so every tab
@@ -2540,11 +2547,27 @@ textarea#ai-input {
 
     /* Main Content Adjustments */
     .main-content {
+        flex: 1 1 auto;
         height: auto;
-        min-height: calc(100vh - 65px);
-        padding-bottom: 75px; /* Margin to not get hidden by bottom navigation */
-        overflow-y: visible;
+        min-height: 0;
+        /* The reserve that keeps content off the fixed bottom bar is set once,
+           further down with the safe-area rules — not duplicated here. */
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
     }
+
+    /* Most panels are long forms and scroll inside the shell. */
+    .content-panel.active {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    /* The chat panel is the strict one: it does not scroll at all — its
+       message log does, so the composer stays pinned above the keyboard. */
+    #panel-wizard.active { overflow: hidden; }
 
     .content-panel {
         padding: 12px;
@@ -5174,3 +5197,86 @@ body.boxes-light .card-header { background: linear-gradient(180deg, rgba(37,99,2
     color: var(--text-primary); --sketch-bg: var(--bg-card);
 }
 .spec-sketch svg { display: block; width: 100%; height: auto; }
+
+/* ── The shell owns the viewport; the chat owns the scroll ──────────────────
+   The app should sit exactly in the screen, the way a messaging app does — no
+   page scroll, nothing cut off at the bottom. Panels that are genuinely long
+   (settings, catalogue, admin) still scroll, because a form has to; what must
+   never scroll is the shell around them.
+
+   The chat panel is the strict case: it is a column of fixed height whose only
+   scrolling child is the message log, so the composer stays pinned to the
+   bottom and the header stays put — exactly the WhatsApp arrangement. */
+#panel-wizard.active {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+#panel-wizard .split-view { flex: 1 1 auto; min-height: 0; }
+/* Was an inline height:calc(100vh - 160px), which outranked every stylesheet
+   and pushed the composer below the fold. It only ever needed to fill its
+   parent, and the parent is already the right height. */
+#panel-wizard .control-side { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+#panel-wizard .chat-container { height: 100%; min-height: 0; display: flex; flex-direction: column; }
+#panel-wizard .chat-messages { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+#panel-wizard .chat-input-area { flex: 0 0 auto; }
+
+/* iOS bounces the whole document when a nested scroller hits its end; contain
+   keeps that bounce inside the log instead of dragging the shell. */
+html, body { overscroll-behavior: none; }
+
+/* ── One pane at a time on a phone ─────────────────────────────────────────
+   Stacking the chat above the characterization card leaves the chat about a
+   third of the screen — too little to hold a conversation in. On a phone the
+   two swap instead of sharing: the "אפיון ואומדן" button in the toolbar is the
+   switch, and each pane gets the whole height.
+
+   Desktop is unaffected — there the two genuinely fit side by side. */
+@media (max-width: 768px) {
+    #panel-wizard .split-view {
+        display: flex;
+        flex-direction: column;
+    }
+    #panel-wizard .control-side,
+    #panel-wizard .preview-side {
+        flex: 1 1 auto;
+        min-height: 0;
+        width: 100%;
+    }
+    /* Card open → it takes the screen and the chat steps aside. */
+    #panel-wizard:not(.hide-estimate) .control-side { display: none; }
+    #panel-wizard:not(.hide-estimate) .preview-side { display: flex !important; }
+    #panel-wizard:not(.hide-estimate) .preview-side .card-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+}
+
+/* ── Give the conversation the screen ──────────────────────────────────────
+   On a phone the chat panel was 325px of chrome above 244px of conversation.
+   A messaging app is the other way round: a thin header, then the thread.
+   Nothing is removed — the same controls are here, just sized for a thumb
+   instead of a desk. */
+@media (max-width: 768px) {
+    #panel-wizard .section-header { margin-bottom: 8px; gap: 8px; }
+    #panel-wizard .section-header h2 { font-size: 1.05rem; margin: 0; }
+    /* Explanatory copy earns its space once and costs it forever. Desktop
+       already hides it above 861px for the same reason; this covers the gap. */
+    #panel-wizard .section-subtitle { display: none; }
+
+    /* Model choice and quota are set-and-forget, not touched mid-job: one
+       compact row instead of a stacked block with a 40px ring. */
+    #panel-wizard .model-quota-bar { gap: 8px; padding: 0; }
+    #panel-wizard .model-class-btn { padding: 6px 10px; font-size: 0.78rem; }
+    #panel-wizard #model-class-pills { padding: 0; gap: 6px; }
+    #panel-wizard .quota-ring { transform: scale(0.7); transform-origin: center; }
+    #panel-wizard .quota-ring-wrap { gap: 4px; }
+    #panel-wizard .quota-info-text { display: none; }
+
+    /* The stage pills stay — they are the navigation — but on one line. */
+    #panel-wizard #chat-mode-toggle { padding: 6px 10px; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    #panel-wizard #chat-mode-toggle::-webkit-scrollbar { display: none; }
+    #panel-wizard .mode-pill { padding: 6px 12px; font-size: 0.82rem; white-space: nowrap; }
+    #panel-wizard .stage-hint { font-size: 0.72rem; }
+
+    #panel-wizard .chat-toolbar { padding: 6px 10px; gap: 6px; }
+    #panel-wizard .chat-messages { padding: 12px; }
+}

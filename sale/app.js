@@ -6796,9 +6796,12 @@ function setChatMode(mode, projOverride) {
         ? 'תאר את העבודה (מה מתקינים, איפה, באילו תנאים)...'
         : 'כתוב כאן הודעה למומחה התמחור...';
 
-    // Characterization lives in the side panel — it cannot be the stage and be
-    // hidden at the same time. Pricing goes back to whatever the user prefers.
-    if (mode === 'plan') toggleEstimatePanel(false, false);
+    // Characterization lives in the side panel — on a wide screen it cannot be
+    // the stage and be hidden at the same time, so plan mode opens it. On a
+    // phone the two panes swap rather than share, and the conversation is where
+    // you start, so the chat stays in front and the card is one tap away.
+    const wide = window.matchMedia('(min-width: 769px)').matches;
+    if (mode === 'plan') toggleEstimatePanel(!wide, false);
     else toggleEstimatePanel(localStorage.getItem('sj_hide_estimate') !== '0', false);
 
     renderChatHistory(mode === 'plan' ? ensurePlanHistory(proj) : proj.chatHistory);
