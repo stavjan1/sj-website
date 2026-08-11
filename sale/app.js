@@ -6851,8 +6851,41 @@ function setChatMode(mode, projOverride) {
 // One door for all three, so the transition and the gate logic live in one
 // place instead of being re-derived at every call site.
 const STAGE_INDEX = { plan: 0, price: 1, draft: 2 };
+const STAGE_BY_INDEX = ['plan', 'price', 'draft'];
 let stageTransitionBusy = false;
 let stagePending = null;
+
+// A keyboard is the one thing the desktop has that the phone does not, so that
+// is where the desktop earns its keep: Alt+1/2/3 jumps between the stages
+// without hunting for the rail. Advertised in each pill's tooltip — a shortcut
+// nobody knows about is not a feature.
+const STAGE_HAS_KEYBOARD = matchMedia('(hover: hover) and (pointer: fine)').matches;
+const stageKeyHint = (i) => (STAGE_HAS_KEYBOARD ? ` (Alt+${i + 1})` : '');
+
+// Is something covering the app right now? Checked by geometry rather than by a
+// list of ids, because the list would go stale the first time a modal is added
+// and the shortcut would start firing behind it.
+function blockingOverlayOpen() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    return [...document.querySelectorAll('body > div, body > section')].some((el) => {
+        const cs = getComputedStyle(el);
+        if (cs.position !== 'fixed' || cs.display === 'none' || cs.visibility === 'hidden') return false;
+        if (parseFloat(cs.opacity) === 0 || cs.pointerEvents === 'none') return false;
+        if ((parseInt(cs.zIndex, 10) || 0) < 1000) return false;
+        const r = el.getBoundingClientRect();
+        return r.width >= vw * 0.8 && r.height >= vh * 0.8;   // actually covers the app
+    });
+}
+
+document.addEventListener('keydown', (e) => {
+    if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    const i = ['1', '2', '3'].indexOf(e.key);
+    if (i === -1) return;
+    if (!activeProjectId) return;                       // nothing to navigate yet
+    if (blockingOverlayOpen()) return;                  // don't move the app behind a dialog
+    e.preventDefault();
+    goToStage(STAGE_BY_INDEX[i]);
+});
 
 // Steps you have not reached yet are locked; the lock is the same rule the
 // pricing gate uses, stated once.
@@ -6920,10 +6953,19 @@ function renderStageRail(proj) {
         ? 2 : STAGE_INDEX[activeChatMode] ?? 0;
     document.querySelectorAll('.stage-rail').forEach((rail) => {
         [...rail.querySelectorAll('.mode-pill')].forEach((pill, i) => {
+            const locked = i > at;
             pill.classList.toggle('active', i === current);
-            pill.classList.toggle('locked', i > at);
+            pill.classList.toggle('locked', locked);
             pill.setAttribute('aria-current', i === current ? 'step' : 'false');
-            pill.disabled = false;   // a locked step still explains itself when tapped
+            // Locked is dimming — visible only to someone who can see it. The
+            // button stays operable on purpose (tapping it explains what is
+            // missing), so aria-disabled, not disabled: announced as
+            // unavailable, still focusable, still able to answer.
+            pill.setAttribute('aria-disabled', locked ? 'true' : 'false');
+            pill.disabled = false;
+            pill.title = locked
+                ? (i === 1 ? 'נעול — קודם משלימים את האפיון' : 'נעול — קודם אפיון ותמחור')
+                : `מעבר לשלב ${i + 1}${stageKeyHint(i)}`;
         });
     });
 }
