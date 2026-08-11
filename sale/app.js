@@ -6851,6 +6851,8 @@ function setChatMode(mode, projOverride) {
 // One door for all three, so the transition and the gate logic live in one
 // place instead of being re-derived at every call site.
 const STAGE_INDEX = { plan: 0, price: 1, draft: 2 };
+let stageTransitionBusy = false;
+let stagePending = null;
 
 // Steps you have not reached yet are locked; the lock is the same rule the
 // pricing gate uses, stated once.
@@ -6866,6 +6868,17 @@ function goToStage(stage) {
         showToast(stage === 'price' ? 'קודם משלימים את האפיון' : 'קודם אפיון ותמחור — ואז מכינים טיוטה', 'error');
         return;
     }
+
+    // A tap that arrives mid-slide is held, not run. Running it now would land
+    // BEFORE the slide already in flight — startViewTransition defers its
+    // callback — so the earlier tap would win and the thumb would end up on a
+    // stage it did not choose last. Only the most recent request is kept:
+    // tapping 1→2→3 quickly means 3.
+    //
+    // This has to come before the from/to check below: mid-slide the app still
+    // LOOKS like the stage being left, so a tap back to it reads as a no-op and
+    // would be silently dropped.
+    if (stageTransitionBusy) { stagePending = stage; return; }
 
     const from = document.getElementById('panel-create').classList.contains('active')
         ? 2 : STAGE_INDEX[activeChatMode] ?? 0;
@@ -6885,8 +6898,19 @@ function goToStage(stage) {
     // startViewTransition is the browser's own mechanism for it — where it is
     // missing, or where the user asked for less motion, this is just a call.
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (document.startViewTransition && !reduced) document.startViewTransition(apply);
-    else apply();
+    if (!document.startViewTransition || reduced) { apply(); return; }
+
+    stageTransitionBusy = true;
+    const vt = document.startViewTransition(apply);
+    // Both of these reject when a transition is cut short, and an uncaught
+    // rejection here is a red console on a page that is working fine.
+    vt.ready.catch(() => {});
+    vt.finished.catch(() => {}).finally(() => {
+        stageTransitionBusy = false;
+        const next = stagePending;
+        stagePending = null;
+        if (next) goToStage(next);   // re-enters the gate, so a locked step is still refused
+    });
 }
 
 // Paints the rail: which step you are on, which are still locked.

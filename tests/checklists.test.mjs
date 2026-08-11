@@ -126,3 +126,22 @@ test('the written assumptions stay tied to the characterization', () => {
     assert.ok(!app.includes('quoteData.specTermsWritten'),
         'the assumptions marker is stored inside quoteData, which is rebuilt on every form edit');
 });
+
+test('a tap during a stage slide is queued before the no-op check', () => {
+    // Mid-slide the app still LOOKS like the stage being left, so `from === to`
+    // is true for a tap heading back to it. If that check runs first the tap is
+    // silently dropped and the thumb ends up somewhere it did not choose.
+    const app = readFileSync(join(ROOT, 'sale/app.js'), 'utf8');
+    const fn = app.slice(app.indexOf('function goToStage'));
+    const body = fn.slice(0, fn.indexOf('\nfunction ', 10));
+    const busy = body.indexOf('stageTransitionBusy) { stagePending');
+    const noop = body.indexOf('if (from === to) return;');
+    assert.ok(busy > -1, 'the mid-slide queue is gone');
+    assert.ok(noop > -1, 'the no-op check is gone');
+    assert.ok(busy < noop, 'the busy check must come before the from/to no-op check');
+
+    // An aborted transition rejects both promises; uncaught, that is a red
+    // console on a page that is working fine.
+    assert.ok(/vt\.ready\.catch/.test(body), 'vt.ready rejection is unhandled');
+    assert.ok(/vt\.finished\.catch/.test(body), 'vt.finished rejection is unhandled');
+});
