@@ -5124,3 +5124,30 @@ body.boxes-light .card-header { background: linear-gradient(180deg, rgba(37,99,2
 .ck-chip-btn:hover { color: var(--text-primary); }
 .ck-chip-btn.ck-wa { color: #25d366; }
 .ck-chip-more { color: var(--text-muted); }
+
+/* Edit a message and re-run. The pencil is quiet until you're on the bubble —
+   on touch there is no hover, so it stays visible there. */
+.chat-bubble.user { position: relative; }
+.chat-edit-btn {
+    position: absolute; inset-inline-start: -6px; top: 4px;
+    width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    color: var(--text-secondary); font-size: 0.68rem; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity var(--transition-speed), color var(--transition-speed);
+}
+.chat-bubble.user:hover .chat-edit-btn,
+.chat-edit-btn:focus-visible { opacity: 1; }
+.chat-edit-btn:hover { color: var(--color-accent); border-color: var(--color-accent); }
+@media (pointer: coarse) {
+    .chat-edit-btn { opacity: 1; width: 32px; height: 32px; }
+}
+.chat-edit-box { display: flex; flex-direction: column; gap: 8px; min-width: min(420px, 70vw); }
+.chat-edit-text {
+    width: 100%; resize: vertical; font-family: inherit; font-size: 0.9rem; line-height: 1.5;
+    background: var(--bg-input); color: var(--text-primary);
+    border: 1px solid var(--color-accent); border-radius: 8px; padding: 8px 10px;
+}
+.chat-edit-text:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.chat-edit-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chat-edit-note { font-size: 0.75rem; color: var(--text-secondary); }

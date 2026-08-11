@@ -7524,11 +7524,12 @@ function renderChatHistory(chatHistory) {
 
     log.innerHTML = '';
 
-    chatHistory.forEach(msg => {
+    chatHistory.forEach((msg, msgIndex) => {
         if (msg.hidden) return; // behind-the-scenes instruction — AI-only, never shown
         const bubble = document.createElement('div');
         const role = msg.role === 'user' ? 'user' : 'model';
         bubble.className = `chat-bubble ${role}`;
+        bubble.dataset.index = msgIndex;
 
         let text = msg.parts[0].text;
         // The /ask/ lists block renders as the shared designed cards (same
@@ -7555,6 +7556,19 @@ function renderChatHistory(chatHistory) {
             html = `<div class="chat-bubble-photos">${thumbs}</div>` + html;
         }
         bubble.innerHTML = html;
+        // Your own words stay editable. Rewriting one truncates the thread from
+        // that point and asks again — a corrected detail should cost a tap, not
+        // a new project.
+        if (role === 'user' && !msg.images) {
+            const edit = document.createElement('button');
+            edit.type = 'button';
+            edit.className = 'chat-edit-btn';
+            edit.title = 'ערוך ושלח מחדש';
+            edit.setAttribute('aria-label', 'ערוך את ההודעה ושלח מחדש');
+            edit.innerHTML = '<i class="fa-solid fa-pen" aria-hidden="true"></i>';
+            edit.onclick = () => startEditMessage(msgIndex);
+            bubble.appendChild(edit);
+        }
         if (text || (Array.isArray(msg.images) && msg.images.length) || !listsData) log.appendChild(bubble);
         if (listsData && window.ZeremListCards) {
             const holder = document.createElement('div');
@@ -7568,6 +7582,88 @@ function renderChatHistory(chatHistory) {
 
     log.scrollTop = log.scrollHeight;
     applyChatSearch();
+}
+
+// ── Edit a message and re-run ────────────────────────────────────────────────
+// Everything after the edited message is dropped before re-running: an answer
+// built on the old wording is not an answer to the new one, and leaving it
+// there would let the agent contradict itself inside one thread.
+function activeChatArray(proj) {
+    return activeChatMode === 'plan' ? ensurePlanHistory(proj) : proj.chatHistory;
+}
+
+function startEditMessage(index) {
+    const proj = projectsList.find(p => p.id === activeProjectId);
+    if (!proj) return;
+    const history = activeChatArray(proj);
+    const msg = history[index];
+    if (!msg || msg.role !== 'user') return;
+
+    const bubble = document.querySelector(`#chat-messages-log .chat-bubble[data-index="${index}"]`);
+    if (!bubble || bubble.querySelector('.chat-edit-box')) return;
+
+    const original = msg.parts[0].text;
+    const dropped = history.length - index - 1;
+
+    bubble.innerHTML = '';
+    const box = document.createElement('div');
+    box.className = 'chat-edit-box';
+    box.innerHTML = `
+        <textarea class="chat-edit-text" rows="3"></textarea>
+        <div class="chat-edit-actions">
+            <button type="button" class="btn btn-accent btn-small" onclick="commitEditMessage(${index})">
+                <i class="fa-solid fa-rotate-right" aria-hidden="true"></i> שלח מחדש
+            </button>
+            <button type="button" class="btn btn-secondary btn-small" onclick="cancelEditMessage()">ביטול</button>
+            ${dropped > 0 ? `<span class="chat-edit-note">${dropped} הודעות אחרי זו יימחקו</span>` : ''}
+        </div>`;
+    bubble.appendChild(box);
+    const ta = box.querySelector('.chat-edit-text');
+    ta.value = original;
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+    ta.onkeydown = (e) => {
+        if (e.key === 'Escape') cancelEditMessage();
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) commitEditMessage(index);
+    };
+}
+
+function cancelEditMessage() {
+    const proj = projectsList.find(p => p.id === activeProjectId);
+    if (proj) renderChatHistory(activeChatArray(proj));
+}
+
+async function commitEditMessage(index) {
+    const proj = projectsList.find(p => p.id === activeProjectId);
+    if (!proj) return;
+    const ta = document.querySelector('#chat-messages-log .chat-edit-text');
+    if (!ta) return;
+    const text = ta.value.trim();
+    if (!text) { showToast('אי אפשר לשלוח הודעה ריקה', 'error'); return; }
+
+    const history = activeChatArray(proj);
+    const msg = history[index];
+    if (!msg || msg.role !== 'user') return;
+
+    if (text === msg.parts[0].text) { cancelEditMessage(); return; }
+
+    msg.parts[0].text = text;
+    history.length = index + 1;          // drop every reply built on the old wording
+
+    // The characterization card was filled from answers that may no longer hold.
+    // Only the agent's own guesses are cleared — what the user chose stays.
+    if (activeChatMode === 'plan' && proj.spec && proj.spec.answers) {
+        Object.keys(proj.spec.answers).forEach(id => {
+            if (proj.spec.answers[id].source === 'ai') delete proj.spec.answers[id];
+        });
+    }
+
+    saveProjects();
+    renderChatHistory(history);
+    renderSpecCard(proj);
+
+    if (activeChatMode === 'plan') await runPlanningAgent(proj);
+    else await runPricingAgent(proj);
 }
 
 function showTypingIndicator(show) {
