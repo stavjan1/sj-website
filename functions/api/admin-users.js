@@ -11,6 +11,7 @@
 import {
   ADMIN_EMAIL, verifyGoogleEmail, bearerToken, jsonResponse, getTierForEmail,
 } from './_tiers.js';
+import { sendMailTracked } from './_mail.js';
 
 const USER_PREFIX = 'user:';
 
@@ -80,4 +81,44 @@ export async function onRequestGet(context) {
   const mailConfigured = !!(env.RESEND_API_KEY);
 
   return jsonResponse({ ok: true, count: users.length, users, mail, mailConfigured });
+}
+
+
+// POST /api/admin-users  { test: 'mail' }  → send a real test email to the admin
+//
+// Exists because the only honest way to know outbound mail works is to send
+// one. Verifying that needed a second Google account and a signup; this makes
+// it a button, and it exercises the exact path a real signup takes —
+// sendMailTracked, same channel key, same recording — so a pass here means a
+// signup would have arrived too.
+export async function onRequestPost(context) {
+  const { request, env } = context;
+
+  const email = await verifyGoogleEmail(bearerToken(request));
+  if (!email || email.toLowerCase() !== ADMIN_EMAIL) {
+    return jsonResponse({ error: { message: 'אין הרשאה.' } }, 403);
+  }
+
+  const body = await request.json().catch(() => ({}));
+  if (body.test !== 'mail') return jsonResponse({ error: { message: 'בקשה לא מוכרת.' } }, 400);
+
+  if (!env.RESEND_API_KEY) {
+    return jsonResponse({
+      ok: false,
+      reason: 'לא הוגדר RESEND_API_KEY במשתני הסביבה של Cloudflare — בלעדיו לא נשלח דבר.',
+    });
+  }
+
+  const result = await sendMailTracked(env, 'signup', {
+    to: ADMIN_EMAIL,
+    subject: '⚡ בדיקת מייל מזרם',
+    text: `זו הודעת בדיקה שנשלחה מפאנל הניהול של זרם.
+
+אם היא הגיעה — ההתראה על נרשם חדש תגיע גם היא, דרך אותו נתיב בדיוק.`,
+  });
+
+  return jsonResponse({
+    ok: !!result.ok,
+    reason: result.ok ? null : (result.error || result.skipped || 'שגיאה לא ידועה'),
+  });
 }

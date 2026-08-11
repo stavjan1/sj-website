@@ -3530,24 +3530,43 @@ body.has-custom-bg.light-theme .chat-container {
 }
 
 .spec-rows { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
+
+/* A row has three shapes: answered (one line, value visible), pending (one line,
+   question only), and expanded (the one being answered). Collapsing the first
+   two is what keeps the whole checklist inside a phone screen. */
 .spec-row { padding: 9px 0; border-bottom: 1px solid var(--border-color); }
 .spec-row:last-child { border-bottom: none; }
+.spec-row.answered, .spec-row.pending {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    background: none; border-inline: none; border-block-start: none;
+    font-family: inherit; text-align: start; cursor: pointer;
+    padding-block: 11px;
+}
+.spec-row.answered:hover .spec-row-q, .spec-row.pending:hover .spec-row-q { color: var(--text-primary); }
+.spec-row-q {
+    font-size: 0.84rem; color: var(--text-secondary); flex: 1 1 auto; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.spec-row-v {
+    font-size: 0.82rem; font-weight: 700; color: var(--text-primary);
+    flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    max-width: 45%;
+}
+.spec-row.skipped .spec-row-v { color: var(--text-secondary); font-style: italic; font-weight: 500; }
+.spec-row.expanded {
+    background: var(--bg-card); border: 1px solid var(--color-accent);
+    border-radius: 10px; padding: 12px 13px; margin: 6px 0;
+}
 .spec-q { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
-.spec-q-text { font-size: 0.86rem; color: var(--text-secondary); font-weight: 600; }
-.spec-dot { font-size: 0.6rem; color: var(--text-muted); }
-.spec-row.done .spec-dot { color: var(--color-success); }
-/* An answered row reads as answered from the check icon and the value beneath
-   it — the label keeps full contrast rather than fading to muted, which fails
-   AA against the light theme's panel. Never carry state on colour alone. */
-.spec-row.done .spec-q-text { font-weight: 500; }
-.spec-row.skipped .spec-dot { color: var(--text-muted); }
-.spec-row.open.crit .spec-dot { color: var(--color-accent); }
+.spec-q-text { font-size: 0.9rem; color: var(--text-primary); font-weight: 700; }
+.spec-dot { font-size: 0.62rem; color: var(--text-muted); flex-shrink: 0; }
+.spec-row.answered.done .spec-dot { color: var(--color-success); }
+.spec-row.expanded .spec-dot { color: var(--color-accent); }
 .spec-crit-tag {
     font-size: 0.66rem; font-weight: 700; letter-spacing: 0.02em;
     color: var(--text-primary); border: 1px solid var(--color-accent);
-    border-radius: 4px; padding: 0 5px; line-height: 1.5;
+    border-radius: 4px; padding: 0 5px; line-height: 1.5; flex-shrink: 0;
 }
-.spec-row.done .spec-crit-tag, .spec-row.skipped .spec-crit-tag { display: none; }
 /* A real button, not a title-attribute tooltip: title text is invisible to
    touch and to keyboard users, and the "why" is the argument for answering. */
 .spec-why {
@@ -3572,7 +3591,10 @@ body.has-custom-bg.light-theme .chat-container {
    Chips get a 44px target there without bloating the desktop layout. */
 @media (pointer: coarse) {
     .spec-chip, .spec-type-chip { min-height: 44px; padding-block: 0; display: inline-flex; align-items: center; }
-    .spec-skip, .spec-edit, .spec-force, .spec-why { min-height: 44px; display: inline-flex; align-items: center; }
+    .spec-skip, .spec-force, .spec-why { min-height: 44px; display: inline-flex; align-items: center; }
+    /* The collapsed rows are the primary targets — every one of them is a tap
+       to open or to change an answer. */
+    .spec-row.answered, .spec-row.pending, .spec-more, .spec-order { min-height: 44px; }
 }
 /* Keyboard users must be able to see where they are. The app suppresses the
    default outline in several places; these controls opt back in. */
@@ -3602,12 +3624,12 @@ body.has-custom-bg.light-theme .chat-container {
 /* --text-secondary, not --text-muted: muted small text measures 4.35:1 against
    the light theme's panel, just under the 4.5:1 floor. These are controls, so
    they take the readable token. */
-.spec-edit, .spec-skip, .spec-force {
+.spec-skip, .spec-force {
     background: none; border: none; cursor: pointer; font-family: inherit;
     color: var(--text-secondary); font-size: 0.74rem; padding: 0;
     text-decoration: underline; text-underline-offset: 3px;
 }
-.spec-edit:hover, .spec-skip:hover, .spec-force:hover { color: var(--color-accent); }
+.spec-skip:hover, .spec-force:hover { color: var(--color-accent); }
 .spec-skip { margin-top: 7px; }
 
 .spec-assume-note {

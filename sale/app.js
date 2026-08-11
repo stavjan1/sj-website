@@ -12,6 +12,30 @@ function isAdmin() {
     return (getActiveUser() || '').toLowerCase().trim() === ADMIN_EMAIL.toLowerCase();
 }
 
+// Sending one is the only honest proof that sending works. Runs the exact path
+// a real signup takes, so a pass here means the signup email would arrive too.
+async function adminTestMail(btn) {
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> שולח…';
+    try {
+        const res = await fetch('/api/admin-users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({ test: 'mail' }),
+        });
+        const d = await res.json();
+        if (d.ok) showToast('נשלח ✓ בדוק את תיבת הדואר של ' + ADMIN_EMAIL);
+        else showToast('לא נשלח: ' + (d.reason || (d.error && d.error.message) || res.status), 'error');
+    } catch (e) {
+        showToast('לא נשלח: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+        adminRefreshUserList();   // refresh the status line with the new result
+    }
+}
+
 // What the signup notification actually did last time, in one line. The old
 // copy promised an email that had never once been sent; this reports state.
 function signupMailNote(d) {
@@ -275,7 +299,10 @@ async function adminRefreshUserList() {
         const newThisMonth = users.filter(u => u.firstSeen && u.firstSeen >= monthStart.getTime()).length;
         const summary = `<p style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 10px;">
             סה"כ <b>${users.length}</b> נרשמים · <b>${newThisMonth}</b> חדשים החודש
-            <span style="color:var(--text-muted)">${signupMailNote(d)}</span></p>`;
+            <span style="color:var(--text-secondary)">${signupMailNote(d)}</span>
+            <button type="button" class="btn btn-secondary btn-small" style="margin-inline-start:8px;" onclick="adminTestMail(this)">
+                <i class="fa-solid fa-paper-plane" aria-hidden="true"></i> שלח מייל בדיקה
+            </button></p>`;
         container.innerHTML = summary + users.map(u => {
             const last = u.lastUpdated ? new Date(u.lastUpdated).toLocaleDateString('he-IL') : '—';
             const joined = u.firstSeen ? new Date(u.firstSeen).toLocaleDateString('he-IL') : null;
@@ -6460,6 +6487,33 @@ function toggleSpecWhy(btn, fieldId) {
 
 // The characterization card — the source of truth on screen. The chat is how
 // you fill it; this is what is actually true about the job.
+// Which question is open right now. Fourteen questions with their chips all
+// showing runs past 2,000px on a phone, so only one is open at a time, answered
+// ones collapse to a single line, and answering advances to the next gap. The
+// card stops being a form and starts reading like a conversation with a
+// visible transcript above it.
+let specOpenField = null;
+
+// The next thing that actually needs answering: unanswered criticals first,
+// then unanswered optionals. Null when nothing is left.
+function nextSpecField(project, fields) {
+    const answers = (project.spec && project.spec.answers) || {};
+    const open = fields.filter(f => !answers[f.id]);
+    return (open.find(f => f.critical) || open[0] || null);
+}
+
+function openSpecField(fieldId) {
+    specOpenField = fieldId;
+    renderSpecCard();
+    const row = document.querySelector('.spec-row[data-field="' + fieldId + '"]');
+    if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function editSpecField(fieldId) {
+    clearSpecAnswer(fieldId);
+    openSpecField(fieldId);
+}
+
 function renderSpecCard(proj) {
     const host = document.getElementById('spec-card');
     if (!host) return;
@@ -6476,27 +6530,48 @@ function renderSpecCard(proj) {
         `<button type="button" class="spec-type-chip ${project.spec.jobType === t ? 'active' : ''}" onclick="setSpecJobType('${t}')">${JOB_TYPE_LABELS[t]}</button>`
     ).join('');
 
-    // Open by default: anything that blocks pricing, plus anything already
-    // touched. Everything else waits behind one tap.
+    // Optional questions stay out of the way until the criticals are done.
     const isDeferred = (f) => !f.critical && !answers[f.id];
     const deferredCount = list.fields.filter(isDeferred).length;
     const visibleFields = specShowAll ? list.fields : list.fields.filter(f => !isDeferred(f));
+
+    // Nothing open, or the open one just got answered → move to the next gap.
+    if (!specOpenField || answers[specOpenField] || !visibleFields.some(f => f.id === specOpenField)) {
+        const next = nextSpecField(project, visibleFields);
+        specOpenField = next ? next.id : null;
+    }
 
     const rows = visibleFields.map(f => {
         const a = answers[f.id];
         const done = !!a && !a.skipped && a.value !== '' && a.value != null;
         const skipped = !!a && a.skipped;
-        const state = done ? 'done' : (skipped ? 'skipped' : 'open');
         const fromAi = done && a.source === 'ai';
+        const isOpen = specOpenField === f.id;
 
-        let control = '';
+        // Answered → one line, the answer doing the talking, tap to change it.
         if (done || skipped) {
-            control = `<div class="spec-answer">
-                    <span class="spec-answer-val">${skipped ? 'נבדוק בשטח' : escapeHtml(a.value)}</span>
-                    ${fromAi ? '<span class="spec-ai-tag" title="מולא אוטומטית — אשר או תקן">הצעה</span>' : ''}
-                    <button type="button" class="spec-edit" onclick="clearSpecAnswer('${f.id}')" title="שנה">שנה</button>
-                </div>`;
-        } else if (f.type === 'chips' && Array.isArray(f.chips)) {
+            return `<button type="button" class="spec-row answered ${done ? 'done' : 'skipped'}" data-field="${f.id}"
+                    onclick="editSpecField('${f.id}')">
+                <i class="fa-solid ${done ? 'fa-circle-check' : 'fa-circle-half-stroke'} spec-dot" aria-hidden="true"></i>
+                <span class="spec-row-q">${escapeHtml(f.question)}</span>
+                <span class="spec-row-v">${skipped ? 'נבדוק בשטח' : escapeHtml(a.value)}</span>
+                ${fromAi ? '<span class="spec-ai-tag">הצעה</span>' : ''}
+            </button>`;
+        }
+
+        // Unanswered and closed → one line saying so, tap to open.
+        if (!isOpen) {
+            return `<button type="button" class="spec-row pending ${f.critical ? 'crit' : 'optional'}" data-field="${f.id}"
+                    onclick="openSpecField('${f.id}')">
+                <i class="fa-regular fa-circle spec-dot" aria-hidden="true"></i>
+                <span class="spec-row-q">${escapeHtml(f.question)}</span>
+                ${f.critical ? '<span class="spec-crit-tag">חובה</span>' : ''}
+            </button>`;
+        }
+
+        // The open one → the whole question, with its answers.
+        let control = '';
+        if (f.type === 'chips' && Array.isArray(f.chips)) {
             control = `<div class="spec-chips">${f.chips.map((c, i) =>
                 `<button type="button" class="spec-chip" onclick="setSpecChip('${f.id}',${i})">${escapeHtml(c)}</button>`).join('')}</div>`;
         } else if (f.type === 'number') {
@@ -6508,17 +6583,17 @@ function renderSpecCard(proj) {
                     onchange="setSpecAnswer('${f.id}', this.value.trim(), 'user')">`;
         }
 
-        return `<div class="spec-row ${state} ${f.critical ? 'crit' : 'optional'}">
+        return `<div class="spec-row expanded ${f.critical ? 'crit' : 'optional'}" data-field="${f.id}">
                 <div class="spec-q">
-                    <i class="fa-solid ${done ? 'fa-circle-check' : (skipped ? 'fa-circle-half-stroke' : 'fa-circle')} spec-dot" aria-hidden="true"></i>
-                    <span class="spec-q-text" id="specq-${f.id}">${escapeHtml(f.question)}</span>
+                    <i class="fa-regular fa-circle-dot spec-dot" aria-hidden="true"></i>
+                    <span class="spec-q-text">${escapeHtml(f.question)}</span>
                     ${f.critical ? '<span class="spec-crit-tag">חובה</span>' : ''}
                     <button type="button" class="spec-why" aria-expanded="false" aria-controls="specwhy-${f.id}"
                         aria-label="למה שואלים את זה" onclick="toggleSpecWhy(this,'${f.id}')"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
                 </div>
                 <p class="spec-why-text" id="specwhy-${f.id}" hidden>${escapeHtml(f.why)}</p>
                 ${control}
-                ${(done || skipped) ? '' : `<button type="button" class="spec-skip" onclick="skipSpecField('${f.id}')">לא יודע — נבדוק בשטח</button>`}
+                <button type="button" class="spec-skip" onclick="skipSpecField('${f.id}')">לא יודע — נבדוק בשטח</button>
             </div>`;
     }).join('');
 
