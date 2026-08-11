@@ -99,3 +99,34 @@ test('the pricing map keeps its scope rule', () => {
     assert.ok(map.includes('לעולם אל תצטק') || map.includes('לעולם אל תצטט'),
         'the "never quote an inspector fee without its installation" rule is gone');
 });
+
+test('the fonts and icons survive a deploy and a dead network', () => {
+    // At a job site there is no reception to fetch a typeface with. Without
+    // these cached the app is blank squares, and a quote drafted on site
+    // prints in a different font than one drafted at home.
+    const sw = read('sale/sw.js');
+
+    for (const host of ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com']) {
+        assert.ok(sw.includes(host), `${host} is no longer cached — offline loses its assets`);
+    }
+
+    // Replaying a stale Google auth script would be worse than not having it.
+    for (const host of ['accounts.google.com', 'apis.google.com']) {
+        assert.ok(!new RegExp(`CDN_HOSTS[^\]]*${host.replace('.', '\.')}`, 's').test(sw),
+            `${host} must not be cache-first — auth has to be live`);
+    }
+
+    // The shell cache is wiped on every deploy. If the CDN cache shares that
+    // fate, the fonts vanish right after an update — exactly when there is no
+    // reception to re-fetch them.
+    const activate = sw.slice(sw.indexOf("addEventListener('activate'"));
+    const body = activate.slice(0, activate.indexOf('\n});'));
+    assert.ok(/k !== CACHE && k !== CDN_CACHE/.test(body),
+        'the activate handler evicts the CDN cache on every deploy');
+
+    // A plain <link rel=stylesheet> to another origin yields an opaque
+    // response: status 0, ok false. Filtering on res.ok alone would cache
+    // nothing at all and the whole branch would be dead code.
+    assert.ok(/res\.type === 'opaque'/.test(sw),
+        'opaque CDN responses are rejected, so the icon CSS would never cache');
+});

@@ -2,7 +2,19 @@
 // Purpose: make the app installable (PWA) and let the shell open instantly,
 // including offline at a job site (the user's data lives in localStorage
 // anyway). AI calls and cloud sync (/api/*) are ALWAYS network-only.
-const CACHE = 'zerem-shell-v70';
+const CACHE = 'zerem-shell-v71';
+
+// The typeface and the icons come from other people's servers, and at a job
+// site there is no reception to fetch them with. Without them the app is a wall
+// of blank squares and — worse — a quote drafted on site prints in a different
+// font than one drafted at home, because the PDF asks for Heebo and gets
+// whatever the phone has.
+//
+// Kept in its own cache on purpose: the shell cache is wiped on every deploy,
+// and evicting the fonts each time would mean needing reception again right
+// after an update, which is precisely when it is not there.
+const CDN_CACHE = 'zerem-cdn-v1';
+const CDN_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com'];
 const SHELL = [
   '/sale/',
   '/sale/index.html',
@@ -24,7 +36,9 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(
+        keys.filter((k) => k !== CACHE && k !== CDN_CACHE).map((k) => caches.delete(k))
+      ))
       .then(() => self.clients.claim())
   );
 });
@@ -33,7 +47,30 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET') return;               // never touch writes
   if (url.pathname.startsWith('/api/')) return;          // AI + data: network only
-  if (url.origin !== location.origin) return;            // CDN (html2pdf, fonts): browser default
+
+  // Fonts and icons: keep whatever we were served, and serve it again offline.
+  // Cache-first, because these URLs are immutable — cdnjs pins the version in
+  // the path and Google Fonts hashes the file name — so there is nothing to
+  // revalidate and a job site should not wait on a request that will time out.
+  // Google's auth scripts are deliberately not here: they are useless offline
+  // and must never be replayed stale.
+  if (CDN_HOSTS.includes(url.hostname)) {
+    e.respondWith(
+      caches.match(e.request).then((hit) => hit || fetch(e.request).then((res) => {
+        // An opaque response (no-cors, as a plain stylesheet link makes) reports
+        // status 0 and ok=false. Checking res.ok alone would cache nothing at
+        // all, which is the failure this whole branch exists to prevent.
+        if (res && (res.ok || res.type === 'opaque')) {
+          const copy = res.clone();
+          caches.open(CDN_CACHE).then((c) => c.put(e.request, copy));
+        }
+        return res;
+      }).catch(() => caches.match(e.request)))
+    );
+    return;
+  }
+
+  if (url.origin !== location.origin) return;            // anything else third-party: browser default
   if (!url.pathname.startsWith('/sale/') && url.pathname !== '/assistant.js' && url.pathname !== '/assets/listcards.js') return;
 
   // Network-first with cache fallback: fresh app when online, working shell offline.
