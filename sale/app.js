@@ -3843,47 +3843,78 @@ async function renderAdminTraffic() {
 
 // Clarity gives the friction signals a raw counter cannot: where people rage-
 // click, where they scroll past everything, where a script died on them.
+// Clarity gives the friction signals a raw counter cannot: where people rage-
+// click, where they scroll past everything, where a script died on them.
+// The token, the cache and the history puller all live in /api/clarity — this
+// only reduces its payload down to the numbers worth looking at.
+function reduceClarity(payload) {
+    const out = { sessions: 0, bots: 0, pages: [], friction: {} };
+    for (const metric of Array.isArray(payload) ? payload : []) {
+        const name = String(metric.metricName || '');
+        const info = Array.isArray(metric.information) ? metric.information : [];
+        if (name === 'Traffic') {
+            for (const r of info) {
+                out.sessions += parseInt(r.totalSessionCount || '0', 10) || 0;
+                out.bots += parseInt(r.totalBotSessionCount || '0', 10) || 0;
+            }
+        } else if (/popular\s*pages/i.test(name)) {
+            out.pages = info.slice(0, 12).map(r => ({
+                url: r.Url || r.URL || r.url || r.PageTitle || '—',
+                views: parseInt(r.visitsCount || r.totalSessionCount || '0', 10) || 0,
+            }));
+        } else {
+            // Friction metrics name their count field differently per metric —
+            // sum whatever numeric field the row actually carries.
+            let sum = 0;
+            for (const r of info) {
+                for (const [k, v] of Object.entries(r)) {
+                    if (/count|sessions|subtotal/i.test(k)) { const n = parseInt(v, 10); if (Number.isFinite(n)) sum += n; }
+                }
+            }
+            if (sum > 0) out.friction[name] = sum;
+        }
+    }
+    return out;
+}
+
 async function renderAdminClarity() {
     const box = document.getElementById('admin-clarity-body');
     if (!box) return;
     box.innerHTML = '<p class="input-help">טוען מפות חום…</p>';
+    const dash = '<p class="input-help" style="margin:10px 0 0;"><a href="https://clarity.microsoft.com/projects/view/xgux1eczkt/dashboard" target="_blank" rel="noopener">לצפייה בהקלטות ובמפת החום עצמה ב-Clarity ←</a></p>';
     try {
-        const res = await fetch('/api/analytics?admin=1&clarity=1', {
-            headers: { 'Authorization': 'Bearer ' + googleAccessToken },
-        });
+        const res = await fetch('/api/clarity', { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
         const d = await res.json();
 
-        if (d.configured === false) {
+        if (!d.ok) {
+            const why = d.error === 'token-not-set'
+                ? 'לא הוגדר טוקן. הדבק אותו בכרטיס "חיבור Clarity" למטה, ומפות החום יופיעו כאן.'
+                : 'לא הצלחנו למשוך נתונים מ-Clarity כרגע (' + escapeHtml(String(d.error || '')) + ').';
             box.innerHTML = `<div class="tclarity">
-                <h4 class="tcol-title"><i class="fa-solid fa-fire"></i> מפות חום — אתר המשרד</h4>
-                <p class="input-help" style="margin:0;">${escapeHtml(d.note || '')} כדי להפעיל: Clarity → Settings → Data Export → Generate new API token, ואז ב-Cloudflare Pages → Variables and secrets להוסיף <code>CLARITY_API_TOKEN</code>.</p>
-                <p class="input-help" style="margin:6px 0 0;"><a href="https://clarity.microsoft.com/projects/view/xgux1eczkt/dashboard" target="_blank" rel="noopener">פתח את לוח המחוונים של Clarity ←</a></p>
-            </div>`;
+                <h4 class="tcol-title"><i class="fa-solid fa-fire" aria-hidden="true"></i> מפות חום — אתר המשרד</h4>
+                <p class="input-help" style="margin:0;">${why}</p>${dash}</div>`;
             return;
         }
 
-        const data = d.data || {};
+        const data = reduceClarity(d.data);
         const friction = Object.entries(data.friction || {});
         const frictionRows = friction.length
             ? `<ul class="tlist">${friction.map(([k, v]) => `<li><span class="tk">${escapeHtml(clarityMetricLabel(k))}</span><span class="tv">${Number(v).toLocaleString('he-IL')}</span></li>`).join('')}</ul>`
             : '<p class="input-help" style="margin:0;">אין ממצאי חיכוך ב-3 הימים האחרונים.</p>';
         const pages = (data.pages || []).length
-            ? `<ul class="tlist">${data.pages.map(p => `<li><span class="tk">${escapeHtml(p.url)}</span><span class="tv">${Number(p.views).toLocaleString('he-IL')}</span></li>`).join('')}</ul>`
+            ? `<ul class="tlist">${data.pages.map(pg => `<li><span class="tk">${escapeHtml(pg.url)}</span><span class="tv">${Number(pg.views).toLocaleString('he-IL')}</span></li>`).join('')}</ul>`
             : '';
 
         box.innerHTML = `<div class="tclarity">
-            <h4 class="tcol-title"><i class="fa-solid fa-fire"></i> מפות חום — אתר המשרד <span class="input-help" style="font-weight:400;">(3 ימים אחרונים, מקור Clarity)</span></h4>
-            ${d.error ? `<p class="input-help" style="color:#f0c040;margin:0 0 8px;">${escapeHtml(d.error)}</p>` : ''}
+            <h4 class="tcol-title"><i class="fa-solid fa-fire" aria-hidden="true"></i> מפות חום — אתר המשרד <span class="input-help" style="font-weight:400;">(3 ימים אחרונים, מקור Clarity)</span></h4>
             <div class="tkpis">
                 <div class="ask"><span class="asv">${Number(data.sessions || 0).toLocaleString('he-IL')}</span><span class="asl">סשנים</span></div>
                 <div class="ask"><span class="asv">${Number(data.bots || 0).toLocaleString('he-IL')}</span><span class="asl">בוטים</span></div>
-                <div class="ask"><span class="asv">${(d.history || []).length}</span><span class="asl">ימים בהיסטוריה</span></div>
             </div>
             <h5 class="tsub">איפה נתקעים</h5>
             ${frictionRows}
             ${pages ? '<h5 class="tsub">דפים פופולריים</h5>' + pages : ''}
-            <p class="input-help" style="margin:10px 0 0;"><a href="https://clarity.microsoft.com/projects/view/xgux1eczkt/dashboard" target="_blank" rel="noopener">לצפייה בהקלטות ובמפת החום עצמה ב-Clarity ←</a></p>
-        </div>`;
+            ${dash}</div>`;
     } catch (e) {
         box.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה במפות החום: ${escapeHtml(e.message)}</p>`;
     }
