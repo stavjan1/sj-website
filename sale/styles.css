@@ -5151,3 +5151,17 @@ body.boxes-light .card-header { background: linear-gradient(180deg, rgba(37,99,2
 .chat-edit-text:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 .chat-edit-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .chat-edit-note { font-size: 0.75rem; color: var(--text-secondary); }
+
+/* Dictation. Recording is signalled by colour AND a pulse, so the state does
+   not rest on colour alone. */
+.chat-mic-btn { flex-shrink: 0; }
+.chat-mic-btn.recording {
+    background: var(--color-danger); border-color: var(--color-danger); color: #fff;
+    animation: micPulse 1.4s ease-in-out infinite;
+}
+@keyframes micPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(240, 82, 82, 0.55); }
+    60%      { box-shadow: 0 0 0 9px rgba(240, 82, 82, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .chat-mic-btn.recording { animation: none; } }
+@media (pointer: coarse) { .chat-mic-btn { min-width: 44px; min-height: 44px; } }

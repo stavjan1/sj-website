@@ -418,6 +418,10 @@
                                     <i class="fa-solid fa-camera"></i>
                                     <input type="file" accept="image/*" multiple style="display:none" onchange="onChatPhotoPicked(this)">
                                 </label>
+                                <button type="button" class="btn btn-secondary chat-mic-btn" id="btn-chat-mic"
+                                    onclick="toggleChatDictation()" title="הכתבה קולית" aria-label="הכתבה קולית" style="display:none;">
+                                    <i class="fa-solid fa-microphone" aria-hidden="true"></i>
+                                </button>
                                 <textarea id="chat-user-input" rows="2" placeholder="כתוב כאן הודעה למומחה התמחור..." onkeydown="handleChatKeyDown(event)"></textarea>
                                 <button class="btn btn-accent" id="btn-send-chat" onclick="sendChatMessage()">
                                     <i class="fa-solid fa-paper-plane"></i>

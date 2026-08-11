@@ -1478,6 +1478,7 @@ function initUserSession() {
     updateUserProfileUI();
     updateGuestUpgradeUI();
     setupQuotePreviewFit();
+    initChatDictation();
     showAdminTabIfNeeded();
     if (isAdmin()) {
         setTimeout(() => { adminRefreshStatus(); adminRefreshUserList(); adminRefreshSystemCatalogInfo(); }, 300);
@@ -7092,6 +7093,7 @@ function openProjectStage(projectId, step, e) {
 // AI Pricing Chat (סוכן תמחור מומחה)
 // ==========================================================================
 async function sendChatMessage() {
+    stopChatDictation();   // never leave the mic listening behind a sent message
     if (!activeProjectId) {
         showToast('אנא בחר או צור פרויקט תחילה בלשונית ניהול פרויקטים', 'error');
         switchTab('projects');
@@ -7582,6 +7584,103 @@ function renderChatHistory(chatHistory) {
 
     log.scrollTop = log.scrollHeight;
     applyChatSearch();
+}
+
+// ── Voice dictation ──────────────────────────────────────────────────────────
+// Browser speech recognition, Hebrew. The button hides itself where the API is
+// missing rather than offering something that will not work — Firefox and most
+// in-app webviews have no implementation, and a dead mic button on a building
+// site is worse than none.
+//
+// Dictation appends to whatever is already typed instead of replacing it, so a
+// half-written message survives, and interim words appear as they are heard so
+// you can see it is listening.
+let chatRecognition = null;
+let chatDictating = false;
+let dictationBaseText = '';
+
+function speechRecognitionCtor() {
+    return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function initChatDictation() {
+    const btn = document.getElementById('btn-chat-mic');
+    if (!btn) return;
+    // No API, or an insecure origin (getUserMedia and speech both need HTTPS).
+    if (!speechRecognitionCtor() || !window.isSecureContext) { btn.style.display = 'none'; return; }
+    btn.style.display = '';
+}
+
+function toggleChatDictation() {
+    if (chatDictating) { stopChatDictation(); return; }
+
+    const Ctor = speechRecognitionCtor();
+    const input = document.getElementById('chat-user-input');
+    const btn = document.getElementById('btn-chat-mic');
+    if (!Ctor || !input) return;
+
+    chatRecognition = new Ctor();
+    chatRecognition.lang = 'he-IL';
+    chatRecognition.continuous = true;      // a job description is several sentences
+    chatRecognition.interimResults = true;  // show it listening
+
+    dictationBaseText = input.value.trim();
+
+    chatRecognition.onresult = (event) => {
+        let settled = '', pending = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const chunk = event.results[i][0].transcript;
+            if (event.results[i].isFinal) settled += chunk;
+            else pending += chunk;
+        }
+        if (settled) dictationBaseText = (dictationBaseText + ' ' + settled.trim()).trim();
+        input.value = (dictationBaseText + ' ' + pending).trim();
+        input.scrollTop = input.scrollHeight;
+    };
+
+    chatRecognition.onerror = (event) => {
+        const why = {
+            'not-allowed': 'הדפדפן חסם את המיקרופון — אשר גישה והפעל שוב',
+            'service-not-allowed': 'הדפדפן חסם את המיקרופון — אשר גישה והפעל שוב',
+            'no-speech': 'לא נשמע דיבור',
+            'audio-capture': 'לא נמצא מיקרופון',
+            'network': 'זיהוי הדיבור דורש חיבור לאינטרנט',
+        }[event.error];
+        // 'aborted' is what a deliberate stop looks like — never an error to show.
+        if (event.error !== 'aborted' && why) showToast(why, 'error');
+        stopChatDictation();
+    };
+
+    chatRecognition.onend = () => { if (chatDictating) stopChatDictation(); };
+
+    try {
+        chatRecognition.start();
+    } catch (e) {
+        showToast('לא הצלחנו להפעיל את ההקלטה', 'error');
+        return;
+    }
+
+    chatDictating = true;
+    if (btn) {
+        btn.classList.add('recording');
+        btn.setAttribute('aria-label', 'עצור הכתבה');
+        btn.title = 'עצור הכתבה';
+    }
+    input.focus();
+}
+
+function stopChatDictation() {
+    chatDictating = false;
+    if (chatRecognition) {
+        try { chatRecognition.stop(); } catch (e) { /* already stopped */ }
+        chatRecognition = null;
+    }
+    const btn = document.getElementById('btn-chat-mic');
+    if (btn) {
+        btn.classList.remove('recording');
+        btn.setAttribute('aria-label', 'הכתבה קולית');
+        btn.title = 'הכתבה קולית';
+    }
 }
 
 // ── Edit a message and re-run ────────────────────────────────────────────────
