@@ -2158,12 +2158,6 @@ textarea#ai-input {
     content: '🔒';
     font-size: 0.7rem;
 }
-.mode-pill.pulse { animation: pillPulse 0.85s ease; }
-@keyframes pillPulse {
-    0% { box-shadow: 0 0 0 0 rgba(77, 142, 240, 0.55); }
-    70% { box-shadow: 0 0 0 12px rgba(77, 142, 240, 0); }
-    100% { box-shadow: 0 4px 14px var(--color-accent-glow); }
-}
 .stage-hint {
     margin-inline-start: auto;
     font-size: 0.78rem;
@@ -5279,4 +5273,61 @@ html, body { overscroll-behavior: none; }
 
     #panel-wizard .chat-toolbar { padding: 6px 10px; gap: 6px; }
     #panel-wizard .chat-messages { padding: 12px; }
+}
+
+/* ── The stage rail, and the slide between stages ──────────────────────────
+   Three steps on one line with arrows between them, so the shape of the job
+   stays visible while you are inside it. A step you have not reached is dimmed
+   rather than removed — knowing what comes next is part of knowing where you
+   are — and tapping it says why instead of doing nothing. */
+.stage-rail { align-items: center; }
+.stage-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; border-radius: 50%;
+    font-size: 0.68rem; font-weight: 800;
+    border: 1px solid currentColor; margin-inline-end: 5px;
+}
+.mode-pill.active .stage-num { background: rgba(255, 255, 255, 0.22); border-color: transparent; }
+.mode-pill.locked { opacity: 0.45; }
+.stage-arrow { color: var(--text-muted); font-size: 0.7rem; flex-shrink: 0; }
+#draft-stage-rail { margin-bottom: 12px; }
+
+/* What must NOT slide. Animating the root alone drags the whole shell across
+   the screen — navigation included — which is the same disorientation as a hard
+   cut, only slower. Naming an element lifts it out of the root snapshot and
+   gives it its own morph, so it holds its place while the work area travels
+   under it. The rail is named once: only one of the two copies is ever
+   rendered (the other panel is display:none), so the name stays unique. */
+.sidebar { view-transition-name: app-sidebar; }
+.stage-rail { view-transition-name: stage-rail; }
+
+/* The slide itself. Only transform and opacity, so it stays on the compositor
+   and does not stutter on the cheap Android in someone's pocket. */
+@keyframes stage-in-forward  { from { opacity: 0; transform: translateX(-24px); } }
+@keyframes stage-out-forward { to   { opacity: 0; transform: translateX(24px); } }
+@keyframes stage-in-back     { from { opacity: 0; transform: translateX(24px); } }
+@keyframes stage-out-back    { to   { opacity: 0; transform: translateX(-24px); } }
+
+/* In RTL the next step sits to the LEFT, so forward enters from the left.
+   Getting this backwards makes the motion argue with the arrows. */
+html[data-stage-dir='forward']::view-transition-old(root) {
+    animation: stage-out-forward 180ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+html[data-stage-dir='forward']::view-transition-new(root) {
+    animation: stage-in-forward 220ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+html[data-stage-dir='back']::view-transition-old(root) {
+    animation: stage-out-back 180ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+html[data-stage-dir='back']::view-transition-new(root) {
+    animation: stage-in-back 220ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+}
+
+@media (max-width: 768px) {
+    .stage-num { width: 16px; height: 16px; font-size: 0.62rem; }
+    .stage-arrow { font-size: 0.62rem; }
 }

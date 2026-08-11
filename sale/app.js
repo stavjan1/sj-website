@@ -6776,21 +6776,9 @@ function setChatMode(mode, projOverride) {
     }
     activeChatMode = mode;
 
-    const planBtn = document.getElementById('mode-btn-plan');
-    const priceBtn = document.getElementById('mode-btn-price');
-    if (planBtn) planBtn.classList.toggle('active', mode === 'plan');
-    if (priceBtn) {
-        priceBtn.classList.toggle('active', mode === 'price');
-        priceBtn.classList.toggle('locked', STAGE_ORDER[stage] < 1);
-    }
-    // A short pulse on the newly-active pill makes the stage handoff feel alive.
-    const activePill = mode === 'plan' ? planBtn : priceBtn;
-    if (activePill) {
-        activePill.classList.remove('pulse');
-        void activePill.offsetWidth; // restart the animation
-        activePill.classList.add('pulse');
-        setTimeout(() => activePill.classList.remove('pulse'), 900);
-    }
+    // Which step is current and which are locked is renderStageRail's job — it
+    // paints both rails from one rule, and the slide between stages carries the
+    // sense of movement the old per-pill pulse used to.
     const input = document.getElementById('chat-user-input');
     if (input) input.placeholder = mode === 'plan'
         ? 'תאר את העבודה (מה מתקינים, איפה, באילו תנאים)...'
@@ -6805,10 +6793,68 @@ function setChatMode(mode, projOverride) {
     else toggleEstimatePanel(localStorage.getItem('sj_hide_estimate') !== '0', false);
 
     renderChatHistory(mode === 'plan' ? ensurePlanHistory(proj) : proj.chatHistory);
+    renderStageRail(proj);
     renderSpecCard(proj);
     updatePlanActionBar(proj);
     updatePriceActionBar(proj);
     updateStageHint(proj);
+}
+
+// ── Moving between the three stages ──────────────────────────────────────────
+// One door for all three, so the transition and the gate logic live in one
+// place instead of being re-derived at every call site.
+const STAGE_INDEX = { plan: 0, price: 1, draft: 2 };
+
+// Steps you have not reached yet are locked; the lock is the same rule the
+// pricing gate uses, stated once.
+function stageReachable(proj, stage) {
+    const at = STAGE_ORDER[getProjectStage(proj)] || 0;
+    return STAGE_INDEX[stage] <= at;
+}
+
+function goToStage(stage) {
+    const proj = projectsList.find((p) => p.id === activeProjectId);
+    if (!proj) return;
+    if (!stageReachable(proj, stage)) {
+        showToast(stage === 'price' ? 'קודם משלימים את האפיון' : 'קודם אפיון ותמחור — ואז מכינים טיוטה', 'error');
+        return;
+    }
+
+    const from = document.getElementById('panel-create').classList.contains('active')
+        ? 2 : STAGE_INDEX[activeChatMode] ?? 0;
+    const to = STAGE_INDEX[stage];
+    if (from === to) return;
+
+    // In a right-to-left layout the next step lives to the LEFT, so "forward"
+    // has to enter from that side or the motion contradicts the arrows.
+    document.documentElement.dataset.stageDir = to > from ? 'forward' : 'back';
+
+    const apply = () => {
+        if (stage === 'draft') goToDraft();
+        else { switchTab('wizard'); setChatMode(stage, proj); }
+    };
+
+    // A cut makes you re-find yourself on every step; a slide carries you.
+    // startViewTransition is the browser's own mechanism for it — where it is
+    // missing, or where the user asked for less motion, this is just a call.
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (document.startViewTransition && !reduced) document.startViewTransition(apply);
+    else apply();
+}
+
+// Paints the rail: which step you are on, which are still locked.
+function renderStageRail(proj) {
+    const at = STAGE_ORDER[getProjectStage(proj)] || 0;
+    const current = document.getElementById('panel-create')?.classList.contains('active')
+        ? 2 : STAGE_INDEX[activeChatMode] ?? 0;
+    document.querySelectorAll('.stage-rail').forEach((rail) => {
+        [...rail.querySelectorAll('.mode-pill')].forEach((pill, i) => {
+            pill.classList.toggle('active', i === current);
+            pill.classList.toggle('locked', i > at);
+            pill.setAttribute('aria-current', i === current ? 'step' : 'false');
+            pill.disabled = false;   // a locked step still explains itself when tapped
+        });
+    });
 }
 
 function updateStageHint(proj) {
@@ -7089,6 +7135,7 @@ function goToDraft() {
     saveProjects();
     filterProjectsList();
     switchTab('create');
+    renderStageRail(proj);
     showToast('הכנת טיוטה — ערוך את ההצעה והפק PDF');
 }
 
