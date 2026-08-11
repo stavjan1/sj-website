@@ -1605,6 +1605,27 @@
                     </div>
                 </div>
 
+                        <!-- Clarity analytics token — feeds the automated site-analyst routine -->
+                        <div class="section-card" style="border-color:rgba(240,192,64,0.25);">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-chart-line" style="color:#f0c040;"></i> חיבור Clarity (אנליטיקס)</h3>
+                            </div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+                                <p class="input-help" style="margin:0;line-height:1.7;">
+                                    מזין כאן פעם אחת את טוקן ה-API של Clarity, ומכאן רוטינת האנליסט של קלוד
+                                    מושכת נתוני שימוש (מצרפיים בלבד) כל 3 ימים ומתכננת שיפורים.
+                                    יצירת הטוקן: clarity.microsoft.com ← פרויקט SJ ← Settings ← Data Export ← Generate new API token.
+                                </p>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <input type="password" id="admin-clarity-token" placeholder="הדבק כאן את הטוקן" dir="ltr" style="text-align:left;">
+                                </div>
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <button class="btn btn-accent btn-small" onclick="adminSaveClarityToken()"><i class="fa-solid fa-save"></i> שמור טוקן</button>
+                                    <span class="input-help" id="admin-clarity-status" style="margin:0;"></span>
+                                </div>
+                            </div>
+                        </div>
+
                 <!-- Pricing benchmark stats — aggregate only, zero client PII -->
                 <div class="section-card" style="border-color:rgba(240,192,64,0.25);margin-bottom:20px;">
                     <div class="card-header flex-header">
@@ -1648,26 +1669,6 @@
                             </div>
                         </div>
 
-                        <!-- Clarity analytics token — feeds the automated site-analyst routine -->
-                        <div class="section-card" style="border-color:rgba(240,192,64,0.25);">
-                            <div class="card-header">
-                                <h3><i class="fa-solid fa-chart-line" style="color:#f0c040;"></i> חיבור Clarity (אנליטיקס)</h3>
-                            </div>
-                            <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
-                                <p class="input-help" style="margin:0;line-height:1.7;">
-                                    מזין כאן פעם אחת את טוקן ה-API של Clarity, ומכאן רוטינת האנליסט של קלוד
-                                    מושכת נתוני שימוש (מצרפיים בלבד) כל 3 ימים ומתכננת שיפורים.
-                                    יצירת הטוקן: clarity.microsoft.com ← פרויקט SJ ← Settings ← Data Export ← Generate new API token.
-                                </p>
-                                <div class="form-group" style="margin-bottom:0;">
-                                    <input type="password" id="admin-clarity-token" placeholder="הדבק כאן את הטוקן" dir="ltr" style="text-align:left;">
-                                </div>
-                                <div style="display:flex;gap:8px;align-items:center;">
-                                    <button class="btn btn-accent btn-small" onclick="adminSaveClarityToken()"><i class="fa-solid fa-save"></i> שמור טוקן</button>
-                                    <span class="input-help" id="admin-clarity-status" style="margin:0;"></span>
-                                </div>
-                            </div>
-                        </div>
 
                         <!-- Tier management: assign plans to users by email (no payments yet) -->
                         <div class="section-card" style="border-color:rgba(240,192,64,0.25);">

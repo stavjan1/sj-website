@@ -94,11 +94,12 @@ export async function onRequest(context) {
     }
     await env.SJ_DATA.put(key, payload);
 
-    // Notify AFTER the save succeeded — a rejected first sync (413 above) must
-    // not email the admin about a user that has no cloud record.
-    if (isNewUser) {
-      context.waitUntil(notifyNewSignup(env, email).catch(() => {}));
-    }
+    // No signup email is sent from here. web3forms rejects server-to-server
+    // submissions on the free plan (403), and this path has no browser
+    // continuation to hand a payload to the way /api/lead does — a background
+    // sync must not make the browser post an admin email on every routine save.
+    // New signups are visible in Admin → משתמשי המערכת, which reads `firstSeen`
+    // off these same records. `isNewUser` still drives the counter below.
 
     // ---- Free-plan monthly cloud-quote counter (SOFT — never blocks the save) ----
     // Count quotes that are genuinely new to the cloud this sync. Re-syncing an
@@ -135,24 +136,6 @@ export async function onRequest(context) {
   return json({ error: { message: 'מתודה לא נתמכת.' } }, 405);
 }
 
-
-// Fire-and-forget "new user signed up" email to the admin (web3forms — the
-// same channel the lead form uses; env WEB3FORMS_KEY with the same public
-// fallback lead.js documents, dead once Stav rotates the key).
-const WEB3FORMS_KEY_FALLBACK = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
-async function notifyNewSignup(env, email) {
-  await fetch('https://api.web3forms.com/submit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({
-      access_key: (env && env.WEB3FORMS_KEY) || WEB3FORMS_KEY_FALLBACK,
-      subject: '⚡ נרשם חדש בזרם: ' + email,
-      from_name: 'זרם — הרשמות',
-      message: 'משתמש חדש התחבר ושמר לראשונה במערכת זרם:\n\n' + email +
-        '\n\nאפשר לראות את הפעילות שלו בלשונית Admin.',
-    }),
-  });
-}
 
 function isEmptyDb(db) {
   if (!db) return true;

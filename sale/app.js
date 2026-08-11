@@ -261,7 +261,7 @@ async function adminRefreshUserList() {
         const newThisMonth = users.filter(u => u.firstSeen && u.firstSeen >= monthStart.getTime()).length;
         const summary = `<p style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 10px;">
             סה"כ <b>${users.length}</b> נרשמים · <b>${newThisMonth}</b> חדשים החודש
-            <span style="color:var(--text-muted)">(על כל נרשם חדש נשלח אליך מייל אוטומטי)</span></p>`;
+            <span style="color:var(--text-muted)">(הרשמות חדשות מופיעות כאן — אין מייל אוטומטי)</span></p>`;
         container.innerHTML = summary + users.map(u => {
             const last = u.lastUpdated ? new Date(u.lastUpdated).toLocaleDateString('he-IL') : '—';
             const joined = u.firstSeen ? new Date(u.firstSeen).toLocaleDateString('he-IL') : null;

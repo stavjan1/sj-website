@@ -59,7 +59,9 @@ export async function onRequestPost(context) {
   if (turns.length === 0) return json({ error: { message: 'אין שיחה לשלוח.' } }, 400);
 
   const transcript = turns
-    .map((m) => (m.role === 'user' ? 'מתעניין: ' : 'העוזר של SJ: ') + m.content.trim())
+    // Each turn is bounded like /api/assistant does it: this endpoint is public
+    // and feeds an AI call, so message size cannot be attacker-chosen.
+    .map((m) => (m.role === 'user' ? 'מתעניין: ' : 'העוזר של SJ: ') + m.content.trim().slice(0, 2000))
     .join('\n\n');
 
   // 1) AI-drafted personalised follow-up (non-streaming).

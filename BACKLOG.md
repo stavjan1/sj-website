@@ -135,7 +135,7 @@ gating (server-side ADMIN_EMAIL on every admin endpoint), per-user KV keying
 
 - [x] "Perfect site" compliance pass (04/08): accessibility statement + privacy policy
       pages, footer legal links sitewide, discreet cookie/measurement notice bar with
-      Clarity opt-out, branded 404, signup tracking (firstSeen + email-on-new-signup +
+      Clarity opt-out, branded 404, signup tracking (firstSeen + admin signup strip +
       admin counters).
 - [ ] bebusy365.com research — blocked by session network policy; needs Stav to allow
       the domain in the environment settings or share screenshots.
