@@ -5165,3 +5165,12 @@ body.boxes-light .card-header { background: linear-gradient(180deg, rgba(37,99,2
 }
 @media (prefers-reduced-motion: reduce) { .chat-mic-btn.recording { animation: none; } }
 @media (pointer: coarse) { .chat-mic-btn { min-width: 44px; min-height: 44px; } }
+
+/* The job sketch. Stroked in currentColor so one drawing serves every theme
+   and print; the label chips need a matching backdrop, hence --sketch-bg. */
+.spec-sketch {
+    margin-top: 12px; padding: 10px; border-radius: 10px;
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    color: var(--text-primary); --sketch-bg: var(--bg-card);
+}
+.spec-sketch svg { display: block; width: 100%; height: auto; }
