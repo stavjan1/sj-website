@@ -106,3 +106,23 @@ test('an inspector fee is never quoted without naming the installation', () => {
             `an inspector price appears without its installation type: ${window.slice(0, 120)}`);
     }
 });
+
+test('the written assumptions stay tied to the characterization', () => {
+    // The assumptions paragraph is a claim in a document that goes to a
+    // customer. Answer a field that was left open and the paragraph is no
+    // longer true, so entering the draft has to re-derive it.
+    const app = readFileSync(join(ROOT, 'sale/app.js'), 'utf8');
+    const goToDraft = app.slice(app.indexOf('function goToDraft'), app.indexOf('function goToDraft') + 700);
+    assert.ok(/refreshSpecTerms\(/.test(goToDraft), 'goToDraft does not refresh the assumptions block');
+    assert.ok(app.includes('function refreshSpecTerms'), 'refreshSpecTerms is gone');
+
+    // syncCurrentQuoteToProject REPLACES quoteData with a fixed key list, so
+    // anything else parked there is destroyed the next time the user types.
+    // This cost a debugging session once; it should not cost a second.
+    const sync = app.slice(app.indexOf('function syncCurrentQuoteToProject'));
+    const body = sync.slice(0, sync.indexOf('\n}'));
+    const keys = [...body.matchAll(/^\s{12}(\w+):/gm)].map((m) => m[1]);
+    assert.ok(keys.length > 5, 'could not read the quoteData key list');
+    assert.ok(!app.includes('quoteData.specTermsWritten'),
+        'the assumptions marker is stored inside quoteData, which is rebuilt on every form edit');
+});

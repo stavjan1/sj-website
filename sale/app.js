@@ -3360,6 +3360,9 @@ function syncCurrentQuoteToProject() {
     if (!activeProjectId) return;
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (proj) {
+        // NOTE: this REPLACES quoteData with exactly the keys below — anything
+        // else stored on it is destroyed the next time the user types. Put
+        // per-project state on the project itself, not here.
         proj.quoteData = {
             clientName: document.getElementById('form-client-name').value,
             clientSub: document.getElementById('form-client-sub').value,
@@ -6433,6 +6436,50 @@ function specTermsBlock(proj) {
     return out;
 }
 
+// An assumption is a claim about the job, and claims go stale. Answer a field
+// that was left open and the quote would still tell the customer it was
+// assumed — a false statement in a document that goes out under Stav's name.
+// So the block is rewritten whenever the characterization moves. If it was
+// edited by hand it is flagged instead of clobbered: the edit was deliberate,
+// and overwriting it silently is the worse failure of the two.
+// The marker lives on the project, not inside quoteData: that object is
+// rebuilt from a fixed key list on every form edit (syncCurrentQuoteToProject),
+// so anything stored there disappears the moment the user types.
+function refreshSpecTerms(proj) {
+    if (!proj || !proj.quoteData) return;
+    const written = proj.specTermsWritten;
+    if (written === undefined) return;          // nothing was ever written by us
+    const fresh = specTermsBlock(proj);
+    if (fresh === written) return;
+
+    const summary = proj.quoteData.summary || '';
+    let next;
+    if (written && summary.includes(written)) {
+        next = summary.replace(written, fresh);
+    } else if (!written) {
+        // Nothing to replace — the block goes back where export puts it, ahead
+        // of the business terms.
+        const terms = appState.settings.businessDetails.terms || '';
+        next = terms && summary.endsWith(terms)
+            ? summary.slice(0, -terms.length) + fresh + terms
+            : summary + (summary && !summary.endsWith('\n') ? '\n\n' : '') + fresh;
+    } else {
+        showToast('ההנחות בהצעה נערכו ידנית והאפיון השתנה — בדוק אותן', 'error');
+        return;
+    }
+
+    proj.quoteData.summary = next;
+    proj.specTermsWritten = fresh;
+    saveProjects();
+    if (appState.currentQuote && appState.currentQuote.id === proj.id) {
+        appState.currentQuote.summary = next;
+        const field = document.getElementById('form-summary');
+        if (field) field.value = next;
+        if (typeof updatePreviewFromForm === 'function') updatePreviewFromForm();
+    }
+    showToast('ההנחות בהצעה עודכנו לפי האפיון');
+}
+
 // A compact Hebrew rendering of the confirmed characterization — this is what
 // the pricing agent receives instead of a wall of chat.
 function specToText(proj) {
@@ -7136,6 +7183,7 @@ function goToDraft() {
     filterProjectsList();
     switchTab('create');
     renderStageRail(proj);
+    refreshSpecTerms(proj);   // the characterization may have moved since the quote was written
     showToast('הכנת טיוטה — ערוך את ההצעה והפק PDF');
 }
 
@@ -8017,8 +8065,11 @@ ${checkedMatsText}
         proj.quoteData.subject = result.subject || proj.quoteData.subject;
         proj.quoteData.items = result.items || [];
         proj.quoteData.basePrice = result.basePrice || (result.items || []).reduce((sum, i) => sum + (i.price || 0), 0);
+        // Remember the block verbatim so it can be refreshed later without
+        // guessing which lines were ours.
+        proj.specTermsWritten = specTermsBlock(proj);
         proj.quoteData.summary = (result.summary ? result.summary + '\n\n' : '')
-            + specTermsBlock(proj)
+            + proj.specTermsWritten
             + appState.settings.businessDetails.terms;
 
         saveProjects();
