@@ -2,11 +2,13 @@
 // Purpose: make the app installable (PWA) and let the shell open instantly,
 // including offline at a job site (the user's data lives in localStorage
 // anyway). AI calls and cloud sync (/api/*) are ALWAYS network-only.
-const CACHE = 'zerem-shell-v59';
+const CACHE = 'zerem-shell-v60';
 const SHELL = [
   '/sale/',
   '/sale/index.html',
   '/sale/app.js',
+  '/sale/coverage.js',
+  '/sale/sketch.js',
   '/sale/styles.css',
   '/sale/manifest.webmanifest',
   '/sale/icons/icon-192.png',
@@ -42,6 +44,9 @@ self.addEventListener('fetch', (e) => {
         caches.open(CACHE).then((c) => c.put(e.request, copy));
         return res;
       })
-      .catch(() => caches.match(e.request, { ignoreSearch: url.pathname === '/sale/' || url.pathname === '/sale/index.html' }))
+      // ignoreSearch everywhere under /sale/: the shell is versioned with ?v=NN,
+      // so an offline request for app.js?v=46 must still match a cached app.js.
+      // Without this the precache is dead weight the moment a version bumps.
+      .catch(() => caches.match(e.request, { ignoreSearch: true }))
   );
 });

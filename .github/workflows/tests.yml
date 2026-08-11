@@ -1,0 +1,38 @@
+# Runs the guards on every push and pull request.
+#
+# The suite is data and structure only — no browser, no dependencies, no
+# install step. It finishes in under a second, which is the point: a check that
+# takes a minute gets skipped, and these are the checks that caught a wrong
+# professional title on a live page.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run the guards
+        run: node --test tests/*.test.mjs
+
+      - name: Check every function still parses
+        # Pages Functions are never bundled locally, so a syntax error would
+        # only surface as a 500 in production.
+        run: |
+          for f in functions/api/*.js; do
+            cp "$f" "/tmp/$(basename "$f")x.mjs"
+            node --check "/tmp/$(basename "$f")x.mjs" || { echo "syntax error in $f"; exit 1; }
+          done
+          for f in sale/app.js sale/coverage.js sale/sketch.js sale/sw.js track.js assistant.js reserve.js; do
+            node --check "$f" || { echo "syntax error in $f"; exit 1; }
+          done
