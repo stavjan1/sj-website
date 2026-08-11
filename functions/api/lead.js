@@ -15,6 +15,7 @@
 
 import { generate } from './_ai.js';
 import { rateLimit } from './_tiers.js';
+import { sendMail, SJ_FROM } from './_mail.js';
 
 // web3forms key: prefer the env var (Cloudflare → Settings → Env vars,
 // WEB3FORMS_KEY). The literal fallback keeps this working until the env var is
@@ -26,7 +27,6 @@ import { rateLimit } from './_tiers.js';
 // key this function hands it.
 const WEB3FORMS_KEY_FALLBACK = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
 const WEB3FORMS_ENDPOINT = 'https://api.web3forms.com/submit';
-const SJ_FROM = 'SJ הנדסת חשמל <info@sj-eng.co.il>';
 
 const DRAFT_PROMPT = `אתה כותב בשם SJ הנדסת חשמל מייל קצר, חם ומקצועי בעברית אל מתעניין שדיבר עם העוזר ההנדסי באתר. בהתבסס על תמלול השיחה:
 - פתח בשלום אישי לפי השם.
@@ -102,24 +102,12 @@ export async function onRequestPost(context) {
     },
   };
 
-  // 2b) If Resend is configured, send the email straight to the visitor FROM SJ.
-  let sentToVisitor = false;
-  if (env.RESEND_API_KEY) {
-    try {
-      const r = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.RESEND_API_KEY}` },
-        body: JSON.stringify({
-          from: env.RESEND_FROM || SJ_FROM,
-          to: [email],
-          reply_to: 'info@sj-eng.co.il',
-          subject: 'סיכום שיחתך עם SJ הנדסת חשמל',
-          text: fullBody,
-        }),
-      });
-      sentToVisitor = r.ok;
-    } catch (e) { /* non-fatal */ }
-  }
+  // 2b) If Resend is configured, send the summary straight to the visitor FROM SJ.
+  const sentToVisitor = (await sendMail(env, {
+    to: email,
+    subject: 'סיכום שיחתך עם SJ הנדסת חשמל',
+    text: fullBody,
+  })).ok;
 
   return json({
     ok: true,

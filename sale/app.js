@@ -12,6 +12,20 @@ function isAdmin() {
     return (getActiveUser() || '').toLowerCase().trim() === ADMIN_EMAIL.toLowerCase();
 }
 
+// What the signup notification actually did last time, in one line. The old
+// copy promised an email that had never once been sent; this reports state.
+function signupMailNote(d) {
+    if (!d || !d.mailConfigured) {
+        return '(מייל אוטומטי כבוי — נדרש RESEND_API_KEY בהגדרות Cloudflare)';
+    }
+    const m = d.mail;
+    if (!m) return '(מייל אוטומטי פעיל — עוד לא נשלח אף מייל)';
+    const when = new Date(m.at).toLocaleDateString('he-IL');
+    return m.ok
+        ? `(מייל אוטומטי פעיל · אחרון נשלח ${when})`
+        : `(⚠ המייל האחרון נכשל ב-${when}: ${escapeHtml(String(m.detail || 'שגיאה'))})`;
+}
+
 function showAdminTabIfNeeded() {
     const adminTab = document.getElementById('tab-admin');
     if (adminTab) adminTab.style.display = isAdmin() ? 'flex' : 'none';
@@ -261,7 +275,7 @@ async function adminRefreshUserList() {
         const newThisMonth = users.filter(u => u.firstSeen && u.firstSeen >= monthStart.getTime()).length;
         const summary = `<p style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 10px;">
             סה"כ <b>${users.length}</b> נרשמים · <b>${newThisMonth}</b> חדשים החודש
-            <span style="color:var(--text-muted)">(הרשמות חדשות מופיעות כאן — אין מייל אוטומטי)</span></p>`;
+            <span style="color:var(--text-muted)">${signupMailNote(d)}</span></p>`;
         container.innerHTML = summary + users.map(u => {
             const last = u.lastUpdated ? new Date(u.lastUpdated).toLocaleDateString('he-IL') : '—';
             const joined = u.firstSeen ? new Date(u.firstSeen).toLocaleDateString('he-IL') : null;
@@ -4465,7 +4479,7 @@ function getMarketAnchorsPromptBlock() {
 • תמיד טווח, לא מספר בודד. • פירוק לרכיבים: כמות נקודות/מפסקים/שקעים, מטרים של צנרת+כבל, מא"זים שנוספים ללוח, השחלות, חציבה. • תמיד עם הסתייגות: "לפני מע"מ", "ללא/כולל חומר", "ללא תיקון ליקויים". • עבודה קטנה-בודדת יקרה יחסית למכרז גדול (יתרון גודל מוזיל) — לעבודות בית/דירה נטה לרמה הגבוהה של הטווחים למטה.
 
 ## עוגני עבודה שלמה (מהשטח, ₪, לפני מע"מ)
-• הכנה להגדלת חיבור חד-פאזי 1×40 → תלת-פאזי 3×25 (דירה): מ~2,000 ועד ~כפול, ללא תיקון ליקויים — מקור: בודק מוסמך סוג 3 (אמין). תלוי בגודל המתקן וכמות הלוחות.
+• הכנה להגדלת חיבור חד-פאזי 1×40 → תלת-פאזי 3×25 (דירה): מ~2,000 ועד ~כפול, ללא תיקון ליקויים — מקור: חשמלאי בודק סוג 3 (אמין). תלוי בגודל המתקן וכמות הלוחות.
 • חבילת פיטינג חיצונית (מתג + גוף תאורה + ~3 שקעים + ~5 קופסאות חיבורים + ~20מ' תעלה + ~30מ' כבל 3×2.5): ~2,500–3,500.
 • התקנת עמדת טעינה כולל לוח פיצול על פילר ציבורי (~1.5 ימי עבודה): ~3,000–4,500, ללא תשלום לבודק. שים לב לתוספות-תקן: לוח נעול בשטח ציבורי, מפסק פקט.
 • התקנת גוף תאורה גדול (קוטר ~1מ'), התקנה בלבד: ~300.
@@ -6233,7 +6247,7 @@ const JOB_TYPE_MATCHERS = [
     { type: 'solar',      re: /סולארי|פוטו.?וולטא|פאנלים סולאריים|מונה נטו|אינוורטר|\bpv\b/i },
     { type: 'panel',      re: /לוח חשמל|החלפת לוח|הגדלת לוח|לוח משני|לוח דירתי|לוח ראשי|הגדלת חיבור/i },
     { type: 'earthing',   re: /הארק|אלקטרוד|השוואת פוטנציאל|פס פוטנציאלים|מתקן איפוס/i },
-    { type: 'inspection', re: /בדיקת מתקן|בודק מוסמך|דוח ליקויים|חוות דעת|בדיקה תקופתית|תיק מתקן/i },
+    { type: 'inspection', re: /בדיקת מתקן|חשמלאי בודק|דוח ליקויים|חוות דעת|בדיקה תקופתית|תיק מתקן/i },
     { type: 'fault',      re: /תקלה|קצר\b|אין חשמל|פחת קופץ|קופץ|נשרף|מהבהב|לא עובד/i },
     { type: 'lighting',   re: /תאורה|גופי תאורה|גוף תאורה|ספוט|פס צבירה|שקועים|תאורת חוץ/i },
     { type: 'infra',      re: /תשתית|תעלה|תעלת כבלים|צנרת|שרשור|חפירה|מעבר קיר|העברת קו|העברת כבל|קו הזנה/i },

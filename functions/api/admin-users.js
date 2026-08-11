@@ -71,5 +71,13 @@ export async function onRequestGet(context) {
 
   // Most recently active first.
   users.sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
-  return jsonResponse({ ok: true, count: users.length, users });
+
+  // Delivery state of the signup notification. Shown next to the counter so a
+  // broken key is visible where it matters — the old notification failed
+  // silently for months while the UI claimed it was working.
+  let mail = null;
+  try { mail = safeParse((await env.SJ_DATA.get('mail:last:signup')) || 'null'); } catch { /* optional */ }
+  const mailConfigured = !!(env.RESEND_API_KEY);
+
+  return jsonResponse({ ok: true, count: users.length, users, mail, mailConfigured });
 }

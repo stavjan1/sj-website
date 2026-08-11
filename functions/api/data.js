@@ -18,7 +18,8 @@
 // keeps everything locally (PDF export still works) and shows the upgrade
 // screen. Counted by history-entry IDs that don't exist in the stored blob.
 
-import { loadTierConfig, getTierForEmail, monthKey, verifyGoogleEmail } from './_tiers.js';
+import { loadTierConfig, getTierForEmail, monthKey, verifyGoogleEmail, ADMIN_EMAIL } from './_tiers.js';
+import { sendMailTracked } from './_mail.js';
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -94,12 +95,14 @@ export async function onRequest(context) {
     }
     await env.SJ_DATA.put(key, payload);
 
-    // No signup email is sent from here. web3forms rejects server-to-server
-    // submissions on the free plan (403), and this path has no browser
-    // continuation to hand a payload to the way /api/lead does — a background
-    // sync must not make the browser post an admin email on every routine save.
-    // New signups are visible in Admin → משתמשי המערכת, which reads `firstSeen`
-    // off these same records. `isNewUser` still drives the counter below.
+    // Notify AFTER the save succeeded — a rejected first sync (413 below) must
+    // not announce a user who has no cloud record. Sent via Resend: web3forms
+    // rejects server-to-server calls on the free plan, which is why the old
+    // notification never actually arrived. The result is recorded, so Admin
+    // shows what really happened instead of promising an email.
+    if (isNewUser) {
+      context.waitUntil(notifyNewSignup(env, email));
+    }
 
     // ---- Free-plan monthly cloud-quote counter (SOFT — never blocks the save) ----
     // Count quotes that are genuinely new to the cloud this sync. Re-syncing an
@@ -136,6 +139,21 @@ export async function onRequest(context) {
   return json({ error: { message: 'מתודה לא נתמכת.' } }, 405);
 }
 
+
+// "New user signed up" → the admin. Fire-and-forget by design (a signup must
+// never fail because email is down), but tracked, so a broken key surfaces in
+// Admin → מצב מערכת rather than disappearing.
+async function notifyNewSignup(env, email) {
+  return sendMailTracked(env, 'signup', {
+    to: ADMIN_EMAIL,
+    subject: '⚡ נרשם חדש בזרם: ' + email,
+    text: `משתמש חדש התחבר ושמר לראשונה במערכת זרם:
+
+${email}
+
+אפשר לראות את הפעילות שלו בלשונית Admin ← משתמשי המערכת.`,
+  }).catch(() => ({ ok: false }));
+}
 
 function isEmptyDb(db) {
   if (!db) return true;
