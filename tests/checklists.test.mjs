@@ -145,3 +145,30 @@ test('a tap during a stage slide is queued before the no-op check', () => {
     assert.ok(/vt\.ready\.catch/.test(body), 'vt.ready rejection is unhandled');
     assert.ok(/vt\.finished\.catch/.test(body), 'vt.finished rejection is unhandled');
 });
+
+test('the page-break guide agrees with the exporter, and never prints', () => {
+    const app = readFileSync(join(ROOT, 'sale/app.js'), 'utf8');
+
+    // The guide's position is derived from the PDF margin. If the exporter's
+    // margin changes and this constant does not, the line lands in the wrong
+    // place and quietly lies about where the page ends.
+    const declared = app.match(/marginMm:\s*(\d+)/);
+    assert.ok(declared, 'PDF_PAGE.marginMm is gone');
+    const quoteOpts = app.slice(app.indexOf('const options = {'));
+    const exporter = quoteOpts.match(/margin:\s*(\d+)/);
+    assert.ok(exporter, 'the quote exporter no longer sets a margin');
+    assert.equal(declared[1], exporter[1],
+        `guide margin ${declared[1]}mm != exporter margin ${exporter[1]}mm`);
+
+    // The guides sit inside the sheet, which is exactly what html2canvas
+    // photographs — so a red dashed line on a customer's quote is one missing
+    // removal away.
+    const capture = app.slice(app.indexOf('function _unscaleSheetForCapture'));
+    const body = capture.slice(0, capture.indexOf('\n}'));
+    assert.ok(/page-guide/.test(body) && /remove\(\)/.test(body),
+        'the page guides are not stripped before capture');
+
+    const css = readFileSync(join(ROOT, 'sale/styles.css'), 'utf8');
+    assert.ok(/@media print[\s\S]{0,200}\.page-guide/.test(css),
+        'the print path does not hide the page guides');
+});

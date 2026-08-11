@@ -5418,6 +5418,60 @@ function updatePreviewFromForm() {
     }
     
     syncCurrentQuoteToProject();
+    renderPageGuides();
+}
+
+// ── Where the paper actually ends ────────────────────────────────────────────
+// The preview is one continuous A4-shaped sheet, so a quote that runs long
+// looks fine on screen and then arrives as two pages — the second one holding
+// nothing but the footer. Nothing in the editor said so until the PDF existed.
+//
+// html2pdf captures the sheet at its full height and slices it across A4 pages
+// with a 10mm margin, so one page holds the source pixels that map to the
+// 190×277mm content box — NOT the sheet's own 1123px height. Deriving it from
+// the same numbers the export uses keeps the line honest.
+const PDF_PAGE = { widthMm: 210, heightMm: 297, marginMm: 10 };
+
+function pdfPageHeightPx(sheetWidthPx) {
+    const contentW = PDF_PAGE.widthMm - 2 * PDF_PAGE.marginMm;
+    const contentH = PDF_PAGE.heightMm - 2 * PDF_PAGE.marginMm;
+    return sheetWidthPx * (contentH / contentW);
+}
+
+function renderPageGuides() {
+    const sheet = document.getElementById('quote-pdf-sheet');
+    if (!sheet) return;
+    sheet.querySelectorAll('.page-guide').forEach((el) => el.remove());
+
+    const pageH = pdfPageHeightPx(sheet.offsetWidth);
+    if (!isFinite(pageH) || pageH <= 0) return;
+    const total = Math.max(sheet.scrollHeight, sheet.offsetHeight);
+    const pages = Math.ceil(total / pageH);
+
+    for (let i = 1; i < pages; i++) {
+        const guide = document.createElement('div');
+        guide.className = 'page-guide';
+        guide.style.top = `${Math.round(pageH * i)}px`;
+        guide.setAttribute('aria-hidden', 'true');
+        guide.innerHTML = `<span class="page-guide-label">עמוד ${i + 1}</span>`;
+        sheet.appendChild(guide);
+    }
+
+    const warn = document.getElementById('page-overflow-warning');
+    if (warn) {
+        if (pages > 1) {
+            // Say it in lines of text, not pixels — the number has to mean
+            // something to the person holding the paper.
+            const lineH = parseFloat(getComputedStyle(sheet).lineHeight) || 17;
+            const spillLines = Math.max(1, Math.round((total - pageH * (pages - 1)) / lineH));
+            warn.style.display = 'flex';
+            warn.innerHTML = `<i class="fa-solid fa-file-lines"></i>`
+                + `<span>ההצעה תודפס על <strong>${pages}</strong> עמודים. `
+                + `בערך <strong>${spillLines}</strong> שורות גלשו — קצר את ההערות או אחד הסעיפים כדי להחזיר לעמוד אחד.</span>`;
+        } else {
+            warn.style.display = 'none';
+        }
+    }
 }
 
 // The user's LAST choice in the editor becomes the default for the next new
@@ -8518,11 +8572,17 @@ function _unscaleSheetForCapture(sheet) {
     sheet.style.transform = 'none';
     sheet.style.marginBottom = '0';
     document.body.style.zoom = '';
+    // The page-break guides live inside the sheet so they line up with it under
+    // any scale — which also means html2canvas would photograph them straight
+    // into the customer's PDF. They come out for the capture.
+    const guides = [...sheet.querySelectorAll('.page-guide')];
+    guides.forEach((g) => g.remove());
     return () => {
         sheet.style.transform = saved.transform;
         sheet.style.marginBottom = saved.marginBottom;
         document.body.style.zoom = saved.bodyZoom;
         try { fitQuotePreview(); } catch (e) {}
+        try { renderPageGuides(); } catch (e) {}
     };
 }
 
