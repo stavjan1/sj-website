@@ -14,6 +14,7 @@
 
 import { generate } from './_ai.js';
 import { getPricingMap } from './_pricing_map.js';
+import { getKitBlock } from './_electrical_kit.js';
 import {
   ADMIN_EMAIL, MODEL_CLASS, loadTierConfig, getTierForEmail,
   verifyGoogleEmail, bearerToken, dayKey, rateLimit,
@@ -99,6 +100,12 @@ export async function onRequestPost(context) {
   // of quoting flat numbers.
   const pricingMap = await getPricingMap(env);
   const messages = [...body.messages, { role: 'system', content: pricingMap }];
+
+  // Characterization stage only: the equipment kit for this job family, so the
+  // product list comes back complete down to the glands and the labels. Sent
+  // per request rather than always — pricing chats don't need the parts bin.
+  const kit = getKitBlock(typeof body.jobKit === 'string' ? body.jobKit.slice(0, 40) : '');
+  if (kit) messages.push({ role: 'system', content: kit });
 
   return generate(env, {
     provider,

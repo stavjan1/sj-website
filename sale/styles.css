@@ -23,6 +23,12 @@
 
     --color-success: #22c984;
     --color-success-hover: #10a86a;
+    /* Button greens are a separate token from the text green on purpose:
+       #22c984 under white text measures 2.15:1, nowhere near the 4.5:1 floor,
+       while as text on the dark card it is a comfortable 8:1. One value cannot
+       be both, so there are two. */
+    --color-success-btn: #0d7a4a;
+    --color-success-btn-hover: #0a6a40;
     --color-danger: #f05252;
     --color-danger-hover: #d83838;
 
@@ -672,12 +678,12 @@ textarea#ai-input {
 }
 
 .btn-success {
-    background-color: var(--color-success);
-    color: white;
+    background-color: var(--color-success-btn);
+    color: #fff;
 }
 
 .btn-success:hover {
-    background-color: var(--color-success-hover);
+    background-color: var(--color-success-btn-hover);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
 }
@@ -3207,6 +3213,12 @@ textarea#ai-input {
 
 /* Light Theme Variables */
 body.light-theme {
+    /* Amber deep enough to read on white (4.9:1) — the dark theme's #f0c040
+       measures 1.7:1 here, which is decoration, not text. */
+    --admin-gold: #a16207;
+    /* Same story for the success green: 2.2:1 as text on a white card. */
+    --color-success: #0f7a4d;
+    --color-success-hover: #0a6a40;
     --bg-main: #f0f2f5;
     --bg-card: #ffffff;
     --bg-card-header: #f8fafc;
@@ -3480,6 +3492,143 @@ body.has-custom-bg.light-theme .chat-container {
 
 
 /* ===== Pricing-chat side dashboard: scope / BOM / toolkit cards ===== */
+/* --------------------------------------------------------------------------
+   Characterization card (כרטיס האפיון) — stage 1's centre of gravity.
+   Reads as a worksheet you complete, not a form you fill: every row is either
+   answered, knowingly skipped, or open, and the gate at the bottom is the only
+   way into pricing.
+   -------------------------------------------------------------------------- */
+.spec-card {
+    background: var(--bg-input, rgba(255,255,255,0.02));
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 14px 16px;
+}
+.spec-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.spec-head .wizard-dash-title { margin: 0; }
+.spec-count {
+    font-size: 0.78rem; font-weight: 700; color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+.spec-types { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 8px; }
+.spec-type-chip {
+    padding: 4px 11px; border-radius: 50px; cursor: pointer;
+    border: 1px solid var(--border-color); background: transparent;
+    color: var(--text-secondary); font-family: inherit; font-size: 0.76rem; font-weight: 600;
+    transition: border-color var(--transition-speed), color var(--transition-speed);
+}
+.spec-type-chip:hover { border-color: var(--border-hover); color: var(--text-secondary); }
+/* Accent as the border, not the label: the accent hue drops to 3.8:1 against
+   the mid theme's panel, and selection must not be signalled by colour alone —
+   the border weight carries it. */
+.spec-type-chip.active { border-color: var(--color-accent); border-width: 2px; color: var(--text-primary); font-weight: 700; }
+
+.spec-bar { height: 4px; border-radius: 4px; background: var(--border-color); overflow: hidden; }
+.spec-bar span {
+    display: block; height: 100%; background: var(--color-accent);
+    transition: width 0.35s ease;
+}
+
+.spec-rows { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; }
+.spec-row { padding: 9px 0; border-bottom: 1px solid var(--border-color); }
+.spec-row:last-child { border-bottom: none; }
+.spec-q { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.spec-q-text { font-size: 0.86rem; color: var(--text-secondary); font-weight: 600; }
+.spec-dot { font-size: 0.6rem; color: var(--text-muted); }
+.spec-row.done .spec-dot { color: var(--color-success); }
+/* An answered row reads as answered from the check icon and the value beneath
+   it — the label keeps full contrast rather than fading to muted, which fails
+   AA against the light theme's panel. Never carry state on colour alone. */
+.spec-row.done .spec-q-text { font-weight: 500; }
+.spec-row.skipped .spec-dot { color: var(--text-muted); }
+.spec-row.open.crit .spec-dot { color: var(--color-accent); }
+.spec-crit-tag {
+    font-size: 0.66rem; font-weight: 700; letter-spacing: 0.02em;
+    color: var(--text-primary); border: 1px solid var(--color-accent);
+    border-radius: 4px; padding: 0 5px; line-height: 1.5;
+}
+.spec-row.done .spec-crit-tag, .spec-row.skipped .spec-crit-tag { display: none; }
+/* A real button, not a title-attribute tooltip: title text is invisible to
+   touch and to keyboard users, and the "why" is the argument for answering. */
+.spec-why {
+    background: none; border: none; padding: 2px 4px; cursor: pointer;
+    color: var(--text-secondary); font-size: 0.72rem; line-height: 1;
+}
+.spec-why:hover { color: var(--color-accent); }
+.spec-why-text {
+    margin: 5px 0 0; font-size: 0.76rem; line-height: 1.6;
+    color: var(--text-secondary); padding-inline-start: 17px;
+}
+
+.spec-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.spec-chip {
+    padding: 5px 12px; border-radius: 50px; cursor: pointer;
+    border: 1px solid var(--border-color); background: var(--bg-card);
+    color: var(--text-secondary); font-family: inherit; font-size: 0.8rem;
+    transition: border-color var(--transition-speed), color var(--transition-speed);
+}
+.spec-chip:hover { border-color: var(--color-accent); color: var(--text-primary); }
+/* On a touch device this card is answered with a thumb, on a van, in the sun.
+   Chips get a 44px target there without bloating the desktop layout. */
+@media (pointer: coarse) {
+    .spec-chip, .spec-type-chip { min-height: 44px; padding-block: 0; display: inline-flex; align-items: center; }
+    .spec-skip, .spec-edit, .spec-force, .spec-why { min-height: 44px; display: inline-flex; align-items: center; }
+}
+/* Keyboard users must be able to see where they are. The app suppresses the
+   default outline in several places; these controls opt back in. */
+.spec-card :is(button, input):focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+.spec-inline { display: flex; align-items: center; gap: 7px; margin-top: 7px; }
+.spec-num, .spec-text {
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: 8px; padding: 6px 10px; color: var(--text-primary);
+    font-family: inherit; font-size: 0.82rem;
+}
+.spec-num { width: 110px; }
+.spec-text { width: 100%; margin-top: 7px; }
+.spec-unit { font-size: 0.78rem; color: var(--text-secondary); }
+
+.spec-answer { display: flex; align-items: center; gap: 8px; margin-top: 4px; padding-inline-start: 17px; }
+.spec-answer-val { font-size: 0.84rem; color: var(--text-primary); }
+.spec-row.skipped .spec-answer-val { color: var(--text-secondary); font-style: italic; }
+.spec-ai-tag {
+    font-size: 0.64rem; font-weight: 700; color: var(--text-secondary);
+    border: 1px dashed var(--border-hover); border-radius: 4px; padding: 0 5px;
+}
+/* --text-secondary, not --text-muted: muted small text measures 4.35:1 against
+   the light theme's panel, just under the 4.5:1 floor. These are controls, so
+   they take the readable token. */
+.spec-edit, .spec-skip, .spec-force {
+    background: none; border: none; cursor: pointer; font-family: inherit;
+    color: var(--text-secondary); font-size: 0.74rem; padding: 0;
+    text-decoration: underline; text-underline-offset: 3px;
+}
+.spec-edit:hover, .spec-skip:hover, .spec-force:hover { color: var(--color-accent); }
+.spec-skip { margin-top: 7px; }
+
+.spec-assume-note {
+    margin: 10px 0 0; font-size: 0.76rem; color: var(--text-secondary);
+}
+.spec-gate { margin-top: 14px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.spec-gate-btn { width: 100%; font-size: 0.95rem; }
+.spec-gate-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+.spec-gate-hint { margin: 0; font-size: 0.76rem; color: var(--text-secondary); }
+.spec-more {
+    width: 100%; margin-top: 10px; padding: 9px; cursor: pointer; font-family: inherit;
+    background: transparent; border: 1px dashed var(--border-color); border-radius: 8px;
+    color: var(--text-secondary); font-size: 0.8rem; font-weight: 600;
+}
+.spec-more:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.spec-order {
+    margin-top: 4px; background: none; border: none; cursor: pointer; font-family: inherit;
+    color: var(--text-secondary); font-size: 0.78rem; display: inline-flex; align-items: center; gap: 6px;
+}
+.spec-order:hover { color: var(--color-accent); }
+
 .wizard-dash-card {
     background: var(--bg-input, rgba(255,255,255,0.02));
     border: 1px solid var(--border-color, rgba(255,255,255,0.08));
@@ -4201,6 +4350,47 @@ body {
 .admin-stats-tbl th, .admin-stats-tbl td { padding: 8px 10px; text-align: right; border-bottom: 1px solid var(--border-color); }
 .admin-stats-tbl th { color: var(--text-muted); font-weight: 700; font-size: 0.76rem; }
 .admin-stats-tbl tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+/* Traffic + Clarity — two columns that never merge, because the office site
+   and זרם are different businesses answering different questions. */
+.tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.tcol, .tclarity {
+    background: var(--bg-input); border: 1px solid var(--border-color);
+    border-radius: 10px; padding: 14px;
+}
+.tcol-title {
+    margin: 0 0 12px; font-size: 0.92rem; font-weight: 700; color: var(--text-primary);
+    display: flex; align-items: center; gap: 8px;
+}
+.tcol-title i { color: #f0c040; }
+.tkpis { display: flex; gap: 10px; flex-wrap: wrap; }
+.tkpis .ask {
+    flex: 1; min-width: 88px; background: var(--bg-card);
+    border: 1px solid var(--border-color); border-radius: 8px;
+    padding: 10px 12px; display: flex; flex-direction: column; gap: 2px;
+}
+/* The admin gold is 1.7:1 on a white panel — unreadable in the light theme.
+   One token, overridden per theme, keeps the "admin" colour without the cost. */
+.tkpis .asv { font-size: 1.3rem; font-weight: 800; color: var(--admin-gold, #f0c040); }
+.tkpis .asl { font-size: 0.72rem; color: var(--text-secondary); }
+.tspark { width: 100%; height: 44px; margin-top: 12px; display: block; }
+.tsub { margin: 14px 0 6px; font-size: 0.78rem; font-weight: 700; color: var(--text-muted); }
+.tlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.tlist li {
+    display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
+    font-size: 0.8rem; padding: 4px 0; border-bottom: 1px solid var(--border-color);
+}
+.tlist li:last-child { border-bottom: none; }
+.tlist .tk { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tlist .tv { color: var(--text-primary); font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.tclarity { margin-top: 4px; }
+.tinsights {
+    background: rgba(240,192,64,0.06); border: 1px solid rgba(240,192,64,0.28);
+    border-radius: 10px; padding: 14px; margin-bottom: 16px;
+}
+.tinsight-list li { border-bottom: none; padding: 3px 0; }
+.tinsight-list .tk { white-space: normal; color: var(--text-primary); line-height: 1.6; }
+@media (max-width: 820px) { .tgrid { grid-template-columns: 1fr; } }
 
 /* ==========================================================================
    v4.28 — collapsible archive + read-only project view
