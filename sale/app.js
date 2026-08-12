@@ -7301,9 +7301,20 @@ function updatePlanActionBar(proj) {
     const bar = document.getElementById('plan-action-bar');
     if (!bar) return;
     const plan = proj && Array.isArray(proj.planChatHistory) ? proj.planChatHistory : [];
-    const lastText = _lastModelText(plan);
-    const hasList = /רשימת (ה)?מוצרים|רשימת (ה)?ציוד/.test(lastText);
-    const show = activeChatMode === 'plan' && plan.some(m => m.role === 'user') && hasList && canPriceProject(proj);
+
+    // The invitation to price used to require the agent's last message to
+    // contain the words "רשימת המוצרים" or "רשימת הציוד". Phrase it any other
+    // way — and it often does — and the prompt never appeared, on a finished
+    // characterization with the gate wide open. The whole point of this product
+    // is that OUR checklist decides when a job is ready to price, not the
+    // agent's prose. canPriceProject is that decision; it is the only thing
+    // that should gate this.
+    //
+    // Pricing was never affected: it sends the last plan message whatever it
+    // says, alongside the card. Only the prompt was hidden.
+    const answered = plan.some((m) => m.role === 'model');
+    const show = activeChatMode === 'plan' && plan.some((m) => m.role === 'user')
+        && answered && canPriceProject(proj);
     bar.style.display = show ? 'flex' : 'none';
 }
 

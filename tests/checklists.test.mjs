@@ -320,3 +320,21 @@ test('one tap cannot silently discard accumulated work', () => {
     assert.equal(calls, 1, 'clearSpecAnswer is back — it should exist only in the note explaining its removal');
     assert.ok(!/^function clearSpecAnswer/m.test(app), 'clearSpecAnswer was reinstated');
 });
+
+test('the invitation to price is gated by our checklist, not the agent prose', () => {
+    // It used to require the agent's last message to contain "רשימת המוצרים"
+    // or "רשימת הציוד". Phrase it any other way — and it often does — and the
+    // prompt never appeared, on a finished characterization with the gate wide
+    // open. The premise of this product is that OUR checklist decides when a
+    // job is ready to price.
+    const app = read('sale/app.js');
+    const fn = app.slice(app.indexOf('function updatePlanActionBar'));
+    const body = fn.slice(0, fn.indexOf('\n}'));
+
+    assert.ok(/canPriceProject\(proj\)/.test(body), 'the gate no longer decides when pricing is offered');
+    assert.ok(!/רשימת/.test(body.replace(/\/\/.*$/gm, '')),
+        'the invitation is matched against the agent\'s wording again');
+    // Still not offered before the agent has said anything at all.
+    assert.ok(/role === 'model'/.test(body), 'the prompt can appear before the agent has replied');
+    assert.ok(/activeChatMode === 'plan'/.test(body), 'the prompt is not limited to the characterization screen');
+});
