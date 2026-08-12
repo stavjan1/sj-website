@@ -18,13 +18,21 @@ import { rateLimit } from './_tiers.js';
 import { sendMail, SJ_FROM } from './_mail.js';
 
 // web3forms key: prefer the env var (Cloudflare → Settings → Env vars,
-// WEB3FORMS_KEY). The literal fallback keeps this working until the env var is
-// set, but it's committed in a PUBLIC repo — rotate the key and set the new one
-// as WEB3FORMS_KEY so the exposed value below stops working.
-// The key reaches the browser by design: web3forms access keys are public (the
-// contact forms carry one in a hidden input), and the free plan only accepts
-// client-side submissions. Rotation still works — the browser posts whatever
-// key this function hands it.
+// WEB3FORMS_KEY). The literal below is the fallback until that is set.
+//
+// It being in a public repo is NOT a leak: web3forms access keys are public by
+// design — the contact forms carry one in a hidden input, and the free plan
+// only accepts client-side submissions. What a public key costs you is form
+// spam, and the fix for that is web3forms' own captcha/domain settings, not
+// rotation.
+//
+// If you do rotate it, rotate all FIVE places or leads go missing silently:
+//   functions/api/lead.js          (here — or set WEB3FORMS_KEY and skip it)
+//   functions/api/share-catalog.js (same)
+//   contact.html, index.html, zerem/index.html
+// Those three hardcode the key in the form itself and never reach a Function,
+// so setting the env var alone leaves them posting a dead key — no error, no
+// bounce, the lead just never arrives. A test pins all five together.
 const WEB3FORMS_KEY_FALLBACK = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
 const WEB3FORMS_ENDPOINT = 'https://api.web3forms.com/submit';
 

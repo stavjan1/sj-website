@@ -14,11 +14,10 @@
 // it optionally and passes it through here.
 
 // Read the web3forms key from the environment (Cloudflare → Settings → Env vars,
-// name WEB3FORMS_KEY). The literal fallback keeps lead capture working until the
-// env var is set — but it lives in a PUBLIC repo, so it must be rotated: set the
-// new key as WEB3FORMS_KEY and the exposed one below becomes dead.
-// The key is handed to the browser on purpose: web3forms access keys are public,
-// and its free plan rejects server-to-server submissions outright.
+// name WEB3FORMS_KEY); the literal below is the fallback until that is set.
+// The key is handed to the browser on purpose: web3forms access keys are public
+// by design, and its free plan rejects server-to-server submissions outright.
+// See lead.js for why rotating it is a five-file change, not an env var.
 const WEB3FORMS_KEY_FALLBACK = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
 const WEB3FORMS_ENDPOINT = 'https://api.web3forms.com/submit';
 

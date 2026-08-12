@@ -241,3 +241,35 @@ test('the first screen does not point in a direction', () => {
     assert.ok(/startFirstProject\(\)/.test(body),
         'the empty state has no action, only a description');
 });
+
+test('rotating the web3forms key cannot half-happen', () => {
+    // The key is public by design — web3forms puts it in a hidden input — so
+    // its presence in a public repo is not the problem. The problem is that it
+    // lives in FIVE places: two Functions that fall back to it, and three
+    // static forms that hardcode it and never touch a Function.
+    //
+    // The comments say to rotate it and set WEB3FORMS_KEY. Do exactly that and
+    // the Functions keep working while the three contact forms keep posting a
+    // dead key — no error, no bounce, just leads quietly falling on the floor.
+    // This fails loudly if a rotation only lands in some of them.
+    const files = ['contact.html', 'index.html', 'zerem/index.html',
+                   'functions/api/lead.js', 'functions/api/share-catalog.js'];
+    const found = new Map();
+    for (const f of files) {
+        const text = read(f);
+        for (const m of text.matchAll(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi)) {
+            if (!found.has(m[0])) found.set(m[0], []);
+            found.get(m[0]).push(f);
+        }
+    }
+    assert.ok(found.size > 0, 'the web3forms key vanished from every known location');
+    assert.equal(found.size, 1,
+        'more than one web3forms key is live — a rotation landed in some files but not others: '
+        + [...found].map(([k, fs]) => `${k.slice(0, 8)}… in ${fs.join(', ')}`).join(' | '));
+
+    // And every one of the five still carries it, so a rotation cannot skip a file.
+    const carriers = [...found.values()][0];
+    for (const f of files) {
+        assert.ok(carriers.includes(f), `${f} no longer carries the key — was a rotation missed here?`);
+    }
+});
