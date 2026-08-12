@@ -6655,8 +6655,30 @@ function setSpecJobType(type) {
     if (!proj) return;
     const spec = ensureSpec(proj);
     if (spec.jobType === type) return;
+
+    // A different checklist means different fields, so the answers cannot come
+    // along: of 111 field ids only 8 appear in more than one checklist, and all
+    // but one of those ask a DIFFERENT question under the same id. Carrying
+    // them would quietly put a wrong fact into a customer's quote, which is
+    // worse than losing them.
+    //
+    // But losing them silently is its own bug: the type chips sit at the top of
+    // the card, a thumb finds them by accident, and a full characterization
+    // disappears with no warning and no way back. So ask first — and only when
+    // there is actually something to lose, since the agent sets the type on
+    // almost every new job.
+    const answered = Object.keys(spec.answers || {}).length;
+    if (answered) {
+        const label = (allChecklists()[type] || GENERIC_CHECKLIST).label || type;
+        if (!confirm(`מעבר ל"${label}" יחליף את רשימת השאלות, ו-${answered} התשובות שכבר מילאת יימחקו.\n\nאי אפשר לשחזר אותן אחר כך. להחליף?`)) {
+            renderSpecCard(proj);   // repaint so the chip snaps back to the real type
+            return;
+        }
+    }
+
     spec.jobType = type;
-    spec.answers = {}; // a different checklist means different fields
+    spec.answers = {};
+    specEditingField = null;
     saveProjects();
     renderSpecCard(proj);
     updatePlanActionBar(proj);

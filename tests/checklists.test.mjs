@@ -268,3 +268,34 @@ test('changing an answer does not destroy it first', () => {
     assert.ok(/c === current \? ' active' : ''/.test(renderBody),
         'the chosen chip is not marked when re-opening an answered question');
 });
+
+test('switching job type cannot silently destroy a characterization', () => {
+    // The type chips sit at the top of the card where a thumb finds them by
+    // accident, and switching wipes every answer with no way back. Measured:
+    // a fully answered charger job lost all 14, and switching back restored
+    // nothing.
+    const app = read('sale/app.js');
+    const fn = app.slice(app.indexOf('function setSpecJobType'));
+    const body = fn.slice(0, fn.indexOf('\n}'));
+
+    assert.ok(/confirm\(/.test(body), 'the job type can be changed without confirming the loss');
+    // Only when there is something to lose — the agent sets the type on almost
+    // every new job, and a dialog there would be intolerable.
+    assert.ok(/if \(answered\)/.test(body), 'it asks even when no answers exist yet');
+    // Declining has to repaint, or the chip keeps showing the type not chosen.
+    assert.ok(/renderSpecCard\(proj\);\s*\/\/.*\n?\s*return;|renderSpecCard\(proj\);[^\n]*\n\s*return;/.test(body),
+        'declining leaves the chip showing a type the project is not on');
+
+    // Carrying answers across is NOT the fix: of 111 field ids only 8 appear in
+    // more than one checklist and all but one ask a different question under
+    // the same id, so a carried answer would put a wrong fact in a quote.
+    assert.ok(/spec\.answers = \{\}/.test(body), 'answers are carried across checklists');
+
+    // The agent's own paths must stay dialog-free, and must never overwrite a
+    // type the user has already answered under.
+    const prefill = app.slice(app.indexOf('function applySpecPrefill'));
+    const prefillBody = prefill.slice(0, prefill.indexOf('\n}\n'));
+    assert.ok(!/confirm\(/.test(prefillBody), 'the agent path would block on a dialog');
+    assert.ok(/source === 'user'/.test(prefillBody),
+        'the agent can retype a job the user has already answered under');
+});
