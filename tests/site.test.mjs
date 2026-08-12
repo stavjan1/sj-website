@@ -207,3 +207,37 @@ test('the customer-facing quote page cannot be broken out of', () => {
     const bare = [...body.matchAll(/\$\{\s*((?:q|it|biz)\.[\w.]+)\s*\}/g)].map((m) => m[1]);
     assert.deepEqual(bare, [], `value dropped into the quote sheet unescaped: ${bare.join(', ')}`);
 });
+
+test('a deploy actually reaches an installed service worker', () => {
+    // "Network-first" is only as fresh as the fetch underneath it, and a plain
+    // fetch() may still be answered from the browser's HTTP cache. Observed:
+    // server at ?v=66, worker cache at ?v=65, page rendered ?v=65 — a whole
+    // deploy behind. The HTML carries the ?v= for every other file, so one
+    // stale page means the entire app is stale.
+    const sw = read('sale/sw.js');
+    assert.ok(/cache: 'reload'/.test(sw),
+        'the shell fetch can be served from the HTTP cache, so a deploy may not arrive');
+    assert.ok(/mode === 'navigate'/.test(sw),
+        'navigations are not treated as shell requests');
+
+    // The cache has to stay keyed on the original request or the offline
+    // lookup below it stops finding anything.
+    assert.ok(/c\.put\(e\.request, copy\)/.test(sw),
+        'the cache is keyed on the rewritten request, breaking the offline fallback');
+});
+
+test('the first screen does not point in a direction', () => {
+    // The empty state said "צור פרויקט חדש מימין" long after the box moved
+    // above the list. It is seen once, by someone with nothing to compare it
+    // to, so nobody ever reported it.
+    const app = read('sale/app.js');
+    const fn = app.slice(app.indexOf('function renderProjectsList'));
+    // Comments stripped: the one above the fix quotes the old wording, and a
+    // test that cannot tell an explanation from a string is a test that
+    // punishes writing things down.
+    const body = fn.slice(0, fn.indexOf('\n    const cats')).replace(/\/\/.*$/gm, '');
+    assert.ok(!/מימין|משמאל/.test(body),
+        'the projects empty state points in a direction that can go stale');
+    assert.ok(/startFirstProject\(\)/.test(body),
+        'the empty state has no action, only a description');
+});

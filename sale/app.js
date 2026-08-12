@@ -2417,6 +2417,15 @@ function toggleProjectSort(field) {
 }
 
 // List rows vs. a compact grid of cards.
+// The empty state's button: put the cursor where the work starts, rather than
+// telling someone which way to look for it.
+function startFirstProject() {
+    const input = document.getElementById('new-project-name');
+    if (!input) return;
+    input.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); }
+}
+
 let projectsView = 'list';
 function setProjectsView(view) {
     projectsView = view === 'grid' ? 'grid' : 'list';
@@ -3354,11 +3363,24 @@ function renderProjectsList(list) {
     container.innerHTML = '';
 
     if (projectsList.length === 0) {
-        container.innerHTML = `<div style="color:var(--text-muted); text-align:center; padding:40px;">אין פרויקטים פעילים. צור פרויקט חדש מימין.</div>`;
+        // This said "צור פרויקט חדש מימין". The box is above the list, not to
+        // the right — it has been for a while, and the sentence went stale
+        // without anyone noticing because it is only ever seen once, by
+        // someone with nothing to compare it to. A button cannot point the
+        // wrong way, and it works the same on a phone as on a desktop.
+        container.innerHTML = `
+            <div class="projects-empty">
+                <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                <p class="pe-title">עוד אין פרויקטים</p>
+                <p class="pe-sub">כל עבודה מתחילה בתיאור במילים שלך — ומשם זרם בונה את האפיון.</p>
+                <button type="button" class="btn btn-accent" onclick="startFirstProject()">
+                    <i class="fa-solid fa-plus"></i> פרויקט חדש
+                </button>
+            </div>`;
         return;
     }
     if (list.length === 0) {
-        container.innerHTML = `<div style="color:var(--text-muted); text-align:center; padding:40px;">לא נמצאו פרויקטים התואמים לחיפוש.</div>`;
+        container.innerHTML = `<div class="projects-empty"><p class="pe-sub">לא נמצאו פרויקטים התואמים לחיפוש.</p></div>`;
         return;
     }
 

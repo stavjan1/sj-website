@@ -2,7 +2,7 @@
 // Purpose: make the app installable (PWA) and let the shell open instantly,
 // including offline at a job site (the user's data lives in localStorage
 // anyway). AI calls and cloud sync (/api/*) are ALWAYS network-only.
-const CACHE = 'zerem-shell-v76';
+const CACHE = 'zerem-shell-v78';
 
 // The typeface and the icons come from other people's servers, and at a job
 // site there is no reception to fetch them with. Without them the app is a wall
@@ -73,11 +73,26 @@ self.addEventListener('fetch', (e) => {
   if (url.origin !== location.origin) return;            // anything else third-party: browser default
   if (!url.pathname.startsWith('/sale/') && url.pathname !== '/assistant.js' && url.pathname !== '/assets/listcards.js') return;
 
+  // "Network-first" is only as fresh as the fetch underneath it, and a plain
+  // fetch() is still allowed to be answered by the browser's HTTP cache. That
+  // was observed: the server had index.html at ?v=66, the worker had ?v=65, and
+  // the browser rendered ?v=65 — a whole deploy behind. Because the HTML is
+  // what carries the ?v= for every other file, one stale page means the entire
+  // app is stale.
+  //
+  // Versioned assets are exempt: a ?v= URL is immutable, so revalidating it
+  // every time would cost a round trip to be told nothing changed.
+  const isShell = e.request.mode === 'navigate'
+    || url.pathname.endsWith('.html')
+    || url.pathname.endsWith('/');
+  const request = isShell ? new Request(e.request, { cache: 'reload' }) : e.request;
+
   // Network-first with cache fallback: fresh app when online, working shell offline.
   e.respondWith(
-    fetch(e.request)
+    fetch(request)
       .then((res) => {
         const copy = res.clone();
+        // Keyed on the original request, so the offline lookup below still finds it.
         caches.open(CACHE).then((c) => c.put(e.request, copy));
         return res;
       })
