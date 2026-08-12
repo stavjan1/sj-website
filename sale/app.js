@@ -7148,7 +7148,7 @@ function setChatMode(mode, projOverride) {
     if (mode === 'plan') toggleEstimatePanel(!wide, false);
     else toggleEstimatePanel(localStorage.getItem('sj_hide_estimate') !== '0', false);
 
-    renderChatHistory(mode === 'plan' ? ensurePlanHistory(proj) : proj.chatHistory);
+    renderChatHistory(proj);
     renderStageRail(proj);
     renderSpecCard(proj);
     updatePlanActionBar(proj);
@@ -7497,7 +7497,7 @@ async function runPlanningAgent(activeProject) {
         activeProject.planChatHistory.push({ role: 'model', parts: [{ text: responseText }] });
         applySpecPrefill(activeProject, responseText);
         saveProjects();
-        renderChatHistory(activeProject.planChatHistory);
+        renderChatHistory(activeProject);
         updatePlanActionBar(activeProject);
         addWeightedUsage(effectiveModel, responseText.length, performance.now() - _t0);
     } catch (e) {
@@ -7534,6 +7534,11 @@ async function priceThisProject(force) {
     proj.specExclusions = specExclusions(proj);
     ensureChatHistory(proj).push({
         role: 'user',
+        // Stored as a user turn because that is what the pricing agent must
+        // receive, but it is not something Stav typed — it is the card plus the
+        // agent's own product list. Marked so the thread never offers a pencil
+        // on it: editing it truncates the whole pricing conversation.
+        handoff: true,
         parts: [{ text: `האפיון הושלם ואושר. תמחר את העבודה במלואה — עבודה + חומרים.\n\n${specToText(proj)}\n\nרשימת המוצרים שגובשה:\n${planText}` }]
     });
     saveProjects();
@@ -7634,7 +7639,7 @@ async function sendChatMessage() {
             spec.jobType = detectJobType(userText);
         }
         saveProjects();
-        renderChatHistory(activeProject.planChatHistory);
+        renderChatHistory(activeProject);
         renderSpecCard(activeProject);
         inputArea.value = '';
         const bar = document.getElementById('plan-action-bar');
@@ -7654,7 +7659,7 @@ async function sendChatMessage() {
     saveProjects();
 
     // Render and scroll to bottom
-    renderChatHistory(activeProject.chatHistory);
+    renderChatHistory(activeProject);
     inputArea.value = '';
 
     await runPricingAgent(activeProject, userText.length);
@@ -7714,7 +7719,7 @@ async function runPricingAgent(activeProject, promptChars) {
         saveProjects();
 
         showTypingIndicator(false);
-        renderChatHistory(activeProject.chatHistory);
+        renderChatHistory(activeProject);
         updatePriceActionBar(activeProject); // clear "next step" → draft
 
         applyMaterialsFromResponse(activeProject, responseText);
@@ -7853,7 +7858,7 @@ async function regenerateLastAnswer() {
         return;
     }
     saveProjects();
-    renderChatHistory(history);
+    renderChatHistory(proj);
     if (planning) await runPlanningAgent(activeProject);
     else await runPricingAgent(activeProject);
 }
@@ -8019,19 +8024,70 @@ function handleChatKeyDown(event) {
     }
 }
 
-function renderChatHistory(chatHistory) {
+// One project, one conversation. The two arrays stay exactly as they are — each
+// agent keeps its own clean context, and the pricing prompt still keys off its
+// opening handoff message — but the user sees a single thread with the two
+// stages marked inside it. Pure and read-only: it must never call ensure*,
+// because drawing a conversation should not write a greeting into someone's
+// saved project.
+//
+// Order is plan-then-price, not chronological. Messages carry no timestamp and
+// never have, so for projects that already exist the true order is not
+// recoverable. This is the same order openProjectView has always used.
+function buildChatView(proj) {
+    const plan = Array.isArray(proj.planChatHistory) ? proj.planChatHistory : [];
+    const price = Array.isArray(proj.chatHistory) ? proj.chatHistory : [];
+    const rows = [];
+
+    if (plan.length) rows.push({ divider: 'plan' });
+    plan.forEach((msg, i) => rows.push({ stage: 'plan', i, msg }));
+
+    let openedPrice = false;
+    price.forEach((msg, i) => {
+        // A new project seeds BOTH threads with a greeting, so a merged view
+        // would open with two assistants introducing themselves. Positional
+        // rather than string-matched: only the pricing thread's own opening
+        // model message, and only when a characterization sits above it.
+        if (i === 0 && plan.length && msg && msg.role === 'model') return;
+        if (!openedPrice) { rows.push({ divider: 'price' }); openedPrice = true; }
+        rows.push({ stage: 'price', i, msg });
+    });
+    return rows;
+}
+
+const STAGE_DIVIDER_LABEL = { plan: '1 · אפיון', price: '2 · תמחור' };
+
+function renderChatHistory(projOrHistory) {
     const log = document.getElementById('chat-messages-log');
     if (!log) return;
 
+    // Six call sites used to hand in one raw array. Resolving the project here
+    // means a missed one still draws the whole thread instead of half of it.
+    const proj = (projOrHistory && !Array.isArray(projOrHistory))
+        ? projOrHistory
+        : projectsList.find(p => p.id === activeProjectId);
+    if (!proj) { log.innerHTML = ''; return; }
+    const rows = buildChatView(proj);
+
     // Starter chips only help an empty conversation — once it's rolling they
-    // just eat chat height.
+    // just eat chat height. "Empty" is the whole thread now, not one half.
     const sugg = document.querySelector('.chat-suggestions');
-    if (sugg) sugg.style.display = (chatHistory || []).some(m => m.role === 'user') ? 'none' : 'flex';
+    if (sugg) sugg.style.display = rows.some(r => r.msg && r.msg.role === 'user') ? 'none' : 'flex';
 
     log.innerHTML = '';
 
-    chatHistory.forEach((msg, msgIndex) => {
-        if (msg.hidden) return; // behind-the-scenes instruction — AI-only, never shown
+    rows.forEach((row) => {
+        if (row.divider) {
+            const sep = document.createElement('div');
+            sep.className = 'chat-stage-divider';
+            sep.dataset.stage = row.divider;
+            sep.innerHTML = `<span>${STAGE_DIVIDER_LABEL[row.divider] || ''}</span>`;
+            log.appendChild(sep);
+            return;
+        }
+        const msg = row.msg;
+        if (!msg || msg.hidden) return; // behind-the-scenes instruction — AI-only, never shown
+        const msgIndex = row.i;
         const bubble = document.createElement('div');
         const role = msg.role === 'user' ? 'user' : 'model';
         bubble.className = `chat-bubble ${role}`;
@@ -8039,9 +8095,10 @@ function renderChatHistory(chatHistory) {
         // plan[3] and price[3] were both data-index="3", and the edit lookup
         // takes the FIRST match — so clicking one could open, and truncate,
         // the other. An address needs the stage in it.
-        bubble.dataset.stage = activeChatMode;
+        bubble.dataset.stage = row.stage;
+        if (row.stage !== activeChatMode) bubble.classList.add('chat-seg-past');
 
-        let text = msg.parts[0].text;
+        let text = (msg.parts && msg.parts[0] && msg.parts[0].text) || '';
         // The /ask/ lists block renders as the shared designed cards (same
         // component as the quick chat) — extract BEFORE the generic JSON strips.
         let listsData = null;
@@ -8069,14 +8126,22 @@ function renderChatHistory(chatHistory) {
         // Your own words stay editable. Rewriting one truncates the thread from
         // that point and asks again — a corrected detail should cost a tap, not
         // a new project.
-        if (role === 'user' && !msg.images) {
+        // The handoff turn is stored as role:'user' but its text is the card
+        // plus the agent's own product list. A pencil on it invites truncating
+        // the entire pricing conversation from its very first message.
+        // Flagged at creation. The text test is only for projects priced
+        // before the flag existed — position is not a test: the handoff sits at
+        // index 1 when the greeting precedes it, and at 0 when it does not.
+        const isHandoff = row.stage === 'price' && (msg.handoff === true
+            || /^האפיון הושלם ואושר/.test((msg.parts && msg.parts[0] && msg.parts[0].text) || ''));
+        if (role === 'user' && !msg.images && !isHandoff) {
             const edit = document.createElement('button');
             edit.type = 'button';
             edit.className = 'chat-edit-btn';
             edit.title = 'ערוך ושלח מחדש';
             edit.setAttribute('aria-label', 'ערוך את ההודעה ושלח מחדש');
             edit.innerHTML = '<i class="fa-solid fa-pen" aria-hidden="true"></i>';
-            edit.onclick = () => startEditMessage(activeChatMode, msgIndex);
+            edit.onclick = () => startEditMessage(row.stage, msgIndex);
             bubble.appendChild(edit);
         }
         if (text || (Array.isArray(msg.images) && msg.images.length) || !listsData) log.appendChild(bubble);
@@ -8084,13 +8149,13 @@ function renderChatHistory(chatHistory) {
             const holder = document.createElement('div');
             holder.className = 'chat-listcards';
             log.appendChild(holder);
-            const proj = (typeof projectsList !== 'undefined' && Array.isArray(projectsList))
-                ? projectsList.find(p => p.id === activeProjectId) : null;
-            ZeremListCards.render(holder, listsData, { job: proj ? (proj.name || '') : '' });
+            holder.dataset.stage = row.stage;
+            holder.dataset.index = msgIndex;
+            ZeremListCards.render(holder, listsData, { job: proj.name || '' });
         }
     });
 
-    log.scrollTop = log.scrollHeight;
+    scrollChatToActiveStage(log);
     applyChatSearch();
 }
 
@@ -8240,7 +8305,7 @@ function startEditMessage(stage, index) {
 
 function cancelEditMessage() {
     const proj = projectsList.find(p => p.id === activeProjectId);
-    if (proj) renderChatHistory(activeChatArray(proj));
+    if (proj) renderChatHistory(proj);
 }
 
 async function commitEditMessage(stage, index) {
@@ -8272,7 +8337,7 @@ async function commitEditMessage(stage, index) {
     }
 
     saveProjects();
-    renderChatHistory(history);
+    renderChatHistory(proj);
     renderSpecCard(proj);
 
     // Re-run the agent that owns the edited message, on its own screen.
@@ -11291,4 +11356,21 @@ async function adminSaveClarityToken() {
         status.textContent = 'שגיאה: ' + e.message;
         status.style.color = 'var(--color-danger)';
     }
+}
+
+
+// With both stages in one log, "the bottom" is the end of the PRICING half. Any
+// action taken while characterizing would otherwise throw the user past a full
+// materials list to reach it. Land on the end of the stage being worked in.
+function scrollChatToActiveStage(log) {
+    log = log || document.getElementById('chat-messages-log');
+    if (!log) return;
+    const mine = log.querySelectorAll('[data-stage="' + activeChatMode + '"]');
+    const last = mine[mine.length - 1];
+    if (!last) { log.scrollTop = log.scrollHeight; return; }
+    // When it is the last thing in the log anyway, go all the way down — avoids
+    // leaving a sliver of blank space under the final bubble.
+    log.scrollTop = last.nextElementSibling
+        ? Math.max(0, last.offsetTop + last.offsetHeight - log.clientHeight + 24)
+        : log.scrollHeight;
 }

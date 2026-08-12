@@ -5468,3 +5468,32 @@ html[data-stage-dir='back']::view-transition-new(root) {
     line-height: 1.6;
 }
 .projects-empty .btn { margin-top: 6px; }
+
+/* ── One conversation, two stages ────────────────────────────────────────────
+   The characterization and the pricing are one scroll now, so the seam between
+   them has to be legible without being loud — it is a chapter heading in a
+   conversation, not a section header in a document. */
+.chat-stage-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 18px 2px 12px;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+.chat-stage-divider::before,
+.chat-stage-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-color);
+}
+.chat-stage-divider span { white-space: nowrap; }
+.chat-stage-divider:first-child { margin-top: 4px; }
+
+/* Messages from the stage you are not in stay readable but recede, so it is
+   obvious at a glance which half the next message joins. */
+.chat-bubble.chat-seg-past { opacity: 0.62; }
+.chat-bubble.chat-seg-past:hover { opacity: 1; }

@@ -346,7 +346,9 @@ test('a chat message is addressed by stage, not by index alone', () => {
     // the other. This is the groundwork for showing both as one thread.
     const app = read('sale/app.js');
 
-    assert.ok(/bubble\.dataset\.stage = activeChatMode/.test(app),
+    // From the row being drawn, not from the active screen — with both stages
+    // in one log the screen is no longer the answer to "which conversation".
+    assert.ok(/bubble\.dataset\.stage = row\.stage/.test(app),
         'bubbles no longer carry which conversation they belong to');
     assert.ok(/function startEditMessage\(stage, index\)/.test(app), 'startEditMessage lost its stage');
     assert.ok(/async function commitEditMessage\(stage, index\)/.test(app), 'commitEditMessage lost its stage');
