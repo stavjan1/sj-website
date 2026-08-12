@@ -7,6 +7,15 @@ scripts prove the policy is correct **before** it ships.
 Both read the live policy straight out of `_headers`, serve the real site files
 locally with that policy applied as *enforcing*, and drive a real Chromium.
 
+They locate the repo from their own path, so they run from any checkout on any
+OS. They used to carry an absolute `/home/user/sj-website`, which meant they
+only ever ran on the one machine they were written on — written once, never
+run again. They are not in CI: that would put Playwright into a repo that
+deliberately has no dependencies. The durable guard against the quote-viewer
+XSS is the dependency-free test in `tests/site.test.mjs`, which runs on every
+push; these scripts are for proving it again in a real browser when you want
+that.
+
 ```bash
 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install playwright   # drop the flag if Chromium isn't preinstalled
 node scripts/security/csp-page-check.js      # loads every page type, reports violations

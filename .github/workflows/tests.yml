@@ -33,6 +33,16 @@ jobs:
             cp "$f" "/tmp/$(basename "$f")x.mjs"
             node --check "/tmp/$(basename "$f")x.mjs" || { echo "syntax error in $f"; exit 1; }
           done
-          for f in sale/app.js sale/coverage.js sale/sketch.js sale/sw.js track.js assistant.js reserve.js; do
-            node --check "$f" || { echo "syntax error in $f"; exit 1; }
+
+      - name: Check every browser script still parses
+        # This was a hand-written list and had quietly fallen behind: root
+        # app.js (loaded by every marketing page), assets/listcards.js and
+        # checkups/app.js were all shipping unchecked. Found by globbing, so
+        # the list cannot go stale again — a new file is covered the day it
+        # lands.
+        run: |
+          fail=0
+          for f in $(git ls-files '*.js' | grep -v '^functions/'); do
+            node --check "$f" || { echo "syntax error in $f"; fail=1; }
           done
+          exit $fail

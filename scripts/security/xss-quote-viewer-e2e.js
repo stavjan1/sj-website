@@ -11,7 +11,10 @@ const http = require('http');
 const fs = require('fs');
 const { chromium } = require('playwright');
 
-const PAGE = fs.readFileSync('/home/user/sj-website/q/index.html', 'utf8');
+// Resolved from this file, not hardcoded: the original absolute path meant
+// the script only ran on the one machine it was written on.
+const ROOT = require('path').resolve(__dirname, '..', '..');
+const PAGE = fs.readFileSync(require('path').join(ROOT, 'q', 'index.html'), 'utf8');
 const OLD_SAFEIMG = `const safeImg = (s) => /^data:image\\/(png|jpe?g|gif|webp|svg\\+xml);/i.test(String(s || '')) ? String(s) : '';`;
 
 // A valid 1x1 GIF, so onload fires deterministically, then the attribute breakout.
