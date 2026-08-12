@@ -299,3 +299,24 @@ test('switching job type cannot silently destroy a characterization', () => {
     assert.ok(/source === 'user'/.test(prefillBody),
         'the agent can retype a job the user has already answered under');
 });
+
+test('one tap cannot silently discard accumulated work', () => {
+    // Third of a family found in one night: change an answer (destroyed it),
+    // switch job type (wiped all 14), reset the design (dropped the block order
+    // and styling of every quote). None of them asked, none could be undone.
+    const app = read('sale/app.js');
+
+    const reset = app.slice(app.indexOf('function resetQuoteDesign'));
+    const resetBody = reset.slice(0, reset.indexOf('\n}'));
+    assert.ok(/confirm\(/.test(resetBody), 'the quote design resets with no confirmation');
+    // ...but only when there is something to discard.
+    assert.ok(/defaultQuoteLayout\(\)\)\)/.test(resetBody),
+        'it asks even when the layout is already the default');
+
+    // A data-deleting function with no callers is a loaded gun: the next
+    // person wiring up a "change" button finds a ready-made way to wipe an
+    // answer and re-shut the pricing gate.
+    const calls = [...app.matchAll(/clearSpecAnswer/g)].length;
+    assert.equal(calls, 1, 'clearSpecAnswer is back — it should exist only in the note explaining its removal');
+    assert.ok(!/^function clearSpecAnswer/m.test(app), 'clearSpecAnswer was reinstated');
+});

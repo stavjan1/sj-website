@@ -4330,6 +4330,15 @@ function setQuoteEnglish(on) {
     saveQuoteLayout(); applyQuoteLayout(); renderDesignerPreview();
 }
 function resetQuoteDesign() {
+    // The layout holds the block order you dragged into place and the
+    // alignment, size and weight of each one — the shape of every quote you
+    // send. The button is one word next to the designer, and there is no undo,
+    // so it asks. Only when the layout has actually been changed: offering to
+    // discard nothing is just noise.
+    const current = JSON.stringify(getQuoteLayout());
+    if (current !== JSON.stringify(defaultQuoteLayout())) {
+        if (!confirm('לאפס את עיצוב ההצעה לברירת המחדל?\n\nסדר הבלוקים והעיצוב שהגדרת יימחקו, ואי אפשר לשחזר אותם.')) return;
+    }
     appState.settings.quoteLayout = defaultQuoteLayout();
     saveQuoteLayout(); applyQuoteLayout(); renderDesignerBlocks();
     const eng = document.getElementById('designer-english'); if (eng) eng.checked = false;
@@ -6641,14 +6650,13 @@ function skipSpecField(fieldId) {
     updatePlanActionBar(proj);
 }
 
-function clearSpecAnswer(fieldId) {
-    const proj = projectsList.find(p => p.id === activeProjectId);
-    if (!proj || !proj.spec || !proj.spec.answers) return;
-    delete proj.spec.answers[fieldId];
-    saveProjects();
-    renderSpecCard(proj);
-    updatePlanActionBar(proj);
-}
+// clearSpecAnswer lived here. Its only caller was editSpecField, which used it
+// to empty a field before re-asking — the bug that let tapping an answer to
+// look at it destroy it. Left behind with no callers it is a loaded gun: the
+// next person wiring up a "change" button would find a ready-made function
+// that silently deletes an answer and re-shuts the pricing gate. Answers are
+// replaced by setSpecAnswer or turned into an assumption by skipSpecField;
+// there is no case for removing one outright.
 
 function setSpecJobType(type) {
     const proj = projectsList.find(p => p.id === activeProjectId);
