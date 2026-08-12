@@ -5615,19 +5615,35 @@ function renderPageGuides() {
     }
 
     const warn = document.getElementById('page-overflow-warning');
-    if (warn) {
-        if (pages > 1) {
-            // Say it in lines of text, not pixels — the number has to mean
-            // something to the person holding the paper.
-            const lineH = parseFloat(getComputedStyle(sheet).lineHeight) || 17;
-            const spillLines = Math.max(1, Math.round((total - pageH * (pages - 1)) / lineH));
-            warn.style.display = 'flex';
-            warn.innerHTML = `<i class="fa-solid fa-file-lines"></i>`
-                + `<span>ההצעה תודפס על <strong>${pages}</strong> עמודים. `
-                + `בערך <strong>${spillLines}</strong> שורות גלשו — קצר את ההערות או אחד הסעיפים כדי להחזיר לעמוד אחד.</span>`;
-        } else {
-            warn.style.display = 'none';
-        }
+    if (!warn) return;
+
+    // A real quote — five items and a full exclusions list — measures about
+    // 1,850px against a 1,158px page, so running to two pages is the normal
+    // case, not the exception. Warning every time would make this noise, and a
+    // warning that always fires is one nobody reads.
+    //
+    // What is actually worth saying is the ugly case: a last page holding a
+    // scrap, which is how the company footer ended up alone on page two. Below
+    // a fifth of a page, that tail is worth trimming away; above it, the quote
+    // simply is two pages and the dashed guide is all anyone needs.
+    const tail = total - pageH * (pages - 1);
+    const ORPHAN = pageH * 0.2;
+    if (pages > 1 && tail < ORPHAN) {
+        // In lines, not pixels — the number has to mean something to the person
+        // holding the paper.
+        const lineH = parseFloat(getComputedStyle(sheet).lineHeight) || 17;
+        const spillLines = Math.max(1, Math.round(tail / lineH));
+        // Hebrew does not take a bare numeral for one. "1 שורות" reads as
+        // machine output, which is the opposite of what this product is for.
+        const spilled = spillLines === 1
+            ? 'שורה אחת בלבד גלשה'
+            : `רק <strong>${spillLines}</strong> שורות גלשו`;
+        warn.style.display = 'flex';
+        warn.innerHTML = `<i class="fa-solid fa-scissors"></i>`
+            + `<span>${spilled} לעמוד ${pages}. `
+            + `קיצור קל של ההערות או של אחד הסעיפים יחזיר את ההצעה לעמוד אחד.</span>`;
+    } else {
+        warn.style.display = 'none';
     }
 }
 
