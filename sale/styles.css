@@ -3604,6 +3604,9 @@ body.has-custom-bg.light-theme .chat-container {
     transition: border-color var(--transition-speed), color var(--transition-speed);
 }
 .spec-chip:hover { border-color: var(--color-accent); color: var(--text-primary); }
+/* Re-opening an answered question shows which chip was chosen — same treatment
+   the job-type chips already use, so the card reads consistently. */
+.spec-chip.active { border-color: var(--color-accent); border-width: 2px; color: var(--text-primary); font-weight: 700; }
 /* On a touch device this card is answered with a thumb, on a van, in the sun.
    Chips get a 44px target there without bloating the desktop layout. */
 @media (pointer: coarse) {

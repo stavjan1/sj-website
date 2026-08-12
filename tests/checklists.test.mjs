@@ -15,8 +15,13 @@ import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
+// Line endings are normalised on read. Git stores LF but checks out CRLF on
+// Windows, so a test that slices on a newline-plus-brace boundary passes on
+// CI and fails on Stav's machine — or worse, the other way round.
+const read = (rel) => readFileSync(join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
+
 function loadChecklists() {
-    const src = readFileSync(join(ROOT, 'sale/coverage.js'), 'utf8');
+    const src = read('sale/coverage.js');
     return JSON.parse(src.slice(src.indexOf('{'), src.lastIndexOf('}') + 1));
 }
 
@@ -111,7 +116,7 @@ test('the written assumptions stay tied to the characterization', () => {
     // The assumptions paragraph is a claim in a document that goes to a
     // customer. Answer a field that was left open and the paragraph is no
     // longer true, so entering the draft has to re-derive it.
-    const app = readFileSync(join(ROOT, 'sale/app.js'), 'utf8');
+    const app = read('sale/app.js');
     const goToDraft = app.slice(app.indexOf('function goToDraft'), app.indexOf('function goToDraft') + 700);
     assert.ok(/refreshSpecTerms\(/.test(goToDraft), 'goToDraft does not refresh the assumptions block');
     assert.ok(app.includes('function refreshSpecTerms'), 'refreshSpecTerms is gone');
@@ -131,7 +136,7 @@ test('a tap during a stage slide is queued before the no-op check', () => {
     // Mid-slide the app still LOOKS like the stage being left, so `from === to`
     // is true for a tap heading back to it. If that check runs first the tap is
     // silently dropped and the thumb ends up somewhere it did not choose.
-    const app = readFileSync(join(ROOT, 'sale/app.js'), 'utf8');
+    const app = read('sale/app.js');
     const fn = app.slice(app.indexOf('function goToStage'));
     const body = fn.slice(0, fn.indexOf('\nfunction ', 10));
     const busy = body.indexOf('stageTransitionBusy) { stagePending');
@@ -147,7 +152,7 @@ test('a tap during a stage slide is queued before the no-op check', () => {
 });
 
 test('the page-break guide agrees with the exporter, and never prints', () => {
-    const app = readFileSync(join(ROOT, 'sale/app.js'), 'utf8');
+    const app = read('sale/app.js');
 
     // The guide's position is derived from the PDF margin. If the exporter's
     // margin changes and this constant does not, the line lands in the wrong
@@ -168,7 +173,7 @@ test('the page-break guide agrees with the exporter, and never prints', () => {
     assert.ok(/page-guide/.test(body) && /remove\(\)/.test(body),
         'the page guides are not stripped before capture');
 
-    const css = readFileSync(join(ROOT, 'sale/styles.css'), 'utf8');
+    const css = read('sale/styles.css');
     assert.ok(/@media print[\s\S]{0,200}\.page-guide/.test(css),
         'the print path does not hide the page guides');
 });
@@ -177,7 +182,7 @@ test('every file the user picks either works or says why', () => {
     // A FileReader with no onerror fails in complete silence: the dialog
     // closes, nothing changes, nothing to act on. Worst on a backup restore,
     // where the person is already trying to recover something.
-    const app = readFileSync(join(ROOT, 'sale/app.js'), 'utf8');
+    const app = read('sale/app.js');
     const readers = [...app.matchAll(/new FileReader\(\)/g)];
     assert.equal(readers.length, 1,
         `${readers.length} FileReaders — they should all go through readFileOrExplain`);
@@ -211,7 +216,7 @@ test('the welcome screen describes the product that was actually built', () => {
     // מהר וזה יוצא שמפספסים דברים". The welcome screen kept selling the old
     // story — one-click pricing, name your project first — which is the first
     // thing a new user reads and the last thing anyone thinks to update.
-    const app = readFileSync(join(ROOT, 'sale/app.js'), 'utf8');
+    const app = read('sale/app.js');
     const fn = app.slice(app.indexOf('function showWelcomeOnboarding'));
     const body = fn.slice(0, fn.indexOf('\nfunction closeOnboarding'));
 
@@ -229,4 +234,37 @@ test('the welcome screen describes the product that was actually built', () => {
     // would stack a second copy behind the first.
     assert.ok(/getElementById\('onboarding-modal'\)\) return/.test(body),
         'nothing stops two welcome modals stacking');
+});
+
+test('changing an answer does not destroy it first', () => {
+    // editSpecField used to call clearSpecAnswer before opening the field, so
+    // tapping "change" on a critical answer emptied it, dropped the coverage
+    // count and re-shut the pricing gate — on a project that may already have
+    // been priced and drafted. Tapping to LOOK at an answer lost it.
+    const app = read('sale/app.js');
+    const fn = app.slice(app.indexOf('function editSpecField'));
+    const body = fn.slice(0, fn.indexOf('\n}'));
+    assert.ok(!/clearSpecAnswer/.test(body),
+        'editing a field clears it before a replacement exists');
+
+    // Not clearing is only half of it: the card skips past anything answered,
+    // and the answered row renders a summary with no control. Both have to
+    // know the difference between "just answered" and "opened to be changed",
+    // or "tap to change it" changes nothing at all.
+    assert.ok(/specEditingField/.test(body), 'editing no longer marks the field as being edited');
+
+    const render = app.slice(app.indexOf('function renderSpecCard'));
+    const renderBody = render.slice(0, render.indexOf('\nfunction '));
+    assert.ok(/editingOpen/.test(renderBody),
+        'the auto-advance still jumps away from a field opened for editing');
+    assert.ok(/!\(isOpen && specEditingField === f\.id\)/.test(renderBody),
+        'an answered field being edited still renders as a summary, with no control');
+
+    // And the control has to come back showing what is already there.
+    assert.ok(/const current = \(answers\[f\.id\]/.test(renderBody),
+        'the control does not pre-fill the existing answer');
+    assert.ok(/value="\$\{escapeAttr\(current\)\}"/.test(renderBody),
+        'the text input does not show the current answer');
+    assert.ok(/c === current \? ' active' : ''/.test(renderBody),
+        'the chosen chip is not marked when re-opening an answered question');
 });

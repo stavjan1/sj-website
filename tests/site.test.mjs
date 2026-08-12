@@ -10,7 +10,9 @@ import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PAGES = readdirSync(ROOT).filter((f) => f.endsWith('.html'));
-const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
+// Normalised: git checks out CRLF on Windows and LF on CI, and several of
+// these tests slice on a newline-plus-brace boundary.
+const read = (rel) => readFileSync(join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
 
 test('every JSON-LD block parses', () => {
     // A single unescaped quote inside מע"מ silently invalidated a whole FAQPage

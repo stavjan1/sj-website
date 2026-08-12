@@ -6625,6 +6625,7 @@ function setSpecAnswer(fieldId, value, source) {
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (!proj) return;
     ensureSpec(proj).answers[fieldId] = { value, source: source || 'user', skipped: false };
+    specEditingField = null;   // the edit is made; let the card move on
     saveProjects();
     renderSpecCard(proj);
     updatePlanActionBar(proj);
@@ -6634,6 +6635,7 @@ function skipSpecField(fieldId) {
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (!proj) return;
     ensureSpec(proj).answers[fieldId] = { value: '', source: 'user', skipped: true };
+    specEditingField = null;   // the edit is made; let the card move on
     saveProjects();
     renderSpecCard(proj);
     updatePlanActionBar(proj);
@@ -6806,15 +6808,27 @@ function nextSpecField(project, fields) {
     return (open.find(f => f.critical) || open[0] || null);
 }
 
+// Which answered field the user deliberately opened to change. The card
+// normally skips past anything already answered — that is what makes it
+// advance on its own — so without this an edit would be bounced straight back
+// to the next gap.
+let specEditingField = null;
+
 function openSpecField(fieldId) {
+    if (specEditingField !== fieldId) specEditingField = null;
     specOpenField = fieldId;
     renderSpecCard();
     const row = document.querySelector('.spec-row[data-field="' + fieldId + '"]');
     if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
+// Opening an answer to look at it is not the same as throwing it away. This
+// used to clear the field first, so tapping "שנה" on a critical field emptied
+// it, dropped the coverage count, and re-shut the pricing gate — on a project
+// that may already have been priced and drafted. The answer now stays until a
+// new one replaces it, and the control opens showing what is already there.
 function editSpecField(fieldId) {
-    clearSpecAnswer(fieldId);
+    specEditingField = fieldId;
     openSpecField(fieldId);
 }
 
@@ -6840,7 +6854,10 @@ function renderSpecCard(proj) {
     const visibleFields = specShowAll ? list.fields : list.fields.filter(f => !isDeferred(f));
 
     // Nothing open, or the open one just got answered → move to the next gap.
-    if (!specOpenField || answers[specOpenField] || !visibleFields.some(f => f.id === specOpenField)) {
+    // Unless it was opened on purpose to be changed, in which case moving on is
+    // exactly the wrong thing to do.
+    const editingOpen = specEditingField && specEditingField === specOpenField;
+    if (!editingOpen && (!specOpenField || answers[specOpenField] || !visibleFields.some(f => f.id === specOpenField))) {
         const next = nextSpecField(project, visibleFields);
         specOpenField = next ? next.id : null;
     }
@@ -6853,7 +6870,9 @@ function renderSpecCard(proj) {
         const isOpen = specOpenField === f.id;
 
         // Answered → one line, the answer doing the talking, tap to change it.
-        if (done || skipped) {
+        // Unless this is the one being changed right now, which needs its
+        // control back — otherwise "tap to change it" changes nothing.
+        if ((done || skipped) && !(isOpen && specEditingField === f.id)) {
             return `<button type="button" class="spec-row answered ${done ? 'done' : 'skipped'}" data-field="${f.id}"
                     onclick="editSpecField('${f.id}')">
                 <i class="fa-solid ${done ? 'fa-circle-check' : 'fa-circle-half-stroke'} spec-dot" aria-hidden="true"></i>
@@ -6874,16 +6893,23 @@ function renderSpecCard(proj) {
         }
 
         // The open one → the whole question, with its answers.
+        // What is already answered, so re-opening a field shows it instead of an
+        // empty box. Without this you cannot check an answer without retyping it.
+        const current = (answers[f.id] && !answers[f.id].skipped) ? String(answers[f.id].value || '') : '';
+
         let control = '';
         if (f.type === 'chips' && Array.isArray(f.chips)) {
             control = `<div class="spec-chips">${f.chips.map((c, i) =>
-                `<button type="button" class="spec-chip" onclick="setSpecChip('${f.id}',${i})">${escapeHtml(c)}</button>`).join('')}</div>`;
+                `<button type="button" class="spec-chip${c === current ? ' active' : ''}" onclick="setSpecChip('${f.id}',${i})">${escapeHtml(c)}</button>`).join('')}</div>`;
         } else if (f.type === 'number') {
-            control = `<div class="spec-inline"><input type="number" class="spec-num" placeholder="0"
+            // Stored as "15 מ'" — the unit rides along for the quote, so strip it
+            // back off before it goes into a number input that would reject it.
+            const num = current.replace(/[^\d.,-]/g, '').trim();
+            control = `<div class="spec-inline"><input type="number" class="spec-num" placeholder="0" value="${escapeAttr(num)}"
                     onchange="setSpecAnswer('${f.id}', this.value ? this.value + ' ${escapeAttr(f.unit || '')}' : '', 'user')">
                     <span class="spec-unit">${escapeHtml(f.unit || '')}</span></div>`;
         } else {
-            control = `<input type="text" class="spec-text" placeholder="תשובה קצרה…"
+            control = `<input type="text" class="spec-text" placeholder="תשובה קצרה…" value="${escapeAttr(current)}"
                     onchange="setSpecAnswer('${f.id}', this.value.trim(), 'user')">`;
         }
 
