@@ -4208,6 +4208,8 @@ body {
 .ob-bolt { font-size: 2.2rem; margin-bottom: 6px; }
 .onboard-box h2 { margin: 0 0 8px; font-size: 1.35rem; }
 .ob-sub { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7; margin: 0 0 16px; }
+/* One less thing to do, said quietly — it removes a step rather than adding one. */
+.ob-note { color: var(--text-muted); font-size: 0.82rem; line-height: 1.6; margin: 12px 0 0; }
 .ob-steps {
     text-align: right; margin: 0 0 20px; padding: 0 18px 0 0;
     display: flex; flex-direction: column; gap: 10px;

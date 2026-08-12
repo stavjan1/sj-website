@@ -205,3 +205,28 @@ test('every file the user picks either works or says why', () => {
     assert.ok(!/localStorage\.setItem/.test(uploadBody),
         'the logo/background path writes storage directly instead of via safeLocalSet');
 });
+
+test('the welcome screen describes the product that was actually built', () => {
+    // The pivot was away from rushing to a price: "הפלטפורמה דוחפת לשלב התמחור
+    // מהר וזה יוצא שמפספסים דברים". The welcome screen kept selling the old
+    // story — one-click pricing, name your project first — which is the first
+    // thing a new user reads and the last thing anyone thinks to update.
+    const app = readFileSync(join(ROOT, 'sale/app.js'), 'utf8');
+    const fn = app.slice(app.indexOf('function showWelcomeOnboarding'));
+    const body = fn.slice(0, fn.indexOf('\nfunction closeOnboarding'));
+
+    assert.ok(!/בלחיצה אחת/.test(body),
+        'the welcome screen still promises one-click pricing');
+    assert.ok(/נפתח כשכל השדות הקריטיים/.test(body),
+        'the welcome screen does not explain that pricing is gated');
+    assert.ok(/הנחה כתובה/.test(body),
+        'the welcome screen does not explain what a skipped field becomes');
+    // Naming stopped being required when projects started titling themselves.
+    assert.ok(!/שם הלקוח או העבודה, וזהו/.test(body),
+        'the welcome screen still asks for a project name');
+
+    // Called twice before dismissal — the flag is only written on close — it
+    // would stack a second copy behind the first.
+    assert.ok(/getElementById\('onboarding-modal'\)\) return/.test(body),
+        'nothing stops two welcome modals stacking');
+});

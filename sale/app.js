@@ -4379,6 +4379,10 @@ function markActivePdfTemplate() {
 // ==========================================================================
 function showWelcomeOnboarding() {
     if (localStorage.getItem(getStorageKey('sj_onboarded_v1'))) return;
+    // The flag is only written on dismissal, so anything that calls this twice
+    // before then — a retry, a second sign-in path — stacks a second copy on
+    // the first, and closing one leaves the user staring at its twin.
+    if (document.getElementById('onboarding-modal')) return;
     if ((projectsList || []).length > 0) { // veteran user — don't lecture
         localStorage.setItem(getStorageKey('sj_onboarded_v1'), '1');
         return;
@@ -4390,18 +4394,36 @@ function showWelcomeOnboarding() {
         <div class="onboard-box" role="dialog" aria-modal="true">
             <div class="ob-bolt">⚡</div>
             <h2>ברוך הבא לזרם</h2>
-            <p class="ob-sub">מהתיאור של העבודה ועד הצעת מחיר חתומה — ככה זה עובד:</p>
+            <p class="ob-sub">קודם מבינים את העבודה, ורק אחר כך מתמחרים. ככה לא מפספסים:</p>
             <ol class="ob-steps">
-                <li><b>צור פרויקט</b> — שם הלקוח או העבודה, וזהו.</li>
-                <li><b>אפיון בצ'אט</b> — מתארים את העבודה במילים, וה-AI ממלא את כרטיס האפיון ובונה רשימת מוצרים מלאה (כולל מה ששוכחים).</li>
-                <li><b>תמחור</b> — בלחיצה אחת הרשימה מתומחרת: חומרים + עבודה + סה"כ.</li>
-                <li><b>הצעה ללקוח</b> — עורכים, מורידים PDF ממותג או שולחים בוואטסאפ.</li>
+                <li><b>1 · אפיון</b> — מתארים את העבודה במילים. ה-AI ממלא את כרטיס האפיון ובונה רשימת ציוד מלאה, כולל מה ששוכחים. אתה מתקן מה שלא מדויק.</li>
+                <li><b>2 · תמחור</b> — נפתח כשכל השדות הקריטיים סגורים. שדה שהשארת פתוח לא נעלם — הוא הופך להנחה כתובה שמודפסת בהצעה ללקוח.</li>
+                <li><b>3 · הצעה</b> — עורכים, מורידים PDF ממותג או שולחים בוואטסאפ.</li>
             </ol>
+            <p class="ob-note">אין צורך לתת שם לפרויקט — הוא נקרא לבד לפי התיאור.</p>
             <button class="btn btn-accent ob-go" onclick="closeOnboarding()">יאללה, מתחילים ⚡</button>
         </div>`;
     m.addEventListener('click', (e) => { if (e.target === m) closeOnboarding(); });
     document.body.appendChild(m);
+    focusDialog(m);
 }
+
+// A dialog you can only leave with the mouse is a dialog that traps a keyboard.
+// These all sit on .upgrade-modal-backdrop and all have a way out, so Escape
+// takes the same way out the buttons do.
+function focusDialog(backdrop) {
+    const target = backdrop.querySelector('button, [href], input, select, textarea');
+    if (target) try { target.focus(); } catch (e) {}
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const open = [...document.querySelectorAll('.upgrade-modal-backdrop')].pop();
+    if (!open) return;
+    e.preventDefault();
+    if (open.id === 'onboarding-modal') closeOnboarding();
+    else open.remove();
+});
 function closeOnboarding() {
     localStorage.setItem(getStorageKey('sj_onboarded_v1'), '1');
     const m = document.getElementById('onboarding-modal');
@@ -4434,6 +4456,7 @@ function maybeShowBizGate() {
         </div>`;
     m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
     document.body.appendChild(m);
+    focusDialog(m);
 }
 
 function saveBusinessSettings() {
