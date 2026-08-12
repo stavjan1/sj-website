@@ -7079,6 +7079,24 @@ function getProjectStage(proj) {
     return (proj.chatHistory || []).some(m => m.role === 'user') ? 'pricing' : 'planning';
 }
 
+// The pricing thread's counterpart to ensurePlanHistory. Deliberately empty:
+// six ingest paths (cloud merge, recovery restore, backup import, legacy scan,
+// Drive recover, loadProjects) can hand back a project with no chatHistory at
+// all, and renderChatHistory iterates it unguarded right after clearing the
+// log — so the whole conversation shows as blank. It does NOT invent a
+// greeting; fabricating a message the agent never sent is worse than nothing.
+function ensureChatHistory(proj) {
+    if (!Array.isArray(proj.chatHistory)) proj.chatHistory = [];
+    return proj.chatHistory;
+}
+
+// One place that answers "which array does this stage own". Anything that edits
+// or regenerates must ask by STAGE, never by the activeChatMode global — the
+// global says which screen you are on, not which message you clicked.
+function chatArrayFor(proj, stage) {
+    return stage === 'plan' ? ensurePlanHistory(proj) : ensureChatHistory(proj);
+}
+
 function ensurePlanHistory(proj) {
     if (!Array.isArray(proj.planChatHistory)) {
         proj.planChatHistory = [{
@@ -7514,7 +7532,7 @@ async function priceThisProject(force) {
     proj.stage = 'pricing';
     proj.specAssumptions = specAssumptions(proj);
     proj.specExclusions = specExclusions(proj);
-    proj.chatHistory.push({
+    ensureChatHistory(proj).push({
         role: 'user',
         parts: [{ text: `האפיון הושלם ואושר. תמחר את העבודה במלואה — עבודה + חומרים.\n\n${specToText(proj)}\n\nרשימת המוצרים שגובשה:\n${planText}` }]
     });
@@ -8018,6 +8036,10 @@ function renderChatHistory(chatHistory) {
         const role = msg.role === 'user' ? 'user' : 'model';
         bubble.className = `chat-bubble ${role}`;
         bubble.dataset.index = msgIndex;
+        // plan[3] and price[3] were both data-index="3", and the edit lookup
+        // takes the FIRST match — so clicking one could open, and truncate,
+        // the other. An address needs the stage in it.
+        bubble.dataset.stage = activeChatMode;
 
         let text = msg.parts[0].text;
         // The /ask/ lists block renders as the shared designed cards (same
@@ -8054,7 +8076,7 @@ function renderChatHistory(chatHistory) {
             edit.title = 'ערוך ושלח מחדש';
             edit.setAttribute('aria-label', 'ערוך את ההודעה ושלח מחדש');
             edit.innerHTML = '<i class="fa-solid fa-pen" aria-hidden="true"></i>';
-            edit.onclick = () => startEditMessage(msgIndex);
+            edit.onclick = () => startEditMessage(activeChatMode, msgIndex);
             bubble.appendChild(edit);
         }
         if (text || (Array.isArray(msg.images) && msg.images.length) || !listsData) log.appendChild(bubble);
@@ -8177,18 +8199,21 @@ function activeChatArray(proj) {
     return activeChatMode === 'plan' ? ensurePlanHistory(proj) : proj.chatHistory;
 }
 
-function startEditMessage(index) {
+function startEditMessage(stage, index) {
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (!proj) return;
-    const history = activeChatArray(proj);
+    const history = chatArrayFor(proj, stage);
     const msg = history[index];
     if (!msg || msg.role !== 'user') return;
 
-    const bubble = document.querySelector(`#chat-messages-log .chat-bubble[data-index="${index}"]`);
+    const bubble = document.querySelector(
+        `#chat-messages-log .chat-bubble[data-stage="${stage}"][data-index="${index}"]`);
     if (!bubble || bubble.querySelector('.chat-edit-box')) return;
 
-    const original = msg.parts[0].text;
-    const dropped = history.length - index - 1;
+    const original = (msg.parts && msg.parts[0] && msg.parts[0].text) || '';
+    // Hidden turns hold positions but are never drawn, so a raw length
+    // difference promises to delete more than the user can see.
+    const dropped = history.slice(index + 1).filter((m) => m && !m.hidden).length;
 
     bubble.innerHTML = '';
     const box = document.createElement('div');
@@ -8196,11 +8221,11 @@ function startEditMessage(index) {
     box.innerHTML = `
         <textarea class="chat-edit-text" rows="3"></textarea>
         <div class="chat-edit-actions">
-            <button type="button" class="btn btn-accent btn-small" onclick="commitEditMessage(${index})">
+            <button type="button" class="btn btn-accent btn-small" onclick="commitEditMessage('${stage}',${index})">
                 <i class="fa-solid fa-rotate-right" aria-hidden="true"></i> שלח מחדש
             </button>
             <button type="button" class="btn btn-secondary btn-small" onclick="cancelEditMessage()">ביטול</button>
-            ${dropped > 0 ? `<span class="chat-edit-note">${dropped} הודעות אחרי זו יימחקו</span>` : ''}
+            ${dropped > 0 ? `<span class="chat-edit-note">${dropped === 1 ? 'הודעה אחת אחרי זו תימחק' : `${dropped} הודעות אחרי זו יימחקו`}</span>` : ''}
         </div>`;
     bubble.appendChild(box);
     const ta = box.querySelector('.chat-edit-text');
@@ -8209,7 +8234,7 @@ function startEditMessage(index) {
     ta.setSelectionRange(ta.value.length, ta.value.length);
     ta.onkeydown = (e) => {
         if (e.key === 'Escape') cancelEditMessage();
-        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) commitEditMessage(index);
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) commitEditMessage(stage, index);
     };
 }
 
@@ -8218,26 +8243,29 @@ function cancelEditMessage() {
     if (proj) renderChatHistory(activeChatArray(proj));
 }
 
-async function commitEditMessage(index) {
+async function commitEditMessage(stage, index) {
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (!proj) return;
-    const ta = document.querySelector('#chat-messages-log .chat-edit-text');
+    // Read from the bubble being edited, not the first edit box on the page.
+    const editing = document.querySelector(
+        `#chat-messages-log .chat-bubble[data-stage="${stage}"][data-index="${index}"]`);
+    const ta = editing && editing.querySelector('.chat-edit-text');
     if (!ta) return;
     const text = ta.value.trim();
     if (!text) { showToast('אי אפשר לשלוח הודעה ריקה', 'error'); return; }
 
-    const history = activeChatArray(proj);
+    const history = chatArrayFor(proj, stage);
     const msg = history[index];
     if (!msg || msg.role !== 'user') return;
 
-    if (text === msg.parts[0].text) { cancelEditMessage(); return; }
+    if (text === ((msg.parts && msg.parts[0] && msg.parts[0].text) || '')) { cancelEditMessage(); return; }
 
     msg.parts[0].text = text;
     history.length = index + 1;          // drop every reply built on the old wording
 
     // The characterization card was filled from answers that may no longer hold.
     // Only the agent's own guesses are cleared — what the user chose stays.
-    if (activeChatMode === 'plan' && proj.spec && proj.spec.answers) {
+    if (stage === 'plan' && proj.spec && proj.spec.answers) {
         Object.keys(proj.spec.answers).forEach(id => {
             if (proj.spec.answers[id].source === 'ai') delete proj.spec.answers[id];
         });
@@ -8247,7 +8275,9 @@ async function commitEditMessage(index) {
     renderChatHistory(history);
     renderSpecCard(proj);
 
-    if (activeChatMode === 'plan') await runPlanningAgent(proj);
+    // Re-run the agent that owns the edited message, on its own screen.
+    if (stage !== activeChatMode) setChatMode(stage, proj);
+    if (stage === 'plan') await runPlanningAgent(proj);
     else await runPricingAgent(proj);
 }
 

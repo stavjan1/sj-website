@@ -338,3 +338,33 @@ test('the invitation to price is gated by our checklist, not the agent prose', (
     assert.ok(/role === 'model'/.test(body), 'the prompt can appear before the agent has replied');
     assert.ok(/activeChatMode === 'plan'/.test(body), 'the prompt is not limited to the characterization screen');
 });
+
+test('a chat message is addressed by stage, not by index alone', () => {
+    // A project holds two conversations. Bubbles were stamped with only their
+    // array index, so plan[3] and price[3] were both data-index="3" and the
+    // edit lookup — a first-match querySelector — could open one and truncate
+    // the other. This is the groundwork for showing both as one thread.
+    const app = read('sale/app.js');
+
+    assert.ok(/bubble\.dataset\.stage = activeChatMode/.test(app),
+        'bubbles no longer carry which conversation they belong to');
+    assert.ok(/function startEditMessage\(stage, index\)/.test(app), 'startEditMessage lost its stage');
+    assert.ok(/async function commitEditMessage\(stage, index\)/.test(app), 'commitEditMessage lost its stage');
+    assert.ok(/data-stage="\$\{stage\}"\]\[data-index="\$\{index\}"/.test(app),
+        'the edit lookup matches on index alone again');
+
+    const commit = app.slice(app.indexOf('async function commitEditMessage'));
+    const body = commit.slice(0, commit.indexOf('\n}'));
+    assert.ok(/chatArrayFor\(proj, stage\)/.test(body),
+        'the edit writes to whichever screen is open rather than the message it was given');
+    assert.ok(!/activeChatMode === 'plan'/.test(body),
+        'the edit still branches on the active screen instead of the message stage');
+
+    // Six ingest paths can produce a project with no chatHistory, and the
+    // renderer clears the log before iterating it — a blank conversation.
+    assert.ok(/function ensureChatHistory/.test(app), 'the pricing thread has no safe accessor');
+
+    // Hidden turns hold array positions but are never drawn.
+    assert.ok(/filter\(\(m\) => m && !m\.hidden\)\.length/.test(app),
+        'the deletion warning counts messages the user cannot see');
+});
