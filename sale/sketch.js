@@ -74,7 +74,13 @@
         const t = el('text', {
             x, y, 'text-anchor': anchor || 'start',
             'font-size': small ? 9 : 11, 'font-family': 'Heebo, Arial, sans-serif',
-            fill: 'currentColor', stroke: 'none', direction: 'rtl',
+            // ltr on purpose, for Hebrew labels, in an RTL app. text-anchor is
+            // resolved against the element's direction: under rtl, "end" means
+            // the LEFT edge, so every right-hand label grew outward past the
+            // canvas and was cut off — "מבט צד" arrived as "ט צד". ltr makes the
+            // anchors purely geometric. The Hebrew still reads right-to-left,
+            // because bidi orders the glyphs inside the run either way.
+            fill: 'currentColor', stroke: 'none', direction: 'ltr',
         });
         t.textContent = str;
         return t;
@@ -277,7 +283,14 @@
         if (!scene) return false;
 
         const svg = el('svg', {
-            viewBox: `0 0 ${W} ${H}`, width: '100%', role: 'img',
+            // direction=ltr on the canvas, deliberately, inside an RTL app.
+            // text-anchor is resolved against the inherited direction, so under
+            // rtl "end" means the LEFT edge — every right-hand label grew
+            // outward past the viewBox and was clipped ("מבט צד" arrived as
+            // "ט צד"). Forcing ltr makes the anchors purely geometric; the
+            // Hebrew inside each label still lays out right-to-left on its own,
+            // because bidi works per text run.
+            viewBox: `0 0 ${W} ${H}`, width: '100%', role: 'img', direction: 'ltr',
             'aria-label': 'שרטוט סכמטי של העבודה — לא בקנה מידה',
         });
         const g = el('g', {
