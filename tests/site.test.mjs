@@ -159,3 +159,51 @@ test('the local snapshots have a door, and restoring is all-or-nothing', () => {
     assert.ok(/nothingToLose/.test(confirmBody),
         'the restore prompt promises a backup even when there is nothing to back up');
 });
+
+test('the customer-facing quote page cannot be broken out of', () => {
+    // /q/ renders a quote shared from someone else's account — hostile data by
+    // definition — and it has already shipped a stored XSS once: safeImg's
+    // regex was anchored only at the start, so everything after
+    // "data:image/png;" came back verbatim and escaped the src="..." attribute.
+    //
+    // Grepping for the regex would not have caught that; the mistake reads
+    // fine. So run the real functions out of the page against the real attack.
+    const html = read('q/index.html');
+    const escSrc = html.match(/const esc = [^\n]+/);
+    const imgSrc = html.match(/const safeImg = [^\n]+/);
+    assert.ok(escSrc && imgSrc, 'esc/safeImg are gone from the quote page');
+    const { esc, safeImg } = new Function(`${escSrc[0]}\n${imgSrc[0]}\nreturn { esc, safeImg };`)();
+
+    const attacks = [
+        '"><script>alert(1)</script>',
+        "'><img src=x onerror=alert(1)>",
+        '</div><svg onload=alert(1)>',
+        'data:image/png;",onerror="alert(1)',              // the shape that shipped
+        'data:image/png;base64,AAA" onerror="alert(1)',
+        'javascript:alert(1)',
+        'data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==',
+        'data:image/png;base64,AAA<script>',
+    ];
+    for (const a of attacks) {
+        assert.ok(!/[<>"]/.test(esc(a)), `esc left markup intact: ${a}`);
+        assert.equal(safeImg(a), '', `safeImg accepted a hostile src: ${a}`);
+    }
+
+    // ...and the guard has to stay narrow enough to be useful.
+    for (const ok of [
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==',
+        'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQ==',
+        'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=',
+    ]) {
+        assert.equal(safeImg(ok), ok, `safeImg rejected a legitimate logo: ${ok.slice(0, 30)}`);
+    }
+
+    // Dropping a value straight into the sheet is the whole bug class, so look
+    // for exactly that: an interpolation whose entire body is a data read.
+    // (Anything richer is a nested template a regex cannot honestly parse, so
+    // this deliberately does not try.)
+    const render = html.slice(html.indexOf('function render('));
+    const body = render.slice(0, render.indexOf('\n        }'));
+    const bare = [...body.matchAll(/\$\{\s*((?:q|it|biz)\.[\w.]+)\s*\}/g)].map((m) => m[1]);
+    assert.deepEqual(bare, [], `value dropped into the quote sheet unescaped: ${bare.join(', ')}`);
+});
