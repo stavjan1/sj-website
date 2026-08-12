@@ -6982,26 +6982,7 @@ function renderSpecCard(proj) {
             ${gateReady ? '' : `<p class="spec-gate-hint" id="spec-gate-hint">חסרים ${cov.missingCritical.length} שדות חובה</p>
             <button type="button" class="spec-force" onclick="priceThisProject(true)">דלג ותמחר עכשיו — הכל יירשם כהנחות</button>`}
             ${cov.answered ? '<button type="button" class="spec-order" onclick="openFieldWorkOrder()"><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i> פקודת עבודה לשטח</button>' : ''}
-            ${cov.answered && window.ZeremSketch && ZeremSketch.canDraw(project.spec.jobType) ? '<button type="button" class="spec-order" onclick="toggleSpecSketch()"><i class="fa-solid fa-pen-ruler" aria-hidden="true"></i> שרטוט העבודה</button>' : ''}
-        </div>
-        <div id="spec-sketch" class="spec-sketch" hidden></div>
-        <div style="display:none">
         </div>`;
-}
-
-// Draw the job. Nothing is generated here — the scene and every line live in
-// sketch.js, and the numbers come from answers already on the card, so this
-// costs no request and no waiting.
-function toggleSpecSketch() {
-    const host = document.getElementById('spec-sketch');
-    const proj = projectsList.find(p => p.id === activeProjectId);
-    if (!host || !proj || !window.ZeremSketch) return;
-    if (!host.hidden) { host.hidden = true; return; }
-    const list = getChecklist(proj);
-    const drew = ZeremSketch.render(host, proj.spec.jobType, list, proj.spec.answers);
-    if (!drew) { showToast('לסוג העבודה הזה אין מה לשרטט', 'error'); return; }
-    host.hidden = false;
-    host.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
 // The same characterization, printed for the person doing the work: what the

@@ -61,8 +61,8 @@ test('all pages agree on one asset version', () => {
 });
 
 test('the offline shell contains every script the app loads', () => {
-    // coverage.js and sketch.js became load-bearing after the shell list was
-    // written; offline, the app opened without its checklists.
+    // coverage.js became load-bearing after the shell list was written;
+    // offline, the app opened without its checklists.
     const sw = read('sale/sw.js');
     const html = read('sale/index.html');
     const scripts = [...html.matchAll(/<script src="([^"]+)"/g)]

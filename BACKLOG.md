@@ -148,3 +148,20 @@ gating (server-side ADMIN_EMAIL on every admin endpoint), per-user KV keying
 - [ ] 🟢 checkups: extract the duplicated periodic-service core (dates/ICS/calendar/
       import) shared by /checkups/app.js and sale/app.js into one file (found in the
       pre-deploy review 08/08; both copies fixed identically for now).
+
+## Dropped, with the part worth keeping
+- [x] ~~Auto-generated job sketches~~ — **removed 12/08/2026 on Stav's call.**
+      What shipped was schematic side views (wall, route, panel, socket). His
+      verdict: *"כל אחד יכול לדמיין את הפרטות הזאת"* — and he is right; a picture
+      that only restates what the card already says earns nothing.
+      **The idea underneath is NOT dead, and is worth revisiting as its own
+      feature.** What he actually wanted, in his words: a drawing of the riser
+      and the exit from the flat, annotated per segment — *"קידוח 30 עם צינור 25"*,
+      *"הרכבה בגובה 120"*, *"מריכון 25"*, and a bend section marked *"שרשורי"*.
+      That is not decoration: it is the field work order drawn instead of
+      listed, segment by segment with the real dimensions on each. Buildable
+      from the same characterization answers, but a different feature from what
+      was removed — the value is in the per-segment annotations, not the shape.
+      He also pictured it looser: *"שרבוט יותר ציורי, שבן אדם יחשוב שהוא צייר
+      משהו עם דף ועט"* — a hand-drawn feel, not CAD lines. (The 3D/Revit
+      walkthrough he mentioned he dismissed himself as fantasy.)
