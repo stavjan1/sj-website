@@ -24,7 +24,7 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
     
     <!-- Custom styling -->
-    <link rel="stylesheet" href="styles.css?v=82">
+    <link rel="stylesheet" href="styles.css?v=85">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -106,6 +106,13 @@
                     <span>דוחות בדיקה</span>
                 </button>
                 <div class="nav-proj-divider proj-tab"></div>
+                <!-- Phone: the bell takes a bottom-bar slot only on days it has
+                     something to say (renderReminderBell shows/hides it). -->
+                <button class="nav-btn mobile-core" id="tab-reminders" style="display:none;"
+                        onclick="toggleReminderPopover(event)" aria-label="תזכורות לקוחות">
+                    <i class="fa-solid fa-bell"></i>
+                    <span>תזכורות <b class="rb-count-mobile" id="rb-count-mobile">0</b></span>
+                </button>
                 <button class="nav-btn nav-more-btn" id="tab-more" onclick="toggleMoreDrawer()">
                     <i class="fa-solid fa-ellipsis"></i>
                     <span>עוד</span>
@@ -151,7 +158,7 @@
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
                 </div>
-                <span class="version">v5.28</span>
+                <span class="version">v5.29</span>
             </div>
         </aside>
         
@@ -163,7 +170,7 @@
                 <div class="topnav-row1">
                     <div class="topnav-brand">
                         <div class="topnav-logo"><i class="fa-solid fa-bolt"></i></div>
-                        <div><div class="tb-name">SJ הנדסת חשמל <span class="tb-ver" id="tb-ver">v5.28</span></div><div class="tb-sub">מערכת הצעות מחיר</div></div>
+                        <div><div class="tb-name">SJ הנדסת חשמל <span class="tb-ver" id="tb-ver">v5.29</span></div><div class="tb-sub">מערכת הצעות מחיר</div></div>
                     </div>
                     <div class="topnav-worlds">
                         <button class="topnav-world active" data-world="projects" onclick="switchWorld('projects')"><i class="fa-solid fa-folder-open"></i> ניהול פרויקטים</button>
@@ -174,6 +181,14 @@
                         <span id="banner-sync-indicator" style="display:none; align-items:center; gap:6px; color:var(--text-secondary); font-size:0.78rem;">
                             <i class="fa-solid fa-arrows-rotate fa-spin" style="color:var(--color-success)"></i> <span>מסנכרן…</span>
                         </span>
+                        <!-- Customer reminders: quotes waiting for an answer +
+                             checkups coming due, counted from every screen -->
+                        <button type="button" class="reminder-bell" id="reminder-bell"
+                                onclick="toggleReminderPopover(event)"
+                                aria-haspopup="dialog" aria-expanded="false" aria-label="תזכורות לקוחות">
+                            <i class="fa-solid fa-bell"></i>
+                            <span class="rb-count" id="rb-count" hidden>0</span>
+                        </button>
                         <a class="quick-mode-link" href="/ask/" title="הצ'אט המהיר — שאלת תמחור בלי לפתוח פרויקט">⚡ מצב מהיר</a>
                         <button type="button" class="theme-flip" id="theme-flip" onclick="flipTheme()" aria-label="החלפת מצב תצוגה">
                             <i id="theme-flip-icon" class="fa-solid fa-sun"></i>
@@ -1123,7 +1138,7 @@
                                     <i class="fa-solid fa-star"></i> תן חוות דעת על המוצר
                                 </a>
                             </div>
-                            <p class="input-help" style="margin:14px 0 0;opacity:.7;">גרסה <span id="about-version">v5.28</span> · &copy; 2026 SJ הנדסת חשמל · כל הזכויות שמורות.</p>
+                            <p class="input-help" style="margin:14px 0 0;opacity:.7;">גרסה <span id="about-version">v5.29</span> · &copy; 2026 SJ הנדסת חשמל · כל הזכויות שמורות.</p>
                         </div>
                     </div>
                 </div>
@@ -2039,16 +2054,21 @@
         </div>
     </div>
 
+    <!-- Reminder list — one card over both nudge sources. Lives at body level
+         so it is never clipped by a panel that owns its own scroll; anchored
+         under the bell on a desktop, a sheet above the bar on a phone. -->
+    <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
+
     <!-- Application Script -->
     <script src="/assets/listcards.js"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=82"></script>
-    <script src="app.js?v=82"></script>
+    <script src="coverage.js?v=85"></script>
+    <script src="app.js?v=85"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=82" defer></script>
-    <script src="/track.js?v=82" defer></script>
+    <script src="../assistant.js?v=85" defer></script>
+    <script src="/track.js?v=85" defer></script>
 </body>
 </html>

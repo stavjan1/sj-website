@@ -1849,6 +1849,14 @@ function loadProjects() {
     localStorage.removeItem(getStorageKey('sj_active_project_id'));
     updateActiveProjectBanner(null);
     switchTab('projects');
+
+    // The reminder bell counts periodic checkups too, and those live in a tab
+    // this device may never open. One quiet pull after the boot settles keeps
+    // the count honest instead of reading zero until someone visits that tab.
+    setTimeout(() => {
+        try { ckEnsureLocal(); if (!ckCloudPulled) ckCloudLoad(); } catch (e) { /* offline */ }
+        try { renderReminderBell(); } catch (e) {}
+    }, 2500);
 }
 
 // Write to localStorage, surviving a full quota. A user with many report/logo
@@ -3304,6 +3312,10 @@ function openProjectFromReminder(projectId, e) {
 }
 
 function renderFollowupReminders() {
+    // The bell is refreshed from here on purpose, before the early return: the
+    // strip only exists on the projects dashboard, but the count has to be
+    // right from wherever the app happens to be standing.
+    try { renderReminderBell(); } catch (e) { /* bell is an add-on, never fatal */ }
     const box = document.getElementById('followup-reminders');
     if (!box) return;
     const due = getDueFollowups();
@@ -3343,6 +3355,9 @@ function renderFollowupReminders() {
                 <button class="btn btn-success btn-small" onclick="followupWhatsApp('${p.id}', event)" title="שלח תזכורת בוואטסאפ">
                     <i class="fa-brands fa-whatsapp"></i>
                 </button>
+                <button class="btn btn-secondary btn-small" onclick="followupRemindMe('${p.id}', event)" title="קבע תזכורת ביומן — שתגיע גם כשהמערכת סגורה">
+                    <i class="fa-regular fa-calendar-plus"></i>
+                </button>
                 ${advanceBtn}
                 <button class="btn btn-secondary btn-small" onclick="snoozeFollowup('${p.id}', 1, event)" title="הזכר לי מחר">מחר</button>
                 <button class="btn btn-secondary btn-small" onclick="snoozeFollowup('${p.id}', 30, event)" title="הפסק להזכיר">✕</button>
@@ -3353,6 +3368,306 @@ function renderFollowupReminders() {
         <div class="fu-title"><i class="fa-solid fa-bell"></i> ${due.length === 1 ? 'פרויקט אחד ממתין' : due.length + ' פרויקטים ממתינים'} למעקב — לקוח שלא ענה זה כסף על השולחן</div>
         ${rows}
     </div>`;
+}
+
+// ==========================================================================
+// "מי מחכה לי" — one bell over both reminder systems.
+//
+// Two things nudge you to call a customer, and until now they lived on two
+// different tabs: a quote sent with no answer (the strip above, projects
+// dashboard) and a periodic checkup coming due (the שירות תקופתי tab). Either
+// one could sit there for a week unseen, because seeing it required being on
+// exactly the right screen. The bell carries the count everywhere and opens
+// both lists in one place.
+// ==========================================================================
+
+// Read the checkup clients off local storage without triggering the tab's
+// cloud pull — the bell needs the numbers, not a sync.
+function ckEnsureLocal() {
+    if (ckLoaded) return;
+    try { ckClients = JSON.parse(localStorage.getItem(ckStorageKey()) || '[]'); } catch { ckClients = []; }
+    if (!Array.isArray(ckClients)) ckClients = [];
+    ckLoaded = true;
+}
+
+// Both sources, flattened into one shape and sorted by how late they are.
+function getReminderItems() {
+    const items = [];
+    try {
+        getDueFollowups().forEach((p) => {
+            const since = p.statusChangedAt || new Date(p.created).getTime() || Date.now();
+            const days = Math.floor((Date.now() - since) / 86400000);
+            const isPayment = (p.status || '') === 'הושלם';
+            items.push({
+                kind: 'followup', id: p.id, name: p.name || 'פרויקט',
+                why: (isPayment ? 'ממתין לתשלום' : 'ממתין לתשובה') + ' ' + days + ' ימים',
+                lateness: days,
+                phone: p.clientPhone || '', email: p.clientEmail || '',
+            });
+        });
+    } catch (e) { /* projects not loaded yet */ }
+    try {
+        ckEnsureLocal();
+        ckDueSoonClients().forEach((c) => {
+            const n = ckDaysUntil(ckNextDue(c));
+            items.push({
+                kind: 'checkup', id: c.id, name: c.name || 'לקוח',
+                why: n < 0 ? 'בדיקה באיחור ' + Math.abs(n) + ' יום' : n === 0 ? 'הבדיקה היום' : 'בדיקה בעוד ' + n + ' יום',
+                // Same unit as a follow-up's: days already overdue. A checkup
+                // that hasn't come due yet goes negative, so it sorts below a
+                // quote that is genuinely sitting there waiting for an answer.
+                lateness: -n,
+                phone: c.phone || '', email: c.email || '',
+            });
+        });
+    } catch (e) { /* checkups not available */ }
+    return items.sort((a, b) => b.lateness - a.lateness);
+}
+
+function renderReminderBell() {
+    const n = getReminderItems().length;
+    const deskCount = document.getElementById('rb-count');
+    if (deskCount) {
+        deskCount.textContent = n > 99 ? '99+' : String(n);
+        deskCount.hidden = n === 0;
+    }
+    const bell = document.getElementById('reminder-bell');
+    if (bell) {
+        bell.classList.toggle('has-due', n > 0);
+        bell.setAttribute('aria-label', n === 0 ? 'תזכורות לקוחות — אין כרגע' : 'תזכורות לקוחות — ' + n + ' ממתינות');
+    }
+    // The phone's bottom bar has room for five buttons, not six, so the mobile
+    // bell earns its slot only on days it has something to say.
+    const mob = document.getElementById('tab-reminders');
+    if (mob) {
+        mob.style.display = n > 0 ? '' : 'none';
+        const badge = document.getElementById('rb-count-mobile');
+        if (badge) badge.textContent = n > 9 ? '9+' : String(n);
+    }
+    if (reminderPopOpen) renderReminderPopover();
+}
+
+let reminderPopOpen = false;
+
+function toggleReminderPopover(e) {
+    if (e) e.stopPropagation();
+    reminderPopOpen ? closeReminderPopover() : openReminderPopover(e && e.currentTarget);
+}
+
+function openReminderPopover(anchor) {
+    const pop = document.getElementById('reminder-pop');
+    if (!pop) return;
+    reminderPopOpen = true;
+    pop.hidden = false;
+    renderReminderPopover();
+    positionReminderPopover(anchor);
+    document.getElementById('reminder-bell')?.setAttribute('aria-expanded', 'true');
+    setTimeout(() => {
+        document.addEventListener('click', _reminderOutside);
+        document.addEventListener('keydown', _reminderEsc);
+        // A resize moves the bell out from under the card; closing beats
+        // leaving it pointing at nothing.
+        window.addEventListener('resize', closeReminderPopover, { once: true });
+    }, 0);
+}
+
+function closeReminderPopover() {
+    reminderPopOpen = false;
+    const pop = document.getElementById('reminder-pop');
+    if (pop) pop.hidden = true;
+    document.getElementById('reminder-bell')?.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('click', _reminderOutside);
+    document.removeEventListener('keydown', _reminderEsc);
+}
+
+function _reminderOutside(ev) {
+    const pop = document.getElementById('reminder-pop');
+    if (pop && !pop.contains(ev.target)) closeReminderPopover();
+}
+function _reminderEsc(ev) { if (ev.key === 'Escape') closeReminderPopover(); }
+
+// Anchored under the bell on a desktop; a sheet above the nav bar on a phone,
+// where there is no bell to anchor to once the bottom bar owns the button.
+function positionReminderPopover(anchor) {
+    const pop = document.getElementById('reminder-pop');
+    if (!pop) return;
+    if (window.innerWidth <= 860) {
+        pop.style.top = ''; pop.style.left = ''; pop.style.right = '';
+        pop.classList.add('rp-sheet');
+        return;
+    }
+    pop.classList.remove('rp-sheet');
+    const r = (anchor || document.getElementById('reminder-bell'))?.getBoundingClientRect();
+    if (!r) return;
+    pop.style.top = Math.round(r.bottom + 8) + 'px';
+    // Clamp to the viewport so the card never hangs off either edge.
+    const w = pop.offsetWidth || 340;
+    pop.style.left = Math.round(Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8)) + 'px';
+    pop.style.right = 'auto';
+}
+
+function renderReminderPopover() {
+    const pop = document.getElementById('reminder-pop');
+    if (!pop) return;
+    const items = getReminderItems();
+    if (items.length === 0) {
+        pop.innerHTML = `<div class="rp-head">תזכורות לקוחות</div>
+            <div class="rp-empty"><i class="fa-regular fa-circle-check"></i> אין למי לחזור כרגע — הכל מטופל.</div>`;
+        return;
+    }
+    // The quote follow-ups are the Pro feature; the periodic checkups never
+    // were, so a free plan still gets its checkup rows in full.
+    const locked = !tierAllows('reminders');
+    const followups = items.filter((i) => i.kind === 'followup');
+    const shown = locked ? items.filter((i) => i.kind === 'checkup') : items;
+
+    const rows = shown.slice(0, 8).map((i) => {
+        // Ids are generated locally, but they land inside a quoted attribute —
+        // the same sink that produced this project's stored-XSS bug once.
+        const id = escapeHtml(i.id);
+        const wa = i.phone
+            ? `<button class="rp-act rp-wa" title="וואטסאפ" onclick="reminderAction('${i.kind}','${id}','wa')"><i class="fa-brands fa-whatsapp"></i></button>` : '';
+        const mail = i.email
+            ? `<button class="rp-act" title="מייל" onclick="reminderAction('${i.kind}','${id}','mail')"><i class="fa-solid fa-envelope"></i></button>` : '';
+        return `<div class="rp-row">
+            <button class="rp-main" onclick="reminderAction('${i.kind}','${id}','open')">
+                <span class="rp-name">${escapeHtml(i.name)}</span>
+                <span class="rp-why">${escapeHtml(i.why)}</span>
+            </button>
+            <span class="rp-acts">${wa}${mail}</span>
+        </div>`;
+    }).join('');
+
+    const lockedRow = locked && followups.length
+        ? `<button class="rp-row rp-locked" onclick="closeReminderPopover(); showUpgradeModal('reminders')">
+               <i class="fa-solid fa-lock"></i>
+               <span>${followups.length} ${followups.length === 1 ? 'הצעה ממתינה' : 'הצעות ממתינות'} לתשובה — מעקב הצעות במסלול Pro</span>
+           </button>` : '';
+
+    const more = shown.length > 8 ? `<div class="rp-more">+${shown.length - 8} נוספים</div>` : '';
+    pop.innerHTML = `<div class="rp-head">מי מחכה לי <b>${items.length}</b></div>${lockedRow}${rows}${more}`;
+}
+
+function reminderAction(kind, id, what) {
+    if (kind === 'checkup') {
+        if (what === 'wa') return ckWhatsapp(id);
+        if (what === 'mail') return ckMailto(id);
+        closeReminderPopover();
+        switchTab('checkups');
+        return;
+    }
+    if (what === 'wa') { followupWhatsApp(id); return; }
+    if (what === 'mail') { followupEmail(id); return; }
+    closeReminderPopover();
+    switchTab('projects');
+    openProjectFromReminder(id);
+}
+
+// ---------- follow-up reminders that survive the app being closed ----------
+//
+// A nudge that only renders inside ZEREM is not a reminder: on the day you
+// don't open the app, it simply doesn't happen. This puts it in the calendar
+// the phone already rings from — Google when signed in with Google, an ICS
+// file otherwise, so iPhone and Outlook users are not left out.
+
+function _followupWhen() {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(9, 0, 0, 0);
+    return d;
+}
+function _localDateTime(d) {
+    const p = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) +
+        'T' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':00';
+}
+function _followupTitle(proj) {
+    const isPayment = (proj.status || '') === 'הושלם';
+    // A dot, not a dash: project names carry their own dashes ("לוי — לוח"),
+    // and two of them in one calendar title read as noise.
+    return '⚡ לחזור ל' + (proj.name || 'לקוח') + ' · ' + (isPayment ? 'תשלום ממתין' : 'הצעה ממתינה לתשובה');
+}
+function _followupDesc(proj) {
+    return [
+        proj.clientPhone ? 'טלפון: ' + proj.clientPhone : '',
+        proj.clientEmail ? 'מייל: ' + proj.clientEmail : '',
+        '', _followupMessage(proj),
+        '', '(נוצר אוטומטית ממעקב ההצעות של זרם)',
+    ].filter((l) => l !== null).join('\n');
+}
+
+async function followupRemindMe(projectId, e) {
+    if (e) e.stopPropagation();
+    const proj = projectsList.find((p) => p.id === projectId);
+    if (!proj) return;
+    const when = _followupWhen();
+
+    let token = null;
+    if (!isGuestUser()) {
+        try { token = await ckEnsureCalToken(); } catch (err) { token = null; }
+    }
+    if (!token) { _followupIcs(proj, when); return; }
+
+    const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone) || 'Asia/Jerusalem';
+    const dt = _localDateTime(when);
+    const end = new Date(when.getTime() + 30 * 60000);
+    const body = JSON.stringify({
+        summary: _followupTitle(proj),
+        description: _followupDesc(proj),
+        start: { dateTime: dt, timeZone: tz },
+        end: { dateTime: _localDateTime(end), timeZone: tz },
+        reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 0 }] },
+    });
+    const base = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+    const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+    try {
+        let res = null;
+        if (proj.followupEventId) {
+            res = await fetch(base + '/' + proj.followupEventId, { method: 'PATCH', headers, body });
+            if (res.status === 404 || res.status === 410) res = null; // deleted by hand — recreate
+        }
+        if (!res) res = await fetch(base, { method: 'POST', headers, body });
+        if (res.status === 401 || res.status === 403) {
+            localStorage.removeItem(CK_CAL_TOKEN_KEY);
+            showToast('ההרשאה ליומן פגה — לחץ שוב על כפתור היומן', 'error');
+            return;
+        }
+        const ev = await res.json();
+        if (!res.ok || !ev.id) throw new Error('calendar-error');
+        proj.followupEventId = ev.id;
+        saveProjects();
+        showToast('תזכורת נקבעה ביומן למחר ב-9:00');
+    } catch (err) {
+        // Never leave the click with nothing to show for it.
+        _followupIcs(proj, when);
+    }
+}
+
+function _followupIcs(proj, when) {
+    const p = (n) => String(n).padStart(2, '0');
+    const stamp = (d) => d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate()) +
+        'T' + p(d.getUTCHours()) + p(d.getUTCMinutes()) + '00Z';
+    const end = new Date(when.getTime() + 30 * 60000);
+    const summary = ckIcsText(_followupTitle(proj));
+    const ics = [
+        'BEGIN:VCALENDAR', 'VERSION:2.0',
+        'PRODID:-//SJ Electrical Engineering//Followup//HE',
+        'BEGIN:VEVENT',
+        'UID:fu-' + proj.id + '@sj-eng.co.il',
+        'DTSTAMP:' + stamp(new Date()),
+        'DTSTART:' + stamp(when),
+        'DTEND:' + stamp(end),
+        'SUMMARY:' + summary,
+        'DESCRIPTION:' + ckIcsText(_followupDesc(proj)),
+        'BEGIN:VALARM', 'TRIGGER:PT0M', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
+        'END:VEVENT', 'END:VCALENDAR',
+    ].join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+    a.download = 'followup-' + String(proj.name || 'client').replace(/[^\w֐-׿-]+/g, '_') + '.ics';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast('קובץ תזכורת ירד — פתח אותו והוא ייכנס ליומן שלך');
 }
 
 function renderProjectsList(list) {
@@ -10996,6 +11311,7 @@ function ckPersist() {
     const cutoff = Date.now() - 90 * 86400000;
     ckClients = ckClients.filter((c) => !c.deleted || c.deleted > cutoff);
     localStorage.setItem(ckStorageKey(), JSON.stringify(ckClients));
+    try { renderReminderBell(); } catch (e) { /* bell is an add-on, never fatal */ }
     if (isGuestUser() || !googleAccessToken) return;
     clearTimeout(ckSaveTimer);
     ckSaveTimer = setTimeout(ckCloudSave, 1500);
@@ -11030,6 +11346,7 @@ async function ckCloudLoad() {
         ckClients = [...byId.values()];
         localStorage.setItem(ckStorageKey(), JSON.stringify(ckClients));
         ckRender();
+        try { renderReminderBell(); } catch (e) {}
         ckCloudSave();
     } catch { /* offline */ }
 }

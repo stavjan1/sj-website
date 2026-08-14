@@ -45,7 +45,11 @@ export async function onRequestGet(context) {
     return jsonResponse({ ok: false, error: 'rate-limited' }, 429);
   }
 
-  const token = await env.SJ_DATA.get(TOKEN_KEY);
+  // Either place works, and neither is more correct: the admin card writes the
+  // token to KV, and CLARITY_API_TOKEN is where a Cloudflare secret naturally
+  // goes. Accepting only one of them is how this stayed unplugged — the token
+  // existed, went to the other place, and nothing said so.
+  const token = (await env.SJ_DATA.get(TOKEN_KEY)) || env.CLARITY_API_TOKEN;
   if (!token) return jsonResponse({ ok: false, error: 'token-not-set' });
 
   // Serve the cache while fresh — Clarity caps API calls per day.
