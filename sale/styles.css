@@ -2163,6 +2163,12 @@ textarea#ai-input {
     background: var(--bg-card); color: var(--text-primary);
 }
 .aip-events { margin-top: 4px; }
+.aip-models { display: flex; flex-direction: column; gap: 7px; }
+.aim-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 88px; align-items: center; gap: 10px; }
+.aim-name { font-size: 0.82rem; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: ltr; text-align: start; }
+.aim-pct { font-size: 0.82rem; font-weight: 800; color: var(--text-primary); white-space: nowrap; }
+.aim-pct small { font-weight: 600; color: var(--text-muted); }
+@media (max-width: 768px) { .aim-row { grid-template-columns: 1fr 70px; } .aim-row .aip-bar { display: none; } }
 @media (max-width: 768px) {
     .aip-row { grid-template-columns: 1fr; gap: 8px; }
     .aip-cap { width: 140px; }
@@ -2171,15 +2177,6 @@ textarea#ai-input {
 /* ==========================================================================
    Periodic maintenance — the type switch, the chips, and the row badge.
    ========================================================================== */
-.proj-kind { display: inline-flex; gap: 0; flex-shrink: 0; border: 1px solid var(--border-color); border-radius: 999px; overflow: hidden; }
-.proj-kind-btn {
-    padding: 8px 14px; border: none; background: transparent; cursor: pointer;
-    font-family: inherit; font-size: 0.8rem; font-weight: 700; color: var(--text-secondary);
-    white-space: nowrap;
-}
-.proj-kind-btn:hover { color: var(--text-primary); }
-.proj-kind-btn.active { background: var(--color-accent); color: #fff; }
-
 .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .mchip {
     padding: 8px 13px; min-height: 36px; border-radius: 999px; cursor: pointer;
@@ -2236,10 +2233,6 @@ body.light-theme .marr-title { color: #a16207; }
 }
 
 @media (max-width: 768px) {
-    /* The create row stacks on a phone; the type switch gets its own line and
-       fills it, so both options stay thumb-sized. */
-    .proj-kind { width: 100%; }
-    .proj-kind-btn { flex: 1; padding: 10px 8px; }
     .mchip { min-height: 44px; }
 }
 

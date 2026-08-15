@@ -2160,19 +2160,6 @@ function createNewProject() {
     
     loadProject(newProj.id);
     showToast(autoName ? 'פרויקט חדש נפתח — תאר את העבודה והשם ייקבע לבד' : `פרויקט "${name}" נוצר בהצלחה`);
-
-    // Recurring work: ask for the interval and the next date now, while the
-    // customer is still in mind. The toggle resets, so the next project starts
-    // as a one-off again rather than inheriting a choice nobody repeated.
-    if (_newProjectKind === 'maintenance') {
-        newProj.kind = 'maintenance';
-        saveProjects();
-        setNewProjectKind('job');
-        setTimeout(() => openMaintenanceDialog(newProj.id), 250);
-        if (projectsList.length === 1) setTimeout(maybeShowBizGate, 2400);
-        return;
-    }
-
     switchTab('wizard'); // Auto switch to pricing chat
     // First project ever → one soft, skippable nudge to fill business details.
     if (projectsList.length === 1) setTimeout(maybeShowBizGate, 1200);
@@ -2473,6 +2460,7 @@ function filterProjectsList() {
     if (q) filtered = filtered.filter(p => p.name.toLowerCase().includes(q));
     if (statusFilter !== 'all') filtered = filtered.filter(p => (p.status || 'טיוטה') === statusFilter);
     if (activeCategoryFilter) filtered = filtered.filter(p => (p.category || '') === activeCategoryFilter);
+    if (repeatFilterOn) filtered = filtered.filter(projectRepeats);
 
     renderProjectCategories();
 
@@ -2483,6 +2471,16 @@ function filterProjectsList() {
     renderProjectsList(filtered);
     updateMetricsDashboard();
     renderFollowupReminders();
+}
+
+// Show only the work that comes back. A filter, not a screen: the same project
+// in two places is two places to keep in step.
+let repeatFilterOn = false;
+function toggleRepeatFilter() {
+    repeatFilterOn = !repeatFilterOn;
+    const btn = document.getElementById('repeat-filter');
+    if (btn) btn.classList.toggle('active', repeatFilterOn);
+    filterProjectsList();
 }
 
 // ── Project categories (user-managed labels for filtering the list) ───────────
@@ -3412,6 +3410,17 @@ const MAINT_LEAD_PRESETS = [
 ];
 const MAINT_LEAD_DEFAULT = [90, 30];
 
+// How many times the work is assumed to come back. Three by default: long
+// enough to be worth automating, short enough that a stale series cannot haunt
+// a calendar for a decade after the customer changed hands.
+const MAINT_REPEATS_DEFAULT = 3;
+const MAINT_REPEAT_PRESETS = [
+    { n: 1, label: 'פעם אחת' },
+    { n: 3, label: '3 פעמים' },
+    { n: 5, label: '5 פעמים' },
+    { n: 0, label: 'ללא הגבלה' },
+];
+
 // One default for everyone, overridable per project. Asking on every project
 // would be friction on the 95% that want the same answer; forcing one number
 // on everyone ignores that a factory needs a quarter's notice and a flat needs
@@ -3436,17 +3445,22 @@ function maintLeadsChosen() {
     return !!(appState.settings && Array.isArray(appState.settings.maintenanceLeadDays));
 }
 
-let _newProjectKind = 'job';
-function setNewProjectKind(kind) {
-    _newProjectKind = kind === 'maintenance' ? 'maintenance' : 'job';
-    document.querySelectorAll('.proj-kind-btn').forEach((b) => {
-        b.classList.toggle('active', b.dataset.kind === _newProjectKind);
-    });
+// Recurrence is a property, not a kind of project.
+//
+// The first version asked at creation: one-off job or periodic maintenance.
+// Stav's counter-example killed it — panel maintenance is a one-off JOB whose
+// OPPORTUNITY comes back next year. The work is not recurring; the sale is. And
+// at creation you usually don't know yet: you know when the job is finished. So
+// any project can be told "remind me to come back", and the list can filter for
+// the ones that carry it.
+function projectRepeats(p) {
+    return !!(p && p.maintenance && p.maintenance.next);
 }
 
 // ---- the dialog ----
 let _maintTarget = null;      // project id being configured
 let _maintMonths = 12;
+let _maintRepeats = MAINT_REPEATS_DEFAULT;
 
 function openMaintenanceDialog(projectId) {
     const proj = projectsList.find((p) => p.id === projectId);
@@ -3456,8 +3470,10 @@ function openMaintenanceDialog(projectId) {
     const existing = proj.maintenance || {};
     _maintMonths = existing.months || 12;
 
+    _maintRepeats = maintRepeatsOf(proj);
     document.getElementById('maint-for').textContent = 'עבור: ' + (proj.name || 'הפרויקט');
     maintPickInterval(_maintMonths, true);
+    maintRenderRepeats();
     document.getElementById('maint-next').value = existing.next || maintAddMonths(ckToday(), _maintMonths);
     // Offer the calendar only once there is something to put in it.
     const calBlock = document.getElementById('maint-cal-block');
@@ -3502,6 +3518,17 @@ function maintCustomMonths() {
     _maintMonths = Math.min(120, v);
     document.getElementById('maint-next').value = maintAddMonths(ckToday(), _maintMonths);
 }
+function maintRenderRepeats() {
+    const row = document.getElementById('maint-repeat-row');
+    if (!row) return;
+    row.innerHTML = MAINT_REPEAT_PRESETS.map((p) =>
+        `<button type="button" class="mchip${p.n === _maintRepeats ? ' active' : ''}" onclick="maintPickRepeats(${p.n})">${escapeHtml(p.label)}</button>`
+    ).join('');
+}
+function maintPickRepeats(n) {
+    _maintRepeats = n;
+    maintRenderRepeats();
+}
 function maintPickLead(id) {
     document.querySelectorAll('#maint-lead-row .mchip').forEach((b) => {
         b.classList.toggle('active', b.dataset.lead === id);
@@ -3535,6 +3562,7 @@ function maintSave() {
     proj.maintenance = Object.assign({}, proj.maintenance, {
         months: _maintMonths || 12,
         next,
+        repeats: _maintRepeats,
         // Only record an override when it differs from the global default.
         leadDays: chosen && chosen.join(',') !== maintDefaultLeads().join(',') ? chosen : null,
         eventId: (proj.maintenance && proj.maintenance.eventId) || null,
@@ -3542,7 +3570,7 @@ function maintSave() {
     saveProjects();
     filterProjectsList();
     dlg.close();
-    showToast('תחזוקה נקבעה — ' + ckFmtDate(next) + ' · תזכורת ' + maintLeadLabel(maintLeadsFor(proj)) + ' לפני');
+    showToast('נקבע — ' + ckFmtDate(next) + ' · תזכורת ' + maintLeadLabel(maintLeadsFor(proj)) + ' לפני');
 }
 
 function maintCancel() {
@@ -3569,10 +3597,11 @@ function maintDueIn(proj) {
 // The chip on the project row: the next date, and one tap to change it. Turns
 // amber once the job has entered its reminder window.
 function maintBadgeHtml(p) {
-    if ((p.kind || 'job') !== 'maintenance') return '';
     const due = maintNextDue(p);
+    // Not recurring (yet): a quiet affordance, so any project can become one
+    // the moment you realise it will come back — usually when it's finished.
     if (!due) {
-        return `<span class="maint-chip" onclick="event.stopPropagation(); openMaintenanceDialog('${escapeHtml(p.id)}')" title="קבע מועד תחזוקה"><i class="fa-solid fa-rotate"></i> קבע מועד</span>`;
+        return `<span class="maint-chip maint-add" onclick="event.stopPropagation(); openMaintenanceDialog('${escapeHtml(p.id)}')" title="תזכיר לי לחזור לעבודה הזאת"><i class="fa-solid fa-rotate"></i> תזכיר לי לחזור</span>`;
     }
     const n = ckDaysUntil(due);
     const due_soon = maintDueIn(p) !== null;
@@ -3671,10 +3700,20 @@ function maintEventBody(proj) {
         '(נוצר אוטומטית מזרם)',
     ].join('\n');
 }
-function maintRrule(months) {
-    return months % 12 === 0
+// Bounded on purpose. An open-ended series keeps firing years after the
+// customer, the price or the job changed — Stav's point, and he is right: the
+// app knows when a visit actually happened and can extend then. `repeats: 0`
+// is the explicit "no end" choice for someone who wants it anyway.
+function maintRrule(months, repeats) {
+    const base = months % 12 === 0
         ? 'RRULE:FREQ=YEARLY;INTERVAL=' + (months / 12)
         : 'RRULE:FREQ=MONTHLY;INTERVAL=' + months;
+    const n = Number(repeats);
+    return n > 0 ? base + ';COUNT=' + n : base;
+}
+function maintRepeatsOf(proj) {
+    const r = proj && proj.maintenance && proj.maintenance.repeats;
+    return r === 0 || r > 0 ? r : MAINT_REPEATS_DEFAULT;
 }
 
 function openMaintCalendarPicker(projectId) {
@@ -3740,7 +3779,7 @@ async function maintToGoogle(projectId) {
                 description: maintEventBody(proj),
                 start: { dateTime: b.date + 'T09:00:00', timeZone: tz },
                 end: { dateTime: b.date + 'T10:00:00', timeZone: tz },
-                recurrence: [maintRrule(months)],
+                recurrence: [maintRrule(months, maintRepeatsOf(proj))],
                 reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 0 }] },
             });
             const r = await fetch(base, { method: 'POST', headers, body });
@@ -3813,7 +3852,7 @@ function maintToIcs(projectId) {
             'DTSTAMP:' + stampNow,
             'DTSTART:' + d + 'T090000',
             'DTEND:' + d + 'T100000',
-            maintRrule(months),
+            maintRrule(months, maintRepeatsOf(proj)),
             'SUMMARY:' + summary,
             'DESCRIPTION:' + desc,
             'URL:' + maintDeepLink(proj),
@@ -3959,7 +3998,7 @@ function getReminderItems() {
     } catch (e) { /* projects not loaded yet */ }
     try {
         (projectsList || []).forEach((p) => {
-            if ((p.kind || 'job') !== 'maintenance') return;
+            if (!projectRepeats(p)) return;
             const n = maintDueIn(p);
             if (n === null) return;                 // not inside its lead window yet
             items.push({
@@ -5014,6 +5053,26 @@ function aiPanelHtml(ai) {
         </div>`;
     }).join('');
 
+    // Which model actually did the work. The ledger records it per pool, and
+    // the answer is not always the one configured: a fallback down the chain
+    // quietly serves a different model, and this is where that shows up.
+    const modelTotals = {};
+    Object.values(ai.totals || {}).forEach((t) => {
+        Object.entries(t.models || {}).forEach(([m, n]) => { modelTotals[m] = (modelTotals[m] || 0) + n; });
+    });
+    const modelSum = Object.values(modelTotals).reduce((a, b) => a + b, 0);
+    const models = modelSum
+        ? `<div class="aip-models"><h4 class="tcol-title"><i class="fa-solid fa-diagram-project"></i> לפי מודל</h4>
+             ${Object.entries(modelTotals).sort((a, b) => b[1] - a[1]).map(([m, n]) => {
+                 const pct = Math.round((n / modelSum) * 100);
+                 return `<div class="aim-row">
+                     <span class="aim-name">${escapeHtml(m)}</span>
+                     <div class="aip-bar"><div class="aip-fill" style="width:${pct}%"></div></div>
+                     <span class="aim-pct">${pct}% <small>(${n})</small></span>
+                 </div>`;
+             }).join('')}</div>`
+        : '';
+
     const events = (ai.events || []).length
         ? `<div class="aip-events"><h4 class="tcol-title"><i class="fa-solid fa-triangle-exclamation"></i> אירועים אחרונים</h4>
              <ul class="tlist">${ai.events.slice(0, 12).map((e) => {
@@ -5027,6 +5086,7 @@ function aiPanelHtml(ai) {
         <button class="btn btn-accent btn-small" onclick="saveAiCaps()" style="align-self:flex-start;">
             <i class="fa-solid fa-floppy-disk"></i> שמור תקרות
         </button>
+        ${models}
         ${events}`;
 }
 

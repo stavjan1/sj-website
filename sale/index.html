@@ -24,7 +24,7 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
     
     <!-- Custom styling -->
-    <link rel="stylesheet" href="styles.css?v=92">
+    <link rel="stylesheet" href="styles.css?v=93">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -162,7 +162,7 @@
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
                 </div>
-                <span class="version">v5.35</span>
+                <span class="version">v5.36</span>
             </div>
         </aside>
         
@@ -174,7 +174,7 @@
                 <div class="topnav-row1">
                     <div class="topnav-brand">
                         <div class="topnav-logo"><i class="fa-solid fa-bolt"></i></div>
-                        <div><div class="tb-name">SJ הנדסת חשמל <span class="tb-ver" id="tb-ver">v5.35</span></div><div class="tb-sub">מערכת הצעות מחיר</div></div>
+                        <div><div class="tb-name">SJ הנדסת חשמל <span class="tb-ver" id="tb-ver">v5.36</span></div><div class="tb-sub">מערכת הצעות מחיר</div></div>
                     </div>
                     <div class="topnav-worlds">
                         <button class="topnav-world active" data-world="projects" onclick="switchWorld('projects')"><i class="fa-solid fa-folder-open"></i> ניהול פרויקטים</button>
@@ -234,13 +234,6 @@
                     <div class="create-project-inline">
                         <i class="fa-solid fa-folder-plus text-accent"></i>
                         <input type="text" id="new-project-name" placeholder="שם הפרויקט / לקוח — או פשוט צור פרויקט והשם ייקבע מהתיאור" onkeydown="if(event.key==='Enter')createNewProject()">
-                        <!-- Work that repeats needs a date, not only a quote. Saying so
-                             here, instead of converting the project later, is what makes
-                             the reminder exist at all. -->
-                        <div class="proj-kind" role="group" aria-label="סוג העבודה">
-                            <button type="button" class="proj-kind-btn active" data-kind="job" onclick="setNewProjectKind('job')">עבודה חד-פעמית</button>
-                            <button type="button" class="proj-kind-btn" data-kind="maintenance" onclick="setNewProjectKind('maintenance')">תחזוקה תקופתית</button>
-                        </div>
                         <button class="btn btn-accent" onclick="createNewProject()">
                             <i class="fa-solid fa-plus"></i> צור פרויקט
                         </button>
@@ -268,6 +261,11 @@
                                 שם <i class="fa-solid fa-arrow-down-long sort-arrow"></i>
                             </button>
                         </div>
+                        <!-- Recurring work is a property of a project, not a screen of
+                             its own — so it is a filter here, next to the others. -->
+                        <button type="button" class="sort-toggle" id="repeat-filter" onclick="toggleRepeatFilter()" title="הצג רק עבודות שחוזרות">
+                            <i class="fa-solid fa-rotate"></i> חוזרים
+                        </button>
                         <select id="project-status-filter" onchange="filterProjectsList()" class="project-filter-select">
                             <option value="all">כל הסטטוסים</option>
                             <option value="טיוטה">טיוטה</option>
@@ -1161,7 +1159,7 @@
                                     <i class="fa-solid fa-star"></i> תן חוות דעת על המוצר
                                 </a>
                             </div>
-                            <p class="input-help" style="margin:14px 0 0;opacity:.7;">גרסה <span id="about-version">v5.35</span> · &copy; 2026 SJ הנדסת חשמל · כל הזכויות שמורות.</p>
+                            <p class="input-help" style="margin:14px 0 0;opacity:.7;">גרסה <span id="about-version">v5.36</span> · &copy; 2026 SJ הנדסת חשמל · כל הזכויות שמורות.</p>
                         </div>
                     </div>
                 </div>
@@ -2113,6 +2111,12 @@
             <div class="ck-hint">מחושב לפי התדירות — אפשר לשנות.</div>
         </div>
 
+        <div class="ck-field">
+            <label>כמה פעמים לחזור?</label>
+            <div class="chip-row" id="maint-repeat-row"></div>
+            <div class="ck-hint">מחירים, לקוחות ועבודות משתנים — עדיף סדרה קצרה, והיא תתארך בכל פעם שתסמן "בוצע".</div>
+        </div>
+
         <!-- Asked once, on the first maintenance project ever. -->
         <div class="ck-field" id="maint-lead-block">
             <label>מתי להזכיר לך?</label>
@@ -2146,11 +2150,11 @@
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=92"></script>
-    <script src="app.js?v=92"></script>
+    <script src="coverage.js?v=93"></script>
+    <script src="app.js?v=93"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=92" defer></script>
-    <script src="/track.js?v=92" defer></script>
+    <script src="../assistant.js?v=93" defer></script>
+    <script src="/track.js?v=93" defer></script>
 </body>
 </html>

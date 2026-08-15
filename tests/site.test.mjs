@@ -361,3 +361,26 @@ test('the calendar entry is the action, at the date you take it', () => {
     assert.match(app, /function captureMaintDeepLink[\s\S]{0,400}history\.replaceState/,
         'the deep link is not cleaned from the URL — a refresh would re-trigger it');
 });
+
+test('recurrence is a property of a project, and it ends', () => {
+    const app = read('sale/app.js');
+    const html = read('sale/index.html');
+
+    // The job/maintenance switch at creation is gone. Stav's counter-example:
+    // panel maintenance is a one-off JOB whose OPPORTUNITY returns next year —
+    // the work does not recur, the sale does. And at creation you rarely know;
+    // you know when the job is finished.
+    assert.ok(!html.includes('proj-kind'), 'the create-time type switch is back');
+    assert.ok(!/setNewProjectKind/.test(app), 'the type-switch handler survived the removal');
+    assert.match(app, /function projectRepeats/, 'recurrence is no longer readable as a property');
+    assert.match(app, /if \(repeatFilterOn\) filtered = filtered\.filter\(projectRepeats\);/,
+        'the recurring filter is gone from the projects list');
+
+    // And the series is bounded. An open RRULE keeps firing years after the
+    // price, the customer or the job changed.
+    assert.match(app, /n > 0 \? base \+ ';COUNT=' \+ n : base/,
+        'the recurrence rule lost its COUNT — the calendar series repeats forever again');
+    assert.match(app, /const MAINT_REPEATS_DEFAULT = \d+;/, 'the default repeat count is gone');
+    assert.ok(!/MAINT_REPEATS_DEFAULT = 0;/.test(app),
+        'the default became unlimited — the whole point was that it should end');
+});
