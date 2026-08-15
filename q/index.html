@@ -7,56 +7,60 @@
     <meta name="robots" content="noindex">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;900&display=swap" rel="stylesheet">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='none' stroke='%232b74db' stroke-width='6'/%3E%3Cpath d='M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z' fill='%23ffaa00'/%3E%3C/svg%3E">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Hebrew:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2L4.5 13h6l-1.5 9L18.5 10h-6z' fill='%23A16207'/%3E%3C/svg%3E">
     <style>
+        /* Client-facing quote document — deliberately always light, like paper. */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Heebo', 'Segoe UI', sans-serif; background: #eef2f8; color: #0f172a; line-height: 1.65; padding: 18px 12px 40px; }
+        body { font-family: 'IBM Plex Sans Hebrew', 'Heebo', sans-serif; background: #F5F5F4; color: #1C1917; line-height: 1.65; padding: 18px 12px 40px; }
         .sheet {
             max-width: 760px; margin: 0 auto; background: #fff;
-            border-radius: 14px; box-shadow: 0 6px 30px rgba(15, 23, 42, 0.12);
+            border: 1px solid #E7E5E4; border-radius: 12px;
+            box-shadow: 0 4px 18px rgb(28 25 23 / 0.07);
             padding: 30px 28px;
         }
-        .qs-loading, .qs-error { text-align: center; padding: 60px 20px; color: #475569; }
-        .qs-error { color: #b91c1c; }
+        .qs-loading, .qs-error { text-align: center; padding: 60px 20px; color: #57534E; }
+        .qs-error { color: #B91C1C; }
         .qs-header { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
-        .qs-to .lbl { color: #64748b; font-size: 0.85rem; }
-        .qs-to .name { font-weight: 800; font-size: 1.1rem; }
-        .qs-to .sub { color: #64748b; font-size: 0.85rem; }
+        .qs-to .lbl { color: #79716B; font-size: 0.85rem; }
+        .qs-to .name { font-weight: 700; font-size: 1.1rem; }
+        .qs-to .sub { color: #79716B; font-size: 0.85rem; }
         .qs-biz { text-align: center; }
         .qs-biz img { max-height: 64px; max-width: 190px; object-fit: contain; }
-        .qs-biz .bn { font-weight: 900; color: #1e3a8a; font-size: 1.15rem; }
-        .qs-biz .bo { color: #475569; font-size: 0.85rem; }
-        .qs-meta { text-align: left; color: #475569; font-size: 0.85rem; }
-        .qs-divider { height: 2px; background: #1e3a8a; margin: 16px 0 20px; }
-        h1 { text-align: center; color: #1e3a8a; font-size: 1.35rem; margin-bottom: 20px; text-decoration: underline; }
-        .qs-item { border-bottom: 1px dashed #cbd5e1; padding: 12px 0; }
+        .qs-biz .bn { font-weight: 700; font-size: 1.15rem; }
+        .qs-biz .bo { color: #57534E; font-size: 0.85rem; }
+        .qs-meta { text-align: left; color: #57534E; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+        .qs-divider { height: 2px; background: #1C1917; margin: 16px 0 20px; }
+        h1 { text-align: center; font-size: 1.3rem; margin-bottom: 20px; }
+        .qs-item { border-bottom: 1px dashed #D6D3D1; padding: 12px 0; }
         .qs-item .t { font-weight: 700; display: flex; justify-content: space-between; gap: 10px; }
-        .qs-item .t .p { color: #1e3a8a; white-space: nowrap; }
-        .qs-item .d { color: #475569; font-size: 0.92rem; white-space: pre-wrap; }
+        .qs-item .t .p { white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .qs-item .d { color: #57534E; font-size: 0.92rem; white-space: pre-wrap; }
         .qs-total {
             display: flex; justify-content: space-between; align-items: baseline;
-            background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px;
-            padding: 14px 18px; margin: 22px 0 6px; font-weight: 900; font-size: 1.15rem; color: #1e3a8a;
+            background: #FEF3C7; border: 1px solid #A16207; border-radius: 8px;
+            padding: 14px 18px; margin: 22px 0 6px; font-weight: 700; font-size: 1.15rem;
+            font-variant-numeric: tabular-nums;
         }
-        .qs-vat { color: #64748b; font-size: 0.82rem; margin-bottom: 18px; }
-        .qs-summary { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; white-space: pre-wrap; margin-bottom: 16px; }
+        .qs-vat { color: #79716B; font-size: 0.82rem; margin-bottom: 18px; }
+        .qs-summary { background: #FAFAF9; border: 1px solid #E7E5E4; border-radius: 8px; padding: 12px 16px; font-size: 0.9rem; white-space: pre-wrap; margin-bottom: 16px; }
         .qs-signed {
             display: flex; align-items: center; gap: 12px;
-            background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px;
+            background: #F0FDF4; border: 1px solid #15803D; border-radius: 8px;
             padding: 10px 16px; margin-bottom: 16px; font-size: 0.9rem;
         }
         .qs-signed img { height: 44px; }
         .qs-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 22px; }
         .qs-btn {
-            display: inline-flex; align-items: center; gap: 8px;
-            padding: 12px 26px; border-radius: 50px; font-weight: 700; text-decoration: none;
+            display: inline-flex; align-items: center; gap: 8px; min-height: 44px;
+            padding: 10px 26px; border-radius: 8px; font-weight: 500; text-decoration: none;
             font-size: 0.98rem;
         }
-        .qs-btn.call { background: #1e3a8a; color: #fff; }
-        .qs-btn.wa { background: #25d366; color: #fff; }
-        .qs-foot { text-align: center; color: #94a3b8; font-size: 0.78rem; margin-top: 22px; }
-        .qs-foot a { color: #64748b; }
+        .qs-btn.call { background: #1C1917; color: #fff; }
+        .qs-btn.wa { background: #1FAF5A; color: #fff; }
+        .qs-foot { text-align: center; color: #A8A29E; font-size: 0.78rem; margin-top: 22px; }
+        .qs-foot a { color: #79716B; }
+        @media print { body { background: #fff; padding: 0; } .sheet { border: none; box-shadow: none; } .qs-actions { display: none; } }
     </style>
 </head>
 <body>
@@ -86,7 +90,7 @@
                 if (!res.ok || !body.data) throw new Error((body.error && body.error.message) || 'ההצעה לא נמצאה.');
                 render(body.data, sheet);
             } catch (e) {
-                sheet.innerHTML = '<div class="qs-error">⚠️ ' + esc(e.message) + '</div>';
+                sheet.innerHTML = '<div class="qs-error">' + esc(e.message) + '</div>';
             }
         }
 
@@ -129,15 +133,15 @@
                         <span>✓ ההצעה אושרה ונחתמה על ידי <strong>${esc(q.signature.name)}</strong> בתאריך ${esc(q.signature.date)}</span>
                     </div>` : ''}
                 <div class="qs-actions">
-                    ${biz.phone ? `<a class="qs-btn call" href="tel:${esc(biz.phone)}">📞 ${esc(biz.phone)}</a>` : ''}
+                    ${biz.phone ? `<a class="qs-btn call" href="tel:${esc(biz.phone)}">${esc(biz.phone)}</a>` : ''}
                     ${waPhone ? `<a class="qs-btn wa" target="_blank" rel="noopener" href="https://wa.me/${waPhone}?text=${encodeURIComponent('היי, בקשר להצעת מחיר ' + (q.quoteNumber || ''))}">וואטסאפ</a>` : ''}
                 </div>
-                <div class="qs-foot">הופק באמצעות <a href="/zerem/">זרם — תוכנת הצעות המחיר</a> ⚡</div>
+                <div class="qs-foot">הופק באמצעות <a href="/zerem/">זרם — תוכנת הצעות המחיר</a></div>
             `;
         }
 
         load();
     </script>
-    <script src="/track.js?v=96" defer></script>
+    <script src="/track.js?v=300" defer></script>
 </body>
 </html>

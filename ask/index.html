@@ -17,15 +17,25 @@
 <meta name="twitter:image" content="https://www.sj-eng.co.il/assets/og-ask.jpg">
 <link rel="canonical" href="https://www.sj-eng.co.il/ask/">
 <link rel="icon" href="/sale/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Hebrew:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="/assets/listcards.js"></script>
 <style>
   :root{
-    --bg:#0b0f1a; --panel:#141d2e; --line:#243049; --ink:#eef2fb; --sub:#9fb0cc; --muted:#6f819e;
-    --accent:#2b74db; --accent-ink:#fff; --me:#1c2a44; --price:#8fd0ff;
+    --bg:#FAFAF9; --panel:#FFFFFF; --line:#E7E5E4; --ink:#1C1917; --sub:#57534E; --muted:#79716B;
+    --accent:#A16207; --accent-ink:#fff; --me:#FEF3C7; --price:#854D0E;
   }
-  body.dim{ --bg:#151b2a; --panel:#1d2639; --line:#2d3a56; --ink:#e9eef9; --sub:#a6b3cd; --muted:#7e8ca6; --me:#253452; }
-  body.light{ --bg:#eef2f8; --panel:#ffffff; --line:#d3dcea; --ink:#111827; --sub:#475569; --muted:#8494ab; --me:#d9e6f9; --price:#1d5fc2; }
-  body.light .msg.ai b{color:#1d5fc2}
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0C0A09; --panel:#1C1917; --line:#292524; --ink:#FAFAF9; --sub:#D6D3D1; --muted:#A8A29E;
+      --accent:#F59E0B; --accent-ink:#1C1917; --me:#3B2F14; --price:#FCD34D;
+    }
+  }
+  body.dim{ --bg:#0C0A09; --panel:#1C1917; --line:#292524; --ink:#FAFAF9; --sub:#D6D3D1; --muted:#A8A29E;
+    --accent:#F59E0B; --accent-ink:#1C1917; --me:#3B2F14; --price:#FCD34D; }
+  body.light{ --bg:#FAFAF9; --panel:#FFFFFF; --line:#E7E5E4; --ink:#1C1917; --sub:#57534E; --muted:#79716B;
+    --accent:#A16207; --accent-ink:#fff; --me:#FEF3C7; --price:#854D0E; }
   /* Map the page theme onto the shared list-cards component (assets/listcards.js)
      — declared on body so the dim/light overrides above are picked up. */
   body{--zlc-bg:var(--bg); --zlc-panel:var(--panel); --zlc-line:var(--line);
@@ -34,7 +44,7 @@
   html,body{height:100%}
   body{
     background:var(--bg); color:var(--ink);
-    font-family:'Heebo','Assistant',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    font-family:'IBM Plex Sans Hebrew','Heebo',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
     display:flex; flex-direction:column; height:100dvh; overflow:hidden;
   }
   header{
@@ -42,7 +52,7 @@
     border-bottom:1px solid var(--line); background:var(--panel); flex-shrink:0;
   }
   .logo{width:34px; height:34px; border-radius:9px; background:var(--accent);
-    display:flex; align-items:center; justify-content:center; color:#fff; font-size:1.1rem; flex-shrink:0}
+    display:flex; align-items:center; justify-content:center; color:var(--accent-ink); font-size:1.1rem; flex-shrink:0}
   .h-title{font-weight:800; font-size:1rem; line-height:1.1}
   .h-sub{font-size:.72rem; color:var(--sub)}
   .h-cta{margin-inline-start:auto; display:flex; gap:8px; align-items:center}
@@ -56,7 +66,7 @@
   .mode-tg{display:flex; border:1px solid var(--line); border-radius:999px; overflow:hidden}
   .mt-opt{font-size:.75rem; font-weight:700; padding:6px 11px; color:var(--sub);
     text-decoration:none; white-space:nowrap}
-  .mt-opt.cur{background:var(--accent); color:#fff}
+  .mt-opt.cur{background:var(--accent); color:var(--accent-ink)}
   a.mt-opt:hover{color:var(--ink)}
   @media (max-width:430px){ .h-cta{gap:6px} .mt-opt{padding:6px 8px} }
   main{flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px}
@@ -71,9 +81,9 @@
   .msg{max-width:88%; padding:11px 14px; border-radius:14px; font-size:.94rem; line-height:1.6; white-space:pre-wrap; word-break:break-word}
   .msg.ai{background:var(--panel); border:1px solid var(--line); align-self:flex-start; border-bottom-right-radius:5px}
   .msg.me{background:var(--me); align-self:flex-end; border-bottom-left-radius:5px}
-  .msg.ai b{color:#8fd0ff}
+  .msg.ai b{color:var(--price)}
   .price-line{display:block; font-size:1.15rem; font-weight:800; color:var(--price);
-    background:rgba(43,116,219,.12); border:1px solid rgba(43,116,219,.35);
+    background:var(--me); border:1px solid var(--accent);
     border-radius:10px; padding:8px 12px; margin-bottom:8px}
   .typing .dots::after{content:''; animation:dots 1.4s steps(4,end) infinite}
   @keyframes dots{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
@@ -85,16 +95,16 @@
   .q-opt{font-size:.85rem; color:var(--ink); background:var(--bg); border:1px solid var(--line);
     border-radius:999px; padding:7px 14px; cursor:pointer; font-family:inherit}
   .q-opt:hover{border-color:var(--accent)}
-  .q-opt.on{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700}
+  .q-opt.on{background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:700}
   .q-free{font-size:.85rem; background:var(--bg); border:1px solid var(--line); color:var(--ink);
     border-radius:999px; padding:7px 14px; font-family:inherit; width:130px}
   .q-free:focus{outline:none; border-color:var(--accent)}
-  .q-go{align-self:flex-start; background:var(--accent); color:#fff; border:none; border-radius:10px;
+  .q-go{align-self:flex-start; background:var(--accent); color:var(--accent-ink); border:none; border-radius:10px;
     padding:9px 18px; font-size:.9rem; font-weight:800; cursor:pointer; font-family:inherit; margin-top:2px}
   .q-go:disabled{opacity:.45; cursor:default}
   .qbox.done{opacity:.55; pointer-events:none}
   /* Length→price slider (site-owned formula; AI only fills the numbers) */
-  .calcbox{align-self:flex-start; max-width:88%; background:var(--panel); border:1px solid rgba(43,116,219,.45);
+  .calcbox{align-self:flex-start; max-width:88%; background:var(--panel); border:1px solid var(--accent);
     border-radius:14px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; width:340px}
   .calc-price{font-size:1.5rem; font-weight:800; color:var(--price); text-align:center}
   .calc-label{font-size:.82rem; color:var(--sub); display:flex; justify-content:space-between}
@@ -118,12 +128,12 @@
     border:1px solid var(--line); border-radius:8px; padding:5px 11px; cursor:pointer; display:inline-flex; align-items:center; gap:5px}
   .msg-act:hover{border-color:var(--accent); color:var(--ink)}
   .msg-act:disabled{opacity:.4; cursor:default; pointer-events:none}
-  .msg-act.wa{color:#25d366; border-color:rgba(37,211,102,.4)}
+  .msg-act.wa{color:#1FAF5A; border-color:#1FAF5A}
   .typing{align-self:flex-start; color:var(--muted); font-size:.9rem; padding:6px 4px}
   .cta-card{align-self:stretch; background:var(--panel); border:1px solid var(--accent);
     border-radius:14px; padding:14px 16px; text-align:center}
   .cta-card p{font-size:.9rem; color:var(--sub); margin-bottom:10px}
-  .cta-card a{display:inline-block; background:var(--accent); color:#fff; font-weight:800;
+  .cta-card a{display:inline-block; background:var(--accent); color:var(--accent-ink); font-weight:800;
     text-decoration:none; border-radius:10px; padding:10px 20px; font-size:.92rem}
   footer{flex-shrink:0; border-top:1px solid var(--line); background:var(--panel); padding:10px 12px}
   .inbar{width:100%; max-width:720px; margin:0 auto; display:flex; gap:8px; align-items:flex-end}
@@ -131,7 +141,7 @@
     border-radius:12px; padding:11px 13px; font-family:inherit; font-size:.95rem; max-height:120px; line-height:1.5}
   textarea:focus{outline:none; border-color:var(--accent)}
   .send{width:44px; height:44px; flex-shrink:0; border:none; border-radius:12px; background:var(--accent);
-    color:#fff; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center}
+    color:var(--accent-ink); font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center}
   .send:disabled{opacity:.5; cursor:default}
   .foot-note{text-align:center; font-size:.68rem; color:var(--muted); margin-top:7px}
   .foot-note a{color:var(--muted)}
@@ -141,7 +151,7 @@
   .chip-hint{font-size:.8rem; color:var(--muted); margin-top:18px}
   .trust{font-size:.76rem; color:var(--muted); margin-top:18px}
   .trust b{color:var(--sub); font-weight:700}
-  .send:hover{background:var(--accent-hover,#3a83ea)}
+  .send:hover{filter:brightness(0.94)}
   .send:active{transform:scale(.94)}
   @media (max-width:600px){
     .intro h1{font-size:1.25rem}
@@ -152,17 +162,17 @@
 </head>
 <body>
   <header>
-    <div class="logo">⚡</div>
+    <div class="logo"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M13 2L4.5 13h6l-1.5 9L18.5 10h-6z"/></svg></div>
     <div>
       <div class="h-title">זרם · תמחור AI</div>
       <div class="h-sub">כמה לתמחר עבודת חשמל?</div>
     </div>
     <div class="h-cta">
-      <button class="h-new" id="theme-btn" title="מצב תצוגה">🌙</button>
+      <button class="h-new" id="theme-btn" title="מצב תצוגה">תצוגה</button>
       <button class="h-new" id="new-chat" title="שיחה חדשה" style="display:none;">＋ חדשה</button>
       <button class="h-new" id="acct-btn" title="התחברות עם Google — מכסה יומית מוגדלת">התחבר</button>
       <nav class="mode-tg" title="אותה פלטפורמה — שני מצבים">
-        <span class="mt-opt cur">⚡ מהיר</span>
+        <span class="mt-opt cur">מהיר</span>
         <a class="mt-opt" href="/sale/">מערכת מלאה</a>
       </nav>
     </div>
@@ -171,7 +181,7 @@
   <main id="feed">
     <div class="wrap" id="wrap">
       <div class="intro" id="intro">
-        <h1>כמה לתמחר את העבודה? <span class="wave">👋</span></h1>
+        <h1>כמה לתמחר את העבודה?</h1>
         <p>תאר לי עבודת חשמל <b>במילים שלך</b> — גם קיצורים וסלנג של השטח. תוך שניות תקבל טווח מחיר, מה זה כולל, ומה שאנשים שוכחים לתמחר. ואחרי המחיר — גם <b>רשימת ציוד וכלים</b> לשטח. בלי הרשמה.</p>
         <div class="chip-hint">רוצה לנסות? לחץ על דוגמה:</div>
         <div class="chips" id="chips">
@@ -400,12 +410,12 @@ function addActions(answer){
   // what do I bring" bubbles (one list per described job).
   if (/₪/.test(answer) && !listsMade){
     const listBtn = document.createElement('button'); listBtn.className='msg-act lists';
-    listBtn.innerHTML = '🧰 רשימת ציוד וכלים';
+    listBtn.innerHTML = 'רשימת ציוד וכלים';
     listBtn.onclick = ()=>{
       if (busy || listsMade) return;
       listBtn.disabled = true;
       send('צור עבורי עכשיו רשימת ציוד וחומרים ורשימת כלי עבודה מלאה לעבודה שתוארה בשיחה, לפי פורמט [[רשימות]] — משפט פתיחה קצר אחד ואז הבלוק.',
-        { label:'🧰 רשימת ציוד וכלים', lists:true });
+        { label:'רשימת ציוד וכלים', lists:true });
     };
     row.appendChild(listBtn);
   }
@@ -557,7 +567,7 @@ function renderAcct(){
   const b = document.getElementById('acct-btn'); if (!b) return;
   if (me && me.email){
     const name = me.email.split('@')[0];
-    b.textContent = '⚡ ' + (name.length > 12 ? name.slice(0,12) + '…' : name);
+    b.textContent = (name.length > 12 ? name.slice(0,12) + '…' : name);
     b.title = me.email + ' · מסלול ' + (TIER_NAMES[me.tier] || me.tier) + ' — לחץ להתנתקות';
     b.classList.add('on');
   } else {
@@ -632,7 +642,7 @@ document.getElementById('new-chat').addEventListener('click', ()=>{
 restoreSession();
 
 // Theme: night (default) → dim → day, persisted.
-const THEMES = [['','🌙'],['dim','🌓'],['light','☀️']];
+const THEMES = [['','אוטו'],['dim','כהה'],['light','בהיר']];
 let themeIdx = 0;
 function applyTheme(i){
   themeIdx = i % THEMES.length;
@@ -650,6 +660,6 @@ input.addEventListener('input', ()=>{ input.style.height='auto'; input.style.hei
 document.getElementById('chips').addEventListener('click', e=>{ if(e.target.classList.contains('chip')) send(e.target.textContent); });
 input.focus();
 </script>
-    <script src="/track.js?v=96" defer></script>
+    <script src="/track.js?v=300" defer></script>
 </body>
 </html>
