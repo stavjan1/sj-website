@@ -341,21 +341,22 @@ test('the maintenance reminder is asked once and answered "never" without re-ask
         'the settings screen has no reminder-timing control, but the dialog tells the user to go there');
 });
 
-test('a long reminder lead is not silently dropped by the calendar', () => {
-    // Google caps a reminder override at 40320 minutes — 28 days. Stav's own
-    // default is "3 חודשים + חודש", so the long half of his choice cannot be an
-    // alarm on the visit at all. Sent as one anyway, Google accepts the event
-    // and quietly keeps only what fits: the three-month warning would never
-    // arrive, and nothing would say so.
+test('the calendar entry is the action, at the date you take it', () => {
+    // The first attempt put an all-day note on the VISIT and tried to warn three
+    // months ahead with a reminder override — which Google caps at 28 days, so
+    // the long warning would have been dropped without a word. Stav described
+    // what he actually wanted and it dissolves the problem: a one-hour block AT
+    // the lead date ("שלח הצעת מחיר ל…"), where no long alarm is needed at all.
     const app = read('sale/app.js');
-    assert.match(app, /const asAlarms = leads\.filter\(\(d\) => d <= 28\);/,
-        'the 28-day split is gone — long leads are being sent as reminder overrides again');
-    assert.match(app, /const asEvents = leads\.filter\(\(d\) => d > 28\);/,
-        'long leads no longer become their own heads-up events');
-    // ICS has no such ceiling, so there the lead is a real alarm.
-    assert.match(app, /'TRIGGER:-P' \+ d \+ 'D'/, 'the ICS alarm no longer uses the chosen lead time');
+    assert.match(app, /function maintBlocks/, 'the action-block builder is gone');
+    assert.match(app, /ckAddDays\(due, -d\)/,
+        'blocks no longer sit at due-minus-lead — they are back on the visit date');
+    assert.ok(!/leads\.filter\(\(d\) => d <= 28\)/.test(app),
+        'the 28-day override workaround is back; a block at the lead date does not need it');
+    assert.match(app, /'שלח הצעת מחיר ל'/, 'the block no longer names the action');
+    assert.match(app, /T09:00:00[\s\S]{0,200}T10:00:00/, 'the block is no longer one hour long');
 
-    // And the reminder has to lead back to the work, not just name it.
+    // And the reminder has to lead back to the work, not merely name it.
     assert.match(app, /function maintDeepLink/, 'the calendar entry no longer links back to the project');
     assert.match(app, /function captureMaintDeepLink[\s\S]{0,400}history\.replaceState/,
         'the deep link is not cleaned from the URL — a refresh would re-trigger it');

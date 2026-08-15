@@ -3633,12 +3633,25 @@ function maintDeepLink(proj) {
     const base = location.origin.includes('localhost') ? location.origin + '/sale/' : 'https://www.sj-eng.co.il/sale/';
     return base + '?p=' + encodeURIComponent(proj.id);
 }
-function maintEventTitle(proj) {
-    return '⚡ תחזוקה תקופתית — ' + (proj.name || 'לקוח');
+// What the recurring work is called, so the calendar block reads like the job.
+function maintKindLabel(months) {
+    if (months === 12) return 'בדיקה שנתית';
+    if (months === 6) return 'בדיקה חצי-שנתית';
+    if (months === 24) return 'בדיקה דו-שנתית';
+    if (months % 12 === 0) return 'בדיקה כל ' + (months / 12) + ' שנים';
+    return 'בדיקה כל ' + months + ' חודשים';
 }
-function maintHeadsUpTitle(proj, days) {
-    const when = days % 30 === 0 ? (days / 30) + ' חודשים' : days + ' ימים';
-    return '⚡ לתאם תחזוקה (' + when + ' מראש) — ' + (proj.name || 'לקוח');
+function maintClientName(proj) {
+    return ((proj.quoteData && proj.quoteData.clientName) || proj.name || 'לקוח').trim();
+}
+// The calendar entry is the ACTION, at the moment you should take it — not a
+// note on the visit itself. First block: send the quote. A second lead time,
+// if chosen, is the "they never answered" nudge.
+function maintBlockTitle(proj, months, isFirst) {
+    const what = maintKindLabel(months);
+    return isFirst
+        ? 'שלח הצעת מחיר ל' + maintClientName(proj) + ' — ' + what
+        : 'תזכורת: הצעת מחיר ל' + maintClientName(proj) + ' — ' + what;
 }
 function maintEventBody(proj) {
     const q = proj.quoteData || {};
@@ -3710,67 +3723,64 @@ async function maintToGoogle(projectId) {
     catch { showToast('נדרש אישור גישה ליומן — מוריד קובץ במקום'); maintToIcs(projectId); return; }
 
     const months = (proj.maintenance && proj.maintenance.months) || 12;
-    const leads = maintLeadsFor(proj);
+    const blocks = maintBlocks(proj);
+    if (!blocks.length) { showToast('לא נבחרו תזכורות לפרויקט הזה', 'error'); return; }
     const base = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
     const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+    const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone) || 'Asia/Jerusalem';
     const created = [];
-
-    // Google caps a reminder override at 28 days, so anything longer becomes its
-    // own recurring heads-up event rather than being silently dropped.
-    const asAlarms = leads.filter((d) => d <= 28);
-    const asEvents = leads.filter((d) => d > 28);
-
-    const mainEvent = {
-        summary: maintEventTitle(proj),
-        description: maintEventBody(proj),
-        start: { date: due },
-        end: { date: ckAddDays(due, 1) },
-        recurrence: [maintRrule(months)],
-        reminders: {
-            useDefault: false,
-            overrides: (asAlarms.length ? asAlarms : [1]).map((d) => ({ method: 'popup', minutes: d * 1440 })),
-        },
-    };
 
     try {
         // Replace any series made earlier, so re-adding never doubles the calendar.
         await maintDeleteGoogleEvents(proj, token);
 
-        let res = await fetch(base, { method: 'POST', headers, body: JSON.stringify(mainEvent) });
-        if (res.status === 401 || res.status === 403) {
-            localStorage.removeItem(CK_CAL_TOKEN_KEY);
-            showToast('ההרשאה ליומן פגה — לחץ שוב על היומן', 'error');
-            return;
-        }
-        const ev = await res.json();
-        if (!res.ok || !ev.id) throw new Error('calendar-error');
-        created.push(ev.id);
-
-        for (const d of asEvents) {
-            const at = ckAddDays(due, -d);
+        for (const b of blocks) {
             const body = JSON.stringify({
-                summary: maintHeadsUpTitle(proj, d),
+                summary: b.title,
                 description: maintEventBody(proj),
-                start: { date: at },
-                end: { date: ckAddDays(at, 1) },
+                start: { dateTime: b.date + 'T09:00:00', timeZone: tz },
+                end: { dateTime: b.date + 'T10:00:00', timeZone: tz },
                 recurrence: [maintRrule(months)],
                 reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 0 }] },
             });
-            const r2 = await fetch(base, { method: 'POST', headers, body });
-            const e2 = await r2.json();
-            if (r2.ok && e2.id) created.push(e2.id);
+            const r = await fetch(base, { method: 'POST', headers, body });
+            if (r.status === 401 || r.status === 403) {
+                localStorage.removeItem(CK_CAL_TOKEN_KEY);
+                showToast('ההרשאה ליומן פגה — לחץ שוב על היומן', 'error');
+                return;
+            }
+            const ev = await r.json();
+            if (!r.ok || !ev.id) throw new Error('calendar-error');
+            created.push(ev.id);
         }
 
         proj.maintenance.eventIds = created;
         proj.maintenance.eventId = created[0] || null;
         saveProjects();
         filterProjectsList();
-        showToast('נקבע ביומן Google — ' + ckFmtDate(due) +
-            (asEvents.length ? ' (+' + asEvents.length + ' תזכורות מוקדמות)' : ''));
+        showToast(blocks.length === 1
+            ? 'נקבע ביומן: ' + ckFmtDate(blocks[0].date) + ' — ' + blocks[0].title
+            : 'נקבעו ' + blocks.length + ' פגישות ביומן, הראשונה ב-' + ckFmtDate(blocks[0].date));
     } catch (e) {
         showToast('הוספה ליומן נכשלה — מוריד קובץ במקום', 'error');
         maintToIcs(projectId);
     }
+}
+
+// One hour, at the date you should act — the visit itself needs no entry, the
+// work does. A 12-month interval with a 3-month lead lands the block nine
+// months out, which is where it is actually useful.
+function maintBlocks(proj) {
+    const due = maintNextDue(proj);
+    if (!due) return [];
+    const months = (proj.maintenance && proj.maintenance.months) || 12;
+    const leads = maintLeadsFor(proj);
+    // No early warning chosen → still put the job in the calendar, on the day.
+    if (!leads.length) return [{ date: due, days: 0, title: maintBlockTitle(proj, months, true) }];
+    return leads
+        .slice()
+        .sort((a, b) => b - a)                     // earliest action first
+        .map((d, i) => ({ date: ckAddDays(due, -d), days: d, title: maintBlockTitle(proj, months, i === 0) }));
 }
 
 async function maintDeleteGoogleEvents(proj, token) {
@@ -3782,44 +3792,50 @@ async function maintDeleteGoogleEvents(proj, token) {
     }
 }
 
-// One event, one alarm per lead time — ICS has no 28-day ceiling, so the
-// three-months-ahead nudge is a real alarm here rather than a second event.
+// The same blocks, as a file Apple Calendar and Outlook understand.
 function maintToIcs(projectId) {
     closeMaintCalPicker();
     const proj = projectsList.find((p) => p.id === projectId);
-    const due = proj && maintNextDue(proj);
-    if (!due) return;
+    if (!proj || !maintNextDue(proj)) return;
     const months = (proj.maintenance && proj.maintenance.months) || 12;
-    const dt = due.replace(/-/g, '');
-    const summary = ckIcsText(maintEventTitle(proj));
-    const alarms = [];
-    for (const d of maintLeadsFor(proj)) {
-        alarms.push('BEGIN:VALARM', 'TRIGGER:-P' + d + 'D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM');
-    }
-    if (!alarms.length) {
-        alarms.push('BEGIN:VALARM', 'TRIGGER:-P1D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM');
-    }
+    const blocks = maintBlocks(proj);
+    if (!blocks.length) { showToast('לא נבחרו תזכורות לפרויקט הזה', 'error'); return; }
+    const desc = ckIcsText(maintEventBody(proj));
+    const stampNow = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
+
+    // Floating local time (no Z): 09:00 stays 09:00 wherever the phone is.
+    const events = blocks.flatMap((b, i) => {
+        const d = b.date.replace(/-/g, '');
+        const summary = ckIcsText(b.title);
+        return [
+            'BEGIN:VEVENT',
+            'UID:maint-' + proj.id + '-' + i + '@sj-eng.co.il',
+            'DTSTAMP:' + stampNow,
+            'DTSTART:' + d + 'T090000',
+            'DTEND:' + d + 'T100000',
+            maintRrule(months),
+            'SUMMARY:' + summary,
+            'DESCRIPTION:' + desc,
+            'URL:' + maintDeepLink(proj),
+            'BEGIN:VALARM', 'TRIGGER:PT0M', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
+            'END:VEVENT',
+        ];
+    });
+
     const ics = [
         'BEGIN:VCALENDAR', 'VERSION:2.0',
         'PRODID:-//SJ Electrical Engineering//Maintenance//HE',
-        'BEGIN:VEVENT',
-        'UID:maint-' + proj.id + '@sj-eng.co.il',
-        'DTSTAMP:' + dt + 'T000000Z',
-        'DTSTART;VALUE=DATE:' + dt,
-        'DTEND;VALUE=DATE:' + ckAddDays(due, 1).replace(/-/g, ''),
-        maintRrule(months),
-        'SUMMARY:' + summary,
-        'DESCRIPTION:' + ckIcsText(maintEventBody(proj)),
-        'URL:' + maintDeepLink(proj),
-        ...alarms,
-        'END:VEVENT', 'END:VCALENDAR',
+        ...events,
+        'END:VCALENDAR',
     ].join('\r\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
     a.download = 'maintenance-' + String(proj.name || 'client').replace(/[^\w֐-׿-]+/g, '_') + '.ics';
     a.click();
     URL.revokeObjectURL(a.href);
-    showToast('הקובץ ירד — פתח אותו והאירוע ייכנס ליומן עם התזכורות');
+    showToast(blocks.length === 1
+        ? 'הקובץ ירד — פגישה ב-' + ckFmtDate(blocks[0].date)
+        : 'הקובץ ירד — ' + blocks.length + ' פגישות, הראשונה ב-' + ckFmtDate(blocks[0].date));
 }
 
 // ---- arriving from the reminder ----------------------------------------
