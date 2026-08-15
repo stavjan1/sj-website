@@ -4377,8 +4377,6 @@ async function renderAdminTraffic() {
 
 // Clarity gives the friction signals a raw counter cannot: where people rage-
 // click, where they scroll past everything, where a script died on them.
-// Clarity gives the friction signals a raw counter cannot: where people rage-
-// click, where they scroll past everything, where a script died on them.
 // The token, the cache and the history puller all live in /api/clarity — this
 // only reduces its payload down to the numbers worth looking at.
 function reduceClarity(payload) {
@@ -9556,19 +9554,41 @@ function _jwtExpiryMs(token) {
         return (payload.exp || 0) * 1000;
     } catch (e) { return 0; }
 }
-// True when we already hold a Google ID token that's still valid (>60s left).
-function _haveFreshIdToken() {
-    const t = googleAccessToken || getSessionOrLocalStorageItem(getStorageKey('sj_drive_access_token'));
-    const exp = _jwtExpiryMs(t);
+// An opaque access token (ya29…) carries no readable expiry, so we write down
+// when it dies at the moment we mint it. Without this the app could only judge
+// the freshness of ID tokens, and treated every opaque one as valid forever.
+function _tokenExpKey() { return getStorageKey('sj_drive_token_exp'); }
+function _rememberTokenExpiry(ms) {
+    try { localStorage.setItem(_tokenExpKey(), String(ms)); } catch (e) {}
+}
+function _storedTokenExpiry() {
+    const v = parseInt(localStorage.getItem(_tokenExpKey()) || '0', 10);
+    return Number.isFinite(v) ? v : 0;
+}
+
+// True when the token we hold — of EITHER shape — is still good for >60s.
+function _tokenIsFresh(t) {
+    t = t || googleAccessToken || getSessionOrLocalStorageItem(getStorageKey('sj_drive_access_token'));
+    if (!t) return false;
+    const exp = _jwtExpiryMs(t) || _storedTokenExpiry();
     return !!exp && Date.now() < exp - 60000;
 }
+function _haveFreshIdToken() { return _tokenIsFresh(); }
 
 function checkGoogleSession() {
     if (isGuestUser()) return;
     const savedToken = getSessionOrLocalStorageItem(getStorageKey('sj_drive_access_token'));
-    if (savedToken) {
+    // Adopt the saved token ONLY while it is still alive. Adopting a dead one
+    // was the deadlock: every refresh path below bails out early when a token
+    // is present, so a token that had expired an hour ago blocked its own
+    // replacement forever — and the server answered every admin call with
+    // "אין הרשאה" while the app went on showing "מחובר".
+    if (savedToken && _tokenIsFresh(savedToken)) {
         googleAccessToken = savedToken;   // optimistic — show "connected" now
         updateDriveStatus(true);
+    } else if (savedToken) {
+        googleAccessToken = null;
+        forgetExpiredGoogleToken();
     }
     refreshTierInfo();
     if (_haveFreshIdToken()) {
@@ -9593,7 +9613,9 @@ function checkGoogleSession() {
 let _idAuthTried = 0;
 let _idPromptPending = false;
 function silentIdTokenAuth() {
-    if (isGuestUser() || googleAccessToken || _idPromptPending) return; // don't overlap prompts
+    // Freshness, not mere presence: guarding on "we have a token" is what let an
+    // expired one sit there unreplaced.
+    if (isGuestUser() || _tokenIsFresh() || _idPromptPending) return; // don't overlap prompts
     const clientId = localStorage.getItem('sj_global_google_client_id');
     if (!clientId) return;
     if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
@@ -9609,6 +9631,7 @@ function silentIdTokenAuth() {
                 if (resp && resp.credential) {
                     googleAccessToken = resp.credential; // ID token (JWT) as the bearer
                     localStorage.setItem(getStorageKey('sj_drive_access_token'), googleAccessToken);
+                    _rememberTokenExpiry(_jwtExpiryMs(googleAccessToken));
                     updateDriveStatus(true);
                     refreshTierInfo();
                     cloudLoadAndMerge(true); // pull + union-merge + push → devices converge
@@ -9637,6 +9660,78 @@ function armGoogleTokenRefreshOnGesture() {
     document.addEventListener('pointerdown', _tokenGestureHandler, true);
 }
 
+// Drop a token the server has just refused and start earning a new one. Called
+// on any 401 from /api/* — the server now says 401 for "this token no longer
+// proves who you are" and keeps 403 for "you are not the admin", so the app can
+// tell a lapsed hour apart from a real refusal.
+function forgetExpiredGoogleToken() {
+    googleAccessToken = null;
+    try {
+        localStorage.removeItem(getStorageKey('sj_drive_access_token'));
+        sessionStorage.removeItem(getStorageKey('sj_drive_access_token'));
+        localStorage.removeItem(_tokenExpKey());
+    } catch (e) {}
+    updateDriveStatus(false);
+    silentIdTokenAuth();
+    setTimeout(() => { if (!googleAccessToken) mintGoogleAccessToken(); }, 1500);
+}
+
+// Thirty-odd call sites send `Authorization: Bearer <token>` to /api/*. Rather
+// than teach each one to recover, the recovery lives in one place: any
+// same-origin /api/ call that comes back 401 re-mints the token once and is
+// replayed. Everything else passes through untouched.
+(function installAuthRetry() {
+    const nativeFetch = window.fetch.bind(window);
+    let refreshing = null;
+
+    function isOurApi(input) {
+        try {
+            const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+            return url.origin === location.origin && url.pathname.startsWith('/api/');
+        } catch (e) { return false; }
+    }
+    function carriedOurToken(init) {
+        const h = (init && init.headers) || {};
+        const auth = h instanceof Headers ? h.get('Authorization') : (h.Authorization || h.authorization);
+        return !!auth && /^Bearer\s+\S/i.test(auth);
+    }
+    function withFreshToken(init) {
+        const next = Object.assign({}, init);
+        const h = (init && init.headers) || {};
+        if (h instanceof Headers) {
+            const copy = new Headers(h);
+            copy.set('Authorization', 'Bearer ' + googleAccessToken);
+            next.headers = copy;
+        } else {
+            next.headers = Object.assign({}, h, { Authorization: 'Bearer ' + googleAccessToken });
+        }
+        return next;
+    }
+    // Concurrent 401s (the admin panel fires several cards at once) share ONE
+    // re-mint instead of racing Google with five prompts.
+    function refreshOnce() {
+        if (refreshing) return refreshing;
+        refreshing = (async () => {
+            forgetExpiredGoogleToken();
+            for (let i = 0; i < 12 && !googleAccessToken; i++) {
+                await new Promise((r) => setTimeout(r, 250));
+            }
+            refreshing = null;
+            return !!googleAccessToken;
+        })();
+        return refreshing;
+    }
+
+    window.fetch = async function (input, init) {
+        const res = await nativeFetch(input, init);
+        if (res.status !== 401 || !isOurApi(input) || !carriedOurToken(init)) return res;
+        if (isGuestUser()) return res;
+        const got = await refreshOnce();
+        if (!got) return res;               // caller shows the server's "sign in again"
+        return nativeFetch(input, withFreshToken(init));
+    };
+})();
+
 function mintGoogleAccessToken() {
     const clientId = localStorage.getItem('sj_global_google_client_id');
     if (!clientId || isGuestUser()) return;
@@ -9649,6 +9744,7 @@ function mintGoogleAccessToken() {
                 if (resp && resp.access_token) {
                     googleAccessToken = resp.access_token;
                     localStorage.setItem(getStorageKey('sj_drive_access_token'), googleAccessToken);
+                    _rememberTokenExpiry(Date.now() + (parseInt(resp.expires_in, 10) || 3600) * 1000);
                     updateDriveStatus(true);
                     refreshTierInfo();
                     cloudLoadAndMerge(true); // pull + union-merge + push → converges every device

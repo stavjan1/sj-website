@@ -275,3 +275,44 @@ test('rotating the web3forms key cannot half-happen', () => {
         assert.ok(carriers.includes(f), `${f} no longer carries the key — was a rotation missed here?`);
     }
 });
+
+test('an expired sign-in is not reported as a permission refusal', () => {
+    // Stav pasted the Clarity token into his own admin panel and got
+    // "אין הרשאה" — on his own account, on his own site. The token had simply
+    // aged out (a Google access token lives an hour), and every admin endpoint
+    // answered the two very different failures with one 403: "I cannot tell who
+    // you are" and "I know who you are and it isn't you". The first is fixed by
+    // signing in again; nothing on screen said so.
+    const tiers = read('functions/api/_tiers.js');
+    assert.match(tiers, /export async function adminGate/,
+        'the shared admin gate is gone — the 401/403 split lived there');
+    assert.match(tiers, /'auth-expired'/, 'the gate no longer distinguishes an expired sign-in');
+
+    // No admin endpoint may go back to collapsing both cases into one 403.
+    const dir = join(ROOT, 'functions/api');
+    const offenders = [];
+    for (const f of readdirSync(dir).filter((n) => n.endsWith('.js'))) {
+        const text = readFileSync(join(dir, f), 'utf8').replace(/\r\n/g, '\n');
+        if (/!email\s*\|\|\s*email\.toLowerCase\(\)\s*!==\s*ADMIN_EMAIL/.test(text)) offenders.push(f);
+    }
+    assert.deepEqual(offenders, [],
+        'these endpoints still answer an expired token with "אין הרשאה": ' + offenders.join(', '));
+});
+
+test('a stale Google token cannot block its own replacement', () => {
+    // The deadlock: checkGoogleSession adopted the saved token without checking
+    // whether it was still alive, and every refresh path bailed out early
+    // whenever a token was present. So an expired token sat there forever,
+    // the app kept showing "מחובר", and the server kept refusing it.
+    const app = read('sale/app.js');
+    assert.match(app, /function _tokenIsFresh/,
+        'freshness check is gone — the app is back to trusting any token it finds');
+    assert.match(app, /savedToken && _tokenIsFresh\(savedToken\)/,
+        'checkGoogleSession adopts the saved token again without checking it is alive');
+    assert.match(app, /if \(isGuestUser\(\) \|\| _tokenIsFresh\(\) \|\| _idPromptPending\)/,
+        'silentIdTokenAuth guards on presence again instead of freshness');
+    // And an opaque access token (ya29…) has no readable expiry, so the mint
+    // must write one down or freshness is unknowable for that shape.
+    assert.match(app, /_rememberTokenExpiry\(Date\.now\(\) \+ \(parseInt\(resp\.expires_in/,
+        'the access-token mint no longer records when the token dies');
+});

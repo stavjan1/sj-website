@@ -9,7 +9,7 @@
 // without shipping every user's full quote blob to the browser.
 
 import {
-  ADMIN_EMAIL, verifyGoogleEmail, bearerToken, jsonResponse, getTierForEmail,
+  ADMIN_EMAIL, adminGate, jsonResponse, getTierForEmail,
 } from './_tiers.js';
 import { sendMailTracked } from './_mail.js';
 
@@ -24,10 +24,8 @@ function projectAmount(p) {
 export async function onRequestGet(context) {
   const { request, env } = context;
 
-  const email = await verifyGoogleEmail(bearerToken(request));
-  if (!email || email.toLowerCase() !== ADMIN_EMAIL) {
-    return jsonResponse({ error: { message: 'אין הרשאה.' } }, 403);
-  }
+  const gate = await adminGate(request);
+  if (!gate.ok) return gate.response;
   if (!env.SJ_DATA) {
     return jsonResponse({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
   }
@@ -94,10 +92,8 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  const email = await verifyGoogleEmail(bearerToken(request));
-  if (!email || email.toLowerCase() !== ADMIN_EMAIL) {
-    return jsonResponse({ error: { message: 'אין הרשאה.' } }, 403);
-  }
+  const gate = await adminGate(request);
+  if (!gate.ok) return gate.response;
 
   const body = await request.json().catch(() => ({}));
   if (body.test !== 'mail') return jsonResponse({ error: { message: 'בקשה לא מוכרת.' } }, 400);

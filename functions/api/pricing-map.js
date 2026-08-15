@@ -4,12 +4,13 @@
 // built-in default). Admin-only — the map is injected into every pricing chat,
 // so letting anyone edit it would be prompt-injection-as-a-service.
 
-import { ADMIN_EMAIL, verifyGoogleEmail, bearerToken, jsonResponse } from './_tiers.js';
+import { adminGate, jsonResponse } from './_tiers.js';
 import { DEFAULT_PRICING_MAP, getPricingMap } from './_pricing_map.js';
 
+// Thin shim over the shared gate — see _tiers.js adminGate for why 401 and 403
+// are different answers.
 async function requireAdmin(request) {
-  const email = await verifyGoogleEmail(bearerToken(request));
-  return !!email && email.toLowerCase() === ADMIN_EMAIL;
+  return (await adminGate(request)).ok;
 }
 
 export async function onRequestGet(context) {

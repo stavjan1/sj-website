@@ -14,7 +14,7 @@
 //   GET  /api/stats?admin=1    → admin: full aggregate dashboard + live flag
 //   POST /api/stats            { setLive: true|false }  (admin) → toggle display
 
-import { ADMIN_EMAIL, verifyGoogleEmail, bearerToken, rateLimit, monthKey, jsonResponse } from './_tiers.js';
+import { adminGate, rateLimit, monthKey, jsonResponse } from './_tiers.js';
 
 const MIN_SAMPLES = 5;        // never show an average built on fewer than this
 const SAMPLES_CAP = 1000;     // rolling window kept per bucket
@@ -57,8 +57,8 @@ export async function onRequestPost(context) {
 
   // Admin: toggle the public display flag.
   if (typeof body.setLive === 'boolean') {
-    const email = await verifyGoogleEmail(bearerToken(request));
-    if (!email || email.toLowerCase() !== ADMIN_EMAIL) return jsonResponse({ error: { message: 'אין הרשאה.' } }, 403);
+    const gate = await adminGate(request);
+    if (!gate.ok) return gate.response;
     await env.SJ_DATA.put('config:statsLive', body.setLive ? '1' : '0');
     return jsonResponse({ ok: true, live: body.setLive });
   }
@@ -108,8 +108,8 @@ export async function onRequestGet(context) {
 
   // Admin dashboard — aggregate only, zero client PII.
   if (url.searchParams.get('admin')) {
-    const email = await verifyGoogleEmail(bearerToken(request));
-    if (!email || email.toLowerCase() !== ADMIN_EMAIL) return jsonResponse({ error: { message: 'אין הרשאה.' } }, 403);
+    const gate = await adminGate(request);
+    if (!gate.ok) return gate.response;
     const list = await env.SJ_DATA.list({ prefix: 'stats:samples:' });
     const buckets = [];
     for (const k of list.keys) {

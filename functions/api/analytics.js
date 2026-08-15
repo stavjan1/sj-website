@@ -17,7 +17,7 @@
 // server drops known bot user agents into a separate counter rather than the
 // real one — an excluded hit is still counted somewhere, never silently lost.
 
-import { ADMIN_EMAIL, verifyGoogleEmail, bearerToken, rateLimit, dayKey, jsonResponse } from './_tiers.js';
+import { adminGate, rateLimit, dayKey, jsonResponse } from './_tiers.js';
 
 const SITES = ['site', 'zerem'];
 const UNIQ_CAP = 4000;          // hashed ids kept per day — a counter, not an audience
@@ -126,10 +126,8 @@ export async function onRequestGet(context) {
   const { request, env } = context;
   const url = new URL(request.url);
 
-  const email = await verifyGoogleEmail(bearerToken(request));
-  if (!email || email.toLowerCase() !== ADMIN_EMAIL) {
-    return jsonResponse({ error: { message: 'אין הרשאה.' } }, 403);
-  }
+  const gate = await adminGate(request);
+  if (!gate.ok) return gate.response;
   if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
 
   const days = Math.min(180, Math.max(1, parseInt(url.searchParams.get('days') || '30', 10)));

@@ -12,7 +12,7 @@
 // The GET returns aggregate UX metrics only (session counts, popular pages,
 // rage clicks — no PII), cached 6h in KV: Clarity allows ~10 API calls/day.
 
-import { ADMIN_EMAIL, verifyGoogleEmail, bearerToken, rateLimit, jsonResponse } from './_tiers.js';
+import { adminGate, rateLimit, jsonResponse } from './_tiers.js';
 
 const TOKEN_KEY = 'config:clarity_token';
 const CACHE_KEY = 'clarity:cache';
@@ -20,10 +20,8 @@ const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const email = await verifyGoogleEmail(bearerToken(request));
-  if (!email || email.toLowerCase() !== ADMIN_EMAIL) {
-    return jsonResponse({ error: { message: 'אין הרשאה.' } }, 403);
-  }
+  const gate = await adminGate(request);
+  if (!gate.ok) return gate.response;
   if (!env.SJ_DATA) return jsonResponse({ error: { message: 'KV לא מוגדר.' } }, 501);
 
   let body;

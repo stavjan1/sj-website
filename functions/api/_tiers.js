@@ -156,6 +156,31 @@ export function bearerToken(request) {
   return (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
 }
 
+// The admin gate, with the two failures kept apart.
+//
+// They were one answer before — "אין הרשאה", 403 — for both "your token
+// expired" and "you are not the admin". A Google access token lives an hour,
+// so the everyday case is the first one, and it read on screen as the second:
+// the owner of the account being told he has no permission on his own admin
+// panel, with nothing suggesting that signing in again would fix it. 401 means
+// "prove who you are again" and the client silently re-mints on it; 403 means
+// "we know who you are, and it isn't you".
+//
+// Returns { ok: true, email } on success. On failure it hands back a ready
+// `response` plus the raw `status`/`body`, so an endpoint that serialises its
+// own replies (catalog.js adds CORS headers) can re-wrap instead of losing them.
+export async function adminGate(request) {
+  const email = await verifyGoogleEmail(bearerToken(request));
+  const deny = (status, body) => ({ ok: false, status, body, response: jsonResponse(body, status) });
+  if (!email) {
+    return deny(401, { error: { message: 'ההתחברות פגה — התחבר שוב לגוגל.', code: 'auth-expired' } });
+  }
+  if (email.toLowerCase() !== ADMIN_EMAIL) {
+    return deny(403, { error: { message: 'אין הרשאה.' } });
+  }
+  return { ok: true, email };
+}
+
 export function monthKey(d) {
   return (d || new Date()).toISOString().slice(0, 7); // "2026-07"
 }

@@ -10,7 +10,7 @@
 // a real per-user cost) and is capped at ₪5,000/doc for now (see _smartbee.js).
 
 import {
-  ADMIN_EMAIL, getTierForEmail, verifyGoogleEmail, bearerToken, jsonResponse,
+  ADMIN_EMAIL, adminGate, getTierForEmail, verifyGoogleEmail, bearerToken, jsonResponse,
 } from './_tiers.js';
 import { smartbeeAuth, smartbeeCall, sbVatOption, SB_MAX_DOC } from './_smartbee.js';
 import { getUserBilling, isProviderActive, providerMeta } from './_providers.js';
@@ -36,8 +36,8 @@ export async function onRequestGet(context) {
 
   // Connectivity diagnostic — admin only (returns raw detail to debug the flow).
   if (url.searchParams.get('diag')) {
-    const email = await verifyGoogleEmail(bearerToken(request));
-    if (!email || email.toLowerCase() !== ADMIN_EMAIL) return jsonResponse({ error: { message: 'אין הרשאה.' } }, 403);
+    const gate = await adminGate(request);
+    if (!gate.ok) return gate.response;
     const configured = { clientId: !!env.SMARTBEE_CLIENT_ID, password: !!env.SMARTBEE_PASSWORD, token: !!env.SMARTBEE_TOKEN };
     const auth = await smartbeeAuth(env);
     return jsonResponse({
