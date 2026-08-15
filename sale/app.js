@@ -55,6 +55,11 @@ function showAdminTabIfNeeded() {
     if (adminTab) adminTab.style.display = isAdmin() ? 'flex' : 'none';
     const drawerAdmin = document.getElementById('more-drawer-admin');
     if (drawerAdmin) drawerAdmin.style.display = isAdmin() ? 'flex' : 'none';
+    // Finance dashboard (תזרים) — owner only, same gate.
+    const financeTab = document.getElementById('tab-finance');
+    if (financeTab) financeTab.style.display = isAdmin() ? 'flex' : 'none';
+    const drawerFinance = document.getElementById('more-drawer-finance');
+    if (drawerFinance) drawerFinance.style.display = isAdmin() ? 'flex' : 'none';
     // Signing in as the owner excludes this device from the traffic counters
     // from here on — otherwise Stav's own visits are the traffic.
     if (isAdmin()) { try { localStorage.setItem('sj_notrack', '1'); } catch (e) {} }
@@ -1647,6 +1652,9 @@ function switchTab(tabId) {
     if (tabId === 'accounting') {
         renderAccounting();
     }
+    if (tabId === 'finance') {
+        try { window.renderFinance && window.renderFinance(); } catch (e) {}
+    }
     if (tabId === 'wizard') {
         try { renderPricingEngine(); } catch (e) {}
     }
@@ -2186,20 +2194,22 @@ function checkAskHandoff() {
     if (!raw) return;
     let h;
     try { h = JSON.parse(raw); } catch { try { localStorage.removeItem(ASK_HANDOFF_KEY); } catch {} return; }
-    // Only a fresh, real job (expires after 2h so stale funnels don't nag).
-    if (!h || !h.job || !h.ts || (Date.now() - Number(h.ts)) > 2 * 60 * 60 * 1000) {
+    // A real job from the same working day (24h) — long enough to sign in
+    // on another device without the handoff silently evaporating.
+    if (!h || !h.job || !h.ts || (Date.now() - Number(h.ts)) > 24 * 60 * 60 * 1000) {
         try { localStorage.removeItem(ASK_HANDOFF_KEY); } catch {}
         return;
     }
     const box = document.getElementById('ask-handoff-banner');
     if (!box) return;
     const jobShort = String(h.job).slice(0, 90);
+    const priceLine = h.price ? ` שם זה הוערך ב-${escapeHtml(String(h.price).slice(0, 60))}.` : '';
     box.innerHTML = `
         <div class="ask-handoff">
             <div class="ask-handoff-ic"><i class="fa-solid fa-bolt"></i></div>
             <div class="ask-handoff-txt">
                 <b>המשך מהצ'אט המהיר</b>
-                <span>«${escapeHtml(jobShort)}» — נמשיך את זה כפרויקט מלא ואבנה לך רשימת מוצרים והצעת מחיר.</span>
+                <span>«${escapeHtml(jobShort)}»${priceLine} בלחיצה אחת אפתח פרויקט ואתחיל לבנות רשימת מוצרים.</span>
             </div>
             <button class="btn btn-accent ask-handoff-go" onclick="createProjectFromHandoff()"><i class="fa-solid fa-arrow-left"></i> המשך כפרויקט</button>
             <button class="ask-handoff-x" title="בטל" onclick="dismissAskHandoff()"><i class="fa-solid fa-xmark"></i></button>
@@ -2218,18 +2228,24 @@ function createProjectFromHandoff() {
     // Reuse the tested creation path: seed the name input, then createNewProject().
     const nameInput = document.getElementById('new-project-name');
     if (!nameInput) return;
+    const quickPrice = h.price ? String(h.price).slice(0, 60) : '';
     nameInput.value = job.slice(0, 45);
     createNewProject(); // creates + loads + switches to the wizard (planning stage)
     dismissAskHandoff();
-    // Prefill the planning chat with the exact job so one tap continues the flow.
+    // One click total: fill the planning chat with the job (+ the quick-chat
+    // estimate as context) and SEND it — the user already said "continue".
     setTimeout(() => {
         const inp = document.getElementById('chat-user-input');
-        if (inp) {
-            inp.value = job;
-            inp.dispatchEvent(new Event('input'));
+        if (!inp) return;
+        inp.value = quickPrice ? `${job}\n(הערכה ראשונית מהצ'אט המהיר: ${quickPrice})` : job;
+        inp.dispatchEvent(new Event('input'));
+        try {
+            sendChatMessage();
+            showToast('ממשיכים מהצ\'אט המהיר — בונה לך רשימת מוצרים');
+        } catch (e) {
             inp.focus();
+            showToast('המשכנו מהצ\'אט המהיר — לחץ שלח ואבנה את רשימת המוצרים');
         }
-        showToast('המשכנו מהצ\'אט המהיר — לחץ שלח ואבנה את רשימת המוצרים');
     }, 500);
 }
 

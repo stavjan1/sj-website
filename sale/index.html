@@ -8,27 +8,32 @@
     <!-- App area: kept out of search results (it has its own built-in login) -->
     <meta name="robots" content="noindex">
 
-    <!-- Google Fonts: Heebo for Hebrew, Rubik/Outfit for numbers/UI, David/Frank Ruhl for PDF -->
+    <!-- Google Fonts: IBM Plex Sans Hebrew for UI (Heebo fallback), David/Frank Ruhl for the PDF sheets -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&family=Outfit:wght@300;400;500;600;700&family=Rubik:wght@300;400;500;700&family=David+Libre:wght@400;700&family=Frank+Ruhl+Libre:wght@300;400;500;700;900&display=swap" rel="stylesheet">
-    
-    <!-- FontAwesome for icons -->
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Hebrew:wght@400;500;700&family=Heebo:wght@400;500;700&family=David+Libre:wght@400;700&family=Frank+Ruhl+Libre:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <!-- FontAwesome: still used by icons rendered inside app.js templates.
+         The V3 shell itself is SVG-only; a full de-FA sweep is queued for V3.1. -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    
+
     <!-- Google Identity Services + Drive Picker API -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js" async defer></script>
-    
-    <!-- Custom styling -->
-    <link rel="stylesheet" href="styles.css?v=96">
+
+    <!-- V3 styling: shared tokens + primitives, then the app layers -->
+    <link rel="stylesheet" href="../assets/tokens.css?v=300">
+    <link rel="stylesheet" href="../assets/ui.css?v=300">
+    <link rel="stylesheet" href="css/shell.css?v=300">
+    <link rel="stylesheet" href="css/panels.css?v=300">
+    <link rel="stylesheet" href="css/pdf.css?v=300">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
-    <meta name="theme-color" content="#0c1020">
+    <meta name="theme-color" content="#0C0A09">
     <link rel="icon" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -55,172 +60,107 @@
 
     <div class="app-container" style="display:none;">
         
-        <!-- Sidebar Navigation -->
+        <!-- Icon rail — the ONE navigation. Doubles as the mobile bottom bar
+             (shell.css). Secondary destinations live in the "עוד" drawer; their
+             buttons stay here hidden (.nav-secondary) because switchTab()
+             lights up #tab-<name> on every navigation. -->
         <aside class="sidebar">
-            <!-- Logo & Global Theme Toggle -->
-            <div class="sidebar-logo" style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:8px;">
-                <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
-                    <div class="logo-icon">
-                        <svg viewBox="0 0 100 100" width="22" height="22" fill="currentColor">
-                            <path d="M40 82 L62 46 L46 46 L58 14 L33 52 L50 52 Z"/>
-                        </svg>
-                    </div>
-                    <div class="logo-text">
-                        <span class="brand-name" style="font-size: 0.95rem;">SJ הנדסת חשמל</span>
-                        <span class="brand-sub" style="font-size: 0.72rem;">מערכת הצעות מחיר</span>
-                    </div>
-                </div>
-                <button id="global-theme-toggle" class="theme-toggle-btn" onclick="toggleSystemTheme()" title="החלף מצב תאורה" style="background:none; border:none; color:var(--text-primary); cursor:pointer; font-size:1.15rem; display:flex; align-items:center; justify-content:center; width:34px; height:34px; border-radius:50%; transition: all 0.2s ease;">
-                    <i class="fa-solid fa-sun" id="theme-toggle-icon"></i>
-                </button>
-            </div>
-
-            <!-- Back to main site — at the top so it's never missed -->
-            <a href="../index.html" class="sidebar-home-link">
-                <i class="fa-solid fa-arrow-right"></i>
-                <span>חזרה לאתר הראשי</span>
+            <a class="sidebar-logo" href="../index.html" title="חזרה לאתר הראשי" aria-label="חזרה לאתר הראשי">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2L4.5 13h6l-1.5 9L18.5 10h-6z"/></svg>
             </a>
 
             <nav class="nav-menu">
                 <button class="nav-btn mobile-core active" id="tab-projects" onclick="switchTab('projects')">
-                    <i class="fa-solid fa-folder-open"></i>
-                    <span>ניהול פרויקטים</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+                    <span>פרויקטים</span>
                 </button>
                 <!-- Project workspace tabs: exist ONLY while a project is open
-                     (guided, chronological flow — Stav 04/07). Kept as flat
-                     siblings so the mobile bottom bar keeps working. -->
+                     (guided, chronological flow — Stav 04/07). -->
                 <div class="nav-proj-label proj-tab" id="nav-proj-label">
-                    <i class="fa-solid fa-bolt"></i>
                     <span id="nav-project-name">הפרויקט</span>
                 </div>
                 <button class="nav-btn mobile-core proj-tab" id="tab-wizard" onclick="switchTab('wizard')">
                     <b class="step-num">1</b>
-                    <i class="fa-solid fa-calculator"></i>
-                    <span>אפיון ותמחור (צ'אט)</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5z"/></svg>
+                    <span>אפיון</span>
                 </button>
                 <button class="nav-btn mobile-core proj-tab" id="tab-create" onclick="switchTab('create')">
                     <b class="step-num">2</b>
-                    <i class="fa-solid fa-file-invoice-dollar"></i>
-                    <span>עורך ההצעה (PDF)</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+                    <span>הצעה</span>
                 </button>
-                <!-- Reports live INSIDE the project (Stav 04/07) — step 3 -->
                 <button class="nav-btn proj-tab" id="tab-reports" onclick="switchTab('reports')">
                     <b class="step-num">3</b>
-                    <i class="fa-solid fa-clipboard-check"></i>
-                    <span>דוחות בדיקה</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 13l2 2 4-4"/></svg>
+                    <span>דוחות</span>
                 </button>
                 <div class="nav-proj-divider proj-tab"></div>
-                <!-- Phone: the bell takes a bottom-bar slot only on days it has
-                     something to say (renderReminderBell shows/hides it). -->
+                <!-- The bell takes a slot only on days it has something to say
+                     (renderReminderBell shows/hides it). -->
                 <button class="nav-btn mobile-core" id="tab-reminders" style="display:none;"
                         onclick="toggleReminderPopover(event)" aria-label="תזכורות לקוחות">
-                    <i class="fa-solid fa-bell"></i>
-                    <span>תזכורות <b class="rb-count-mobile" id="rb-count-mobile">0</b></span>
-                </button>
-                <button class="nav-btn nav-more-btn" id="tab-more" onclick="toggleMoreDrawer()">
-                    <i class="fa-solid fa-ellipsis"></i>
-                    <span>עוד</span>
-                </button>
-                <button class="nav-btn" id="tab-statistics" onclick="switchTab('statistics')">
-                    <i class="fa-solid fa-chart-column"></i>
-                    <span>סטטיסטיקה</span>
-                </button>
-                <button class="nav-btn" id="tab-archive" onclick="switchTab('archive')">
-                    <i class="fa-solid fa-users"></i>
-                    <span>ארכיון לקוחות</span>
-                </button>
-                <button class="nav-btn" id="tab-history" onclick="switchTab('history')">
-                    <i class="fa-solid fa-clock-rotate-left"></i>
-                    <span>היסטוריית הצעות</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+                    <span>תזכורות</span>
+                    <b class="nav-badge rb-count-mobile" id="rb-count-mobile">0</b>
                 </button>
                 <button class="nav-btn" id="tab-checkups" onclick="switchTab('checkups')">
-                    <i class="fa-solid fa-calendar-check"></i>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 15l2 2 4-4"/></svg>
                     <span>שירות תקופתי</span>
                 </button>
-                <button class="nav-btn" id="tab-business" onclick="switchTab('business')">
-                    <i class="fa-solid fa-briefcase"></i>
-                    <span>פרטי עסק</span>
+                <button class="nav-btn" id="tab-accounting" onclick="switchTab('accounting')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/></svg>
+                    <span>חשבונות</span>
                 </button>
-                <button class="nav-btn" id="tab-catalog" onclick="switchTab('catalog')">
-                    <i class="fa-solid fa-tags"></i>
-                    <span>מאגר מחירים</span>
+                <a class="nav-btn" href="/ask/" title="שאלת תמחור מהירה — בלי לפתוח פרויקט">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M13 2L4.5 13h6l-1.5 9L18.5 10h-6z"/></svg>
+                    <span>מצב מהיר</span>
+                </a>
+                <button class="nav-btn nav-more-btn" id="tab-more" onclick="toggleMoreDrawer()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+                    <span>עוד</span>
                 </button>
-                <button class="nav-btn" id="tab-settings" onclick="switchTab('settings')">
-                    <i class="fa-solid fa-sliders"></i>
-                    <span>הגדרות מערכת</span>
-                </button>
-                <button class="nav-btn nav-btn-admin" id="tab-admin" onclick="switchTab('admin')" style="display:none;">
-                    <i class="fa-solid fa-shield-halved"></i>
-                    <span>Admin</span>
-                </button>
+                <!-- hidden nav anchors for drawer destinations (switchTab targets) -->
+                <button class="nav-btn nav-secondary" id="tab-statistics" onclick="switchTab('statistics')"><span>סטטיסטיקה</span></button>
+                <button class="nav-btn nav-secondary" id="tab-archive" onclick="switchTab('archive')"><span>ארכיון לקוחות</span></button>
+                <button class="nav-btn nav-secondary" id="tab-history" onclick="switchTab('history')"><span>היסטוריה</span></button>
+                <button class="nav-btn nav-secondary" id="tab-business" onclick="switchTab('business')"><span>פרטי עסק</span></button>
+                <button class="nav-btn nav-secondary" id="tab-catalog" onclick="switchTab('catalog')"><span>מאגר מחירים</span></button>
+                <button class="nav-btn nav-secondary" id="tab-settings" onclick="switchTab('settings')"><span>הגדרות</span></button>
+                <button class="nav-btn nav-secondary" id="tab-finance" onclick="switchTab('finance')" style="display:none;"><span>ניהול פיננסי</span></button>
+                <button class="nav-btn nav-secondary" id="tab-admin" onclick="switchTab('admin')" style="display:none;"><span>Admin</span></button>
             </nav>
 
             <div class="sidebar-footer">
+                <button id="global-theme-toggle" class="nav-btn" onclick="toggleSystemTheme()" title="החלף מצב תאורה">
+                    <span id="theme-toggle-icon" hidden></span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+                    <span>תאורה</span>
+                </button>
                 <div class="user-chip" id="sidebar-user-chip">
                     <div class="user-chip-avatar" id="user-chip-avatar">S</div>
                     <div class="user-chip-info">
                         <span class="user-chip-name" id="user-chip-name">משתמש</span>
-                        <span class="user-chip-role" id="user-chip-role">חשמלאי מוסמך</span>
+                        <span class="user-chip-role" id="user-chip-role"></span>
                     </div>
                     <button class="user-chip-logout" id="user-chip-logout" onclick="handleUserLogout()" title="התנתקות" aria-label="התנתקות">
-                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                     </button>
                 </div>
-                <span class="version">v5.39</span>
             </div>
         </aside>
         
         <!-- Main Workspace -->
         <main class="main-content">
 
-            <!-- Two-row top navigation (desktop): 3 worlds + contextual sub-tabs -->
-            <div class="topnav" id="topnav">
-                <div class="topnav-row1">
-                    <div class="topnav-brand">
-                        <div class="topnav-logo"><i class="fa-solid fa-bolt"></i></div>
-                        <div><div class="tb-name">SJ הנדסת חשמל <span class="tb-ver" id="tb-ver">v5.39</span></div><div class="tb-sub">מערכת הצעות מחיר</div></div>
-                    </div>
-                    <div class="topnav-worlds">
-                        <button class="topnav-world active" data-world="projects" onclick="switchWorld('projects')"><i class="fa-solid fa-folder-open"></i> ניהול פרויקטים</button>
-                        <button class="topnav-world" data-world="accounting" onclick="switchWorld('accounting')"><span class="tw-bee">🐝</span> הנהלת חשבונות</button>
-                        <button class="topnav-world" data-world="prefs" onclick="switchWorld('prefs')"><i class="fa-solid fa-sliders"></i> העדפות</button>
-                    </div>
-                    <div class="topnav-right">
-                        <span id="banner-sync-indicator" style="display:none; align-items:center; gap:6px; color:var(--text-secondary); font-size:0.78rem;">
-                            <i class="fa-solid fa-arrows-rotate fa-spin" style="color:var(--color-success)"></i> <span>מסנכרן…</span>
-                        </span>
-                        <!-- Customer reminders: quotes waiting for an answer +
-                             checkups coming due, counted from every screen -->
-                        <button type="button" class="reminder-bell" id="reminder-bell"
-                                onclick="toggleReminderPopover(event)"
-                                aria-haspopup="dialog" aria-expanded="false" aria-label="תזכורות לקוחות">
-                            <i class="fa-solid fa-bell"></i>
-                            <span class="rb-count" id="rb-count" hidden>0</span>
-                        </button>
-                        <a class="quick-mode-link" href="/ask/" title="הצ'אט המהיר — שאלת תמחור בלי לפתוח פרויקט">⚡ מצב מהיר</a>
-                        <button type="button" class="theme-flip" id="theme-flip" onclick="flipTheme()" aria-label="החלפת מצב תצוגה">
-                            <i id="theme-flip-icon" class="fa-solid fa-sun"></i>
-                            <b id="theme-flip-label">LIGHT MODE</b>
-                        </button>
-                        <div class="topnav-user">
-                            <img id="topnav-avatar" class="tn-avatar" alt="" style="display:none;">
-                            <span id="topnav-username" class="tn-username">משתמש</span>
-                            <button class="tn-logout" onclick="handleUserLogout()" title="התנתקות" aria-label="התנתקות"><i class="fa-solid fa-right-from-bracket"></i></button>
-                        </div>
-                    </div>
-                </div>
-                <div class="topnav-sub" id="topnav-sub"></div>
-            </div>
-
             <!-- In-project stage rail (desktop): vertical steps on the RTL start
                  (right) + a back button. Populated by renderProjectRail(). -->
             <aside class="project-rail" id="project-rail" aria-label="שלבי הפרויקט"></aside>
 
-            <!-- Active Project Banner (slim — the project you're inside) -->
+            <!-- Context header — the project you're inside + sync state -->
             <div class="active-project-banner" id="project-banner">
-                <span class="banner-label"><i class="fa-solid fa-folder-open text-accent"></i> פרויקט פעיל:</span>
-                <span class="banner-value" id="active-project-name">אין פרויקט טעון (בחר או צור פרויקט תחילה)</span>
+                <span class="banner-value" id="active-project-name">אין פרויקט טעון</span>
                 <span class="banner-badge" id="active-project-status" style="display:none;">טיוטה</span>
+                <span id="banner-sync-indicator" style="display:none;"><span>מסנכרן…</span></span>
             </div>
 
             <!-- Tab: Projects Manager -->
@@ -1911,6 +1851,17 @@
                 </div>
             </section>
 
+            <!-- Finance dashboard (תזרים מזומנים) — owner only. Rendered by finance.js -->
+            <section id="panel-finance" class="content-panel">
+                <div class="section-header">
+                    <h2>ניהול פיננסי — תזרים מזומנים</h2>
+                    <p class="section-subtitle">מהצד החי של העסק: יתרות, עקומת מזומן, חיובים קרובים והכנסות מהמערכת.</p>
+                </div>
+                <div id="finance-root">
+                    <div class="empty"><h3>טוען נתונים…</h3></div>
+                </div>
+            </section>
+
         </main>
 
     </div>
@@ -2035,19 +1986,24 @@
         <div class="rpt-footer" id="rpt-footer"><!-- cloned from quote sheet footer --></div>
     </div>
 
-    <!-- Mobile "עוד" drawer — the tabs that aren't part of the field workflow -->
+    <!-- "עוד" drawer — everything that isn't the field workflow.
+         Bottom sheet on the phone, side sheet next to the rail on desktop. -->
     <div id="more-drawer-backdrop" onclick="closeMoreDrawer()"></div>
     <div id="more-drawer">
         <div class="more-drawer-handle"></div>
         <div class="more-drawer-grid">
-            <button onclick="navFromDrawer('reports')"><i class="fa-solid fa-clipboard-check"></i><span>דוחות בדיקה</span></button>
-            <button onclick="navFromDrawer('history')"><i class="fa-solid fa-clock-rotate-left"></i><span>היסטוריית הצעות</span></button>
-            <button onclick="navFromDrawer('checkups')"><i class="fa-solid fa-calendar-check"></i><span>שירות תקופתי</span></button>
-            <button onclick="navFromDrawer('catalog')"><i class="fa-solid fa-tags"></i><span>מאגר מחירים</span></button>
-            <button onclick="navFromDrawer('business')"><i class="fa-solid fa-briefcase"></i><span>פרטי עסק</span></button>
-            <button onclick="navFromDrawer('settings')"><i class="fa-solid fa-sliders"></i><span>הגדרות</span></button>
-            <button id="more-drawer-admin" style="display:none;" onclick="navFromDrawer('admin')"><i class="fa-solid fa-shield-halved" style="color:#f0c040;"></i><span>Admin</span></button>
-            <a href="/zerem/"><i class="fa-solid fa-arrow-right"></i><span>חזרה לאתר</span></a>
+            <button onclick="navFromDrawer('reports')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 13l2 2 4-4"/></svg><span>דוחות בדיקה</span></button>
+            <button onclick="navFromDrawer('history')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 3"/></svg><span>היסטוריית הצעות</span></button>
+            <button onclick="navFromDrawer('statistics')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="18" y1="20" x2="18" y2="14"/><line x1="3" y1="20" x2="21" y2="20"/></svg><span>סטטיסטיקה</span></button>
+            <button onclick="navFromDrawer('archive')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>ארכיון לקוחות</span></button>
+            <button onclick="navFromDrawer('checkups')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 15l2 2 4-4"/></svg><span>שירות תקופתי</span></button>
+            <button onclick="navFromDrawer('accounting')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg><span>הנהלת חשבונות</span></button>
+            <button onclick="navFromDrawer('catalog')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M20.59 13.41L11 3H4v7l9.59 9.59a2 2 0 0 0 2.82 0l4.18-4.18a2 2 0 0 0 0-2.82z"/><circle cx="7.5" cy="6.5" r="1"/></svg><span>מאגר מחירים</span></button>
+            <button onclick="navFromDrawer('business')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg><span>פרטי עסק</span></button>
+            <button onclick="navFromDrawer('settings')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>הגדרות</span></button>
+            <button id="more-drawer-finance" style="display:none;" onclick="navFromDrawer('finance')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg><span>ניהול פיננסי</span></button>
+            <button id="more-drawer-admin" style="display:none;" onclick="navFromDrawer('admin')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>Admin</span></button>
+            <a href="/zerem/"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg><span>חזרה לאתר</span></a>
         </div>
     </div>
 
@@ -2179,15 +2135,17 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/listcards.js"></script>
+    <script src="/assets/listcards.js?v=300"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=96"></script>
-    <script src="app.js?v=96"></script>
+    <script src="coverage.js?v=300"></script>
+    <script src="app.js?v=300"></script>
+    <!-- Finance dashboard (admin) + Telegram report import — separate module -->
+    <script src="finance.js?v=300"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=96" defer></script>
-    <script src="/track.js?v=96" defer></script>
+    <script src="../assistant.js?v=300" defer></script>
+    <script src="/track.js?v=300" defer></script>
 </body>
 </html>

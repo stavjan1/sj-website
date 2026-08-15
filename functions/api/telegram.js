@@ -321,9 +321,17 @@ export async function onRequestPost(context) {
 }
 
 // Printable report view — server-rendered, hostile-data-escaped, RTL, light.
+// ?record=<t> returns the raw JSON record instead (the app's import path).
 export async function onRequestGet(context) {
     const { request, env } = context;
-    const token = new URL(request.url).searchParams.get('view') || '';
+    const url = new URL(request.url);
+    const recordToken = url.searchParams.get('record') || '';
+    if (recordToken && /^[a-z2-9]{8,20}$/.test(recordToken) && env.SJ_DATA) {
+        const raw = await env.SJ_DATA.get(`tgreport:${recordToken}`);
+        if (!raw) return json({ error: { message: 'הדוח לא נמצא או שפג תוקפו' } }, 404);
+        return new Response(raw, { headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+    }
+    const token = url.searchParams.get('view') || '';
     if (!env.SJ_DATA || !/^[a-z2-9]{8,20}$/.test(token)) return new Response('לא נמצא', { status: 404 });
     const rec = JSON.parse(await env.SJ_DATA.get(`tgreport:${token}`) || 'null');
     if (!rec) return new Response('הדוח לא נמצא או שפג תוקפו', { status: 404 });

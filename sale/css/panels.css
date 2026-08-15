@@ -2815,3 +2815,33 @@ i[class^="fa-"], i[class*=" fa-"] {
     .spec-row.answered, .spec-row.pending, .spec-more, .spec-order { min-height: 44px; }
     .chat-edit-btn { opacity: 1; width: 32px; height: 32px; }
 }
+
+/* ============================================================
+   Finance dashboard (#panel-finance) — owner only
+   ============================================================ */
+.fin-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--sp-3); margin-block-end: var(--sp-4); }
+.fin-kpi-label { color: var(--text-3); font-size: var(--fs-xs); }
+.fin-kpi { font-size: var(--fs-2xl); font-weight: 700; font-variant-numeric: tabular-nums; }
+.fin-kpi-sub { color: var(--text-2); font-size: var(--fs-xs); margin-block-start: var(--sp-1); }
+.fin-chart-card { margin-block-end: var(--sp-4); }
+.fin-chart-card h3 { font-size: var(--fs-lg); margin-block-end: var(--sp-3); }
+.fin-legend { display: flex; gap: var(--sp-6); color: var(--text-3); font-size: var(--fs-xs); margin-block-start: var(--sp-2); }
+.fin-dot { display: inline-block; width: 18px; height: 0; border-block-start: 2px solid var(--accent); vertical-align: middle; margin-inline-end: 4px; }
+.fin-dot.dashed { border-block-start-style: dashed; }
+.fin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); margin-block-end: var(--sp-4); }
+@media (max-width: 860px) { .fin-grid { grid-template-columns: 1fr; } }
+.fin-grid h3 { font-size: var(--fs-lg); margin-block-end: var(--sp-3); }
+.fin-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-1); }
+.fin-list li { display: flex; align-items: center; gap: var(--sp-3); padding-block: var(--sp-2); border-block-end: 1px solid var(--border); font-size: var(--fs-sm); }
+.fin-list li > span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fin-list li small { color: var(--text-3); }
+.fin-muted { color: var(--text-3); font-size: var(--fs-sm); }
+.fin-form-row { display: flex; gap: var(--sp-2); margin-block-end: var(--sp-2); align-items: center; }
+.fin-form-row .input { min-width: 0; }
+.fin-x { background: none; border: none; color: var(--text-3); cursor: pointer; font-size: var(--fs-lg); padding: var(--sp-1); min-width: 32px; }
+.fin-x:hover { color: var(--danger); }
+.fin-details { margin-block-start: var(--sp-3); }
+.fin-details summary { cursor: pointer; color: var(--text-2); font-size: var(--fs-sm); padding-block: var(--sp-2); }
+.fin-details .textarea { margin-block: var(--sp-2); }
+.fin-connector { border: 1px solid var(--border); border-radius: var(--r-sm); padding: var(--sp-3); margin-block-start: var(--sp-3); }
+.fin-connector b { display: block; margin-block-end: var(--sp-1); }
