@@ -2198,6 +2198,43 @@ textarea#ai-input {
 .maint-chip.is-due { border-color: rgba(240, 192, 64, 0.5); color: #f0c040; background: rgba(240, 192, 64, 0.08); }
 body.light-theme .maint-chip.is-due { color: #a16207; border-color: rgba(161, 98, 7, 0.45); background: rgba(161, 98, 7, 0.07); }
 
+/* Calendar picker inside the maintenance dialog */
+.mcal-picker {
+    position: absolute; inset-inline: 0; top: calc(100% + 6px); z-index: 20;
+    display: flex; flex-direction: column; gap: 2px; padding: 6px;
+    background: var(--bg-card); border: 1px solid var(--border-color);
+    border-radius: 12px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+.mcal-picker[hidden] { display: none; }
+.mcal-head { padding: 6px 8px 8px; font-size: 0.76rem; font-weight: 700; color: var(--text-muted); }
+.mcal-opt {
+    display: flex; align-items: center; gap: 9px; width: 100%;
+    padding: 10px 10px; min-height: 42px; border: none; border-radius: 8px;
+    background: transparent; color: var(--text-primary); cursor: pointer;
+    font-family: inherit; font-size: 0.86rem; font-weight: 600; text-align: start;
+}
+.mcal-opt:hover { background: var(--bg-input); }
+.mcal-opt i { width: 18px; color: var(--text-muted); }
+
+/* Landing from the calendar reminder */
+.marr-card {
+    background: rgba(240, 192, 64, 0.07); border: 1px solid rgba(240, 192, 64, 0.35);
+    border-radius: 12px; padding: 14px 16px; margin-bottom: 14px; animation: fadeIn 0.3s ease;
+}
+.marr-title { font-size: 0.95rem; font-weight: 800; color: #f0c040; display: flex; align-items: center; gap: 8px; }
+body.light-theme .marr-title { color: #a16207; }
+.marr-sub { font-size: 0.8rem; color: var(--text-secondary); margin: 4px 0 10px; }
+.marr-acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.marr-x {
+    margin-inline-start: auto; background: none; border: none; cursor: pointer;
+    color: var(--text-muted); padding: 6px; border-radius: 6px;
+}
+.marr-x:hover { color: var(--text-primary); background: var(--bg-input); }
+@media (max-width: 768px) {
+    .marr-acts .btn { min-height: 44px; }
+    .marr-x { min-height: 44px; min-width: 44px; }
+}
+
 @media (max-width: 768px) {
     /* The create row stacks on a phone; the type switch gets its own line and
        fills it, so both options stay thumb-sized. */

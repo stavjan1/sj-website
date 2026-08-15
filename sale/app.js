@@ -1062,6 +1062,9 @@ document.addEventListener('DOMContentLoaded', () => {
         showToast('מפתח ה-AI הוגדר בהצלחה');
     }
 
+    // Read the calendar reminder's link before anything rewrites the URL.
+    captureMaintDeepLink();
+
     // Load global Google Client ID from localStorage
     let globalClientId = localStorage.getItem('sj_global_google_client_id');
     if (!globalClientId) {
@@ -1849,6 +1852,10 @@ function loadProjects() {
     localStorage.removeItem(getStorageKey('sj_active_project_id'));
     updateActiveProjectBanner(null);
     switchTab('projects');
+
+    // Arrived from a calendar reminder? The projects are loaded now, so the
+    // link finally has something to point at.
+    try { resumeMaintDeepLink(); } catch (e) {}
 
     // The reminder bell counts periodic checkups too, and those live in a tab
     // this device may never open. One quiet pull after the boot settles keeps
@@ -3452,6 +3459,10 @@ function openMaintenanceDialog(projectId) {
     document.getElementById('maint-for').textContent = 'עבור: ' + (proj.name || 'הפרויקט');
     maintPickInterval(_maintMonths, true);
     document.getElementById('maint-next').value = existing.next || maintAddMonths(ckToday(), _maintMonths);
+    // Offer the calendar only once there is something to put in it.
+    const calBlock = document.getElementById('maint-cal-block');
+    if (calBlock) calBlock.style.display = existing.next ? '' : 'none';
+    closeMaintCalPicker();
 
     // The lead-time question is asked once, ever. After that the block becomes
     // a quiet line telling you what's set and where to change it.
@@ -3604,6 +3615,273 @@ function maintMarkDone(projectId) {
     saveProjects();
     filterProjectsList();
     showToast('הביקור נרשם — הבא: ' + ckFmtDate(proj.maintenance.next));
+}
+
+// ==========================================================================
+// The maintenance reminder, in the calendar the phone already rings from.
+//
+// Two constraints shaped this. Google's API caps a reminder override at 40320
+// minutes — 28 days — so a "three months ahead" lead cannot be an alarm on the
+// visit; it has to be its own (also recurring) heads-up event. ICS has no such
+// limit, so Apple and Outlook get one event carrying an alarm per lead time.
+// Both carry a link back into the project, because a reminder that only says
+// "call someone" makes you go find the file yourself.
+// ==========================================================================
+
+function maintDeepLink(proj) {
+    // Same origin in production; localhost during development keeps working.
+    const base = location.origin.includes('localhost') ? location.origin + '/sale/' : 'https://www.sj-eng.co.il/sale/';
+    return base + '?p=' + encodeURIComponent(proj.id);
+}
+function maintEventTitle(proj) {
+    return '⚡ תחזוקה תקופתית — ' + (proj.name || 'לקוח');
+}
+function maintHeadsUpTitle(proj, days) {
+    const when = days % 30 === 0 ? (days / 30) + ' חודשים' : days + ' ימים';
+    return '⚡ לתאם תחזוקה (' + when + ' מראש) — ' + (proj.name || 'לקוח');
+}
+function maintEventBody(proj) {
+    const q = proj.quoteData || {};
+    // Drop the contact lines we don't have, but keep the deliberate blank ones —
+    // filtering the whole list left a wall of empty lines when a phone was missing.
+    const contact = [
+        q.clientName ? 'לקוח: ' + q.clientName : '',
+        proj.clientPhone ? 'טלפון: ' + proj.clientPhone : '',
+        proj.clientEmail ? 'מייל: ' + proj.clientEmail : '',
+    ].filter(Boolean);
+    return [
+        ...contact,
+        ...(contact.length ? [''] : []),
+        'פתיחת הפרויקט בזרם (הפקת הצעה / קביעה לשנה הבאה):',
+        maintDeepLink(proj),
+        '',
+        '(נוצר אוטומטית מזרם)',
+    ].join('\n');
+}
+function maintRrule(months) {
+    return months % 12 === 0
+        ? 'RRULE:FREQ=YEARLY;INTERVAL=' + (months / 12)
+        : 'RRULE:FREQ=MONTHLY;INTERVAL=' + months;
+}
+
+function openMaintCalendarPicker(projectId) {
+    const proj = projectsList.find((p) => p.id === projectId);
+    if (!proj || !maintNextDue(proj)) { showToast('קודם קבע מועד תחזוקה', 'error'); return; }
+    const box = document.getElementById('maint-cal-picker');
+    if (!box) return;
+    const id = escapeHtml(projectId);
+    box.innerHTML = `
+        <div class="mcal-head">להוסיף את התזכורת ליומן</div>
+        <button class="mcal-opt" onclick="maintToGoogle('${id}')"><i class="fa-brands fa-google"></i> יומן Google</button>
+        <button class="mcal-opt" onclick="maintToIcs('${id}')"><i class="fa-brands fa-apple"></i> אפל / אייפון</button>
+        <button class="mcal-opt" onclick="maintToIcs('${id}')"><i class="fa-solid fa-envelope-open-text"></i> Outlook / אחר</button>
+        <button class="mcal-opt" onclick="maintCopyLink('${id}')"><i class="fa-solid fa-link"></i> העתק קישור לפרויקט</button>`;
+    box.hidden = false;
+    setTimeout(() => document.addEventListener('click', _maintCalOutside), 0);
+}
+function _maintCalOutside(ev) {
+    const box = document.getElementById('maint-cal-picker');
+    if (box && !box.contains(ev.target)) closeMaintCalPicker();
+}
+function closeMaintCalPicker() {
+    const box = document.getElementById('maint-cal-picker');
+    if (box) { box.hidden = true; box.innerHTML = ''; }
+    document.removeEventListener('click', _maintCalOutside);
+}
+
+function maintCopyLink(projectId) {
+    const proj = projectsList.find((p) => p.id === projectId);
+    if (!proj) return;
+    const link = maintDeepLink(proj);
+    (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject())
+        .then(() => showToast('הקישור הועתק'))
+        .catch(() => window.prompt('העתק את הקישור:', link));
+    closeMaintCalPicker();
+}
+
+async function maintToGoogle(projectId) {
+    closeMaintCalPicker();
+    const proj = projectsList.find((p) => p.id === projectId);
+    const due = proj && maintNextDue(proj);
+    if (!due) return;
+    if (isGuestUser()) { showToast('יומן Google דורש התחברות עם Google — מוריד קובץ במקום', 'error'); maintToIcs(projectId); return; }
+    let token;
+    try { token = await ckEnsureCalToken(); }
+    catch { showToast('נדרש אישור גישה ליומן — מוריד קובץ במקום'); maintToIcs(projectId); return; }
+
+    const months = (proj.maintenance && proj.maintenance.months) || 12;
+    const leads = maintLeadsFor(proj);
+    const base = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+    const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+    const created = [];
+
+    // Google caps a reminder override at 28 days, so anything longer becomes its
+    // own recurring heads-up event rather than being silently dropped.
+    const asAlarms = leads.filter((d) => d <= 28);
+    const asEvents = leads.filter((d) => d > 28);
+
+    const mainEvent = {
+        summary: maintEventTitle(proj),
+        description: maintEventBody(proj),
+        start: { date: due },
+        end: { date: ckAddDays(due, 1) },
+        recurrence: [maintRrule(months)],
+        reminders: {
+            useDefault: false,
+            overrides: (asAlarms.length ? asAlarms : [1]).map((d) => ({ method: 'popup', minutes: d * 1440 })),
+        },
+    };
+
+    try {
+        // Replace any series made earlier, so re-adding never doubles the calendar.
+        await maintDeleteGoogleEvents(proj, token);
+
+        let res = await fetch(base, { method: 'POST', headers, body: JSON.stringify(mainEvent) });
+        if (res.status === 401 || res.status === 403) {
+            localStorage.removeItem(CK_CAL_TOKEN_KEY);
+            showToast('ההרשאה ליומן פגה — לחץ שוב על היומן', 'error');
+            return;
+        }
+        const ev = await res.json();
+        if (!res.ok || !ev.id) throw new Error('calendar-error');
+        created.push(ev.id);
+
+        for (const d of asEvents) {
+            const at = ckAddDays(due, -d);
+            const body = JSON.stringify({
+                summary: maintHeadsUpTitle(proj, d),
+                description: maintEventBody(proj),
+                start: { date: at },
+                end: { date: ckAddDays(at, 1) },
+                recurrence: [maintRrule(months)],
+                reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 0 }] },
+            });
+            const r2 = await fetch(base, { method: 'POST', headers, body });
+            const e2 = await r2.json();
+            if (r2.ok && e2.id) created.push(e2.id);
+        }
+
+        proj.maintenance.eventIds = created;
+        proj.maintenance.eventId = created[0] || null;
+        saveProjects();
+        filterProjectsList();
+        showToast('נקבע ביומן Google — ' + ckFmtDate(due) +
+            (asEvents.length ? ' (+' + asEvents.length + ' תזכורות מוקדמות)' : ''));
+    } catch (e) {
+        showToast('הוספה ליומן נכשלה — מוריד קובץ במקום', 'error');
+        maintToIcs(projectId);
+    }
+}
+
+async function maintDeleteGoogleEvents(proj, token) {
+    const ids = (proj.maintenance && proj.maintenance.eventIds) || [];
+    const base = 'https://www.googleapis.com/calendar/v3/calendars/primary/events/';
+    for (const id of ids) {
+        // A 404/410 just means the user already deleted it by hand — fine.
+        try { await fetch(base + id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } }); } catch (e) {}
+    }
+}
+
+// One event, one alarm per lead time — ICS has no 28-day ceiling, so the
+// three-months-ahead nudge is a real alarm here rather than a second event.
+function maintToIcs(projectId) {
+    closeMaintCalPicker();
+    const proj = projectsList.find((p) => p.id === projectId);
+    const due = proj && maintNextDue(proj);
+    if (!due) return;
+    const months = (proj.maintenance && proj.maintenance.months) || 12;
+    const dt = due.replace(/-/g, '');
+    const summary = ckIcsText(maintEventTitle(proj));
+    const alarms = [];
+    for (const d of maintLeadsFor(proj)) {
+        alarms.push('BEGIN:VALARM', 'TRIGGER:-P' + d + 'D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM');
+    }
+    if (!alarms.length) {
+        alarms.push('BEGIN:VALARM', 'TRIGGER:-P1D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM');
+    }
+    const ics = [
+        'BEGIN:VCALENDAR', 'VERSION:2.0',
+        'PRODID:-//SJ Electrical Engineering//Maintenance//HE',
+        'BEGIN:VEVENT',
+        'UID:maint-' + proj.id + '@sj-eng.co.il',
+        'DTSTAMP:' + dt + 'T000000Z',
+        'DTSTART;VALUE=DATE:' + dt,
+        'DTEND;VALUE=DATE:' + ckAddDays(due, 1).replace(/-/g, ''),
+        maintRrule(months),
+        'SUMMARY:' + summary,
+        'DESCRIPTION:' + ckIcsText(maintEventBody(proj)),
+        'URL:' + maintDeepLink(proj),
+        ...alarms,
+        'END:VEVENT', 'END:VCALENDAR',
+    ].join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+    a.download = 'maintenance-' + String(proj.name || 'client').replace(/[^\w֐-׿-]+/g, '_') + '.ics';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast('הקובץ ירד — פתח אותו והאירוע ייכנס ליומן עם התזכורות');
+}
+
+// ---- arriving from the reminder ----------------------------------------
+//
+// The link in the calendar lands here. Being told "call someone" and then
+// having to go find the project yourself is most of the work; this opens it
+// and offers the two things you actually came to do.
+
+let _pendingMaintProject = null;
+
+function captureMaintDeepLink() {
+    try {
+        const p = new URLSearchParams(location.search).get('p');
+        if (p) {
+            _pendingMaintProject = p;
+            // Clean the URL so a refresh (or a shared screenshot) doesn't re-trigger.
+            history.replaceState({}, '', location.pathname);
+        }
+    } catch (e) {}
+}
+
+function resumeMaintDeepLink() {
+    if (!_pendingMaintProject) return;
+    const id = _pendingMaintProject;
+    _pendingMaintProject = null;
+    const proj = projectsList.find((p) => p.id === id);
+    if (!proj) { showToast('הפרויקט מהתזכורת לא נמצא בחשבון הזה', 'error'); return; }
+    const due = maintNextDue(proj);
+    const box = document.getElementById('maint-arrive');
+    if (!box) return;
+    box.innerHTML = `
+        <div class="marr-card">
+            <div class="marr-title"><i class="fa-solid fa-rotate"></i> ${escapeHtml(proj.name || 'תחזוקה')}</div>
+            <div class="marr-sub">${due ? 'מועד התחזוקה: ' + ckFmtDate(due) : 'לא נקבע מועד'}</div>
+            <div class="marr-acts">
+                <button class="btn btn-accent btn-small" onclick="maintArriveQuote('${escapeHtml(id)}')"><i class="fa-solid fa-file-invoice-dollar"></i> הפק הצעת מחיר</button>
+                ${proj.clientPhone ? `<button class="btn btn-success btn-small" onclick="maintWhatsApp('${escapeHtml(id)}')"><i class="fa-brands fa-whatsapp"></i> תאם עם הלקוח</button>` : ''}
+                <button class="btn btn-secondary btn-small" onclick="maintArriveDone('${escapeHtml(id)}')"><i class="fa-solid fa-check"></i> בוצע — קבע לשנה הבאה</button>
+                <button class="btn btn-secondary btn-small" onclick="maintArriveOpen('${escapeHtml(id)}')">פתח את הפרויקט</button>
+                <button class="marr-x" title="סגור" onclick="maintArriveClose()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        </div>`;
+    switchTab('projects');
+}
+function maintArriveClose() {
+    const box = document.getElementById('maint-arrive');
+    if (box) box.innerHTML = '';
+}
+function maintArriveOpen(id) { maintArriveClose(); loadProject(id, false); }
+function maintArriveDone(id) { maintMarkDone(id); maintArriveClose(); }
+function maintArriveQuote(id) {
+    maintArriveClose();
+    loadProject(id, false);
+    switchTab('wizard');
+    setTimeout(() => {
+        const inp = document.getElementById('chat-user-input');
+        const proj = projectsList.find((p) => p.id === id);
+        if (inp && proj) {
+            inp.value = 'תחזוקה תקופתית — ' + (proj.name || '') + '. בוא נבנה רשימת ציוד והצעת מחיר לביקור.';
+            inp.dispatchEvent(new Event('input'));
+        }
+    }, 500);
 }
 
 // ---- settings screen ----

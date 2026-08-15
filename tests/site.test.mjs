@@ -340,3 +340,23 @@ test('the maintenance reminder is asked once and answered "never" without re-ask
     assert.ok(html.includes('id="maint-setting-row"'),
         'the settings screen has no reminder-timing control, but the dialog tells the user to go there');
 });
+
+test('a long reminder lead is not silently dropped by the calendar', () => {
+    // Google caps a reminder override at 40320 minutes — 28 days. Stav's own
+    // default is "3 חודשים + חודש", so the long half of his choice cannot be an
+    // alarm on the visit at all. Sent as one anyway, Google accepts the event
+    // and quietly keeps only what fits: the three-month warning would never
+    // arrive, and nothing would say so.
+    const app = read('sale/app.js');
+    assert.match(app, /const asAlarms = leads\.filter\(\(d\) => d <= 28\);/,
+        'the 28-day split is gone — long leads are being sent as reminder overrides again');
+    assert.match(app, /const asEvents = leads\.filter\(\(d\) => d > 28\);/,
+        'long leads no longer become their own heads-up events');
+    // ICS has no such ceiling, so there the lead is a real alarm.
+    assert.match(app, /'TRIGGER:-P' \+ d \+ 'D'/, 'the ICS alarm no longer uses the chosen lead time');
+
+    // And the reminder has to lead back to the work, not just name it.
+    assert.match(app, /function maintDeepLink/, 'the calendar entry no longer links back to the project');
+    assert.match(app, /function captureMaintDeepLink[\s\S]{0,400}history\.replaceState/,
+        'the deep link is not cleaned from the URL — a refresh would re-trigger it');
+});

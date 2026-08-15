@@ -24,7 +24,7 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
     
     <!-- Custom styling -->
-    <link rel="stylesheet" href="styles.css?v=89">
+    <link rel="stylesheet" href="styles.css?v=91">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -162,7 +162,7 @@
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
                 </div>
-                <span class="version">v5.33</span>
+                <span class="version">v5.34</span>
             </div>
         </aside>
         
@@ -174,7 +174,7 @@
                 <div class="topnav-row1">
                     <div class="topnav-brand">
                         <div class="topnav-logo"><i class="fa-solid fa-bolt"></i></div>
-                        <div><div class="tb-name">SJ הנדסת חשמל <span class="tb-ver" id="tb-ver">v5.33</span></div><div class="tb-sub">מערכת הצעות מחיר</div></div>
+                        <div><div class="tb-name">SJ הנדסת חשמל <span class="tb-ver" id="tb-ver">v5.34</span></div><div class="tb-sub">מערכת הצעות מחיר</div></div>
                     </div>
                     <div class="topnav-worlds">
                         <button class="topnav-world active" data-world="projects" onclick="switchWorld('projects')"><i class="fa-solid fa-folder-open"></i> ניהול פרויקטים</button>
@@ -248,6 +248,9 @@
 
                     <!-- Handoff from the public /ask/ quick-chat: continue that job as a full project -->
                     <div id="ask-handoff-banner"></div>
+                    <!-- Arrived from a calendar reminder (?p=<project>) — offers the
+                         two things you came to do instead of just naming the file -->
+                    <div id="maint-arrive"></div>
 
                     <!-- Search + filter — only above the list -->
                     <div class="project-search-row" style="margin-bottom:12px;">
@@ -1158,7 +1161,7 @@
                                     <i class="fa-solid fa-star"></i> תן חוות דעת על המוצר
                                 </a>
                             </div>
-                            <p class="input-help" style="margin:14px 0 0;opacity:.7;">גרסה <span id="about-version">v5.33</span> · &copy; 2026 SJ הנדסת חשמל · כל הזכויות שמורות.</p>
+                            <p class="input-help" style="margin:14px 0 0;opacity:.7;">גרסה <span id="about-version">v5.34</span> · &copy; 2026 SJ הנדסת חשמל · כל הזכויות שמורות.</p>
                         </div>
                     </div>
                 </div>
@@ -2119,6 +2122,14 @@
             </div>
         </div>
 
+        <!-- The reminder has to leave the app: shown once the project has a date -->
+        <div class="ck-field" id="maint-cal-block" style="display:none; position:relative;">
+            <button type="button" class="btn btn-secondary" style="width:100%;" onclick="openMaintCalendarPicker(_maintTarget)">
+                <i class="fa-regular fa-calendar-plus"></i> הוסף ליומן שלי
+            </button>
+            <div class="mcal-picker" id="maint-cal-picker" hidden></div>
+        </div>
+
         <div class="ck-dlg-actions">
             <button type="button" class="btn btn-secondary" onclick="maintCancel()">בלי תזכורת</button>
             <button type="button" class="btn btn-accent" onclick="maintSave()">שמור</button>
@@ -2135,11 +2146,11 @@
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=89"></script>
-    <script src="app.js?v=89"></script>
+    <script src="coverage.js?v=91"></script>
+    <script src="app.js?v=91"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=89" defer></script>
-    <script src="/track.js?v=89" defer></script>
+    <script src="../assistant.js?v=91" defer></script>
+    <script src="/track.js?v=91" defer></script>
 </body>
 </html>
