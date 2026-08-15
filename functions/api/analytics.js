@@ -19,6 +19,10 @@
 
 import { adminGate, rateLimit, dayKey, jsonResponse } from './_tiers.js';
 
+// The AI pools the ledger in _ai.js writes under. Listed rather than scanned:
+// Pages KV list() is paginated and slow, and this set changes about once a year.
+const AI_POOLS = ['gemini:primary', 'gemini:backup', 'gemini:paid', 'deepseek', 'grok', 'cloudflare', 'all'];
+
 const SITES = ['site', 'zerem'];
 const UNIQ_CAP = 4000;          // hashed ids kept per day — a counter, not an audience
 const PATH_CAP = 200;           // distinct paths tracked per day
@@ -68,6 +72,24 @@ function cleanRef(raw) {
 
 export async function onRequestPost(context) {
   const { request, env } = context;
+
+  // Admin: set the daily ceiling per AI pool, so "used" can become a percentage.
+  // Same endpoint rather than a new one — it already carries the admin gate.
+  if (new URL(request.url).searchParams.get('caps') === '1') {
+    const gate = await adminGate(request);
+    if (!gate.ok) return gate.response;
+    if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
+    let body;
+    try { body = await request.json(); } catch { return jsonResponse({ error: { message: 'בקשה לא תקינה.' } }, 400); }
+    const caps = {};
+    for (const [k, v] of Object.entries(body.caps || {})) {
+      const n = parseInt(v, 10);
+      if (Number.isFinite(n) && n > 0) caps[String(k).slice(0, 40)] = Math.min(10000000, n);
+    }
+    await env.SJ_DATA.put('config:aiCaps', JSON.stringify(caps));
+    return jsonResponse({ ok: true, caps });
+  }
+
   // Analytics must never be the reason a page breaks: every failure path here
   // answers 200 with a skip reason.
   if (!env.SJ_DATA) return jsonResponse({ ok: false, skipped: 'no-kv' }, 200);
@@ -159,7 +181,64 @@ export async function onRequestGet(context) {
     out[site] = { series, total, uniques, bots, cappedDays, topPages: top(pages), topRefs: top(refs) };
   }
 
-  return jsonResponse({ ok: true, days, sites: out, insights: await weeklyInsights(env) });
+  return jsonResponse({
+    ok: true, days, sites: out,
+    insights: await weeklyInsights(env),
+    ai: await aiUsage(env, dates),
+  });
+}
+
+// The AI pools, per day: how much each one served and when one went quiet.
+//
+// The percentage needs a ceiling, and only the account holder knows what his
+// plan allows — so caps are configured (config:aiCaps) rather than guessed. An
+// unset cap reports null and the panel shows a count instead of a made-up
+// percentage; a wrong number here would be worse than no number.
+async function aiUsage(env, dates) {
+  const caps = safeParse(await env.SJ_DATA.get('config:aiCaps'), {}) || {};
+  const pools = {};
+  const series = [];
+  const events = [];
+
+  for (const d of dates) {
+    const day = { date: d, pools: {} };
+    // KV has no prefix scan on Pages KV without list(), which is paginated and
+    // slow; the label set is small and known, so we read it directly.
+    for (const label of AI_POOLS) {
+      const rec = safeParse(await env.SJ_DATA.get(`aiuse:${d}:${label}`), null);
+      if (!rec) continue;
+      const used = (rec.ok || 0) + (rec.quota || 0) + (rec.fail || 0);
+      day.pools[label] = { ok: rec.ok || 0, quota: rec.quota || 0, fail: rec.fail || 0, used, models: rec.models || {} };
+      const agg = pools[label] || (pools[label] = { ok: 0, quota: 0, fail: 0, used: 0, models: {}, daysExhausted: 0 });
+      agg.ok += rec.ok || 0; agg.quota += rec.quota || 0; agg.fail += rec.fail || 0; agg.used += used;
+      if (rec.quota) agg.daysExhausted++;
+      Object.entries(rec.models || {}).forEach(([m, n]) => { agg.models[m] = (agg.models[m] || 0) + n; });
+    }
+    series.push(day);
+  }
+
+  // Events are only worth reading for the recent window — that is where a
+  // "why did it get slow yesterday" question actually gets answered.
+  for (const d of dates.slice(-7)) {
+    const list = safeParse(await env.SJ_DATA.get(`aiuse:events:${d}`), []) || [];
+    if (Array.isArray(list)) events.push(...list.map((e) => ({ ...e, date: d })));
+  }
+
+  const today = dates[dates.length - 1];
+  const todayRow = series.find((s) => s.date === today) || { pools: {} };
+  const todayPools = {};
+  for (const label of AI_POOLS) {
+    const cap = Number(caps[label]) > 0 ? Number(caps[label]) : null;
+    const used = (todayRow.pools[label] || {}).used || 0;
+    todayPools[label] = {
+      used,
+      cap,
+      pct: cap ? Math.min(100, Math.round((used / cap) * 100)) : null,
+      exhausted: !!((todayRow.pools[label] || {}).quota),
+    };
+  }
+
+  return { pools: AI_POOLS, caps, totals: pools, series, today: todayPools, events: events.slice(-40).reverse() };
 }
 
 // The weekly read, computed on view instead of by a scheduled job. A cron that

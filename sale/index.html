@@ -24,7 +24,7 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
     
     <!-- Custom styling -->
-    <link rel="stylesheet" href="styles.css?v=88">
+    <link rel="stylesheet" href="styles.css?v=89">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -162,7 +162,7 @@
                         <i class="fa-solid fa-right-from-bracket"></i>
                     </button>
                 </div>
-                <span class="version">v5.32</span>
+                <span class="version">v5.33</span>
             </div>
         </aside>
         
@@ -174,7 +174,7 @@
                 <div class="topnav-row1">
                     <div class="topnav-brand">
                         <div class="topnav-logo"><i class="fa-solid fa-bolt"></i></div>
-                        <div><div class="tb-name">SJ הנדסת חשמל <span class="tb-ver" id="tb-ver">v5.32</span></div><div class="tb-sub">מערכת הצעות מחיר</div></div>
+                        <div><div class="tb-name">SJ הנדסת חשמל <span class="tb-ver" id="tb-ver">v5.33</span></div><div class="tb-sub">מערכת הצעות מחיר</div></div>
                     </div>
                     <div class="topnav-worlds">
                         <button class="topnav-world active" data-world="projects" onclick="switchWorld('projects')"><i class="fa-solid fa-folder-open"></i> ניהול פרויקטים</button>
@@ -1158,7 +1158,7 @@
                                     <i class="fa-solid fa-star"></i> תן חוות דעת על המוצר
                                 </a>
                             </div>
-                            <p class="input-help" style="margin:14px 0 0;opacity:.7;">גרסה <span id="about-version">v5.32</span> · &copy; 2026 SJ הנדסת חשמל · כל הזכויות שמורות.</p>
+                            <p class="input-help" style="margin:14px 0 0;opacity:.7;">גרסה <span id="about-version">v5.33</span> · &copy; 2026 SJ הנדסת חשמל · כל הזכויות שמורות.</p>
                         </div>
                     </div>
                 </div>
@@ -1672,6 +1672,18 @@
                     </div>
                 </div>
 
+                <!-- AI pools: what each key served today, and which one went quiet -->
+                <div class="section-card" style="border-color:rgba(240,192,64,0.25);margin-bottom:20px;">
+                    <div class="card-header flex-header">
+                        <h3><i class="fa-solid fa-microchip" style="color:#f0c040;"></i> מנועי ה-AI — ניצול מפתחות</h3>
+                        <button class="btn btn-secondary btn-small" onclick="renderAdminAi()"><i class="fa-solid fa-rotate"></i> רענן</button>
+                    </div>
+                    <div class="card-body" style="display:flex;flex-direction:column;gap:16px;">
+                        <p class="input-help" style="margin:0;">כמה בקשות הגיש כל מפתח היום, ומתי מפתח נגמר ונפלנו לגיבוי. קבע תקרה יומית לכל מפתח כדי לראות אחוז — בלי תקרה מוצג מספר בלבד, כי מספר מומצא גרוע מכלום.</p>
+                        <div id="admin-ai-body"><p class="input-help">טוען…</p></div>
+                    </div>
+                </div>
+
                         <!-- Clarity analytics token — feeds the automated site-analyst routine -->
                         <div class="section-card" style="border-color:rgba(240,192,64,0.25);">
                             <div class="card-header">
@@ -2123,11 +2135,11 @@
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=88"></script>
-    <script src="app.js?v=88"></script>
+    <script src="coverage.js?v=89"></script>
+    <script src="app.js?v=89"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=88" defer></script>
-    <script src="/track.js?v=88" defer></script>
+    <script src="../assistant.js?v=89" defer></script>
+    <script src="/track.js?v=89" defer></script>
 </body>
 </html>

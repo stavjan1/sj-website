@@ -4656,6 +4656,105 @@ async function renderAdminTraffic() {
         if (box) box.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה: ${escapeHtml(e.message)}</p>`;
     }
     if (clarityBox) renderAdminClarity();
+    renderAdminAi();
+}
+
+// ---- AI pools: which key did the work, and which one went quiet ----------
+//
+// Before this card there was no counter at all, by design: a second Gemini key
+// covers a dead first one, so the app kept working and nobody looked. But "it
+// worked" and "it worked on the backup all day" are the same picture from
+// outside, and only one of them means you are one bad morning from no AI.
+
+const AI_POOL_LABELS = {
+    'gemini:primary': 'Gemini — מפתח ראשי',
+    'gemini:backup': 'Gemini — מפתח גיבוי',
+    'gemini:paid': 'Gemini — מפתח משלמים',
+    deepseek: 'DeepSeek',
+    grok: 'Grok',
+    cloudflare: 'Workers AI (חינם)',
+    all: 'כשל מלא — כל הספקים',
+};
+
+let _adminAiData = null;
+
+async function renderAdminAi() {
+    if (!isAdmin()) return;
+    const box = document.getElementById('admin-ai-body');
+    if (!box) return;
+    box.innerHTML = '<p class="input-help">טוען…</p>';
+    try {
+        const days = (document.getElementById('admin-traffic-days') || {}).value || '30';
+        const res = await fetch(`/api/analytics?admin=1&days=${encodeURIComponent(days)}`, {
+            headers: { Authorization: 'Bearer ' + googleAccessToken },
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        _adminAiData = d.ai || null;
+        box.innerHTML = _adminAiData ? aiPanelHtml(_adminAiData) : '<p class="input-help">אין נתונים עדיין.</p>';
+    } catch (e) {
+        box.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה: ${escapeHtml(e.message)}</p>`;
+    }
+}
+
+function aiPanelHtml(ai) {
+    const pools = (ai.pools || []).filter((p) => p !== 'all');
+    const rows = pools.map((label) => {
+        const today = (ai.today || {})[label] || { used: 0, cap: null, pct: null, exhausted: false };
+        const total = (ai.totals || {})[label];
+        const cap = today.cap;
+        const pct = today.pct;
+        const bar = cap
+            ? `<div class="aip-bar"><div class="aip-fill${pct >= 90 ? ' hot' : ''}" style="width:${pct}%"></div></div>
+               <span class="aip-pct">${pct}% <small>(${today.used}/${cap})</small></span>`
+            : `<span class="aip-pct aip-nocap">${today.used} בקשות <small>· ללא תקרה</small></span>`;
+        const dry = today.exhausted ? '<span class="aip-dry">נגמר היום</span>' : '';
+        const hist = total
+            ? `<small class="aip-hist">בטווח: ${total.used} בקשות${total.daysExhausted ? ` · נגמר ב-${total.daysExhausted} ימים` : ''}</small>`
+            : '<small class="aip-hist">לא שימש בטווח</small>';
+        return `<div class="aip-row">
+            <div class="aip-name">${escapeHtml(AI_POOL_LABELS[label] || label)} ${dry}${hist}</div>
+            <div class="aip-meter">${bar}</div>
+            <input class="aip-cap" type="number" min="0" placeholder="תקרה ליום"
+                   data-pool="${escapeHtml(label)}" value="${cap || ''}">
+        </div>`;
+    }).join('');
+
+    const events = (ai.events || []).length
+        ? `<div class="aip-events"><h4 class="tcol-title"><i class="fa-solid fa-triangle-exclamation"></i> אירועים אחרונים</h4>
+             <ul class="tlist">${ai.events.slice(0, 12).map((e) => {
+                 const when = e.at ? new Date(e.at).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : e.date;
+                 const what = e.outcome === 'quota' ? 'נגמרה המכסה' : 'שגיאה' + (e.status ? ' ' + e.status : '');
+                 return `<li><span class="tk">${escapeHtml(when)} · ${escapeHtml(AI_POOL_LABELS[e.label] || e.label)} — ${escapeHtml(what)}${e.note ? ' · ' + escapeHtml(e.note) : ''}</span></li>`;
+             }).join('')}</ul></div>`
+        : '<p class="input-help" style="margin:0;">אין אירועי מכסה או כשל בטווח — כל הבקשות נענו על המפתח הראשון. ✓</p>';
+
+    return `<div class="aip-list">${rows}</div>
+        <button class="btn btn-accent btn-small" onclick="saveAiCaps()" style="align-self:flex-start;">
+            <i class="fa-solid fa-floppy-disk"></i> שמור תקרות
+        </button>
+        ${events}`;
+}
+
+async function saveAiCaps() {
+    const caps = {};
+    document.querySelectorAll('.aip-cap').forEach((inp) => {
+        const n = parseInt(inp.value, 10);
+        if (Number.isFinite(n) && n > 0) caps[inp.dataset.pool] = n;
+    });
+    try {
+        const res = await fetch('/api/analytics?caps=1', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({ caps }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        showToast('התקרות נשמרו');
+        renderAdminAi();
+    } catch (e) {
+        showToast('שמירת התקרות נכשלה: ' + e.message, 'error');
+    }
 }
 
 // Clarity gives the friction signals a raw counter cannot: where people rage-

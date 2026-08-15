@@ -97,6 +97,64 @@ function pickModel(cfg, model) {
   return cfg.models.includes(model) ? model : cfg.defaultModel;
 }
 
+// ==========================================================================
+// Usage ledger — which pool served the work, and which one ran dry.
+//
+// There was no counter here at all. The comment below the Gemini retry said as
+// much and treated it as a feature: a second key covers a dead first key, so
+// why count? Because "it kept working" and "it worked on the backup all day"
+// look identical from the outside, and only one of them means you are one bad
+// morning from having no AI at all. A key going quiet was invisible.
+//
+// What is recorded: a per-pool, per-day tally and a short event log. Never the
+// key itself — only a stable label. Sharded by pool rather than one hot key, so
+// two pools never contend; within a pool concurrent writes can still lose a
+// count, which at this product's traffic is a rounding error and not worth a
+// Durable Object.
+// ==========================================================================
+
+const AI_EVENT_CAP = 60;
+
+export function aiPoolLabel(env, provider, paidTier) {
+  if (provider !== 'gemini') return provider;
+  if (paidTier && env && env.GEMINI_API_KEY_PAID) return 'gemini:paid';
+  return 'gemini:primary';
+}
+
+function aiDay(d) { return (d || new Date()).toISOString().slice(0, 10); }
+
+async function bumpPool(env, label, field, model) {
+  const key = `aiuse:${aiDay()}:${label}`;
+  let rec;
+  try { rec = JSON.parse((await env.SJ_DATA.get(key)) || 'null'); } catch { rec = null; }
+  if (!rec || typeof rec !== 'object') rec = { ok: 0, fail: 0, quota: 0, models: {} };
+  rec[field] = (rec[field] || 0) + 1;
+  if (model) rec.models[model] = (rec.models[model] || 0) + 1;
+  // 40 days: long enough to see a monthly pattern, short enough to stay tidy.
+  await env.SJ_DATA.put(key, JSON.stringify(rec), { expirationTtl: 60 * 60 * 24 * 40 });
+}
+
+async function pushEvent(env, ev) {
+  const key = `aiuse:events:${aiDay()}`;
+  let list;
+  try { list = JSON.parse((await env.SJ_DATA.get(key)) || '[]'); } catch { list = []; }
+  if (!Array.isArray(list)) list = [];
+  list.push({ ...ev, at: new Date().toISOString() });
+  if (list.length > AI_EVENT_CAP) list = list.slice(-AI_EVENT_CAP);
+  await env.SJ_DATA.put(key, JSON.stringify(list), { expirationTtl: 60 * 60 * 24 * 40 });
+}
+
+// outcome: 'ok' | 'quota' (429 — the pool is spent) | 'fail' (any other refusal)
+export async function recordAiUse(env, label, outcome, model, extra) {
+  if (!env || !env.SJ_DATA) return;
+  try {
+    await bumpPool(env, label, outcome === 'quota' ? 'quota' : outcome === 'ok' ? 'ok' : 'fail', model);
+    if (outcome !== 'ok') {
+      await pushEvent(env, { label, outcome, model: model || null, ...(extra || {}) });
+    }
+  } catch (e) { /* metering must never break a user's request */ }
+}
+
 // A data: URL → Gemini inline_data part (or null if not a supported image).
 function dataUrlToInlinePart(dataUrl) {
   const m = /^data:(image\/(?:png|jpe?g|gif|webp));base64,([A-Za-z0-9+/=]+)$/i.exec(String(dataUrl || ''));
@@ -324,24 +382,31 @@ export async function generate(env, opts) {
       ? env.GEMINI_API_KEY_PAID
       : keyFor(env, name);
 
+    const label = aiPoolLabel(env, name, opts.paidTier);
+
     // Workers AI: called via runtime binding, not fetch — handle separately.
     if (PROVIDERS[name].kind === 'cloudflare') {
       const headers = { 'X-AI-Provider': name };
       if (i > 0) headers['X-AI-Fallback-From'] = order[0];
       try {
-        return await callCloudflare(key, opts, headers);
+        const out = await callCloudflare(key, opts, headers);
+        await recordAiUse(env, label, 'ok', PROVIDERS[name].defaultModel);
+        return out;
       } catch (e) {
+        await recordAiUse(env, label, 'fail', PROVIDERS[name].defaultModel, { reason: 'binding-error' });
         if (i < order.length - 1) continue;
         return errorResponse('מנוע ה-AI של Cloudflare נכשל: ' + (e && e.message ? e.message : e), 502);
       }
     }
 
     const modelForThis = PROVIDERS[name].models.includes(opts.model) ? opts.model : undefined;
+    const modelUsed = pickModel(PROVIDERS[name], modelForThis);
 
     let upstream;
     try {
       upstream = await callOnce(name, key, { ...opts, model: modelForThis });
     } catch (e) {
+      await recordAiUse(env, label, 'fail', modelUsed, { reason: 'network' });
       if (i < order.length - 1) continue;
       return errorResponse('שגיאת רשת מול שירות ה-AI: ' + e.message, 502);
     }
@@ -351,30 +416,38 @@ export async function generate(env, opts) {
     // falling through to a weaker provider further down the chain. This is
     // the same "retry on error" idiom already used for the whole provider
     // chain below -- just one level deeper, since only Gemini has 2 keys.
-    // No shared "requests used today" counter: that would need cross-request
-    // state (a KV/Durable Object counter, race conditions between concurrent
-    // visitors, timezone-aware daily resets) to solve a problem this simpler
-    // per-request retry already handles.
     if (name === 'gemini' && RETRIABLE.includes(upstream.status) && env.GEMINI_API_KEY_2 && env.GEMINI_API_KEY_2 !== key) {
+      // The first key just refused. THIS is the moment worth recording: from
+      // the user's side the retry hides it completely.
+      await recordAiUse(env, label, upstream.status === 429 ? 'quota' : 'fail', modelUsed,
+        { status: upstream.status, note: 'נופל למפתח הגיבוי' });
       try { await upstream.text(); } catch (e) {} // drain the failed attempt
       try {
         const retryUpstream = await callOnce(name, env.GEMINI_API_KEY_2, { ...opts, model: modelForThis });
         if (!RETRIABLE.includes(retryUpstream.status)) {
+          await recordAiUse(env, 'gemini:backup', 'ok', modelUsed);
           return normalize(name, retryUpstream, !!opts.stream, { 'X-AI-Provider': name });
         }
+        await recordAiUse(env, 'gemini:backup', retryUpstream.status === 429 ? 'quota' : 'fail', modelUsed,
+          { status: retryUpstream.status, note: 'שני מפתחות Gemini נכשלו' });
         upstream = retryUpstream; // both Gemini keys failed; fall through to the next provider below
       } catch (e) { /* keep the original upstream response, fall through below */ }
     }
 
     if (RETRIABLE.includes(upstream.status) && i < order.length - 1) {
+      await recordAiUse(env, label, upstream.status === 429 ? 'quota' : 'fail', modelUsed,
+        { status: upstream.status, note: 'עובר לספק ' + order[i + 1] });
       try { await upstream.text(); } catch (e) {} // drain before next attempt
       continue;
     }
 
     const headers = { 'X-AI-Provider': name };
     if (i > 0) headers['X-AI-Fallback-From'] = order[0];
+    await recordAiUse(env, label, upstream.ok ? 'ok' : (upstream.status === 429 ? 'quota' : 'fail'), modelUsed,
+      upstream.ok ? null : { status: upstream.status });
     return normalize(name, upstream, !!opts.stream, headers);
   }
 
+  await recordAiUse(env, 'all', 'fail', null, { note: 'כל הספקים נכשלו' });
   return errorResponse('כל מנועי ה-AI אינם זמינים כרגע. נסו שוב מאוחר יותר.', 503);
 }

@@ -2135,6 +2135,40 @@ textarea#ai-input {
 .followup-row .fu-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
 /* ==========================================================================
+   Admin: AI pool usage — one row per key, a bar when a ceiling is known.
+   ========================================================================== */
+.aip-list { display: flex; flex-direction: column; gap: 10px; }
+.aip-row {
+    display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.6fr) 110px;
+    align-items: center; gap: 12px;
+    padding: 10px 12px; background: var(--bg-input);
+    border: 1px solid var(--border-color); border-radius: 10px;
+}
+.aip-name { font-size: 0.86rem; font-weight: 700; color: var(--text-primary); min-width: 0; }
+.aip-hist { display: block; font-weight: 500; font-size: 0.74rem; color: var(--text-muted); margin-top: 2px; }
+.aip-dry {
+    display: inline-block; margin-inline-start: 6px; padding: 1px 8px; border-radius: 999px;
+    background: rgba(240, 82, 82, 0.15); color: #f05252; font-size: 0.7rem; font-weight: 800;
+}
+.aip-meter { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.aip-bar { flex: 1; height: 8px; border-radius: 999px; background: var(--bg-card); overflow: hidden; }
+.aip-fill { height: 100%; border-radius: 999px; background: var(--color-success); transition: width .3s ease; }
+.aip-fill.hot { background: #f05252; }
+.aip-pct { font-size: 0.82rem; font-weight: 800; color: var(--text-primary); white-space: nowrap; }
+.aip-pct small { font-weight: 600; color: var(--text-muted); }
+.aip-pct.aip-nocap { font-weight: 700; color: var(--text-secondary); }
+.aip-cap {
+    width: 100%; padding: 7px 9px; font-size: 0.82rem;
+    border: 1px solid var(--border-color); border-radius: 8px;
+    background: var(--bg-card); color: var(--text-primary);
+}
+.aip-events { margin-top: 4px; }
+@media (max-width: 768px) {
+    .aip-row { grid-template-columns: 1fr; gap: 8px; }
+    .aip-cap { width: 140px; }
+}
+
+/* ==========================================================================
    Periodic maintenance — the type switch, the chips, and the row badge.
    ========================================================================== */
 .proj-kind { display: inline-flex; gap: 0; flex-shrink: 0; border: 1px solid var(--border-color); border-radius: 999px; overflow: hidden; }
