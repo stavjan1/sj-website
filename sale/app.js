@@ -1073,10 +1073,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const settingsClientId = document.getElementById('settings-drive-client-id');
     if (settingsClientId) settingsClientId.value = globalClientId;
 
-    // Theme: LIGHT by default for everyone (product decision). A manual choice
+    // Theme: follow the computer unless the user said otherwise. A manual choice
     // (flip button / Settings) is saved in settings.theme and re-applied by
-    // loadSettings right after, so dark users never flash light for long.
-    applySystemTheme('light');
+    // loadSettings right after, so an explicit choice never flashes for long.
+    applySystemTheme('auto');
 
     // 125%-scaling laptops: shrink the whole app to fit (see applyDisplayZoomFix).
     applyDisplayZoomFix();
@@ -3885,7 +3885,7 @@ function loadSettings() {
             _setCheck('pdf-show-signature', appState.settings.pdfShowSignature ?? false);
 
             // Apply saved theme (explicit user choice wins; otherwise follow the OS)
-            applySystemTheme(appState.settings.theme || defaultThemeByOS());
+            applySystemTheme(themePref());
             applyBoxTheme(appState.settings.boxTheme || 'auto');
             applySystemBackground('none'); // cinematic backgrounds retired — always solid
             updatePdfCustomStyles();
@@ -3938,56 +3938,95 @@ window.addEventListener('resize', () => {
 // ===== Theme & Custom Background Handlers =====
 // Product decision (Stav, 04/07): LIGHT is the default for everyone; a manual
 // choice (the sun/moon flip button or Settings) persists per user.
-function defaultThemeByOS() {
-    return 'light';
+// What the computer itself is set to. Windows/macOS/Android all expose this the
+// same way, and a browser with no opinion reports light — which is the safe
+// guess anyway.
+function osTheme() {
+    try {
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    } catch (e) { return 'light'; }
 }
+function defaultThemeByOS() { return 'auto'; }
+
 // Three page themes: light (בוקר) · mid (אמצע — slate/dim) · dark (לילה).
+// 'auto' is not a fourth look — it is "whatever the computer says", resolved at
+// paint time and re-resolved when the OS flips at sunset.
 const THEME_META = {
     light: { cls: 'light-theme', icon: 'fa-sun',   label: 'LIGHT MODE', name: 'מצב בהיר' },
     mid:   { cls: 'mid-theme',   icon: 'fa-adjust', label: 'DIM MODE',   name: 'מצב אמצע' },
     dark:  { cls: 'dark-theme',  icon: 'fa-moon',   label: 'DARK MODE',  name: 'מצב כהה' },
 };
-function applySystemTheme(theme) {
-    if (!THEME_META[theme]) theme = 'dark';
+const THEME_CYCLE = ['auto', 'light', 'mid', 'dark'];
+
+// The stored preference, which may be 'auto'.
+function themePref() {
+    const p = appState.settings && appState.settings.theme;
+    return THEME_CYCLE.includes(p) ? p : 'auto';
+}
+function resolveTheme(pref) {
+    return pref === 'auto' ? osTheme() : (THEME_META[pref] ? pref : 'dark');
+}
+
+function applySystemTheme(pref) {
+    if (!THEME_CYCLE.includes(pref)) pref = 'auto';
+    const theme = resolveTheme(pref);
     document.body.classList.remove('light-theme', 'mid-theme', 'dark-theme');
     document.body.classList.add(THEME_META[theme].cls);
 
-    // Settings buttons (light / mid / dark).
-    [['theme-btn-light', 'light'], ['theme-btn-mid', 'mid'], ['theme-btn-dark', 'dark']].forEach(([id, t]) => {
+    // Settings buttons (auto / light / mid / dark) — the highlight follows the
+    // PREFERENCE, so "אוטומטי" stays lit while the page itself is dark.
+    [['theme-btn-auto', 'auto'], ['theme-btn-light', 'light'], ['theme-btn-mid', 'mid'], ['theme-btn-dark', 'dark']].forEach(([id, t]) => {
         const el = document.getElementById(id);
         if (!el) return;
-        const on = t === theme;
+        const on = t === pref;
         el.classList.toggle('active', on);
         el.style.backgroundColor = on ? 'var(--color-accent)' : '';
         el.style.color = on ? '#fff' : '';
     });
 
     // Sidebar icon (shows where the next tap goes) + top-bar flip (shows current).
+    const nextPref = THEME_CYCLE[(THEME_CYCLE.indexOf(pref) + 1) % THEME_CYCLE.length];
     const toggleIcon = document.getElementById('theme-toggle-icon');
-    if (toggleIcon) toggleIcon.className = 'fa-solid ' + (theme === 'dark' ? 'fa-sun' : theme === 'light' ? 'fa-adjust' : 'fa-moon');
+    if (toggleIcon) toggleIcon.className = 'fa-solid ' + (nextPref === 'auto' ? 'fa-circle-half-stroke' : THEME_META[nextPref].icon);
     const flipIcon = document.getElementById('theme-flip-icon');
     const flipLabel = document.getElementById('theme-flip-label');
     const flip = document.getElementById('theme-flip');
-    if (flipIcon) flipIcon.className = 'fa-solid ' + THEME_META[theme].icon;
-    if (flipLabel) flipLabel.textContent = THEME_META[theme].label;
-    if (flip) { flip.classList.toggle('is-dark', theme !== 'light'); flip.setAttribute('aria-label', 'החלף מצב תצוגה (בהיר / אמצע / כהה)'); }
+    if (flipIcon) flipIcon.className = 'fa-solid ' + (pref === 'auto' ? 'fa-circle-half-stroke' : THEME_META[theme].icon);
+    if (flipLabel) flipLabel.textContent = pref === 'auto' ? 'AUTO' : THEME_META[theme].label;
+    if (flip) {
+        flip.classList.toggle('is-dark', theme !== 'light');
+        flip.setAttribute('aria-label', 'החלף מצב תצוגה (לפי המחשב / בהיר / אמצע / כהה)');
+        flip.title = pref === 'auto' ? 'לפי הגדרת המחשב (' + THEME_META[theme].name + ')' : THEME_META[theme].name;
+    }
 }
 
-// Top-bar toggle cycles light → mid → dark → light.
+// Top-bar toggle cycles auto → light → mid → dark → auto.
 function flipTheme() { toggleSystemTheme(); }
 function toggleSystemTheme() {
-    const cur = document.body.classList.contains('light-theme') ? 'light'
-        : document.body.classList.contains('mid-theme') ? 'mid' : 'dark';
-    setSystemTheme({ light: 'mid', mid: 'dark', dark: 'light' }[cur]);
+    const cur = themePref();
+    setSystemTheme(THEME_CYCLE[(THEME_CYCLE.indexOf(cur) + 1) % THEME_CYCLE.length]);
 }
 
-function setSystemTheme(theme) {
+function setSystemTheme(pref) {
     if (!appState.settings) appState.settings = {};
-    appState.settings.theme = theme;
-    applySystemTheme(theme);
+    appState.settings.theme = THEME_CYCLE.includes(pref) ? pref : 'auto';
+    applySystemTheme(appState.settings.theme);
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
-    showToast('עבר ל' + (THEME_META[theme] ? THEME_META[theme].name : 'מצב כהה'));
+    showToast(appState.settings.theme === 'auto'
+        ? 'התצוגה עוקבת אחרי הגדרת המחשב (' + THEME_META[resolveTheme('auto')].name + ')'
+        : 'עבר ל' + THEME_META[appState.settings.theme].name);
 }
+
+// The OS can flip under us — at sunset, or when the user changes it in Windows
+// while the app is open. Only 'auto' should react.
+try {
+    const _osDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+    if (_osDark && _osDark.addEventListener) {
+        _osDark.addEventListener('change', () => {
+            if (themePref() === 'auto') applySystemTheme('auto');
+        });
+    }
+} catch (e) { /* older browser — the preference still works, it just won't live-update */ }
 
 // Independent box/surface theme, layered on top of the page theme:
 //   'auto'  → surfaces follow the system theme (default)
