@@ -410,3 +410,39 @@ test('a rendered screen is actually reachable', () => {
     assert.match(app, /const key = linked \? 'id:' \+ linked\.id : _clientKey\(client\)/,
         'the archive is back to grouping clients by typed text, so a typo splits a customer in two');
 });
+
+test('the model is switchable, testable, and never switches itself', () => {
+    const tiers = read('functions/api/_tiers.js');
+    const evalFn = read('functions/api/model-eval.js');
+    const traps = read('functions/api/_model_traps.js');
+    const ai = read('functions/api/_ai.js');
+
+    // The app sat two Gemini generations behind, not by decision but because
+    // changing the model meant a deploy and nobody redeploys on a hunch.
+    assert.match(tiers, /export async function loadModelClass/,
+        'the model is hardcoded again — switching needs a deploy');
+    for (const f of ['chat.js', 'assistant.js']) {
+        const src = readFileSync(join(ROOT, 'functions/api', f), 'utf8');
+        assert.ok(!/MODEL_CLASS\.(basic|advanced)/.test(src),
+            `${f} reads the shipped constant directly, so an admin switch would not reach it`);
+    }
+
+    // The traps existed only inside a conversation, which made "does the new
+    // model still pass?" unanswerable — the real reason upgrading felt risky.
+    assert.match(traps, /export const MODEL_TRAPS/, 'the trap suite is gone');
+    const trapCount = (traps.match(/\n  \{\n    id: '/g) || []).length;
+    assert.ok(trapCount >= 5, `only ${trapCount} traps survive; round 1 shipped 5`);
+    assert.match(evalFn, /onRequestPost/, 'the traps can no longer be run against a candidate');
+
+    // And it stays a decision. A cron that swaps models at 3am would change the
+    // numbers customers are quoted, overnight, with nobody watching.
+    // Check the wiring, not the prose — this file's own comments say "cron".
+    assert.ok(!/export\s+(async\s+)?function\s+onSchedule/.test(evalFn),
+        'model-eval grew a scheduled handler — switching must stay a decision');
+    for (const wf of readdirSync(join(ROOT, '.github/workflows'))) {
+        const text = readFileSync(join(ROOT, '.github/workflows', wf), 'utf8');
+        assert.ok(!/model-eval/.test(text),
+            `${wf} automates the model endpoint — a model must never change while nobody is watching`);
+    }
+    assert.match(ai, /'gemini-3\.\d+-flash'/, 'the 3.x candidates are no longer selectable for testing');
+});

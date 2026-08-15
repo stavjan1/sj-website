@@ -5,7 +5,7 @@
 // DeepSeek → Grok).
 
 import { generate } from './_ai.js';
-import { rateLimit, MODEL_CLASS } from './_tiers.js';
+import { rateLimit, loadModelClass } from './_tiers.js';
 
 const PUBLIC_PROMPT = `אתה "העוזר ההנדסי של SJ" — עוזר חכם מבית SJ הנדסת חשמל, משרד תכנון, ייעוץ ושרטוט מערכות חשמל בישראל בסמכות מהנדס חשמל רשום בפנקס המהנדסים.
 
@@ -99,9 +99,12 @@ export async function onRequestPost(context) {
   // curl it into the expensive advanced class (gemini-2.5-pro / deepseek-reasoner)
   // — the tier-gated "מודל מתקדם ⚡" — on our key, for free. Same rule as
   // /api/chat: the browser never names a real model.
+  // Follows the same admin-chosen basic model as the rest of the product, so a
+  // switch does not leave the in-app helper on the old one.
+  const modelClass = await loadModelClass(env);
   return generate(env, {
-    provider: MODEL_CLASS.basic.provider,
-    model: MODEL_CLASS.basic.model,
+    provider: modelClass.basic.provider,
+    model: modelClass.basic.model,
     messages: [{ role: 'system', content: systemPrompt }, ...turns],
     temperature: 0.4,
     max_tokens: 700,

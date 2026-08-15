@@ -27,7 +27,15 @@ export const PROVIDERS = {
     // if a caller explicitly asks for it).
     defaultModel: 'gemini-2.5-flash',
     // gemini-2.5-pro = the "מודל מתקדם ⚡" class (pro+ plans, mapped in chat.js).
-    models: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash'],
+    // The 3.x ids are listed so a candidate can be TESTED (see /api/model-eval)
+    // and switched to from the admin panel. Listing is not selecting: what
+    // customers actually get is MODEL_CLASS / config:models.
+    models: [
+      'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite',
+      'gemini-3.1-flash-lite', 'gemini-3.1-pro-preview',
+      'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro',
+      'gemini-2.0-flash', 'gemini-1.5-flash',
+    ],
   },
   deepseek: {
     label: 'DeepSeek',

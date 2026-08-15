@@ -5058,6 +5058,7 @@ async function renderAdminTraffic() {
     }
     if (clarityBox) renderAdminClarity();
     renderAdminAi();
+    renderAdminModels();
 }
 
 // ---- AI pools: which key did the work, and which one went quiet ----------
@@ -5177,6 +5178,123 @@ async function saveAiCaps() {
     } catch (e) {
         showToast('שמירת התקרות נכשלה: ' + e.message, 'error');
     }
+}
+
+// ---- Which model serves customers -----------------------------------------
+//
+// Deliberately a detector and a test bench, not an auto-updater. The pricing
+// agent answers in a strict JSON protocol and its numbers reach customers, so a
+// model swapped in overnight is a number changed overnight. This shows what is
+// newer, runs the traps against it on demand, and switches on one click after.
+
+let _modelsData = null;
+
+async function renderAdminModels() {
+    if (!isAdmin()) return;
+    const box = document.getElementById('admin-models-body');
+    if (!box) return;
+    box.innerHTML = '<p class="input-help">טוען…</p>';
+    try {
+        const res = await fetch('/api/model-eval', { headers: { Authorization: 'Bearer ' + googleAccessToken } });
+        const d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        _modelsData = d;
+        box.innerHTML = modelsPanelHtml(d);
+    } catch (e) {
+        box.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה: ${escapeHtml(e.message)}</p>`;
+    }
+}
+
+function modelsPanelHtml(d) {
+    const opts = (sel) => (d.allowed || []).map((m) =>
+        `<option value="${escapeHtml(m)}" ${m === sel ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('');
+    const newer = (d.newer || []).length
+        ? `<div class="mdl-newer"><i class="fa-solid fa-arrow-up"></i>
+             יצאו מודלים חדשים יותר מזה שבשימוש: <b>${(d.newer || []).slice(0, 4).map(escapeHtml).join(' · ')}</b>
+             — הרץ עליהם את המלכודות לפני החלפה.</div>`
+        : (d.listError
+            ? `<div class="mdl-note">לא ניתן היה לשאול את גוגל מה קיים (${escapeHtml(d.listError)}) — הרשימה למטה היא מה שהשרת מוכן לקבל.</div>`
+            : '<div class="mdl-note">אין מודל יציב חדש יותר מזה שבשימוש. ✓</div>');
+
+    return `${newer}
+        <div class="mdl-row">
+            <label>מודל בסיסי (כל המשתמשים)</label>
+            <select id="mdl-basic">${opts(d.configured.basic.model)}</select>
+            <button class="btn btn-secondary btn-small" onclick="runModelTraps('basic')"><i class="fa-solid fa-vial"></i> הרץ מלכודות</button>
+        </div>
+        <div class="mdl-row">
+            <label>מודל מתקדם (Pro+)</label>
+            <select id="mdl-advanced">${opts(d.configured.advanced.model)}</select>
+            <button class="btn btn-secondary btn-small" onclick="runModelTraps('advanced')"><i class="fa-solid fa-vial"></i> הרץ מלכודות</button>
+        </div>
+        <div id="mdl-results"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-accent btn-small" onclick="saveModelChoice()"><i class="fa-solid fa-floppy-disk"></i> החלף למודלים שנבחרו</button>
+            <button class="btn btn-secondary btn-small" onclick="resetModelChoice()">חזור לברירת המחדל (${escapeHtml(d.shipped.basic.model)})</button>
+        </div>`;
+}
+
+async function runModelTraps(which) {
+    const sel = document.getElementById('mdl-' + which);
+    const box = document.getElementById('mdl-results');
+    if (!sel || !box) return;
+    const model = sel.value;
+    box.innerHTML = `<p class="input-help">מריץ ${_modelsData ? _modelsData.trapCount : 5} מלכודות על ${escapeHtml(model)}… זה לוקח כמה שניות.</p>`;
+    try {
+        const res = await fetch('/api/model-eval', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({ model }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        const rows = d.results.map((r) => `
+            <div class="mdl-trap ${r.pass ? 'ok' : 'bad'}">
+                <div class="mdl-trap-head">
+                    <i class="fa-solid ${r.pass ? 'fa-check' : 'fa-xmark'}"></i>
+                    <b>${escapeHtml(r.title)}</b>
+                    <small>${r.ms} ms</small>
+                </div>
+                <div class="mdl-trap-why">${escapeHtml(r.why)}</div>
+                ${r.pass ? '' : `<div class="mdl-trap-fail">${escapeHtml((r.failed || []).join(' · ') || r.error || '')}</div>`}
+                <details><summary>מה הוא ענה</summary><pre>${escapeHtml(r.excerpt)}</pre></details>
+            </div>`).join('');
+        box.innerHTML = `<div class="mdl-score ${d.passed === d.total ? 'ok' : 'bad'}">
+                ${escapeHtml(d.model)} — עבר ${d.passed} מתוך ${d.total} · ${d.avgMs} ms בממוצע
+            </div>${rows}
+            <p class="input-help">המלכודות מסננות כשלים שכבר ראינו — הן לא תעודת איכות. עבר = שווה מבט אנושי, לא "מאושר".</p>`;
+    } catch (e) {
+        box.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה: ${escapeHtml(e.message)}</p>`;
+    }
+}
+
+async function saveModelChoice() {
+    const basic = (document.getElementById('mdl-basic') || {}).value;
+    const advanced = (document.getElementById('mdl-advanced') || {}).value;
+    try {
+        const res = await fetch('/api/model-eval', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({ basic, advanced }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        showToast('המודל הוחלף — ' + basic);
+        renderAdminModels();
+    } catch (e) { showToast('ההחלפה נכשלה: ' + e.message, 'error'); }
+}
+
+async function resetModelChoice() {
+    try {
+        const res = await fetch('/api/model-eval', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + googleAccessToken },
+            body: JSON.stringify({}),
+        });
+        if (!res.ok) throw new Error(res.status);
+        showToast('חזרנו לברירת המחדל של הקוד');
+        renderAdminModels();
+    } catch (e) { showToast('נכשל: ' + e.message, 'error'); }
 }
 
 // Clarity gives the friction signals a raw counter cannot: where people rage-

@@ -16,7 +16,7 @@ import { generate } from './_ai.js';
 import { getPricingMap } from './_pricing_map.js';
 import { getKitBlock } from './_electrical_kit.js';
 import {
-  ADMIN_EMAIL, MODEL_CLASS, loadTierConfig, getTierForEmail,
+  ADMIN_EMAIL, loadModelClass, loadTierConfig, getTierForEmail,
   verifyGoogleEmail, bearerToken, dayKey, rateLimit,
 } from './_tiers.js';
 
@@ -75,7 +75,8 @@ export async function onRequestPost(context) {
 
   // ---- Model-class mapping (real model names never come from the browser) ----
   const wantAdvanced = body.modelClass === 'advanced';
-  const cls = wantAdvanced && limits.advancedModel ? MODEL_CLASS.advanced : MODEL_CLASS.basic;
+  const modelClass = await loadModelClass(env);
+  const cls = wantAdvanced && limits.advancedModel ? modelClass.advanced : modelClass.basic;
   let provider = cls.provider;
   let model = cls.model;
   if (isAdmin && body.provider) {

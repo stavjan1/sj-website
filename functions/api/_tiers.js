@@ -49,10 +49,32 @@ export const TIER_NAMES = ['guest', 'free', 'pro', 'business'];
 
 // Model classes the client is allowed to ask for. Real model names never leave
 // the server — the client only speaks "basic" / "advanced".
+// The shipped defaults. Changing which model serves customers used to require a
+// deploy, which is why the app sat two generations behind without anyone
+// deciding to: nobody wants to redeploy on a hunch. `config:models` in KV
+// overrides these, so the switch is an admin action taken AFTER the trap suite
+// has been run against the candidate — evidence first, then one click.
 export const MODEL_CLASS = {
   basic: { provider: 'gemini', model: 'gemini-2.5-flash' },
   advanced: { provider: 'gemini', model: 'gemini-2.5-pro' },
 };
+
+export async function loadModelClass(env) {
+  const merged = JSON.parse(JSON.stringify(MODEL_CLASS));
+  if (!env || !env.SJ_DATA) return merged;
+  try {
+    const raw = await env.SJ_DATA.get('config:models');
+    if (!raw) return merged;
+    const cfg = JSON.parse(raw);
+    for (const cls of ['basic', 'advanced']) {
+      if (cfg[cls] && typeof cfg[cls].model === 'string') {
+        merged[cls].model = cfg[cls].model;
+        if (typeof cfg[cls].provider === 'string') merged[cls].provider = cfg[cls].provider;
+      }
+    }
+  } catch { /* a broken override must never take the AI down */ }
+  return merged;
+}
 
 // Merge the admin-editable KV config over the shipped defaults.
 export async function loadTierConfig(env) {
