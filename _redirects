@@ -16,3 +16,5 @@
 /ASK/*  /ask/    301
 /Ask    /ask/    301
 /Ask/*  /ask/    301
+# V3 working docs — not part of the public site
+/docs/* /404.html 404

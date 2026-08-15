@@ -1629,6 +1629,7 @@ function switchTab(tabId) {
         try { renderAdminTraffic(); } catch (e) {}
         try { renderAdminStats(); } catch (e) {}
         try { adminLoadPricingMap(); } catch (e) {}
+        try { window.renderAdminFunnel && window.renderAdminFunnel(); } catch (e) {}
     }
     if (tabId === 'reports') {
         initReportsPanel();

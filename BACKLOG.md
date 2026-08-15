@@ -173,3 +173,12 @@ gating (server-side ADMIN_EMAIL on every admin endpoint), per-user KV keying
       He also pictured it looser: *"שרבוט יותר ציורי, שבן אדם יחשוב שהוא צייר
       משהו עם דף ועט"* — a hand-drawn feel, not CAD lines. (The 3D/Revit
       walkthrough he mentioned he dismissed himself as fantasy.)
+
+## V3.0 rebuild — queued follow-ups (16.8.2026)
+- Full de-FontAwesome sweep inside sale/app.js rendered templates (V3 shell is already SVG-only; FA CDN kept for panel innerHTML icons meanwhile).
+- Financy (open-banking) connector for the finance dashboard — waiting on Stav's one-time registration at financy.open-finance.ai; server will take keys as env vars.
+- WhatsApp bot variant of the Telegram defect-report bot (Meta API is paid — deferred).
+- Refresh PRODUCT_OVERVIEW.md to describe the V3 shell (one rail, more-drawer, finance panel, funnel card).
+- Visual QA pass on sale/css/panels.css (written against markup, not yet eyeballed screen-by-screen).
+- "תזכיר לי" natural-language calendar reminders from project cards (spec §5ג) — the maint-dialog + calendar plumbing exists; the free-text entry point still to build.
+- Onboarding "מה עכשיו?" next-step hint cards after each stage (spec §5ב) — partial today (plan/price action bars), formalize per stage.

@@ -2845,3 +2845,15 @@ i[class^="fa-"], i[class*=" fa-"] {
 .fin-details .textarea { margin-block: var(--sp-2); }
 .fin-connector { border: 1px solid var(--border); border-radius: var(--r-sm); padding: var(--sp-3); margin-block-start: var(--sp-3); }
 .fin-connector b { display: block; margin-block-end: var(--sp-1); }
+
+/* admin usage funnel */
+.fin-funnel { display: grid; gap: var(--sp-2); }
+.fin-funnel-row { display: flex; align-items: center; gap: var(--sp-3); }
+.ff-label { width: 110px; font-size: var(--fs-sm); color: var(--text-2); flex: none; }
+.ff-bar { flex: 1; background: var(--surface-2); border-radius: var(--r-pill); block-size: 14px; overflow: hidden; }
+.ff-bar i { display: block; block-size: 100%; background: var(--accent); border-radius: var(--r-pill); }
+.fin-funnel-row b { min-width: 36px; text-align: end; }
+.fin-table { border-collapse: collapse; width: 100%; font-size: var(--fs-xs); }
+.fin-table th, .fin-table td { border: 1px solid var(--border); padding: var(--sp-1) var(--sp-2); text-align: start; }
+.fin-table th { background: var(--surface-2); }
+.table-scroll { overflow-x: auto; }

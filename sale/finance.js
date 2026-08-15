@@ -293,6 +293,52 @@
         });
     }
 
+    // ── Admin usage funnel (renders into #admin-funnel-body) ───────────────
+    window.renderAdminFunnel = async function renderAdminFunnel() {
+        const body = document.getElementById('admin-funnel-body');
+        if (!body) return;
+        const token = authToken();
+        if (!token) { body.innerHTML = '<p class="input-help">נדרשת התחברות.</p>'; return; }
+        try {
+            const res = await fetch('/api/funnel', { headers: { Authorization: 'Bearer ' + token } });
+            const data = await res.json();
+            if (!res.ok) throw new Error((data.error && data.error.message) || 'שגיאה');
+            const f = data.funnel;
+            const steps = [
+                ['נרשמו', f.signedUp],
+                ['פתחו פרויקט', f.openedProject],
+                ['דיברו עם ה-AI', f.talkedToAI],
+                ['הפיקו הצעה', f.producedQuote],
+            ];
+            const maxV = Math.max(f.signedUp, 1);
+            body.innerHTML = `
+                <div class="fin-funnel">${steps.map(([label, v]) => `
+                    <div class="fin-funnel-row">
+                        <span class="ff-label">${label}</span>
+                        <span class="ff-bar"><i style="inline-size:${Math.round(100 * v / maxV)}%"></i></span>
+                        <b class="num">${v}</b>
+                    </div>`).join('')}
+                </div>
+                <p class="fin-muted" style="margin-block-start:8px;">
+                    פעילים בשבוע האחרון: <b class="num">${f.activeLast7d}</b> ·
+                    נעצרו אחרי הודעה-שתיים: <b class="num">${f.oneMessageOnly}</b> ·
+                    ייצאו PDF החודש: <b class="num">${f.pdfThisMonth}</b>${f.capped ? ' · (מוצגים 200 הראשונים)' : ''}
+                </p>
+                <details class="fin-details"><summary>פירוט לפי משתמש (${data.users.length})</summary>
+                    <div class="table-scroll"><table class="fin-table">
+                        <thead><tr><th>משתמש</th><th>פרויקטים</th><th>הודעות צ'אט</th><th>הצעות</th><th>מאגר</th><th>פעילות אחרונה</th></tr></thead>
+                        <tbody>${data.users.map(u => `
+                            <tr><td>${esc(u.email)}</td><td class="num">${u.projects}</td><td class="num">${u.chatMsgs}</td>
+                            <td class="num">${u.quotes}</td><td class="num">${u.catalogItems}</td>
+                            <td>${u.lastUpdated ? new Date(u.lastUpdated).toLocaleDateString('he-IL') : '—'}</td></tr>`).join('')}
+                        </tbody>
+                    </table></div>
+                </details>`;
+        } catch (e) {
+            body.innerHTML = '<p class="input-help">שגיאה בטעינת המשפך: ' + esc(e.message) + '</p>';
+        }
+    };
+
     // ── Telegram report import: /sale/?tgreport=<token> ────────────────────
     async function checkTgReport() {
         let token = '';

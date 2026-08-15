@@ -69,7 +69,8 @@ export async function onRequest(context) {
     // list with a non-empty trash slipped past the all-empty check above and
     // poisoned the cloud). Preserve the existing non-empty collection instead.
     if (existing) {
-      for (const k of ['projects', 'history', 'catalog']) {
+      // invoices/clients joined the guard in V3 — a single sync could wipe them.
+      for (const k of ['projects', 'history', 'catalog', 'invoices', 'clients']) {
         const inLen = Array.isArray(incoming[k]) ? incoming[k].length : 0;
         const exLen = Array.isArray(existing[k]) ? existing[k].length : 0;
         if (inLen === 0 && exLen > 0) incoming[k] = existing[k];

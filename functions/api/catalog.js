@@ -54,7 +54,7 @@ export async function onRequest(context) {
       .filter((it) => it.name && Number.isFinite(it.price))
       .slice(0, MAX_ITEMS);
 
-    const payload = { items, updatedAt: Date.now(), publishedBy: email };
+    const payload = { items, updatedAt: Date.now(), publishedBy: gate.email };
     await env.SJ_DATA.put(KEY, JSON.stringify(payload));
     return json({ ok: true, count: items.length, updatedAt: payload.updatedAt });
   }
