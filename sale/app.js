@@ -2153,6 +2153,19 @@ function createNewProject() {
     
     loadProject(newProj.id);
     showToast(autoName ? 'פרויקט חדש נפתח — תאר את העבודה והשם ייקבע לבד' : `פרויקט "${name}" נוצר בהצלחה`);
+
+    // Recurring work: ask for the interval and the next date now, while the
+    // customer is still in mind. The toggle resets, so the next project starts
+    // as a one-off again rather than inheriting a choice nobody repeated.
+    if (_newProjectKind === 'maintenance') {
+        newProj.kind = 'maintenance';
+        saveProjects();
+        setNewProjectKind('job');
+        setTimeout(() => openMaintenanceDialog(newProj.id), 250);
+        if (projectsList.length === 1) setTimeout(maybeShowBizGate, 2400);
+        return;
+    }
+
     switchTab('wizard'); // Auto switch to pricing chat
     // First project ever → one soft, skippable nudge to fill business details.
     if (projectsList.length === 1) setTimeout(maybeShowBizGate, 1200);
@@ -3371,6 +3384,250 @@ function renderFollowupReminders() {
 }
 
 // ==========================================================================
+// Periodic maintenance — a project that comes back.
+//
+// Most jobs end when the quote is paid. Some don't: an annual inspection, a
+// filter change, a thermographic scan. Those were being tracked as one-off
+// projects and remembered by the electrician, which is to say forgotten. A
+// maintenance project carries its own interval and next date, and the bell
+// picks it up at the lead times the user chose once.
+// ==========================================================================
+
+// Presets in the order a tradesman actually thinks about them: the long warning
+// to book the visit, the short one to actually show up. Days, not months, so
+// the arithmetic is honest about a 90-day quarter.
+const MAINT_LEAD_PRESETS = [
+    { id: '90-30', days: [90, 30], label: '3 חודשים + חודש' },
+    { id: '60-14', days: [60, 14], label: 'חודשיים + שבועיים' },
+    { id: '30',    days: [30],     label: 'חודש בלבד' },
+    { id: '14',    days: [14],     label: 'שבועיים בלבד' },
+    { id: 'none',  days: [],       label: 'בלי תזכורת מוקדמת' },
+];
+const MAINT_LEAD_DEFAULT = [90, 30];
+
+// One default for everyone, overridable per project. Asking on every project
+// would be friction on the 95% that want the same answer; forcing one number
+// on everyone ignores that a factory needs a quarter's notice and a flat needs
+// two weeks. So: a global default here, and a per-project override on the card.
+function maintDefaultLeads() {
+    const v = appState.settings && appState.settings.maintenanceLeadDays;
+    return Array.isArray(v) ? v.slice() : MAINT_LEAD_DEFAULT.slice();
+}
+function maintLeadsFor(proj) {
+    const m = proj && proj.maintenance;
+    return m && Array.isArray(m.leadDays) ? m.leadDays.slice() : maintDefaultLeads();
+}
+function maintLeadLabel(days) {
+    if (!days || !days.length) return 'בלי תזכורת מוקדמת';
+    const preset = MAINT_LEAD_PRESETS.find((p) => p.days.join(',') === days.join(','));
+    if (preset) return preset.label;
+    return days.map((d) => (d % 30 === 0 ? (d / 30) + ' חודשים' : d + ' ימים')).join(' + ');
+}
+// Has the user ever been asked? Absence, not emptiness — "בלי תזכורת מוקדמת"
+// is a real answer and must not re-trigger the question.
+function maintLeadsChosen() {
+    return !!(appState.settings && Array.isArray(appState.settings.maintenanceLeadDays));
+}
+
+let _newProjectKind = 'job';
+function setNewProjectKind(kind) {
+    _newProjectKind = kind === 'maintenance' ? 'maintenance' : 'job';
+    document.querySelectorAll('.proj-kind-btn').forEach((b) => {
+        b.classList.toggle('active', b.dataset.kind === _newProjectKind);
+    });
+}
+
+// ---- the dialog ----
+let _maintTarget = null;      // project id being configured
+let _maintMonths = 12;
+
+function openMaintenanceDialog(projectId) {
+    const proj = projectsList.find((p) => p.id === projectId);
+    const dlg = document.getElementById('maint-dialog');
+    if (!proj || !dlg) return;
+    _maintTarget = projectId;
+    const existing = proj.maintenance || {};
+    _maintMonths = existing.months || 12;
+
+    document.getElementById('maint-for').textContent = 'עבור: ' + (proj.name || 'הפרויקט');
+    maintPickInterval(_maintMonths, true);
+    document.getElementById('maint-next').value = existing.next || maintAddMonths(ckToday(), _maintMonths);
+
+    // The lead-time question is asked once, ever. After that the block becomes
+    // a quiet line telling you what's set and where to change it.
+    const block = document.getElementById('maint-lead-block');
+    const row = document.getElementById('maint-lead-row');
+    const note = document.getElementById('maint-lead-note');
+    const current = maintLeadsFor(proj);
+    if (maintLeadsChosen() && !existing.leadDays) {
+        row.innerHTML = '';
+        block.querySelector('label').textContent = 'תזכורות';
+        note.textContent = maintLeadLabel(current) + ' לפני המועד — לשינוי: הגדרות ← תזכורות תחזוקה.';
+    } else {
+        block.querySelector('label').textContent = 'מתי להזכיר לך?';
+        note.textContent = 'בחר את מועד התזכורות הנוח לך, יהיה ניתן לשנות אותו בכל זמן דרך מסך ההגדרות.';
+        row.innerHTML = MAINT_LEAD_PRESETS.map((p) => {
+            const on = p.days.join(',') === current.join(',');
+            return `<button type="button" class="mchip${on ? ' active' : ''}" data-lead="${p.id}" onclick="maintPickLead('${p.id}')">${escapeHtml(p.label)}</button>`;
+        }).join('');
+    }
+    dlg.showModal();
+}
+
+function maintPickInterval(months, silent) {
+    _maintMonths = months;
+    document.querySelectorAll('#maint-interval-row .mchip').forEach((b) => {
+        b.classList.toggle('active', Number(b.dataset.months) === months);
+    });
+    const custom = document.getElementById('maint-months-custom');
+    if (custom) custom.style.display = months === 0 ? '' : 'none';
+    if (!silent && months > 0) {
+        document.getElementById('maint-next').value = maintAddMonths(ckToday(), months);
+    }
+}
+function maintCustomMonths() {
+    const v = parseInt(document.getElementById('maint-months-custom').value, 10);
+    if (!v || v < 1) return;
+    _maintMonths = Math.min(120, v);
+    document.getElementById('maint-next').value = maintAddMonths(ckToday(), _maintMonths);
+}
+function maintPickLead(id) {
+    document.querySelectorAll('#maint-lead-row .mchip').forEach((b) => {
+        b.classList.toggle('active', b.dataset.lead === id);
+    });
+}
+function _maintSelectedLeads() {
+    const el = document.querySelector('#maint-lead-row .mchip.active');
+    if (!el) return null;                     // the block was in "already chosen" mode
+    const preset = MAINT_LEAD_PRESETS.find((p) => p.id === el.dataset.lead);
+    return preset ? preset.days.slice() : null;
+}
+
+// Dates: reuse the checkup helpers, which already clamp 31.1 + 1mo to 28.2.
+function maintAddMonths(dateStr, months) { return ckAddMonths(dateStr, months || 12); }
+
+function maintSave() {
+    const proj = projectsList.find((p) => p.id === _maintTarget);
+    const dlg = document.getElementById('maint-dialog');
+    if (!proj) { dlg.close(); return; }
+    const next = document.getElementById('maint-next').value;
+    if (!next) { showToast('בחר תאריך לביקור הבא', 'error'); return; }
+
+    const chosen = _maintSelectedLeads();
+    if (chosen && !maintLeadsChosen()) {
+        // First maintenance project ever → this answer becomes the default.
+        if (!appState.settings) appState.settings = {};
+        appState.settings.maintenanceLeadDays = chosen;
+        persistSettings();
+    }
+    proj.kind = 'maintenance';
+    proj.maintenance = Object.assign({}, proj.maintenance, {
+        months: _maintMonths || 12,
+        next,
+        // Only record an override when it differs from the global default.
+        leadDays: chosen && chosen.join(',') !== maintDefaultLeads().join(',') ? chosen : null,
+        eventId: (proj.maintenance && proj.maintenance.eventId) || null,
+    });
+    saveProjects();
+    filterProjectsList();
+    dlg.close();
+    showToast('תחזוקה נקבעה — ' + ckFmtDate(next) + ' · תזכורת ' + maintLeadLabel(maintLeadsFor(proj)) + ' לפני');
+}
+
+function maintCancel() {
+    const proj = projectsList.find((p) => p.id === _maintTarget);
+    if (proj) { proj.kind = 'job'; proj.maintenance = null; saveProjects(); filterProjectsList(); }
+    document.getElementById('maint-dialog').close();
+}
+
+// The due date the bell and the calendar both read.
+function maintNextDue(proj) {
+    const m = proj && proj.maintenance;
+    return m && m.next ? m.next : null;
+}
+// Days until the FIRST lead time is reached; null when it isn't due to nag yet.
+function maintDueIn(proj) {
+    const due = maintNextDue(proj);
+    if (!due) return null;
+    const leads = maintLeadsFor(proj);
+    if (!leads.length) return null;                 // user asked for no early nudge
+    const days = ckDaysUntil(due);
+    return days <= Math.max.apply(null, leads) ? days : null;
+}
+
+// The chip on the project row: the next date, and one tap to change it. Turns
+// amber once the job has entered its reminder window.
+function maintBadgeHtml(p) {
+    if ((p.kind || 'job') !== 'maintenance') return '';
+    const due = maintNextDue(p);
+    if (!due) {
+        return `<span class="maint-chip" onclick="event.stopPropagation(); openMaintenanceDialog('${escapeHtml(p.id)}')" title="קבע מועד תחזוקה"><i class="fa-solid fa-rotate"></i> קבע מועד</span>`;
+    }
+    const n = ckDaysUntil(due);
+    const due_soon = maintDueIn(p) !== null;
+    const when = n < 0 ? 'באיחור ' + Math.abs(n) + ' יום' : n === 0 ? 'היום' : ckFmtDate(due);
+    return `<span class="maint-chip${due_soon ? ' is-due' : ''}" onclick="event.stopPropagation(); openMaintenanceDialog('${escapeHtml(p.id)}')" title="תחזוקה תקופתית — לחץ לעריכה"><i class="fa-solid fa-rotate"></i> ${escapeHtml(when)}</span>`;
+}
+
+// ---- reaching the customer about a visit (not about a quote) ----
+function maintMessage(proj) {
+    const due = maintNextDue(proj);
+    const biz = (appState.settings && appState.settings.businessDetails && appState.settings.businessDetails.name) || '';
+    const who = (proj.quoteData && proj.quoteData.clientName) || '';
+    return 'שלום' + (who ? ' ' + who : '') + ', ' + (biz ? 'כאן ' + biz + '. ' : '') +
+        'מתקרב מועד התחזוקה התקופתית' + (due ? ' (' + ckFmtDate(due) + ')' : '') +
+        ' — אשמח שנתאם מועד שנוח לכם.';
+}
+function maintWhatsApp(projectId) {
+    const proj = projectsList.find((p) => p.id === projectId);
+    if (!proj) return;
+    let digits = String(proj.clientPhone || '').replace(/\D/g, '');
+    if (digits.startsWith('0')) digits = '972' + digits.slice(1);
+    window.open('https://wa.me/' + digits + '?text=' + encodeURIComponent(maintMessage(proj)), '_blank', 'noopener');
+}
+function maintEmail(projectId) {
+    const proj = projectsList.find((p) => p.id === projectId);
+    if (!proj || !proj.clientEmail) return;
+    const subject = 'תיאום תחזוקה תקופתית — ' + ((proj.quoteData && proj.quoteData.subject) || proj.name);
+    window.location.href = 'mailto:' + encodeURIComponent(proj.clientEmail) +
+        '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(maintMessage(proj));
+}
+
+// A visit happened → roll the date forward one interval instead of making the
+// user do the arithmetic (and instead of the reminder nagging forever).
+function maintMarkDone(projectId) {
+    const proj = projectsList.find((p) => p.id === projectId);
+    if (!proj || !proj.maintenance) return;
+    const from = proj.maintenance.next || ckToday();
+    proj.maintenance.next = maintAddMonths(from, proj.maintenance.months || 12);
+    proj.maintenance.eventId = null;    // the old calendar series no longer matches
+    saveProjects();
+    filterProjectsList();
+    showToast('הביקור נרשם — הבא: ' + ckFmtDate(proj.maintenance.next));
+}
+
+// ---- settings screen ----
+function renderMaintenanceSetting() {
+    const row = document.getElementById('maint-setting-row');
+    if (!row) return;
+    const cur = maintDefaultLeads();
+    row.innerHTML = MAINT_LEAD_PRESETS.map((p) => {
+        const on = p.days.join(',') === cur.join(',');
+        return `<button type="button" class="mchip${on ? ' active' : ''}" onclick="setMaintenanceLeads('${p.id}')">${escapeHtml(p.label)}</button>`;
+    }).join('');
+}
+function setMaintenanceLeads(id) {
+    const preset = MAINT_LEAD_PRESETS.find((p) => p.id === id);
+    if (!preset) return;
+    if (!appState.settings) appState.settings = {};
+    appState.settings.maintenanceLeadDays = preset.days.slice();
+    persistSettings();
+    renderMaintenanceSetting();
+    try { renderFollowupReminders(); } catch (e) {}
+    showToast('תזכורות התחזוקה: ' + preset.label + ' לפני המועד');
+}
+
+// ==========================================================================
 // "מי מחכה לי" — one bell over both reminder systems.
 //
 // Two things nudge you to call a customer, and until now they lived on two
@@ -3402,6 +3659,20 @@ function getReminderItems() {
                 kind: 'followup', id: p.id, name: p.name || 'פרויקט',
                 why: (isPayment ? 'ממתין לתשלום' : 'ממתין לתשובה') + ' ' + days + ' ימים',
                 lateness: days,
+                phone: p.clientPhone || '', email: p.clientEmail || '',
+            });
+        });
+    } catch (e) { /* projects not loaded yet */ }
+    try {
+        (projectsList || []).forEach((p) => {
+            if ((p.kind || 'job') !== 'maintenance') return;
+            const n = maintDueIn(p);
+            if (n === null) return;                 // not inside its lead window yet
+            items.push({
+                kind: 'maintenance', id: p.id, name: p.name || 'תחזוקה',
+                why: n < 0 ? 'תחזוקה באיחור ' + Math.abs(n) + ' יום'
+                    : n === 0 ? 'התחזוקה היום' : 'תחזוקה בעוד ' + n + ' יום',
+                lateness: -n,
                 phone: p.clientPhone || '', email: p.clientEmail || '',
             });
         });
@@ -3554,6 +3825,15 @@ function reminderAction(kind, id, what) {
         if (what === 'mail') return ckMailto(id);
         closeReminderPopover();
         switchTab('checkups');
+        return;
+    }
+    if (kind === 'maintenance') {
+        // The message differs from a quote chase: this one books a visit.
+        if (what === 'wa') return maintWhatsApp(id);
+        if (what === 'mail') return maintEmail(id);
+        closeReminderPopover();
+        switchTab('projects');
+        openProjectFromReminder(id);
         return;
     }
     if (what === 'wa') { followupWhatsApp(id); return; }
@@ -3718,6 +3998,7 @@ function renderProjectsList(list) {
                 <div class="project-title">${escapeHtml(p.name)}</div>
                 <div class="project-meta">
                     <span><i class="fa-solid fa-calendar"></i> ${formatHebrewDate(p.created)}</span>
+                    ${maintBadgeHtml(p)}
                     <label class="proj-cat-chip ${p.category ? 'has-cat' : ''}" onclick="event.stopPropagation()">
                         <i class="fa-solid fa-tag"></i>
                         <select class="proj-cat-select" onchange="assignProjectCategory('${p.id}', this.value)">
@@ -3888,6 +4169,7 @@ function loadSettings() {
             applySystemTheme(themePref());
             applyBoxTheme(appState.settings.boxTheme || 'auto');
             applySystemBackground('none'); // cinematic backgrounds retired — always solid
+            renderMaintenanceSetting();
             updatePdfCustomStyles();
         } catch (e) {
             console.error('Error loading settings', e);
@@ -3897,6 +4179,7 @@ function loadSettings() {
         applySystemTheme(defaultThemeByOS());
         applyBoxTheme('auto');
         applySystemBackground('none');
+        renderMaintenanceSetting();
         updatePdfCustomStyles();
     }
 }

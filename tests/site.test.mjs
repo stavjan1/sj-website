@@ -316,3 +316,27 @@ test('a stale Google token cannot block its own replacement', () => {
     assert.match(app, /_rememberTokenExpiry\(Date\.now\(\) \+ \(parseInt\(resp\.expires_in/,
         'the access-token mint no longer records when the token dies');
 });
+
+test('the maintenance reminder is asked once and answered "never" without re-asking', () => {
+    const html = read('sale/index.html');
+    const app = read('sale/app.js');
+
+    // Stav specified this sentence word for word. It is the only place the app
+    // tells you the choice is not final, so it must not drift.
+    assert.ok(html.includes('בחר את מועד התזכורות הנוח לך, יהיה ניתן לשנות אותו בכל זמן דרך מסך ההגדרות'),
+        'the reminder-timing copy changed — Stav dictated this sentence verbatim');
+
+    // "בלי תזכורת מוקדמת" is a real answer. Gating the question on a non-empty
+    // list would ask again on every maintenance project for anyone who chose it.
+    assert.match(app, /function maintLeadsChosen\(\)[\s\S]{0,200}Array\.isArray\(appState\.settings\.maintenanceLeadDays\)/,
+        'the "have we asked yet" check no longer tests for presence — "no reminder" would re-ask forever');
+
+    // One global default, overridden per project only when it actually differs.
+    assert.match(app, /function maintDefaultLeads/, 'the global reminder default is gone');
+    assert.match(app, /chosen && chosen\.join\(','\) !== maintDefaultLeads\(\)\.join\(','\) \? chosen : null/,
+        'a per-project override is stored even when it equals the global default');
+
+    // And the settings screen must be able to change it, as the copy promises.
+    assert.ok(html.includes('id="maint-setting-row"'),
+        'the settings screen has no reminder-timing control, but the dialog tells the user to go there');
+});
