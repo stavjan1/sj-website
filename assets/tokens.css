@@ -1,0 +1,117 @@
+/* ============================================================
+   SJ / ZEREM — V3 design tokens. The ONE source of truth.
+   Loaded first on every page (marketing, zerem, sale, ask, q, checkups).
+   Light is the default; dark via [data-theme="dark"] or OS auto.
+   ============================================================ */
+
+:root {
+  /* -- type -- */
+  --font-ui: "IBM Plex Sans Hebrew", "Heebo", -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Frank Ruhl Libre", "David Libre", serif;
+  --fs-xs: 0.8125rem;  /* 13 */
+  --fs-sm: 0.9375rem;  /* 15 */
+  --fs-md: 1rem;       /* 16 */
+  --fs-lg: 1.125rem;   /* 18 */
+  --fs-xl: 1.375rem;   /* 22 */
+  --fs-2xl: 1.75rem;   /* 28 */
+  --fs-3xl: 2.25rem;   /* 36 */
+  --fs-4xl: 3rem;      /* 48 */
+  --lh-body: 1.6;
+  --lh-tight: 1.25;
+
+  /* -- space (4pt grid) -- */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-6: 24px; --sp-8: 32px; --sp-12: 48px; --sp-16: 64px;
+
+  /* -- shape -- */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-pill: 999px;
+
+  /* -- motion -- */
+  --t-fast: 160ms ease-out;
+  --t-med: 220ms ease-out;
+
+  /* -- layers -- */
+  --z-raised: 10; --z-nav: 40; --z-drawer: 100; --z-modal: 1000;
+
+  /* -- light palette (default) -- */
+  --bg: #FAFAF9;            /* warm paper */
+  --surface: #FFFFFF;
+  --surface-2: #F5F5F4;     /* subtle wells / hovers */
+  --text: #1C1917;
+  --text-2: #57534E;        /* secondary text, 7:1 on bg */
+  --text-3: #79716B;        /* hints, 4.6:1 on bg */
+  --border: #E7E5E4;
+  --border-strong: #D6D3D1;
+
+  --accent: #A16207;        /* amber-copper; 4.7:1 on white */
+  --accent-strong: #854D0E; /* hover / active */
+  --accent-soft: #FEF3C7;   /* soft fill behind accent content */
+  --on-accent: #FFFFFF;
+
+  /* status — dual greens kept from V2 (measured WCAG work) */
+  --ok-text: #15803D;
+  --ok-btn: #0D7A4A;
+  --danger: #DC2626;
+  --danger-strong: #B91C1C;
+  --warn-text: #A16207;
+
+  --shadow-1: 0 1px 2px rgb(28 25 23 / 0.05), 0 4px 14px rgb(28 25 23 / 0.06);
+  --scrim: rgb(12 10 9 / 0.5);
+
+  /* -- WhatsApp (real brand action, allowed) -- */
+  --whatsapp: #1FAF5A;      /* darkened for 3:1 on white */
+}
+
+/* dark palette — desaturated, not inverted */
+[data-theme="dark"] {
+  --bg: #0C0A09;
+  --surface: #1C1917;
+  --surface-2: #292524;
+  --text: #FAFAF9;
+  --text-2: #D6D3D1;
+  --text-3: #A8A29E;
+  --border: #292524;
+  --border-strong: #44403C;
+
+  --accent: #F59E0B;        /* brighter amber for dark ground */
+  --accent-strong: #FBBF24;
+  --accent-soft: #3B2F14;
+  --on-accent: #1C1917;
+
+  --ok-text: #4ADE80;
+  --ok-btn: #15803D;
+  --danger: #F87171;
+  --danger-strong: #EF4444;
+  --warn-text: #FCD34D;
+
+  --shadow-1: 0 0 0 1px rgb(255 255 255 / 0.04);
+  --scrim: rgb(0 0 0 / 0.6);
+  --whatsapp: #25D366;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0C0A09;
+    --surface: #1C1917;
+    --surface-2: #292524;
+    --text: #FAFAF9;
+    --text-2: #D6D3D1;
+    --text-3: #A8A29E;
+    --border: #292524;
+    --border-strong: #44403C;
+    --accent: #F59E0B;
+    --accent-strong: #FBBF24;
+    --accent-soft: #3B2F14;
+    --on-accent: #1C1917;
+    --ok-text: #4ADE80;
+    --ok-btn: #15803D;
+    --danger: #F87171;
+    --danger-strong: #EF4444;
+    --warn-text: #FCD34D;
+    --shadow-1: 0 0 0 1px rgb(255 255 255 / 0.04);
+    --scrim: rgb(0 0 0 / 0.6);
+    --whatsapp: #25D366;
+  }
+}

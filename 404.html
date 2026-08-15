@@ -5,36 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>הדף לא נמצא | SJ הנדסת חשמל</title>
     <meta name="robots" content="noindex">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='none' stroke='%232b74db' stroke-width='6'/%3E%3Cpath d='M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z' fill='%23ffaa00'/%3E%3C/svg%3E">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Hebrew:wght@400;500;700&family=Frank+Ruhl+Libre:wght@700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="assets/tokens.css?v=300">
+    <link rel="stylesheet" href="assets/ui.css?v=300">
+    <link rel="stylesheet" href="styles.css?v=300">
+
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2L4.5 13h6l-1.5 9L18.5 10h-6z' fill='%23A16207'/%3E%3C/svg%3E">
+
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: #09090b; color: #fff;
-            font-family: 'Rubik', 'Heebo', -apple-system, sans-serif;
-            min-height: 100vh; display: flex; align-items: center; justify-content: center;
-            text-align: center; padding: 20px;
+        .center-page {
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex; align-items: center; justify-content: center;
+            text-align: center; padding: var(--sp-6);
         }
-        .bolt { width: 72px; height: 72px; margin: 0 auto 18px; }
-        h1 { font-size: 1.5rem; margin-bottom: 8px; }
-        p { color: #a1a1aa; font-size: 0.95rem; margin-bottom: 26px; }
-        .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-        a.btn {
-            display: inline-block; padding: 11px 22px; border-radius: 10px;
-            text-decoration: none; font-size: 0.9rem; color: #fff;
+        .nf-card { max-width: 440px; }
+        .nf-bolt {
+            width: 72px; height: 72px;
+            color: var(--border-strong);
+            margin-block-end: var(--sp-4);
         }
-        a.home { background: #2b74db; }
-        a.wa { border: 1px solid rgba(255,255,255,0.15); }
+        .nf-card h1 { font-family: var(--font-display); font-size: var(--fs-2xl); }
+        .nf-card p { color: var(--text-2); margin-block-end: var(--sp-8); }
+        .nf-actions { display: flex; gap: var(--sp-3); justify-content: center; flex-wrap: wrap; }
     </style>
 </head>
 <body>
-    <div>
-        <svg class="bolt" viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#2b74db" stroke-width="4" stroke-dasharray="5 3"/><path d="M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z" fill="#ffaa00"/></svg>
-        <h1>נראה שהנתיך הזה קפץ</h1>
-        <p>הדף שחיפשתם לא נמצא. אולי הקישור השתנה או שיש שגיאת הקלדה בכתובת.</p>
-        <div class="actions">
-            <a class="btn home" href="/">לדף הבית</a>
-            <a class="btn wa" href="https://wa.me/972535302887">דברו איתנו בוואטסאפ</a>
+    <main class="center-page" id="main-content">
+        <div class="nf-card">
+            <svg class="nf-bolt" viewBox="0 0 100 100" aria-hidden="true">
+                <circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="6 4"/>
+                <path d="M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z" fill="var(--accent)"/>
+            </svg>
+            <h1>נראה שהנתיך הזה קפץ</h1>
+            <p>הדף שחיפשתם לא נמצא. אולי הקישור השתנה או שיש שגיאת הקלדה בכתובת.</p>
+            <div class="nf-actions">
+                <a class="btn btn-primary" href="/">לדף הבית</a>
+                <a class="btn btn-quiet" href="https://wa.me/972535302887">דברו איתנו בוואטסאפ</a>
+            </div>
         </div>
-    </div>
+    </main>
 </body>
 </html>

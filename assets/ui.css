@@ -1,0 +1,180 @@
+/* ============================================================
+   SJ / ZEREM — V3 shared primitives. Loaded after tokens.css.
+   Base + the small set of components every surface reuses.
+   Logical properties only (RTL-first site).
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 { line-height: var(--lh-tight); margin: 0 0 var(--sp-4); font-weight: 700; }
+p { margin: 0 0 var(--sp-4); }
+img, svg, video { max-width: 100%; height: auto; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-strong); }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::selection { background: var(--accent-soft); }
+
+.num, .money { font-variant-numeric: tabular-nums; }
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  min-height: 44px; padding: 0 var(--sp-6);
+  border: 1px solid transparent; border-radius: var(--r-sm);
+  font: 500 var(--fs-md)/1 var(--font-ui);
+  cursor: pointer; user-select: none;
+  transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+  touch-action: manipulation;
+}
+.btn:active { transform: translateY(1px); }
+.btn svg { width: 18px; height: 18px; flex: none; }
+
+.btn-primary { background: var(--accent); color: var(--on-accent); }
+.btn-primary:hover { background: var(--accent-strong); color: var(--on-accent); }
+
+.btn-quiet { background: transparent; color: var(--text); border-color: var(--border-strong); }
+.btn-quiet:hover { background: var(--surface-2); color: var(--text); }
+
+.btn-ghost { background: transparent; color: var(--text-2); }
+.btn-ghost:hover { background: var(--surface-2); color: var(--text); }
+
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { background: var(--danger-strong); color: #fff; }
+
+.btn-ok { background: var(--ok-btn); color: #fff; }
+.btn-whatsapp { background: var(--whatsapp); color: #fff; }
+.btn-whatsapp:hover { filter: brightness(0.94); color: #fff; }
+
+.btn[disabled], .btn[aria-disabled="true"] { opacity: 0.45; pointer-events: none; }
+
+.btn-sm { min-height: 36px; padding: 0 var(--sp-4); font-size: var(--fs-sm); }
+.btn-lg { min-height: 52px; padding: 0 var(--sp-8); font-size: var(--fs-lg); }
+
+/* ---------- cards ---------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--sp-6);
+}
+.card-hover { transition: border-color var(--t-fast), box-shadow var(--t-fast); }
+.card-hover:hover { border-color: var(--border-strong); box-shadow: var(--shadow-1); }
+
+/* ---------- inputs ---------- */
+.field { display: flex; flex-direction: column; gap: var(--sp-2); margin-block-end: var(--sp-4); }
+.field > label { font-size: var(--fs-sm); font-weight: 500; color: var(--text-2); }
+.field .hint { font-size: var(--fs-xs); color: var(--text-3); }
+.field .error { font-size: var(--fs-xs); color: var(--danger); }
+
+.input, .select, .textarea {
+  width: 100%; min-height: 44px; padding: var(--sp-2) var(--sp-3);
+  font: 400 var(--fs-md)/1.4 var(--font-ui); color: var(--text);
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  transition: border-color var(--t-fast);
+}
+.textarea { min-height: 96px; resize: vertical; }
+.input:focus, .select:focus, .textarea:focus { outline: none; border-color: var(--accent); }
+.input::placeholder, .textarea::placeholder { color: var(--text-3); }
+
+/* ---------- chips ---------- */
+.chip {
+  display: inline-flex; align-items: center; gap: var(--sp-1);
+  min-height: 32px; padding: 0 var(--sp-3);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--surface); color: var(--text-2);
+  font-size: var(--fs-sm); cursor: pointer;
+  transition: border-color var(--t-fast), background-color var(--t-fast), color var(--t-fast);
+}
+.chip:hover { border-color: var(--accent); color: var(--text); }
+.chip[aria-pressed="true"], .chip.on {
+  background: var(--accent-soft); border-color: var(--accent); color: var(--text);
+}
+
+/* ---------- status text ---------- */
+.status-ok { color: var(--ok-text); }
+.status-warn { color: var(--warn-text); }
+.status-danger { color: var(--danger); }
+
+/* ---------- drawer (settings etc.) ---------- */
+.drawer-scrim {
+  position: fixed; inset: 0; background: var(--scrim);
+  opacity: 0; pointer-events: none; transition: opacity var(--t-med);
+  z-index: var(--z-drawer);
+}
+.drawer {
+  position: fixed; inset-block: 0; inset-inline-end: 0;
+  width: min(380px, 92vw);
+  background: var(--surface); border-inline-start: 1px solid var(--border);
+  transform: translateX(-100%);
+  transition: transform var(--t-med);
+  z-index: calc(var(--z-drawer) + 1);
+  overflow-y: auto; padding: var(--sp-6);
+}
+[dir="rtl"] .drawer { transform: translateX(100%); }
+.drawer-open .drawer { transform: none; }
+.drawer-open .drawer-scrim { opacity: 1; pointer-events: auto; }
+
+/* ---------- dialog ---------- */
+.dialog { border: none; border-radius: var(--r-md); background: var(--surface); color: var(--text);
+  box-shadow: var(--shadow-1); padding: var(--sp-6); max-width: min(480px, 92vw); }
+.dialog::backdrop { background: var(--scrim); }
+
+/* ---------- toast ---------- */
+.toast {
+  position: fixed; inset-block-end: calc(var(--sp-6) + env(safe-area-inset-bottom));
+  inset-inline-start: 50%; transform: translateX(50%);
+  background: var(--text); color: var(--bg);
+  padding: var(--sp-3) var(--sp-6); border-radius: var(--r-sm);
+  font-size: var(--fs-sm); z-index: var(--z-modal);
+}
+[dir="rtl"] .toast { transform: translateX(50%); }
+
+/* ---------- empty states are the guide ---------- */
+.empty {
+  text-align: center; padding: var(--sp-12) var(--sp-6);
+  color: var(--text-2);
+}
+.empty svg { width: 40px; height: 40px; color: var(--text-3); margin-block-end: var(--sp-3); }
+.empty h3 { font-size: var(--fs-lg); color: var(--text); margin-block-end: var(--sp-2); }
+.empty p { max-width: 42ch; margin-inline: auto; }
+
+/* ---------- a11y helpers ---------- */
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; margin: -1px;
+  clip-path: inset(50%); overflow: hidden; white-space: nowrap;
+}
+.skip-link {
+  position: absolute; inset-block-start: -48px; inset-inline-start: var(--sp-4);
+  background: var(--surface); color: var(--text); padding: var(--sp-2) var(--sp-4);
+  border-radius: 0 0 var(--r-sm) var(--r-sm); z-index: var(--z-modal);
+}
+.skip-link:focus { inset-block-start: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

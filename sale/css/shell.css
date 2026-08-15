@@ -1,0 +1,214 @@
+/* ============================================================
+   ZEREM V3 — app shell: icon rail, more-drawer (desktop side sheet),
+   context header, mobile bottom bar, theme bridge.
+   Loads after assets/tokens.css + assets/ui.css.
+   Content panels live in panels.css; PDF sheets in pdf.css.
+   ============================================================ */
+
+/* ---------- theme bridge ----------
+   app.js applies body classes (light-theme / mid-theme / dark-theme) via its
+   settings system, and an inline pre-paint script sets light/dark from the OS.
+   Tokens follow the body class; 'mid' collapses into dark. */
+body.light-theme {
+  --bg: #FAFAF9; --surface: #FFFFFF; --surface-2: #F5F5F4;
+  --text: #1C1917; --text-2: #57534E; --text-3: #79716B;
+  --border: #E7E5E4; --border-strong: #D6D3D1;
+  --accent: #A16207; --accent-strong: #854D0E; --accent-soft: #FEF3C7; --on-accent: #FFFFFF;
+  --ok-text: #15803D; --ok-btn: #0D7A4A; --danger: #DC2626; --danger-strong: #B91C1C; --warn-text: #A16207;
+  --shadow-1: 0 1px 2px rgb(28 25 23 / 0.05), 0 4px 14px rgb(28 25 23 / 0.06);
+  --scrim: rgb(12 10 9 / 0.5); --whatsapp: #1FAF5A;
+}
+body.dark-theme, body.mid-theme {
+  --bg: #0C0A09; --surface: #1C1917; --surface-2: #292524;
+  --text: #FAFAF9; --text-2: #D6D3D1; --text-3: #A8A29E;
+  --border: #292524; --border-strong: #44403C;
+  --accent: #F59E0B; --accent-strong: #FBBF24; --accent-soft: #3B2F14; --on-accent: #1C1917;
+  --ok-text: #4ADE80; --ok-btn: #15803D; --danger: #F87171; --danger-strong: #EF4444; --warn-text: #FCD34D;
+  --shadow-1: 0 0 0 1px rgb(255 255 255 / 0.04);
+  --scrim: rgb(0 0 0 / 0.6); --whatsapp: #25D366;
+}
+/* legacy box-theme classes are harmless no-ops in V3 */
+body.boxes-light, body.boxes-dark { }
+
+/* ---------- app frame ---------- */
+html, body { height: 100%; }
+body {
+  overflow: hidden; /* the shell is height-locked; panels scroll inside */
+  background: var(--bg); color: var(--text);
+}
+.app-container {
+  display: flex;
+  height: var(--appvh, 100dvh);
+}
+.main-content {
+  flex: 1; min-width: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--sp-6);
+}
+
+/* ---------- icon rail (the old .sidebar, reborn) ---------- */
+.sidebar {
+  display: flex; flex-direction: column; align-items: stretch;
+  width: 76px; flex: none;
+  background: var(--surface);
+  border-inline-end: 1px solid var(--border);
+  padding: var(--sp-3) var(--sp-1);
+  overflow-y: auto; overflow-x: hidden;
+  scrollbar-width: none;
+}
+.sidebar::-webkit-scrollbar { display: none; }
+
+.sidebar-logo {
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--sp-2) 0 var(--sp-4);
+  color: var(--accent);
+}
+.sidebar-logo svg { width: 26px; height: 26px; }
+
+.nav-menu { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+
+.nav-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  min-height: 54px; padding: var(--sp-2) 2px;
+  background: none; border: none; border-radius: var(--r-sm);
+  color: var(--text-3); font: 500 10px/1.2 var(--font-ui);
+  cursor: pointer; text-align: center;
+  transition: color var(--t-fast), background-color var(--t-fast);
+  position: relative;
+}
+.nav-btn svg { width: 22px; height: 22px; flex: none; }
+.nav-btn:hover { color: var(--text); background: var(--surface-2); }
+.nav-btn.active { color: var(--text); }
+.nav-btn.active::before {
+  content: ''; position: absolute; inset-block: 10px; inset-inline-start: -4px;
+  width: 3px; border-radius: 2px; background: var(--accent);
+}
+
+/* project-step group: visible only with an open project (body.in-project) */
+body:not(.in-project) .proj-tab { display: none !important; }
+.nav-proj-label {
+  padding: var(--sp-3) var(--sp-1) var(--sp-1);
+  font-size: 9px; color: var(--text-3); text-align: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border-block-start: 1px solid var(--border); margin-block-start: var(--sp-2);
+}
+.step-num {
+  position: absolute; inset-block-start: 4px; inset-inline-end: 10px;
+  font-size: 9px; color: var(--text-3); font-variant-numeric: tabular-nums;
+}
+
+/* reminder badge on the bell */
+.nav-badge {
+  position: absolute; inset-block-start: 4px; inset-inline-end: 12px;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: var(--r-pill); background: var(--danger); color: #fff;
+  font: 700 10px/16px var(--font-ui); text-align: center;
+}
+
+/* rail footer: theme, user, logout */
+.sidebar-footer {
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-2);
+  padding-block-start: var(--sp-3); border-block-start: 1px solid var(--border);
+}
+.sidebar-footer .nav-btn { width: 100%; min-height: 44px; }
+#sidebar-user-chip { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: var(--sp-1); }
+#user-chip-avatar {
+  width: 30px; height: 30px; border-radius: var(--r-pill);
+  background: var(--surface-2); color: var(--text-2);
+  display: flex; align-items: center; justify-content: center;
+  font: 700 12px var(--font-ui); overflow: hidden;
+}
+#user-chip-avatar img { width: 100%; height: 100%; object-fit: cover; }
+#user-chip-name {
+  font-size: 9px; color: var(--text-3); max-width: 68px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#user-chip-role { display: none; }
+
+/* ---------- context header (in-project banner) ---------- */
+#project-banner {
+  display: none;
+  align-items: center; gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--surface); border-block-end: 1px solid var(--border);
+  font-size: var(--fs-sm);
+}
+body.in-project #project-banner { display: flex; }
+#active-project-name { font-weight: 700; }
+#active-project-status { color: var(--text-3); }
+#banner-sync-indicator { margin-inline-start: auto; color: var(--text-3); font-size: var(--fs-xs); }
+
+/* main column wraps banner + scrolling panels */
+.main-column { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* ---------- in-project step rail (desktop, injected by renderProjectRail) ---------- */
+@media (min-width: 861px) {
+  .project-rail {
+    position: fixed; inset-block-start: var(--topnav-h, 52px); inset-inline-start: 76px;
+    width: 168px; padding: var(--sp-3);
+    display: flex; flex-direction: column; gap: var(--sp-1);
+  }
+  body.in-project-stage .main-content { padding-inline-start: calc(168px + var(--sp-6)); }
+  .project-rail button {
+    display: flex; align-items: center; gap: var(--sp-2);
+    min-height: 40px; padding: 0 var(--sp-3);
+    background: none; border: none; border-radius: var(--r-sm);
+    color: var(--text-2); font: 500 var(--fs-sm) var(--font-ui);
+    cursor: pointer; text-align: start;
+  }
+  .project-rail button:hover { background: var(--surface-2); color: var(--text); }
+  .project-rail button.active { color: var(--text); background: var(--accent-soft); }
+  .project-rail button[disabled] { opacity: 0.4; pointer-events: none; }
+}
+@media (max-width: 860px) {
+  .project-rail { display: none; }
+}
+
+/* ---------- more-drawer: bottom sheet on phone, side sheet on desktop ---------- */
+@media (min-width: 769px) {
+  #more-drawer {
+    position: fixed; inset-block: 0; inset-inline-start: 76px;
+    width: 280px; transform: translateX(100%); /* RTL: off toward the rail */
+    background: var(--surface); border-inline-end: 1px solid var(--border);
+    transition: transform var(--t-med);
+    z-index: var(--z-drawer); overflow-y: auto; padding: var(--sp-6) var(--sp-4);
+  }
+  [dir="rtl"] #more-drawer { transform: translateX(100%); }
+  #more-drawer.open { transform: none; }
+  #more-drawer-backdrop {
+    position: fixed; inset: 0; background: var(--scrim);
+    opacity: 0; pointer-events: none; transition: opacity var(--t-med);
+    z-index: calc(var(--z-drawer) - 1);
+  }
+  #more-drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+}
+
+/* ---------- mobile: rail becomes the bottom bar ---------- */
+@media (max-width: 768px) {
+  .app-container { flex-direction: column; }
+  .sidebar {
+    position: fixed; inset-block-end: 0; inset-inline: 0;
+    width: auto; height: calc(60px + env(safe-area-inset-bottom));
+    flex-direction: row; align-items: stretch;
+    padding: 0 var(--sp-1) env(safe-area-inset-bottom);
+    border-inline-end: none; border-block-start: 1px solid var(--border);
+    z-index: var(--z-nav);
+    overflow: visible;
+  }
+  .sidebar-logo, .sidebar-footer, .nav-proj-label { display: none; }
+  .nav-menu { flex-direction: row; justify-content: space-around; gap: 0; width: 100%; }
+  .nav-btn { flex: 1; min-height: 60px; border-radius: 0; }
+  .nav-btn.active::before {
+    inset-block: auto; inset-block-start: 0; inset-inline: 25%;
+    width: auto; height: 3px;
+  }
+  .step-num { display: none; }
+  /* only the field-core tabs + "more" live in the bar */
+  .nav-btn:not(.mobile-core):not(.nav-more-btn):not(#tab-reminders) { display: none; }
+  .main-content { padding: var(--sp-4) var(--sp-4) calc(76px + env(safe-area-inset-bottom)); }
+  #project-banner { padding-inline: var(--sp-4); }
+}
+@media (min-width: 769px) {
+  .nav-more-btn { display: flex; } /* "more" now exists on desktop too */
+}

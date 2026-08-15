@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
@@ -19,7 +19,16 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="https://www.sj-eng.co.il/assets/og-image.jpg">
     <link rel="canonical" href="https://www.sj-eng.co.il/articles">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='none' stroke='%232b74db' stroke-width='6'/%3E%3Cpath d='M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z' fill='%23ffaa00'/%3E%3C/svg%3E">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Hebrew:wght@400;500;700&family=Frank+Ruhl+Libre:wght@700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="assets/tokens.css?v=300">
+    <link rel="stylesheet" href="assets/ui.css?v=300">
+    <link rel="stylesheet" href="styles.css?v=300">
+
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2L4.5 13h6l-1.5 9L18.5 10h-6z' fill='%23A16207'/%3E%3C/svg%3E">
 
     <!-- Structured data: FAQ + breadcrumbs so Google/AI can cite these guides directly -->
     <script type="application/ld+json">
@@ -168,91 +177,73 @@
       ]
     }
     </script>
-    <link rel="stylesheet" href="styles.css?v=96">
+
+    <style>
+        /* articles page only — guide list + category filter */
+        .guides-filter { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+        .guide-list { display: grid; gap: var(--sp-4); max-width: 780px; }
+        .guide-article { scroll-margin-block-start: 88px; }
+        .guide-article .tag { display: block; color: var(--text-3); font-size: var(--fs-xs); font-weight: 500; margin-block-end: var(--sp-2); }
+        .guide-article h2 { font-size: var(--fs-xl); margin-block-end: var(--sp-3); }
+        .guide-article .article-body > :last-child { margin-block-end: 0; }
+        .guide-article .article-body ol, .guide-article .article-body ul { padding-inline-start: var(--sp-6); margin: 0 0 var(--sp-4); display: grid; gap: var(--sp-2); }
+        .guide-article .callout { margin-block-end: 0; }
+    </style>
 </head>
 <body>
-    <!-- Cursor glow -->
-    <div class="cursor-glow" id="cursor-glow"></div>
+    <a href="#main-content" class="skip-link">דילוג לתוכן</a>
 
-    <!-- Header -->
-    <header class="main-header" id="main-header">
-        <div class="header-container">
-            <a href="index.html#hero" class="logo-area" id="nav-logo-link">
-                <svg class="logo-svg" viewBox="0 0 100 100" width="40" height="40">
-                    <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 2" class="logo-circle"/>
-                    <path d="M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z" fill="currentColor" class="logo-bolt"/>
-                </svg>
-                <div class="logo-text">
-                    <span class="logo-brand">SJ</span>
-                    <span class="logo-subbrand">הנדסת חשמל</span>
-                </div>
+    <header class="site-header">
+        <div class="wrap">
+            <a href="/" class="brand" aria-label="SJ הנדסת חשמל — דף הבית">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4.5 13h6l-1.5 9L18.5 10h-6z" fill="currentColor"/></svg>
+                <span>SJ הנדסת חשמל</span>
             </a>
-            <nav class="desktop-nav" role="navigation" aria-label="תפריט ראשי">
-                <a href="index.html#services" class="nav-link">שירותים</a>
-                <a href="about.html" class="nav-link">אודות</a>
-                <a href="certificates.html" class="nav-link">הסמכות</a>
-                <a href="projects.html" class="nav-link">פרויקטים</a>
-                <a href="articles.html" class="nav-link active">מדריכים</a>
-                <a href="index.html#testimonials" class="nav-link">המלצות</a>
-                <a href="index.html#faq" class="nav-link">שאלות נפוצות</a>
-                <a href="/zerem/" class="nav-link nav-link-staff">
-                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M13 2L4.5 13h6l-1.5 8L18.5 10h-6z"/></svg>
-                    תוכנת הצעות מחיר
-                </a>
-                <a href="index.html#contact" class="btn-primary" id="btn-header-contact">שיחת ייעוץ</a>
+            <button class="nav-toggle" id="nav-toggle" aria-label="פתיחת תפריט" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+            </button>
+            <div class="nav-scrim" id="nav-scrim"></div>
+            <nav class="site-nav" id="site-nav" aria-label="תפריט ראשי">
+                <a href="services.html">שירותים ומחירון</a>
+                <a href="articles.html" aria-current="page">מדריכים</a>
+                <a href="projects.html">פרויקטים</a>
+                <a href="about.html">אודות</a>
+                <a href="certificates.html">הסמכות</a>
+                <a href="/zerem/" class="nav-cta">זרם — תוכנת הצעות מחיר</a>
             </nav>
-            <button class="mobile-menu-toggle" id="mobile-menu-toggle" aria-label="פתח תפריט"><span></span><span></span><span></span></button>
+            <div class="header-actions">
+                <a href="index.html#contact" class="btn btn-primary btn-sm">שיחת ייעוץ</a>
+            </div>
         </div>
     </header>
 
-    <!-- Mobile drawer -->
-    <div class="mobile-drawer" id="mobile-drawer">
-        <nav class="mobile-nav">
-            <a href="index.html#services" class="mobile-nav-link">שירותים</a>
-            <a href="about.html" class="mobile-nav-link">אודות</a>
-            <a href="certificates.html" class="mobile-nav-link">הסמכות</a>
-            <a href="projects.html" class="mobile-nav-link">פרויקטים</a>
-            <a href="articles.html" class="mobile-nav-link">מדריכים</a>
-            <a href="index.html#testimonials" class="mobile-nav-link">המלצות</a>
-            <a href="index.html#faq" class="mobile-nav-link">שאלות נפוצות</a>
-            <a href="/zerem/" class="mobile-nav-link" style="color:#f0c040;">⚡ תוכנת הצעות מחיר</a>
-            <a href="index.html#contact" class="btn-primary">צור קשר</a>
-        </nav>
-    </div>
-
     <main id="main-content">
-        <!-- Guides Hero -->
-        <section class="guides-hero">
-            <div class="section-container">
-                <div class="guides-hero-inner reveal">
-                    <a href="index.html" class="guides-back-link">← חזרה לדף הבית</a>
-                    <h1 class="guides-hero-title">מדריכים ומאמרים מהשטח</h1>
-                    <p class="guides-hero-sub">
-                        ידע מעשי שנצבר משנים של עבודה בשטח — מה לעשות כשהפחת קופץ, איך מאתרים תקלה לבד,
-                        ומה באמת קורה מאחורי הקלעים של תכנון ורישוי חשמל. בלי תיאוריה מיותרת, רק מה שעובד.
-                    </p>
-                </div>
+
+        <!-- Guides hero -->
+        <section class="hero">
+            <div class="wrap">
+                <h1>מדריכים ומאמרים מהשטח</h1>
+                <p class="lede">ידע מעשי שנצבר משנים של עבודה בשטח — מה לעשות כשהפחת קופץ, איך מאתרים תקלה לבד, ומה באמת קורה מאחורי הקלעים של תכנון ורישוי חשמל. בלי תיאוריה מיותרת, רק מה שעובד.</p>
                 <!-- Category filter -->
-                <div class="guides-filter reveal" id="guides-filter">
-                    <button class="guides-chip active" data-cat="all" onclick="filterGuides('all', this)">הכל</button>
-                    <button class="guides-chip" data-cat="firstaid" onclick="filterGuides('firstaid', this)">עזרה ראשונה למי שאינו חשמלאי</button>
-                    <button class="guides-chip" data-cat="diagnostics" onclick="filterGuides('diagnostics', this)">אבחון תקלות</button>
-                    <button class="guides-chip" data-cat="field" onclick="filterGuides('field', this)">טיפים מהשטח</button>
-                    <button class="guides-chip" data-cat="planning" onclick="filterGuides('planning', this)">תכנון ורישוי</button>
+                <div class="guides-filter" id="guides-filter" role="group" aria-label="סינון מדריכים לפי קטגוריה">
+                    <button class="chip" aria-pressed="true" data-cat="all" onclick="filterGuides('all', this)">הכל</button>
+                    <button class="chip" aria-pressed="false" data-cat="firstaid" onclick="filterGuides('firstaid', this)">עזרה ראשונה למי שאינו חשמלאי</button>
+                    <button class="chip" aria-pressed="false" data-cat="diagnostics" onclick="filterGuides('diagnostics', this)">אבחון תקלות</button>
+                    <button class="chip" aria-pressed="false" data-cat="field" onclick="filterGuides('field', this)">טיפים מהשטח</button>
+                    <button class="chip" aria-pressed="false" data-cat="planning" onclick="filterGuides('planning', this)">תכנון ורישוי</button>
                 </div>
             </div>
         </section>
 
-        <!-- All Guides -->
-        <section class="guides-list-section">
-            <div class="section-container">
-                <div class="guides-list" id="guides-list">
+        <!-- All guides -->
+        <section class="section section-alt">
+            <div class="wrap">
+                <div class="guide-list" id="guides-list">
 
-                    <!-- G1 -->
-                    <article class="guide-full-card reveal" id="g1" data-cat="firstaid">
-                        <div class="guide-cat-badge firstaid">עזרה ראשונה למי שאינו חשמלאי</div>
-                        <h2 class="guide-full-title">הפחת בבית קפץ ולא עולה? כך מחזירים חשמל בעצמך</h2>
-                        <div class="guide-full-body">
+                    <article class="card guide-article rv" id="g1" data-cat="firstaid">
+                        <span class="tag">עזרה ראשונה למי שאינו חשמלאי</span>
+                        <h2>הפחת בבית קפץ ולא עולה? כך מחזירים חשמל בעצמך</h2>
+                        <div class="article-body">
                             <p>כשהפחת (מפסק מגן / RCD) קופץ ולא מסכים לעלות — אל תילחמו בו ואל תנסו "להרים בכוח". עובדים בשיטה מסודרת שמבודדת את התקלה:</p>
                             <ol>
                                 <li>מורידים <strong>למטה את כל המאמ"תים</strong> (המפסקים הקטנים) שמתחת לפחת.</li>
@@ -260,16 +251,16 @@
                                 <li>מעלים את המאמ"תים <strong>אחד-אחד, לאט</strong>. ברגע שמרימים מעגל מסוים והפחת קופץ שוב — <strong>זה המעגל הבעייתי</strong>. משאירים אותו למטה, ומחזירים את כל השאר.</li>
                             </ol>
                             <p>התוצאה: כל הבית חוזר לעבוד חוץ מהמעגל התקול — וכבר יודעים בדיוק לאן להפנות את החשמלאי, מה שחוסך זמן וכסף בביקור.</p>
-                            <div class="guide-callout warn">
+                            <div class="callout warn">
                                 <strong>בטיחות לפני הכל:</strong> אם יש ריח שריפה, עשן, ניצוצות או חימום בלוח — לא נוגעים במעגלים. מורידים את המפסק הראשי ומזמינים חשמלאי מיד.
                             </div>
                         </div>
                     </article>
 
-                    <article class="guide-full-card reveal" id="g7" data-cat="firstaid">
-                        <div class="guide-cat-badge firstaid">עזרה ראשונה למי שאינו חשמלאי</div>
-                        <h2 class="guide-full-title">כל הבית חשוך — מה לבדוק לפני שמתקשרים לחשמלאי</h2>
-                        <div class="guide-full-body">
+                    <article class="card guide-article rv" id="g7" data-cat="firstaid">
+                        <span class="tag">עזרה ראשונה למי שאינו חשמלאי</span>
+                        <h2>כל הבית חשוך — מה לבדוק לפני שמתקשרים לחשמלאי</h2>
+                        <div class="article-body">
                             <p>לפני שמזמינים ביקור (ומשלמים עליו), כדאי לעשות כמה בדיקות פשוטות שיכולות לפתור את הבעיה — או לפחות לדעת אם היא בכלל אצלכם:</p>
                             <ol>
                                 <li><strong>רק חלק מהבית כבוי?</strong> כנראה מאמ"ת בודד שקפץ — נסו להעלות אותו (אחרי שהורדתם עומס מאותו מעגל).</li>
@@ -277,29 +268,29 @@
                                 <li><strong>לשכנים בקומה גם אין חשמל?</strong> זו תקלת חברת חשמל — מתקשרים ל-<strong>103</strong> (מוקד חברת חשמל), לא לחשמלאי פרטי.</li>
                                 <li><strong>בית תלת-פאזי שבו חלק מהחדרים עובד וחלק לא?</strong> כנראה נפלה פאזה אחת — זה כבר מקרה לחשמלאי.</li>
                             </ol>
-                            <div class="guide-callout">
+                            <div class="callout">
                                 שווה לשמור בלוח החשמל מדבקה קטנה שמסמנת איזה מאמ"ת שייך לאיזה חדר/מכשיר. ביום של תקלה זה חוסך המון זמן.
                             </div>
                         </div>
                     </article>
 
-                    <article class="guide-full-card reveal" id="g5" data-cat="field">
-                        <div class="guide-cat-badge field">טיפים מהשטח</div>
-                        <h2 class="guide-full-title">השקע מתחמם? אל תתעלמו — זה מתחיל לפני שריפה</h2>
-                        <div class="guide-full-body">
+                    <article class="card guide-article rv" id="g5" data-cat="field">
+                        <span class="tag">טיפים מהשטח</span>
+                        <h2>השקע מתחמם? אל תתעלמו — זה מתחיל לפני שריפה</h2>
+                        <div class="article-body">
                             <p>שקע, תקע או כבל שמתחממים הם כמעט תמיד סימן ל<strong>חיבור רופף</strong>. המנגנון פשוט ומסוכן: מגע רופף יוצר התנגדות, ההתנגדות יוצרת חום, החום שורף ומחמיר את המגע — וכך זה הולך ומתדרדר עד כדי שריפה.</p>
                             <p>הכי שכיח אצל צרכנים בעלי הספק גבוה: מזגנים, דודי חימום, קומקומים ותנורים — במיוחד על שקע ישן או מאריך זול.</p>
                             <p><strong>מה עושים:</strong> מפסיקים להשתמש בשקע, ובודקים את ההידוק של המגעים (בשקע ובלוח). שקע שהושחר או נמס — מחליפים, לא "מהדקים בחזרה".</p>
-                            <div class="guide-callout warn">
+                            <div class="callout warn">
                                 ריח של פלסטיק חרוך ליד שקע = מפסיקים את המעגל מיד ולא מחכים. זה אחד הסימנים המובהקים שמקדימים שריפה חשמלית.
                             </div>
                         </div>
                     </article>
 
-                    <article class="guide-full-card reveal" id="g9" data-cat="firstaid">
-                        <div class="guide-cat-badge firstaid">עזרה ראשונה למי שאינו חשמלאי</div>
-                        <h2 class="guide-full-title">ריח של חשמל שרוף בבית — מה לעשות מיד</h2>
-                        <div class="guide-full-body">
+                    <article class="card guide-article rv" id="g9" data-cat="firstaid">
+                        <span class="tag">עזרה ראשונה למי שאינו חשמלאי</span>
+                        <h2>ריח של חשמל שרוף בבית — מה לעשות מיד</h2>
+                        <div class="article-body">
                             <p>ריח של פלסטיק או חשמל שרוף הוא אחת מהתראות הבטיחות החשובות ביותר בבית. הוא מעיד על רכיב שמתחמם הרבה מעבר למותר — ולעיתים מקדים שריפה חשמלית בדקות. אל מתעלמים ואל "מחכים לראות אם זה עובר":</p>
                             <ol>
                                 <li>אם הריח חזק, מלווה בעשן, ניצוצות או השחרה — <strong>מורידים מיד את המפסק הראשי בלוח</strong>.</li>
@@ -307,32 +298,32 @@
                                 <li><strong>לעולם לא מים</strong> על מקור חשמלי. אם כבר יש להבה — מטף אבקה או CO₂ בלבד, ומתקשרים 102.</li>
                                 <li>מאווררים, ולא מחזירים את המעגל עד שחשמלאי מוסמך בדק ואיתר את הרכיב.</li>
                             </ol>
-                            <div class="guide-callout warn">
+                            <div class="callout warn">
                                 ריח שרוף + עשן + השחרה סביב שקע או לוח = מצב חירום. מנתקים ראשי, מתרחקים, ובמקרה של אש מתקשרים <strong>102</strong>. רכיב ששרף פעם אחת — מחליפים, לא "מנקים ומחזירים".
                             </div>
                         </div>
                     </article>
 
-                    <article class="guide-full-card reveal" id="g4" data-cat="firstaid">
-                        <div class="guide-cat-badge firstaid">עזרה ראשונה למי שאינו חשמלאי</div>
-                        <h2 class="guide-full-title">מאמ"ת קפץ או פחת קפץ — ולמה ההבדל קריטי</h2>
-                        <div class="guide-full-body">
+                    <article class="card guide-article rv" id="g4" data-cat="firstaid">
+                        <span class="tag">עזרה ראשונה למי שאינו חשמלאי</span>
+                        <h2>מאמ"ת קפץ או פחת קפץ — ולמה ההבדל קריטי</h2>
+                        <div class="article-body">
                             <p>בלוח החשמל יש שני סוגי מפסקים שקופצים, וחשוב לא לבלבל ביניהם:</p>
                             <ul>
                                 <li><strong>מאמ"ת (מפסק מודול, המפסקים הקטנים):</strong> קופץ על <em>עומס יתר או קצר</em> — יותר מדי מכשילים חזקים יחד, או שני חוטים שנגעו. אפשר להעלות אותו בזהירות אחרי שמורידים עומס.</li>
                                 <li><strong>פחת (מפסק מגן / RCD, המפסק הרחב עם כפתור "T"):</strong> קופץ על <em>דליפת זרם לאדמה</em> — סימן לסכנת התחשמלות אמיתית.</li>
                             </ul>
-                            <div class="guide-callout warn">
+                            <div class="callout warn">
                                 <strong>הכלל החשוב ביותר:</strong> אם הפחת קופץ שוב ושוב — <strong>אסור לנטרל אותו או לעקוף אותו</strong>. הוא זה שמגן על החיים שלכם מפני התחשמלות. פחת שקופץ הוא לא "תקלה מעצבנת" — הוא עושה בדיוק את העבודה שלו.
                             </div>
                             <p>טיפ קטן: כדאי ללחוץ על כפתור הבדיקה (T) בפחת אחת לחודש. אם הוא לא קופץ בלחיצה — הפחת עצמו תקול וצריך החלפה.</p>
                         </div>
                     </article>
 
-                    <article class="guide-full-card reveal" id="g2" data-cat="firstaid">
-                        <div class="guide-cat-badge firstaid">עזרה ראשונה למי שאינו חשמלאי</div>
-                        <h2 class="guide-full-title">מאתרים את המכשיר התקול בבית — בלי לקרוא לחשמלאי</h2>
-                        <div class="guide-full-body">
+                    <article class="card guide-article rv" id="g2" data-cat="firstaid">
+                        <span class="tag">עזרה ראשונה למי שאינו חשמלאי</span>
+                        <h2>מאתרים את המכשיר התקול בבית — בלי לקרוא לחשמלאי</h2>
+                        <div class="article-body">
                             <p>זיהיתם בעזרת השיטה הקודמת איזה מעגל מפיל את הפחת? אפשר ללכת צעד אחד קדימה ולגלות אם האשם הוא <strong>מכשיר ספציפי</strong> ולא תקלה בקיר:</p>
                             <ol>
                                 <li>שימו לב אילו מכשירים כבו יחד עם המעגל התקול (מקרר, מכונת כביסה, מדיח, דוד וכו').</li>
@@ -341,44 +332,44 @@
                                 <li>חברו את השאר בחזרה. את המכשיר התקול משאירים מנותק ושולחים לבדיקה/תיקון.</li>
                             </ol>
                             <p>הגורמים השכיחים ביותר לזרם דליפה: מכונת כביסה, מדיח, דוד חימום ומקרר ישן. זרם דליפה קטן של 30mA כבר מספיק כדי להפעיל את הפחת — גם בלי תקלה "דרמטית".</p>
-                            <div class="guide-callout">
+                            <div class="callout">
                                 אם אחרי שניתקתם את כל המכשירים המעגל עדיין מפיל את הפחת — הבעיה היא בחיווט עצמו (בקיר/בקופסאות), וכאן כבר צריך חשמלאי.
                             </div>
                         </div>
                     </article>
 
-                    <article class="guide-full-card reveal" id="g11" data-cat="field">
-                        <div class="guide-cat-badge field">טיפים מהשטח</div>
-                        <h2 class="guide-full-title">מותר לי להחליף שקע או מפסק בעצמי? מה החוק אומר</h2>
-                        <div class="guide-full-body">
+                    <article class="card guide-article rv" id="g11" data-cat="field">
+                        <span class="tag">טיפים מהשטח</span>
+                        <h2>מותר לי להחליף שקע או מפסק בעצמי? מה החוק אומר</h2>
+                        <div class="article-body">
                             <p>זו אחת השאלות הנפוצות ביותר, והתשובה חשובה — כי טעות כאן עולה הרבה יותר ממחיר חשמלאי. בישראל חוק החשמל מבחין בין שימוש רגיל לבין עבודה ב"מתקן הקבוע":</p>
                             <ul>
                                 <li><strong>מותר בדרך כלל ללא חשמלאי:</strong> החלפת נורה, חיבור מכשיר עם תקע לשקע, ולחיצה/העלאה של מפסק (מאמ"ת) שקפץ.</li>
                                 <li><strong>אסור ללא חשמלאי מוסמך:</strong> כל עבודה במתקן הקבוע — החלפת שקע או מפסק קיר, חיווט, הוספת נקודות, וכל עבודה בתוך לוח החשמל. גם אם זה "נראה פשוט", זה חיבור קבוע למתח הרשת.</li>
                             </ul>
-                            <div class="guide-callout warn">
+                            <div class="callout warn">
                                 עבודה לא מוסמכת במתקן הקבוע מסכנת חיים, <strong>עלולה לפסול כיסוי ביטוחי</strong> במקרה של נזק או שריפה, וגוררת אחריות משפטית. בכל ספק — חשמלאי בעל רישיון בתוקף.
                             </div>
                         </div>
                     </article>
 
-                    <article class="guide-full-card reveal" id="g3" data-cat="diagnostics">
-                        <div class="guide-cat-badge diagnostics">אבחון תקלות</div>
-                        <h2 class="guide-full-title">ניתקתם את ההארקה והפחת עדיין קופץ? זו כמעט תמיד הסיבה</h2>
-                        <div class="guide-full-body">
+                    <article class="card guide-article rv" id="g3" data-cat="diagnostics">
+                        <span class="tag">אבחון תקלות</span>
+                        <h2>ניתקתם את ההארקה והפחת עדיין קופץ? זו כמעט תמיד הסיבה</h2>
+                        <div class="article-body">
                             <p>זו אחת התקלות שמבלבלות הכי הרבה חשמלאים: מנתקים את ההארקה מהלוח, ובכל זאת הפחת ממשיך לקפוץ. אם זה קורה — <strong>הסיבה כמעט תמיד אחת:</strong></p>
                             <p>מוליך הפאזה או האפס נוגע פיזית במשהו מוליך — <strong>קיר רטוב, צינור מתכת, שריון של כבל, או שהוא יושב בתוך שלולית מים</strong> בקופסת הסתעפות. הפחת מגיב לדליפת הזרם לאדמה דרך המגע הזה, ולא דרך ההארקה של הלוח — ולכן ניתוק ההארקה לא משנה כלום.</p>
                             <p><strong>שיטת איתור:</strong> עוברים על קופסאות ההסתעפות לאורך המעגל החשוד ומחפשים את הנקודה שבה הבידוד נשחק, רטוב, או שהמוליך נוגע בצינור/בקיר. לרוב מדובר בנקודה אחת בלבד — נזק ישן מקדיחה, חדירת מים, או חיבור שבוצע ברשלנות.</p>
-                            <div class="guide-callout">
+                            <div class="callout">
                                 הזיכרון שכדאי לקחת מכאן: פחת מגיב על <strong>דליפה לאדמה</strong>, לא על עומס. אם הוא קופץ — מחפשים איפה הזרם "בורח", לא כמה מכשירים מחוברים.
                             </div>
                         </div>
                     </article>
 
-                    <article class="guide-full-card reveal" id="g12" data-cat="diagnostics">
-                        <div class="guide-cat-badge diagnostics">אבחון תקלות</div>
-                        <h2 class="guide-full-title">הפחת קופץ דווקא כשיורד גשם — הסיבה ומה בודקים</h2>
-                        <div class="guide-full-body">
+                    <article class="card guide-article rv" id="g12" data-cat="diagnostics">
+                        <span class="tag">אבחון תקלות</span>
+                        <h2>הפחת קופץ דווקא כשיורד גשם — הסיבה ומה בודקים</h2>
+                        <div class="article-body">
                             <p>פחת שקופץ דווקא בימי גשם, בלילה הקר או אחרי השקיה הוא תלונה עונתית קלאסית, וכמעט תמיד מצביע על <strong>חדירת מים או לחות למעגל חיצוני</strong>:</p>
                             <p><strong>הסיבה:</strong> מים חודרים לקופסה, לגוף תאורה או לשקע בחצר/מרפסת ויוצרים נתיב דליפה לאדמה — בדיוק מה שהפחת מזהה ומפניו הוא מגן.</p>
                             <ol>
@@ -386,16 +377,16 @@
                                 <li>חפשו במעגל הזה צרכנים <strong>חיצוניים</strong>: תאורת חוץ וגינה, שקע מרפסת, משאבת מים, דוד שמש או צופר.</li>
                                 <li>נתקו/הורידו את המעגל החיצוני; אם הפחת מפסיק לקפוץ — איתרתם את האזור הבעייתי.</li>
                             </ol>
-                            <div class="guide-callout warn">
+                            <div class="callout warn">
                                 מים + חשמל מחייבים איתור והחלפה של האביזר באטום מים (IP44 ומעלה) על ידי חשמלאי. אל "תייבשו ותשכחו" — הבעיה חוזרת בגשם הבא, ומחמירה.
                             </div>
                         </div>
                     </article>
 
-                    <article class="guide-full-card reveal" id="g10" data-cat="planning">
-                        <div class="guide-cat-badge planning">תכנון ורישוי</div>
-                        <h2 class="guide-full-title">התקנת עמדת טעינה לרכב חשמלי בבית — מה חובה לבדוק לפני</h2>
-                        <div class="guide-full-body">
+                    <article class="card guide-article rv" id="g10" data-cat="planning">
+                        <span class="tag">תכנון ורישוי</span>
+                        <h2>התקנת עמדת טעינה לרכב חשמלי בבית — מה חובה לבדוק לפני</h2>
+                        <div class="article-body">
                             <p>לפני שמזמינים התקנת עמדת טעינה (Wallbox) כדאי לבדוק כמה דברים שמשפיעים ישירות על העלות, הבטיחות והאישורים — אחרת מגלים הפתעות באמצע ההתקנה:</p>
                             <ol>
                                 <li><strong>הספק הלוח וזמינות עומס:</strong> טעינה ביתית טיפוסית היא 7.4kW חד-פאזי או 11–22kW תלת-פאזי. צריך לבדוק שהחיבור הקיים עומד בעומס הנוסף — לעיתים נדרשת הגדלת חיבור.</li>
@@ -404,16 +395,16 @@
                                 <li><strong>הארקה תקינה של המבנה:</strong> תנאי בטיחות בסיסי לכל התקנה.</li>
                                 <li><strong>בניין משותף:</strong> ייתכן צורך באישור ועד הבית/חברת ניהול ובתשתית ובמדידה ייעודית לדירה.</li>
                             </ol>
-                            <div class="guide-callout">
+                            <div class="callout">
                                 בהתקנה הכרוכה בהגדלת חיבור או במעבר לתלת-פאזי נדרש תכנון מסודר של מהנדס חשמל. תכנון נכון מראש חוסך החזרת ציוד והתקנות כפולות.
                             </div>
                         </div>
                     </article>
 
-                    <article class="guide-full-card reveal" id="g8" data-cat="planning">
-                        <div class="guide-cat-badge planning">תכנון ורישוי</div>
-                        <h2 class="guide-full-title">הגדלת חיבור חשמל מחברת החשמל — כל השלבים בפועל</h2>
-                        <div class="guide-full-body">
+                    <article class="card guide-article rv" id="g8" data-cat="planning">
+                        <span class="tag">תכנון ורישוי</span>
+                        <h2>הגדלת חיבור חשמל מחברת החשמל — כל השלבים בפועל</h2>
+                        <div class="article-body">
                             <p>הגדלת חיבור היא תהליך מסודר מול חברת החשמל, וטעות בשלב אחד יכולה לעכב חודשים. כך זה עובד בפועל:</p>
                             <ol>
                                 <li>בקשה רשמית לחברת החשמל + תשריט מצב קיים.</li>
@@ -423,19 +414,19 @@
                                 <li>בדיקה של <strong>חשמלאי בודק מוסמך</strong> והפקת אישור.</li>
                                 <li>חיבור בפועל על ידי חברת החשמל.</li>
                             </ol>
-                            <div class="guide-callout">
+                            <div class="callout">
                                 הנקודה שרוב הלקוחות מפספסים: חיבור מעל <strong>80A חד-פאזי</strong> חברת החשמל לרוב לא מאשרת ללא מעבר לתלת-פאזי ותכנון של מהנדס חשמל. כדאי לבדוק את זה <em>לפני</em> שמזמינים ציוד.
                             </div>
                         </div>
                     </article>
 
-                    <article class="guide-full-card reveal" id="g6" data-cat="diagnostics">
-                        <div class="guide-cat-badge diagnostics">אבחון תקלות</div>
-                        <h2 class="guide-full-title">מנוע תלת-פאזי "מהמהם" ולא מסתובב? חפשו פאזה חסרה</h2>
-                        <div class="guide-full-body">
+                    <article class="card guide-article rv" id="g6" data-cat="diagnostics">
+                        <span class="tag">אבחון תקלות</span>
+                        <h2>מנוע תלת-פאזי "מהמהם" ולא מסתובב? חפשו פאזה חסרה</h2>
+                        <div class="article-body">
                             <p>רעש "המהום" חזק ממנוע שלא מסתובב הוא סימן קלאסי ל<strong>פאזה חסרה</strong> (Single Phasing). המנוע מקבל רק שתיים מתוך שלוש הפאזות, מנסה לעלות, ולא מצליח.</p>
                             <p><strong>בדיקה:</strong> מולטימטר על שלוש הפאזות בכניסה ללוח המנוע. מספיק שפאזה אחת נפלה — נתיך שנפח, מגע פגום בקונטקטור, או חוט שהשתחרר — כדי לגרום לתקלה.</p>
-                            <div class="guide-callout warn">
+                            <div class="callout warn">
                                 אל תשאירו מנוע במצב הזה אפילו לדקות — הוא מושך זרם גבוה מאוד על שתי פאזות, מתחמם במהירות, ועלול להישרף. מנתקים, מאתרים את הפאזה החסרה, ורק אז מפעילים מחדש.
                             </div>
                             <p>במנועים חשובים שווה להתקין <strong>מגן פאזות</strong> (Phase Protection Relay) שמנתק אוטומטית בחוסר/חוסר-איזון פאזה — הרבה יותר זול ממנוע חדש.</p>
@@ -443,38 +434,61 @@
                     </article>
 
                 </div>
+            </div>
+        </section>
 
-                <!-- CTA -->
-                <div class="guides-bottom-cta reveal">
-                    <h3>נתקעתם בתקלה או צריכים תכנון חשמל?</h3>
-                    <p>שיחת ייעוץ ראשונית ובדיקת התכנות — ללא התחייבות מצדכם.</p>
-                    <a href="index.html#contact" class="btn-primary">דברו עם מהנדס ←</a>
+        <!-- CTA -->
+        <section class="cta-band">
+            <div class="wrap rv">
+                <h2>נתקעתם בתקלה או צריכים תכנון חשמל?</h2>
+                <p>שיחת ייעוץ ראשונית ובדיקת התכנות — ללא התחייבות מצדכם.</p>
+                <div class="hero-actions">
+                    <a href="index.html#contact" class="btn btn-primary btn-lg">דברו עם מהנדס</a>
                 </div>
             </div>
         </section>
     </main>
 
-    <footer class="main-footer">
-        <div class="footer-container">
-            <p>© 2026 SJ הנדסת חשמל. כל הזכויות שמורות.</p>
-            <p class="legal-links"><a href="privacy.html">מדיניות פרטיות</a> · <a href="accessibility.html">הצהרת נגישות</a></p>
-            <div class="footer-badge" style="margin-top:10px; display:inline-block; background:#ff5a5f; color:#fff; padding:4px 8px; border-radius:4px; font-size:0.9rem;">ללא התחייבות</div>
+    <footer class="site-footer" role="contentinfo">
+        <div class="wrap">
+            <div>
+                <div class="footer-brand-name">SJ הנדסת חשמל</div>
+                <div>תכנון, ייעוץ ושרטוט מערכות חשמל · מהנדס חשמל רשום בפנקס המהנדסים</div>
+            </div>
+            <nav aria-label="קישורי פוטר">
+                <a href="services.html">שירותים ומחירון</a>
+                <a href="pricing-guide.html">מדריך מחירים</a>
+                <a href="articles.html">מדריכים</a>
+                <a href="projects.html">פרויקטים</a>
+                <a href="certificates.html">הסמכות</a>
+                <a href="about.html">אודות</a>
+                <a href="contact.html">צור קשר</a>
+                <a href="/zerem/">זרם</a>
+            </nav>
+            <div>
+                <div>&copy; 2026 SJ הנדסת חשמל. כל הזכויות שמורות.</div>
+                <div><a href="privacy.html">מדיניות פרטיות</a> · <a href="accessibility.html">הצהרת נגישות</a></div>
+            </div>
         </div>
     </footer>
-    <script src="app.js?v=96"></script>
+
+    <a href="https://wa.me/972535302887?text=%D7%94%D7%99%D7%99%20SJ%2C%20%D7%90%D7%A0%D7%99%20%D7%A6%D7%A8%D7%99%D7%9A%20%D7%A2%D7%96%D7%A8%D7%94%20%D7%91%D7%A4%D7%A8%D7%95%D7%99%D7%A7%D7%98%20%D7%A9%D7%9C%D7%99" target="_blank" rel="noopener noreferrer" class="float-wa" aria-label="פתיחת שיחה בוואטסאפ">
+        <svg viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16 1C7.716 1 1 7.716 1 16c0 2.68.686 5.197 1.89 7.39L1 31l7.82-2.05A14.936 14.936 0 0 0 16 31c8.284 0 15-6.716 15-15S24.284 1 16 1zm0 27.5a12.44 12.44 0 0 1-6.34-1.73l-.455-.27-4.64 1.22 1.24-4.52-.295-.47A12.45 12.45 0 0 1 3.5 16C3.5 9.096 9.096 3.5 16 3.5S28.5 9.096 28.5 16 22.904 28.5 16 28.5zm6.847-9.334c-.375-.188-2.222-1.097-2.565-1.222-.344-.125-.594-.188-.844.188-.25.375-.97 1.222-1.188 1.472-.219.25-.438.281-.813.094-.375-.188-1.582-.584-3.013-1.859-1.113-.993-1.865-2.219-2.083-2.594-.219-.375-.023-.578.164-.765.169-.169.375-.438.563-.656.188-.219.25-.375.375-.625.125-.25.063-.469-.031-.656-.094-.188-.844-2.031-1.156-2.781-.305-.731-.614-.63-.844-.642-.219-.011-.469-.014-.719-.014s-.656.094-1 .469-1.313 1.281-1.313 3.125 1.344 3.625 1.531 3.875c.188.25 2.644 4.038 6.407 5.663.895.386 1.594.617 2.138.789.898.285 1.716.245 2.362.149.72-.108 2.219-.908 2.531-1.785.313-.875.313-1.625.219-1.782-.094-.156-.344-.25-.719-.438z"/></svg>
+    </a>
+
+    <script src="app.js?v=300"></script>
     <script>
         // Category filter for the guides page
         function filterGuides(cat, btn) {
-            document.querySelectorAll('.guides-chip').forEach(c => c.classList.remove('active'));
-            if (btn) btn.classList.add('active');
-            document.querySelectorAll('.guide-full-card').forEach(card => {
-                const show = cat === 'all' || card.dataset.cat === cat;
-                card.style.display = show ? '' : 'none';
+            document.querySelectorAll('#guides-filter .chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
+            if (btn) btn.setAttribute('aria-pressed', 'true');
+            document.querySelectorAll('.guide-article').forEach(card => {
+                card.hidden = !(cat === 'all' || card.dataset.cat === cat);
             });
         }
     </script>
-    <script src="track.js?v=96" defer></script>
-    <script src="reserve.js?v=96" defer></script>
-    <script src="assistant.js?v=96" defer></script>
+    <script src="track.js?v=300" defer></script>
+    <script src="reserve.js?v=300" defer></script>
+    <script src="assistant.js?v=300" defer></script>
 </body>
 </html>
