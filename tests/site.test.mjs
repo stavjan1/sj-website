@@ -384,3 +384,29 @@ test('recurrence is a property of a project, and it ends', () => {
     assert.ok(!/MAINT_REPEATS_DEFAULT = 0;/.test(app),
         'the default became unlimited — the whole point was that it should end');
 });
+
+test('a rendered screen is actually reachable', () => {
+    // "ארכיון לקוחות" was marked shipped in the roadmap and had a renderer, its
+    // own CSS and three working helpers — but no panel and no nav entry, so
+    // renderClientArchive() targeted an element that did not exist and was
+    // never called by anything. It read as a finished feature for weeks.
+    const html = read('sale/index.html');
+    const app = read('sale/app.js');
+    const panels = [...html.matchAll(/id="panel-([a-z]+)"/g)].map((m) => m[1]);
+    // Scope to the nav definition — {id,label} pairs are a common shape in this
+    // file (payment methods, providers), and matching them all made the guard
+    // fail on things that were never screens.
+    const navBlock = app.slice(app.indexOf('const NAV_WORLDS'), app.indexOf('let activeWorld'));
+    const tabs = [...navBlock.matchAll(/\{ id: '([a-z]+)',\s*label:/g)].map((m) => m[1]);
+    for (const t of tabs) {
+        assert.ok(panels.includes(t), `nav offers "${t}" but there is no #panel-${t} to show`);
+    }
+    assert.ok(panels.includes('archive'), 'the client archive panel is gone again');
+    assert.match(app, /if \(tabId === 'archive'\) \{\s*renderClientArchive\(\);/,
+        'opening the archive tab no longer renders it');
+
+    // The link that makes the grouping trustworthy.
+    assert.match(app, /function projectClient/, 'projects can no longer name a real client');
+    assert.match(app, /const key = linked \? 'id:' \+ linked\.id : _clientKey\(client\)/,
+        'the archive is back to grouping clients by typed text, so a typo splits a customer in two');
+});

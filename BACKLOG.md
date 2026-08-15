@@ -102,8 +102,16 @@ Fixed & pushed this cycle:
 - [x] Security headers added (nosniff, X-Frame-Options, Referrer-Policy, HSTS,
       Permissions-Policy).
 Stav's actions / decisions:
-- [ ] 🔴 **Rotate the web3forms key** and set it as WEB3FORMS_KEY env var in
-      Cloudflare (the old one is public in git history — rotation kills it).
+- [x] ~~🔴 Rotate the web3forms key~~ — **withdrawn 15/08/2026, it was never a
+      leak.** A web3forms access key is public by design: the contact forms carry
+      it in a hidden input, so every visitor can already read it in the page
+      source, and the free plan only accepts client-side submissions. What a
+      public key costs is form spam, and the fix for that is web3forms' own
+      captcha/domain settings — not rotation. Rotating it is in fact the risky
+      move: the key lives in five places (two Functions plus three static forms
+      that never reach a Function), so a partial rotation loses leads silently.
+      A test now pins all five together. This line sat here as a 🔴 long after
+      the audit that cleared it, and got re-reported as an open security hole.
 - [ ] 🟠 /api/lead email abuse: once RESEND_API_KEY is on, the endpoint can send
       SJ-branded mail to an attacker-chosen address (rate-limited 3/min). Before
       enabling Resend — decide on a guard (confirm-link / tighter limit).

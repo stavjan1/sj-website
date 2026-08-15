@@ -4219,6 +4219,11 @@ body {
     font-weight: 600; cursor: pointer; padding: 0; max-width: 120px;
 }
 .proj-cat-chip .proj-cat-select:focus { outline: none; }
+/* The client chip is the same control beside the category one — the icon tells
+   them apart, so a linked client gets its own colour rather than a second blue. */
+.proj-client-chip.has-cat {
+    color: var(--color-success); border-color: rgba(34, 201, 132, 0.5); background: rgba(34, 201, 132, 0.08);
+}
 .create-project-inline {
     display: flex; align-items: center; gap: 10px;
     padding: 10px 12px; margin-bottom: 12px;

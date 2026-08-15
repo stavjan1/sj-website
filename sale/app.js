@@ -1522,6 +1522,7 @@ const NAV_WORLDS = {
     projects:   { label: 'ניהול פרויקטים', icon: 'fa-folder-open', tabs: [
         { id: 'projects',   label: 'פרויקטים',        icon: 'fa-list-check' },
         { id: 'statistics', label: 'סטטיסטיקה',       icon: 'fa-chart-column' },
+        { id: 'archive',    label: 'ארכיון לקוחות',   icon: 'fa-users' },
         { id: 'history',    label: 'היסטוריית הצעות', icon: 'fa-clock-rotate-left' },
         { id: 'checkups',   label: 'שירות תקופתי',    icon: 'fa-calendar-check' },
     ] },
@@ -1536,7 +1537,7 @@ const NAV_WORLDS = {
 };
 const TAB_WORLD = {
     projects: 'projects', wizard: 'projects', create: 'projects', reports: 'projects',
-    history: 'projects', statistics: 'projects', checkups: 'projects',
+    history: 'projects', statistics: 'projects', checkups: 'projects', archive: 'projects',
     accounting: 'accounting',
     business: 'prefs', catalog: 'prefs', settings: 'prefs', admin: 'prefs',
 };
@@ -1611,6 +1612,9 @@ function switchTab(tabId) {
     if (tabId === 'history') {
         renderHistoryList();
     }
+    if (tabId === 'archive') {
+        renderClientArchive();
+    }
     if (tabId === 'create') {
         ensureQuoteNumber();
         requestAnimationFrame(fitQuotePreview); // scale the A4 preview to fit the pane
@@ -1664,14 +1668,20 @@ function renderClientArchive() {
     if (!box) return;
     const q = (document.getElementById('archive-search')?.value || '').trim().toLowerCase();
 
-    // Group active projects by client. Each project carries its quote + status.
+    // Group active projects by client. A linked client groups by its id, so two
+    // spellings of the same customer stop being two customers; everything else
+    // still falls back to the typed name.
     const groups = {};
     (projectsList || []).forEach(p => {
         const qd = p.quoteData || {};
-        const client = (qd.clientName || p.name || '—').trim();
-        const key = _clientKey(client);
-        if (!groups[key]) groups[key] = { client, contact: qd.clientSub || '', quotes: [] };
-        if (!groups[key].contact && qd.clientSub) groups[key].contact = qd.clientSub;
+        const linked = projectClient(p);
+        const client = linked ? linked.name : (qd.clientName || p.name || '—').trim();
+        const key = linked ? 'id:' + linked.id : _clientKey(client);
+        const contact = linked
+            ? [linked.phone, linked.email].filter(Boolean).join(' · ')
+            : (qd.clientSub || '');
+        if (!groups[key]) groups[key] = { client, contact, quotes: [] };
+        if (!groups[key].contact && contact) groups[key].contact = contact;
         groups[key].quotes.push({
             projectId: p.id,
             number: qd.quoteNumber || '',
@@ -2471,6 +2481,54 @@ function filterProjectsList() {
     renderProjectsList(filtered);
     updateMetricsDashboard();
     renderFollowupReminders();
+}
+
+// ── Linking a project to a real client ───────────────────────────────────────
+//
+// Until now a "client" was whatever string sat in quoteData.clientName, so the
+// archive grouped by text and a typo made a second customer. Worse, the phone
+// and email the follow-up reminders need were typed again per project — the
+// same details already stored on the client record.
+//
+// Linking fixes both: the archive groups by identity, and the contact details
+// the reminders send to come from one place.
+
+function projectClient(p) {
+    if (!p || !p.clientId) return null;
+    return clientsList.find((c) => c.id === p.clientId) || null;
+}
+
+function assignProjectClient(projectId, value) {
+    const proj = projectsList.find((p) => p.id === projectId);
+    if (!proj) return;
+
+    if (value === '__new') {
+        const name = (window.prompt('שם הלקוח החדש:') || '').trim();
+        // Re-render either way, so the select snaps back instead of sitting on
+        // "+ לקוח חדש…" after a cancel.
+        if (name.length < 2) { filterProjectsList(); return; }
+        const existing = clientsList.find((c) => _clientKey(c.name) === _clientKey(name));
+        const client = existing || { id: 'cli' + Date.now(), name, dealerNumber: '', phone: '', email: '', address: '', city: '' };
+        if (!existing) { clientsList.unshift(client); saveClients(); }
+        value = client.id;
+    }
+
+    proj.clientId = value || null;
+    const c = projectClient(proj);
+    if (c) {
+        // The quote and the reminders read these; keeping them in step is the
+        // whole point of the link. A name typed on the quote is overwritten —
+        // the linked client is now the answer to "who is this for".
+        proj.quoteData = proj.quoteData || {};
+        proj.quoteData.clientName = c.name;
+        if (!proj.quoteData.clientSub) proj.quoteData.clientSub = [c.address, c.city].filter(Boolean).join(', ');
+        if (c.phone) proj.clientPhone = c.phone;
+        if (c.email) proj.clientEmail = c.email;
+    }
+    saveProjects();
+    filterProjectsList();
+    try { renderReminderBell(); } catch (e) {}
+    showToast(c ? 'שויך ללקוח: ' + c.name : 'השיוך ללקוח הוסר');
 }
 
 // Show only the work that comes back. A filter, not a screen: the same project
@@ -4315,6 +4373,8 @@ function renderProjectsList(list) {
     const cats = getProjectCategories();
     const catOptions = (sel) => cats.map(c =>
         `<option value="${escapeHtml(c)}" ${sel === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+    const clientOptions = (sel) => clientsList.map(c =>
+        `<option value="${escapeHtml(c.id)}" ${sel === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
 
     list.forEach(p => {
         const isActive = p.id === activeProjectId;
@@ -4337,6 +4397,14 @@ function renderProjectsList(list) {
                         <select class="proj-cat-select" onchange="assignProjectCategory('${p.id}', this.value)">
                             <option value="">ללא קטגוריה</option>
                             ${catOptions(p.category || '')}
+                        </select>
+                    </label>
+                    <label class="proj-cat-chip proj-client-chip ${p.clientId ? 'has-cat' : ''}" onclick="event.stopPropagation()" title="שיוך ללקוח">
+                        <i class="fa-solid fa-user"></i>
+                        <select class="proj-cat-select" onchange="assignProjectClient('${p.id}', this.value)">
+                            <option value="">ללא לקוח</option>
+                            ${clientOptions(p.clientId || '')}
+                            <option value="__new">+ לקוח חדש…</option>
                         </select>
                     </label>
                 </div>
