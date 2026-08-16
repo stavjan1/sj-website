@@ -83,3 +83,14 @@
 
 /assets/listcards.js
   Cache-Control: no-cache
+
+# V3 app layers — same no-cache treatment as the legacy core files, so a CSS
+# fix never has to wait out an edge cache (the ?v= bump is belt, this is braces).
+/assets/*
+  Cache-Control: no-cache
+/sale/css/*
+  Cache-Control: no-cache
+/sale/finance.js
+  Cache-Control: no-cache
+/sale/sw.js
+  Cache-Control: no-cache
