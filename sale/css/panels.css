@@ -2193,6 +2193,9 @@ i[class^="fa-"], i[class*=" fa-"] {
 #more-drawer-backdrop.open { display: block; }
 @media (max-width: 768px) {
 #more-drawer {
+    /* Hidden via display (like the backdrop) — the transform/visibility pair
+       proved flaky under some renderers; display cannot half-apply. */
+    display: none;
     position: fixed;
     inset-inline: 0;
     inset-block-end: 65px;
@@ -2202,14 +2205,9 @@ i[class^="fa-"], i[class*=" fa-"] {
     border-start-start-radius: var(--r-md);
     border-start-end-radius: var(--r-md);
     padding: var(--sp-2) var(--sp-4) var(--sp-4);
-    /* Hidden = its own height PLUS the 65px nav offset, so no sliver peeks. */
-    transform: translateY(calc(100% + 90px));
-    transition: transform var(--t-med), visibility var(--t-med);
     box-shadow: var(--shadow-1);
-    pointer-events: none;
-    visibility: hidden;
 }
-#more-drawer.open { transform: translateY(0); pointer-events: auto; visibility: visible; }
+#more-drawer.open { display: block; }
 }
 /* Desktop (>=769px): shell.css turns the same drawer into a side sheet. */
 .more-drawer-handle { width: 42px; height: 4px; border-radius: var(--r-pill); background: var(--border-strong); margin: 0 auto var(--sp-3); }
