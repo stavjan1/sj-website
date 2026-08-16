@@ -5,7 +5,9 @@ name: Clarity data pull
 
 on:
   schedule:
-    - cron: '0 5 */3 * *' # an hour before the analyst routine runs
+    # Well before the 06:00 UTC analyst routine — GitHub delays scheduled
+    # runs by up to ~80 minutes, so 05:00 sometimes landed after the scan.
+    - cron: '30 3 */3 * *'
   workflow_dispatch: {}
 
 permissions:
