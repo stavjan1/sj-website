@@ -6,16 +6,24 @@
 
     // ── auth: the same token the app already holds ─────────────────────────
     function activeUser() {
+        // app.js owns identity — fall back to raw storage only if it's absent
+        if (typeof getActiveUser === 'function') return (getActiveUser() || '').toLowerCase();
         return (localStorage.getItem('sj_logged_in_user') || sessionStorage.getItem('sj_logged_in_user') || '').toLowerCase();
     }
     function authToken() {
         const u = activeUser();
         if (!u) return null;
+        // Prefer the app's LIVE token (it silently refreshes after boot) over
+        // whatever storage still holds — this is what 401-raced before.
+        if (typeof googleAccessToken !== 'undefined' && googleAccessToken) return googleAccessToken;
+        if (typeof getStorageKey === 'function' && typeof getSessionOrLocalStorageItem === 'function') {
+            return getSessionOrLocalStorageItem(getStorageKey('sj_drive_access_token')) || null;
+        }
         const key = 'sj_user_' + u + '_sj_drive_access_token';
         return localStorage.getItem(key) || sessionStorage.getItem(key) || null;
     }
 
-    const fmtILS = (n) => '₪' + Math.round(Number(n) || 0).toLocaleString('he-IL');
+    const fmtILS = (n) => (typeof nisFmt === 'function') ? nisFmt(n) : '₪' + Math.round(Number(n) || 0).toLocaleString('he-IL');
     const todayISO = () => new Date().toISOString().slice(0, 10);
     const esc = (s) => (typeof escapeHtml === 'function' ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s));
 
@@ -42,20 +50,27 @@
         invoiceIncome = Array.isArray(data.invoiceIncome) ? data.invoiceIncome : [];
     }
 
+    async function saveNow(useKeepalive) {
+        const token = authToken();
+        if (!token || !fin) return;
+        try {
+            const res = await fetch('/api/finance', {
+                method: 'PUT',
+                keepalive: !!useKeepalive,
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({ data: fin }),
+            });
+            if (!res.ok && typeof showToast === 'function' && !useKeepalive) {
+                showToast(res.status === 401 ? 'השמירה נכשלה — ההתחברות פגה, רעננו והתחברו שוב' : 'שמירת הנתונים הפיננסיים נכשלה', 'error');
+            }
+        } catch (e) { if (typeof showToast === 'function' && !useKeepalive) showToast('שמירת הנתונים הפיננסיים נכשלה — בדקו חיבור', 'error'); }
+    }
     function scheduleSave() {
         clearTimeout(saveTimer);
-        saveTimer = setTimeout(async () => {
-            try {
-                const token = authToken();
-                if (!token || !fin) return;
-                await fetch('/api/finance', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                    body: JSON.stringify({ data: fin }),
-                });
-            } catch (e) { /* next change retries */ }
-        }, 1200);
+        saveTimer = setTimeout(() => saveNow(false), 1200);
     }
+    // A pending edit must not die with the tab — flush it on the way out.
+    addEventListener('pagehide', () => { if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; saveNow(true); } });
 
     // ── math: running balance, past + forecast ─────────────────────────────
     function buildCurve() {
@@ -91,7 +106,11 @@
             (fin.recurring || []).forEach(r => {
                 if (Number(r.dayOfMonth) === d.getDate()) fbal += (Number(r.amount) || 0);
             });
-            invoiceIncome.forEach(inv => { if (!inv.paid && inv.date === iso) fbal += inv.amount; });
+            // Open documents have no due date — book them as expected income
+            // two weeks out (a single honest bump, not per-day guesswork).
+            if (i === 14) {
+                fbal += invoiceIncome.filter(inv => !inv.paid).reduce((s, inv) => s + inv.amount, 0);
+            }
             future.push({ date: iso, bal: fbal });
         }
         return { past, future };
@@ -255,12 +274,13 @@
             const lines = (root.querySelector('#fin-csv').value || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
             let added = 0;
             lines.forEach(l => {
-                const [date, amount, ...rest] = l.split(',');
-                const amt = Number(amount);
-                if (/^\d{4}-\d{2}-\d{2}$/.test((date || '').trim()) && amt && rest.length) {
-                    fin.entries.push({ id: 'e' + Date.now() + '_' + added, date: date.trim(), amount: amt, desc: rest.join(',').trim(), category: '', source: 'csv' });
-                    added++;
-                }
+                // date,amount,desc — amount may carry thousands separators ("1,250")
+                const m = l.match(/^\s*(\d{4}-\d{2}-\d{2})\s*,\s*(-?[\d,]+(?:\.\d+)?)\s*,\s*(.+)$/);
+                if (!m) return;
+                const amt = Number(m[2].replace(/,/g, ''));
+                if (!amt) return;
+                fin.entries.push({ id: 'e' + Date.now() + '_' + added, date: m[1], amount: amt, desc: m[3].trim(), category: '', source: 'csv' });
+                added++;
             });
             if (typeof showToast === 'function') showToast(added ? `נוספו ${added} תנועות` : 'לא זוהו שורות תקינות (תאריך,סכום,תיאור)');
             if (added) { scheduleSave(); window.renderFinance(); }
@@ -353,13 +373,22 @@
         let token = '';
         try { token = new URLSearchParams(location.search).get('tgreport') || ''; } catch { return; }
         if (!token || !/^[a-z2-9]{8,20}$/.test(token)) return;
-        try { history.replaceState({}, '', location.pathname); } catch { }
         const u = activeUser();
-        if (!u) return; // after sign-in the link can be opened again
+        if (!u || u === 'guest') {
+            // Keep the token in the URL so the link still works after sign-in.
+            if (typeof showToast === 'function') showToast('כדי לייבא את הדוח מהטלגרם — התחברו עם Google ופתחו את הקישור שוב', 'error');
+            return;
+        }
+        try { history.replaceState({}, '', location.pathname); } catch { }
         try {
             const res = await fetch('/api/telegram?record=' + token);
             if (!res.ok) throw new Error();
-            const rec = await res.json();
+            const raw = await res.text();
+            if (raw.length > 3.5 * 1024 * 1024) {
+                if (typeof showToast === 'function') showToast('הדוח גדול מדי לייבוא — פתחו אותו בקישור הצפייה וההדפסה', 'error');
+                return;
+            }
+            const rec = JSON.parse(raw);
             if (!rec || !Array.isArray(rec.findings)) throw new Error();
             const key = (typeof getStorageKey === 'function') ? getStorageKey('sj_reports') : null;
             if (!key) return;

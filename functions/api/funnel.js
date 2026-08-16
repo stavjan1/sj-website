@@ -12,22 +12,34 @@ import { adminGate, jsonResponse, monthKey } from './_tiers.js';
 export async function onRequestGet(context) {
     const { request, env } = context;
     const gate = await adminGate(request);
-    if (!gate.ok) return jsonResponse({ error: { message: gate.message } }, gate.status);
+    if (!gate.ok) return gate.response; // carries the proper Hebrew 401/403 body
     if (!env.SJ_DATA) return jsonResponse({ error: { message: 'KV לא מוגדר.' } }, 501);
 
-    const list = await env.SJ_DATA.list({ prefix: 'user:', limit: 200 });
+    // Read cap + parallel chunks: the Workers free plan allows ~50 subrequests
+    // per invocation, and each blob is one KV get. 40 newest-listed users per
+    // call keeps headroom for the pdfmo list below; `capped` tells the UI.
+    const list = await env.SJ_DATA.list({ prefix: 'user:', limit: 40 });
     const users = [];
-    for (const key of list.keys) {
+    const blobs = [];
+    for (let i = 0; i < list.keys.length; i += 10) {
+        const chunk = list.keys.slice(i, i + 10);
+        const got = await Promise.all(chunk.map(k => env.SJ_DATA.get(k.name).catch(() => null)));
+        chunk.forEach((k, j) => blobs.push([k.name, got[j]]));
+    }
+    for (const [name, raw] of blobs) {
         let blob = null;
-        try { blob = JSON.parse(await env.SJ_DATA.get(key.name) || 'null'); } catch { }
+        try { blob = JSON.parse(raw || 'null'); } catch { }
         if (!blob) continue;
-        const email = key.name.slice(5);
+        const email = name.slice(5);
         const projects = Array.isArray(blob.projects) ? blob.projects : [];
         const history = Array.isArray(blob.history) ? blob.history : [];
+        // Count only what the USER typed — every project is seeded with one
+        // model greeting per chat, which would inflate the funnel to 100%.
+        const userMsgs = (arr) => Array.isArray(arr) ? arr.filter(m => m && m.role === 'user').length : 0;
         let chatMsgs = 0, planned = 0;
         projects.forEach(p => {
-            const plan = Array.isArray(p.planChatHistory) ? p.planChatHistory.length : 0;
-            const price = Array.isArray(p.chatHistory) ? p.chatHistory.length : 0;
+            const plan = userMsgs(p.planChatHistory);
+            const price = userMsgs(p.chatHistory);
             chatMsgs += plan + price;
             if (plan > 0) planned++;
         });
@@ -55,8 +67,8 @@ export async function onRequestGet(context) {
         producedQuote: users.filter(u => u.quotes > 0).length,
         pdfThisMonth,
         activeLast7d: users.filter(u => u.lastUpdated && (Date.now() - u.lastUpdated) < 7 * 864e5).length,
-        oneMessageOnly: users.filter(u => u.chatMsgs > 0 && u.chatMsgs <= 2).length,
-        capped: list.list_complete === false,
+        oneMessageOnly: users.filter(u => u.chatMsgs > 0 && u.chatMsgs <= 2).length, // real typed messages only
+        capped: list.list_complete === false || list.keys.length >= 40,
     };
 
     users.sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));

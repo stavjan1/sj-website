@@ -68,9 +68,6 @@ body {
 
 .nav-menu { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 
-/* Drawer-only destinations: the buttons exist for switchTab's active-state
-   bookkeeping but are never shown in the rail itself. */
-.nav-btn.nav-secondary { display: none !important; }
 
 .nav-btn {
   display: flex; flex-direction: column; align-items: center; gap: 3px;
@@ -179,7 +176,9 @@ body:not(.in-project-stage) .project-rail { display: none !important; }
     width: 280px; transform: translateX(100%); /* RTL: off toward the rail */
     background: var(--surface); border-inline-end: 1px solid var(--border);
     transition: transform var(--t-med);
-    z-index: var(--z-drawer); overflow-y: auto; padding: var(--sp-6) var(--sp-4);
+    /* MUST outrank the shared backdrop (z-drawer + 1 in panels.css) — with the
+       drawer below it, clicks land on the backdrop and every item is dead. */
+    z-index: calc(var(--z-drawer) + 2); overflow-y: auto; padding: var(--sp-6) var(--sp-4);
   }
   [dir="rtl"] #more-drawer { transform: translateX(100%); }
   #more-drawer.open { transform: none; }

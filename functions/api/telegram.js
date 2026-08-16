@@ -17,6 +17,7 @@
 //      tgreport:<token> — finished report record (TTL 60 days)
 
 import { generate } from './_ai.js';
+import { rateLimit } from './_tiers.js';
 
 const SESS_TTL = 60 * 60 * 24;        // one working day, generous
 const REPORT_TTL = 60 * 60 * 24 * 60; // 60 days to import/print
@@ -135,6 +136,9 @@ async function normalizeFindings(env, sess) {
         const res = await generate(env, {
             stream: false,
             max_tokens: 1500,
+            // Gemini counts thinking tokens inside maxOutputTokens — without
+            // this the JSON answer gets truncated mid-array (see _ai.js).
+            thinkingBudget: 0,
             messages: [
                 {
                     role: 'system',
@@ -169,11 +173,24 @@ async function finalizeReport(env, chatId, sess) {
     await say(env, chatId, `מסדר את ${sess.findings.length} הממצאים ומכין את הדוח…`);
     const rows = await normalizeFindings(env, sess);
 
-    const findings = [];
-    for (const row of rows) {
-        const img = row.fileId ? await fetchPhotoDataUrl(env, row.fileId) : null;
-        findings.push({ location: row.location, desc: row.desc, img: img || '' });
+    // Photo budget: stay under the Workers subrequest cap (each photo costs
+    // getFile + download) and keep the record importable into the app's
+    // localStorage (~5MB quota) — beyond the caps, findings keep text only.
+    const MAX_PHOTOS = 20;
+    const MAX_EMBED_BYTES = 3 * 1024 * 1024;
+    const findings = rows.map(row => ({ location: row.location, desc: row.desc, img: '', fileId: row.fileId }));
+    let embedded = 0, embeddedBytes = 0;
+    for (let i = 0; i < findings.length; i += 4) {
+        const chunk = findings.slice(i, i + 4).filter(f => f.fileId && embedded < MAX_PHOTOS);
+        const imgs = await Promise.all(chunk.map(f => fetchPhotoDataUrl(env, f.fileId).catch(() => null)));
+        chunk.forEach((f, j) => {
+            const img = imgs[j];
+            if (img && embedded < MAX_PHOTOS && embeddedBytes + img.length <= MAX_EMBED_BYTES) {
+                f.img = img; embedded++; embeddedBytes += img.length;
+            }
+        });
     }
+    findings.forEach(f => delete f.fileId);
 
     const now = new Date();
     const record = {
@@ -245,7 +262,21 @@ async function handleUpdate(env, update) {
             await say(env, chatId, 'אין עדיין ממצאים בדוח. שלחו תמונה עם כיתוב "מיקום - ליקוי" ואז "סיים".');
             return;
         }
-        await finalizeReport(env, chatId, sess);
+        // Any failure must reach the user — a silent waitUntil death means
+        // "סיים" and then nothing, forever.
+        try {
+            await finalizeReport(env, chatId, sess);
+        } catch (e) {
+            await say(env, chatId, 'משהו נכשל בהכנת הדוח. נסו "סיים" שוב; אם זה חוזר — שלחו פחות תמונות לדוח אחד.');
+        }
+        return;
+    }
+
+    // Starting a NEW report while an old session is still open must not append
+    // the command as a finding of the old report (a stale morning session
+    // would swallow the afternoon site's report otherwise).
+    if (sess && sess.findings.length && text && START_RE.test(text) && !sess.pendingCaption) {
+        await say(env, chatId, `יש דוח פתוח לפרויקט "${sess.title}" עם ${sess.findings.length} ממצאים.\nכתבו "סיים" כדי לסגור אותו, או "בטל" כדי למחוק אותו — ואז נפתח את החדש.`);
         return;
     }
 
@@ -309,10 +340,14 @@ async function handleUpdate(env, update) {
 export async function onRequestPost(context) {
     const { request, env } = context;
     if (!env.SJ_DATA || !env.TELEGRAM_BOT_TOKEN) return json({ ok: true });
-    if (env.TELEGRAM_WEBHOOK_SECRET &&
+    // The secret is MANDATORY, not recommended: without it any anonymous POST
+    // would be processed as a genuine Telegram update (message relay + KV
+    // writes + AI spend for free). No secret configured = webhook disabled.
+    if (!env.TELEGRAM_WEBHOOK_SECRET ||
         request.headers.get('X-Telegram-Bot-Api-Secret-Token') !== env.TELEGRAM_WEBHOOK_SECRET) {
         return json({ error: 'forbidden' }, 403);
     }
+    if (!(await rateLimit(env, request, 'tg', 60))) return json({ ok: true });
     let update;
     try { update = await request.json(); } catch { return json({ ok: true }); }
     // Answer Telegram fast; do the work after the response.

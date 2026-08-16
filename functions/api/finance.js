@@ -30,7 +30,7 @@ function emptyRecord() {
 export async function onRequestGet(context) {
     const { request, env } = context;
     const gate = await adminGate(request);
-    if (!gate.ok) return jsonResponse({ error: { message: gate.message } }, gate.status);
+    if (!gate.ok) return gate.response; // carries the proper Hebrew 401/403 body
     if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) לא מוגדר.' } }, 501);
 
     let record;
@@ -41,18 +41,24 @@ export async function onRequestGet(context) {
     let invoiceIncome = [];
     try {
         const blob = JSON.parse(await env.SJ_DATA.get(`user:${ADMIN_EMAIL}`) || 'null');
-        invoiceIncome = (blob && Array.isArray(blob.invoices) ? blob.invoices : [])
-            .filter(inv => inv && Number(inv.total) > 0)
-            .map(inv => ({
-                id: 'inv_' + (inv.id || inv.docNumber || Math.random().toString(36).slice(2)),
-                date: inv.createdAt ? new Date(inv.createdAt).toISOString().slice(0, 10) : null,
-                amount: Number(inv.total) || 0,
-                desc: (inv.docLabel || 'מסמך') + (inv.customer && inv.customer.name ? ' — ' + inv.customer.name : ''),
-                category: 'הכנסות',
-                source: 'zerem',
-                paid: !!inv.paid,
-            }))
-            .filter(e => e.date);
+        const invoices = blob && Array.isArray(blob.invoices) ? blob.invoices : [];
+        for (const inv of invoices) {
+            // Per-invoice guard: one malformed createdAt must not drop ALL income.
+            try {
+                if (!inv || !(Number(inv.total) > 0)) continue;
+                const d = new Date(inv.createdAt);
+                if (isNaN(d.getTime())) continue;
+                invoiceIncome.push({
+                    id: 'inv_' + (inv.id || inv.docNumber || invoiceIncome.length),
+                    date: d.toISOString().slice(0, 10),
+                    amount: Number(inv.total) || 0,
+                    desc: (inv.docLabel || 'מסמך') + (inv.customer && inv.customer.name ? ' — ' + inv.customer.name : ''),
+                    category: 'הכנסות',
+                    source: 'zerem',
+                    paid: !!inv.paid,
+                });
+            } catch { /* skip this invoice only */ }
+        }
     } catch { /* blob unreadable — dashboard still works from manual data */ }
 
     return jsonResponse({ data: record, invoiceIncome });
@@ -64,7 +70,7 @@ export async function onRequestPost(context) { return savePut(context); }
 async function savePut(context) {
     const { request, env } = context;
     const gate = await adminGate(request);
-    if (!gate.ok) return jsonResponse({ error: { message: gate.message } }, gate.status);
+    if (!gate.ok) return gate.response; // carries the proper Hebrew 401/403 body
     if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) לא מוגדר.' } }, 501);
 
     let body;
@@ -87,7 +93,8 @@ async function savePut(context) {
     if (!record.accounts.length && !record.entries.length && !record.recurring.length) {
         let existing = null;
         try { existing = JSON.parse(await env.SJ_DATA.get(KEY) || 'null'); } catch { }
-        if (existing && (existing.accounts.length || existing.entries.length || existing.recurring.length)) {
+        const len = (v) => Array.isArray(v) ? v.length : 0;
+        if (existing && (len(existing.accounts) || len(existing.entries) || len(existing.recurring))) {
             return jsonResponse({ ok: true, skipped: 'empty-over-nonempty' });
         }
     }

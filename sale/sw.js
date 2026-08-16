@@ -29,6 +29,7 @@ const SHELL = [
   '/sale/vendor/fontawesome/css/all.min.css',
   '/sale/vendor/fontawesome/webfonts/fa-solid-900.woff2',
   '/sale/vendor/fontawesome/webfonts/fa-brands-400.woff2',
+  '/sale/vendor/fontawesome/webfonts/fa-regular-400.woff2',
   '/assets/tokens.css',
   '/assets/ui.css',
   '/sale/manifest.webmanifest',

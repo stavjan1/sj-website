@@ -2230,8 +2230,13 @@ function createProjectFromHandoff() {
     const nameInput = document.getElementById('new-project-name');
     if (!nameInput) return;
     const quickPrice = h.price ? String(h.price).slice(0, 60) : '';
+    const prevProjectId = activeProjectId;
     nameInput.value = job.slice(0, 45);
     createNewProject(); // creates + loads + switches to the wizard (planning stage)
+    // Creation can be refused (free-plan project cap → upgrade modal). Only a
+    // NEW active project means success; otherwise keep the handoff for retry
+    // and do NOT auto-send into whatever project happened to be open.
+    if (!activeProjectId || activeProjectId === prevProjectId) return;
     dismissAskHandoff();
     // One click total: fill the planning chat with the job (+ the quick-chat
     // estimate as context) and SEND it — the user already said "continue".
@@ -2240,13 +2245,15 @@ function createProjectFromHandoff() {
         if (!inp) return;
         inp.value = quickPrice ? `${job}\n(הערכה ראשונית מהצ'אט המהיר: ${quickPrice})` : job;
         inp.dispatchEvent(new Event('input'));
-        try {
-            sendChatMessage();
-            showToast('ממשיכים מהצ\'אט המהיר — בונה לך רשימת מוצרים');
-        } catch (e) {
-            inp.focus();
-            showToast('המשכנו מהצ\'אט המהיר — לחץ שלח ואבנה את רשימת המוצרים');
-        }
+        // sendChatMessage is async — a sync try/catch would miss late failures
+        // and leave the success toast lying.
+        Promise.resolve()
+            .then(() => sendChatMessage())
+            .then(() => showToast('ממשיכים מהצ\'אט המהיר — בונה לך רשימת מוצרים'))
+            .catch(() => {
+                inp.focus();
+                showToast('המשכנו מהצ\'אט המהיר — לחץ שלח ואבנה את רשימת המוצרים');
+            });
     }, 500);
 }
 
@@ -3543,13 +3550,16 @@ function openMaintenanceDialog(projectId) {
     if (!proj || !dlg) return;
     _maintTarget = projectId;
     const existing = proj.maintenance || {};
-    _maintMonths = existing.months || 12;
+    // A one-time reminder must round-trip as one-time — months||12 would
+    // silently convert it into a yearly series on the next save.
+    _maintMonths = existing.once ? -1 : (existing.months || 12);
 
     _maintRepeats = maintRepeatsOf(proj);
     document.getElementById('maint-for').textContent = 'עבור: ' + (proj.name || 'הפרויקט');
     maintPickInterval(_maintMonths, true);
     maintRenderRepeats();
-    document.getElementById('maint-next').value = existing.next || maintAddMonths(ckToday(), _maintMonths);
+    document.getElementById('maint-next').value = existing.next ||
+        (_maintMonths > 0 ? maintAddMonths(ckToday(), _maintMonths) : ckToday());
     // Offer the calendar only once there is something to put in it.
     const calBlock = document.getElementById('maint-cal-block');
     if (calBlock) calBlock.style.display = existing.next ? '' : 'none';
@@ -7383,7 +7393,7 @@ function renderReportFindings() {
             <input type="text" class="rf-loc" value="${escapeHtml(f.location)}" placeholder="מיקום (למשל: מטבח)" oninput="reportFindings[${i}].location=this.value">
             <textarea class="rf-desc" rows="2" placeholder="תיאור הממצא וההמלצה" oninput="reportFindings[${i}].desc=this.value">${escapeHtml(f.desc)}</textarea>
             <label class="rf-photo${f.img ? ' has' : ''}" title="${f.img ? 'לחץ על התמונה לסימון; על הרקע — החלפה' : 'צרף תמונה מהשטח'}">
-                ${f.img ? `<img src="${f.img}" alt="" onclick="event.preventDefault(); event.stopPropagation(); annotateFinding(${i})" title="לחץ כדי לסמן על התמונה">` : '<i class="fa-solid fa-camera"></i>'}
+                ${f.img && /^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/.test(f.img) ? `<img src="${f.img}" alt="" onclick="event.preventDefault(); event.stopPropagation(); annotateFinding(${i})" title="לחץ כדי לסמן על התמונה">` : '<i class="fa-solid fa-camera"></i>'}
                 <input type="file" accept="image/*" style="display:none" onchange="onReportPhoto(${i}, this)">
             </label>
             <button class="cr-del" onclick="removeReportFinding(${i})" title="מחק ממצא"><i class="fa-solid fa-xmark"></i></button>
