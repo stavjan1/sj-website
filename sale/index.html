@@ -13,9 +13,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Hebrew:wght@400;500;700&family=Heebo:wght@400;500;700&family=David+Libre:wght@400;700&family=Frank+Ruhl+Libre:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 
-    <!-- FontAwesome: still used by icons rendered inside app.js templates.
-         The V3 shell itself is SVG-only; a full de-FA sweep is queued for V3.1. -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
+         CDN copy proved unreliable on real devices (glyphs loading empty). The
+         css + woff2 live in vendor/ so icons work offline and forever. -->
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=302">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -25,11 +26,11 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=301">
-    <link rel="stylesheet" href="../assets/ui.css?v=301">
-    <link rel="stylesheet" href="css/shell.css?v=301">
-    <link rel="stylesheet" href="css/panels.css?v=301">
-    <link rel="stylesheet" href="css/pdf.css?v=301">
+    <link rel="stylesheet" href="../assets/tokens.css?v=302">
+    <link rel="stylesheet" href="../assets/ui.css?v=302">
+    <link rel="stylesheet" href="css/shell.css?v=302">
+    <link rel="stylesheet" href="css/panels.css?v=302">
+    <link rel="stylesheet" href="css/pdf.css?v=302">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -233,40 +234,32 @@
 
                 <!-- LEFT: KPI stats stacked in a column -->
                 <aside class="projects-stats">
-                    <div class="metric-card" style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:12px; padding:16px; display:flex; align-items:center; gap:16px; box-shadow:0 4px 10px rgba(0,0,0,0.1); transition: transform 0.2s ease;">
-                        <div class="metric-icon" style="width:44px; height:44px; border-radius:10px; background:rgba(37,99,235,0.12); color:var(--color-accent); display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
-                            <i class="fa-solid fa-file-signature"></i>
-                        </div>
-                        <div class="metric-info" style="display:flex; flex-direction:column; min-width:0;">
-                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">הצעות שנשלחו</span>
-                            <span id="metric-sent-count" style="font-size:1.45rem; font-weight:800; color:var(--text-primary);">0</span>
+                    <div class="metric-card">
+                        <div class="metric-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></svg></div>
+                        <div class="metric-info">
+                            <span class="metric-label">הצעות שנשלחו</span>
+                            <span class="metric-value" id="metric-sent-count">0</span>
                         </div>
                     </div>
-                    <div class="metric-card" style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:12px; padding:16px; display:flex; align-items:center; gap:16px; box-shadow:0 4px 10px rgba(0,0,0,0.1); transition: transform 0.2s ease;">
-                        <div class="metric-icon" style="width:44px; height:44px; border-radius:10px; background:rgba(34,197,94,0.12); color:var(--color-success); display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
-                            <i class="fa-solid fa-circle-check"></i>
-                        </div>
-                        <div class="metric-info" style="display:flex; flex-direction:column; min-width:0;">
-                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">הצעות שאושרו</span>
-                            <span id="metric-approved-count" style="font-size:1.45rem; font-weight:800; color:var(--text-primary);">0</span>
+                    <div class="metric-card">
+                        <div class="metric-icon ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 5-5"/></svg></div>
+                        <div class="metric-info">
+                            <span class="metric-label">הצעות שאושרו</span>
+                            <span class="metric-value" id="metric-approved-count">0</span>
                         </div>
                     </div>
-                    <div class="metric-card" style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:12px; padding:16px; display:flex; align-items:center; gap:16px; box-shadow:0 4px 10px rgba(0,0,0,0.1); transition: transform 0.2s ease;">
-                        <div class="metric-icon" style="width:44px; height:44px; border-radius:10px; background:rgba(245,158,11,0.12); color:var(--color-warning); display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
-                            <i class="fa-solid fa-shekel-sign"></i>
-                        </div>
-                        <div class="metric-info" style="display:flex; flex-direction:column; min-width:0;">
-                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">צבר אושר (₪)</span>
-                            <span id="metric-approved-sum" style="font-size:1.45rem; font-weight:800; color:var(--text-primary);">0 ₪</span>
+                    <div class="metric-card">
+                        <div class="metric-icon ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6 4v9a5 5 0 0 0 10 0"/><path d="M16 4v6"/><line x1="4" y1="21" x2="20" y2="21"/></svg></div>
+                        <div class="metric-info">
+                            <span class="metric-label">צבר אושר (₪)</span>
+                            <span class="metric-value" id="metric-approved-sum">0 ₪</span>
                         </div>
                     </div>
-                    <div class="metric-card" style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:12px; padding:16px; display:flex; align-items:center; gap:16px; box-shadow:0 4px 10px rgba(0,0,0,0.1); transition: transform 0.2s ease;">
-                        <div class="metric-icon" style="width:44px; height:44px; border-radius:10px; background:rgba(168,85,247,0.12); color:#a855f7; display:flex; align-items:center; justify-content:center; font-size:1.3rem;">
-                            <i class="fa-solid fa-chart-line"></i>
-                        </div>
-                        <div class="metric-info" style="display:flex; flex-direction:column; min-width:0;">
-                            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">אחוז סגירה</span>
-                            <span id="metric-conversion-rate" style="font-size:1.45rem; font-weight:800; color:var(--text-primary);">0%</span>
+                    <div class="metric-card">
+                        <div class="metric-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg></div>
+                        <div class="metric-info">
+                            <span class="metric-label">אחוז סגירה</span>
+                            <span class="metric-value" id="metric-conversion-rate">0%</span>
                         </div>
                     </div>
                 </aside>
@@ -2141,17 +2134,17 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/listcards.js?v=301"></script>
+    <script src="/assets/listcards.js?v=302"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=301"></script>
-    <script src="app.js?v=301"></script>
+    <script src="coverage.js?v=302"></script>
+    <script src="app.js?v=302"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=301"></script>
+    <script src="finance.js?v=302"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=301" defer></script>
-    <script src="/track.js?v=301" defer></script>
+    <script src="../assistant.js?v=302" defer></script>
+    <script src="/track.js?v=302" defer></script>
 </body>
 </html>

@@ -2191,6 +2191,7 @@ i[class^="fa-"], i[class*=" fa-"] {
 /* Mobile "עוד" bottom sheet (sits above the 65px bottom bar) */
 #more-drawer-backdrop { display: none; position: fixed; inset: 0; background: var(--scrim); z-index: calc(var(--z-drawer) + 1); }
 #more-drawer-backdrop.open { display: block; }
+@media (max-width: 768px) {
 #more-drawer {
     position: fixed;
     inset-inline: 0;
@@ -2209,7 +2210,8 @@ i[class^="fa-"], i[class*=" fa-"] {
     visibility: hidden;
 }
 #more-drawer.open { transform: translateY(0); pointer-events: auto; visibility: visible; }
-@media (min-width: 861px) { #more-drawer, #more-drawer-backdrop { display: none !important; } }
+}
+/* Desktop (>=769px): shell.css turns the same drawer into a side sheet. */
 .more-drawer-handle { width: 42px; height: 4px; border-radius: var(--r-pill); background: var(--border-strong); margin: 0 auto var(--sp-3); }
 .more-drawer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
 .more-drawer-grid button, .more-drawer-grid a {
@@ -2873,3 +2875,34 @@ i[class^="fa-"], i[class*=" fa-"] {
 @media (max-width: 1100px) {
     .project-card .stage-chain { flex-basis: 100%; order: 3; }
 }
+
+
+/* ============================================================
+   V3.0.2 — one dropdown indicator, not two (native + drawn)
+   ============================================================ */
+#panel-projects select, .project-filter-select, .proj-cat-select, .ck-dialog select, .content-panel select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2379716B' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: left var(--sp-2) center;
+    background-size: 14px;
+    padding-inline-start: calc(var(--sp-2) + 18px);
+}
+
+/* KPI metric cards — classes instead of the old inline styles */
+.projects-stats { display: flex; flex-direction: column; gap: var(--sp-3); }
+.metric-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+    padding: var(--sp-4); display: flex; align-items: center; gap: var(--sp-3);
+}
+.metric-icon {
+    width: 44px; height: 44px; border-radius: var(--r-sm); flex: none;
+    background: var(--accent-soft); color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+}
+.metric-icon.ok { color: var(--ok-text); }
+.metric-icon svg { width: 22px; height: 22px; }
+.metric-info { display: flex; flex-direction: column; min-width: 0; }
+.metric-label { font-size: var(--fs-xs); color: var(--text-3); font-weight: 500; }
+.metric-value { font-size: var(--fs-xl); font-weight: 700; font-variant-numeric: tabular-nums; }

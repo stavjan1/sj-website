@@ -168,6 +168,9 @@ body.in-project #project-banner { display: flex; }
 @media (max-width: 860px) {
   .project-rail { display: none; }
 }
+/* Leaving a project leaves the rail's old buttons in the DOM — never show
+   them outside a project stage, at any width. */
+body:not(.in-project-stage) .project-rail { display: none !important; }
 
 /* ---------- more-drawer: bottom sheet on phone, side sheet on desktop ---------- */
 @media (min-width: 769px) {
