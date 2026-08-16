@@ -2,7 +2,7 @@
 // Purpose: make the app installable (PWA) and let the shell open instantly,
 // including offline at a job site (the user's data lives in localStorage
 // anyway). AI calls and cloud sync (/api/*) are ALWAYS network-only.
-const CACHE = 'zerem-shell-v103';
+const CACHE = 'zerem-shell-v300';
 
 // The typeface and the icons come from other people's servers, and at a job
 // site there is no reception to fetch them with. Without them the app is a wall
@@ -13,14 +13,21 @@ const CACHE = 'zerem-shell-v103';
 // Kept in its own cache on purpose: the shell cache is wiped on every deploy,
 // and evicting the fonts each time would mean needing reception again right
 // after an update, which is precisely when it is not there.
-const CDN_CACHE = 'zerem-cdn-v1';
+// v2: wiped once in V3.0.1 — a stale/poisoned cached font response could leave
+// the icon font permanently broken on a device, and this cache never expires.
+const CDN_CACHE = 'zerem-cdn-v2';
 const CDN_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com'];
 const SHELL = [
   '/sale/',
   '/sale/index.html',
   '/sale/app.js',
+  '/sale/finance.js',
   '/sale/coverage.js',
-  '/sale/styles.css',
+  '/sale/css/shell.css',
+  '/sale/css/panels.css',
+  '/sale/css/pdf.css',
+  '/assets/tokens.css',
+  '/assets/ui.css',
   '/sale/manifest.webmanifest',
   '/sale/icons/icon-192.png',
   '/sale/icons/icon-512.png',
@@ -70,7 +77,7 @@ self.addEventListener('fetch', (e) => {
   }
 
   if (url.origin !== location.origin) return;            // anything else third-party: browser default
-  if (!url.pathname.startsWith('/sale/') && url.pathname !== '/assistant.js' && url.pathname !== '/assets/listcards.js') return;
+  if (!url.pathname.startsWith('/sale/') && !url.pathname.startsWith('/assets/') && url.pathname !== '/assistant.js') return;
 
   // "Network-first" is only as fresh as the fetch underneath it, and a plain
   // fetch() is still allowed to be answered by the browser's HTTP cache. That

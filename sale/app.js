@@ -3583,6 +3583,12 @@ function maintPickInterval(months, silent) {
     });
     const custom = document.getElementById('maint-months-custom');
     if (custom) custom.style.display = months === 0 ? '' : 'none';
+    // One-time (-1): no recurrence, so the repeat-count question disappears
+    // and the date is whatever the user picks — nothing to auto-compute.
+    const repeatField = document.getElementById('maint-repeat-row');
+    if (repeatField && repeatField.closest('.ck-field')) {
+        repeatField.closest('.ck-field').style.display = months === -1 ? 'none' : '';
+    }
     if (!silent && months > 0) {
         document.getElementById('maint-next').value = maintAddMonths(ckToday(), months);
     }
@@ -3635,9 +3641,10 @@ function maintSave() {
     }
     proj.kind = 'maintenance';
     proj.maintenance = Object.assign({}, proj.maintenance, {
-        months: _maintMonths || 12,
+        once: _maintMonths === -1 || undefined,
+        months: _maintMonths === -1 ? null : (_maintMonths || 12),
         next,
-        repeats: _maintRepeats,
+        repeats: _maintMonths === -1 ? 1 : _maintRepeats,
         // Only record an override when it differs from the global default.
         leadDays: chosen && chosen.join(',') !== maintDefaultLeads().join(',') ? chosen : null,
         eventId: (proj.maintenance && proj.maintenance.eventId) || null,
@@ -3713,6 +3720,15 @@ function maintEmail(projectId) {
 function maintMarkDone(projectId) {
     const proj = projectsList.find((p) => p.id === projectId);
     if (!proj || !proj.maintenance) return;
+    // A one-time reminder is done for good — no next date to compute.
+    if (proj.maintenance.once) {
+        proj.maintenance = null;
+        proj.kind = 'job';
+        saveProjects();
+        filterProjectsList();
+        showToast('הביקור נרשם — התזכורת החד-פעמית הושלמה');
+        return;
+    }
     const from = proj.maintenance.next || ckToday();
     proj.maintenance.next = maintAddMonths(from, proj.maintenance.months || 12);
     proj.maintenance.eventId = null;    // the old calendar series no longer matches
@@ -3739,6 +3755,7 @@ function maintDeepLink(proj) {
 }
 // What the recurring work is called, so the calendar block reads like the job.
 function maintKindLabel(months) {
+    if (!months) return 'ביקור חד-פעמי';
     if (months === 12) return 'בדיקה שנתית';
     if (months === 6) return 'בדיקה חצי-שנתית';
     if (months === 24) return 'בדיקה דו-שנתית';
@@ -3836,7 +3853,7 @@ async function maintToGoogle(projectId) {
     try { token = await ckEnsureCalToken(); }
     catch { showToast('נדרש אישור גישה ליומן — מוריד קובץ במקום'); maintToIcs(projectId); return; }
 
-    const months = (proj.maintenance && proj.maintenance.months) || 12;
+    const months = proj.maintenance && proj.maintenance.once ? 0 : ((proj.maintenance && proj.maintenance.months) || 12);
     const blocks = maintBlocks(proj);
     if (!blocks.length) { showToast('לא נבחרו תזכורות לפרויקט הזה', 'error'); return; }
     const base = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
@@ -3854,7 +3871,8 @@ async function maintToGoogle(projectId) {
                 description: maintEventBody(proj),
                 start: { dateTime: b.date + 'T09:00:00', timeZone: tz },
                 end: { dateTime: b.date + 'T10:00:00', timeZone: tz },
-                recurrence: [maintRrule(months, maintRepeatsOf(proj))],
+                // One-time reminders are a single event, not a series.
+                ...(proj.maintenance && proj.maintenance.once ? {} : { recurrence: [maintRrule(months, maintRepeatsOf(proj))] }),
                 reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 0 }] },
             });
             const r = await fetch(base, { method: 'POST', headers, body });
@@ -3887,7 +3905,7 @@ async function maintToGoogle(projectId) {
 function maintBlocks(proj) {
     const due = maintNextDue(proj);
     if (!due) return [];
-    const months = (proj.maintenance && proj.maintenance.months) || 12;
+    const months = proj.maintenance && proj.maintenance.once ? 0 : ((proj.maintenance && proj.maintenance.months) || 12);
     const leads = maintLeadsFor(proj);
     // No early warning chosen → still put the job in the calendar, on the day.
     if (!leads.length) return [{ date: due, days: 0, title: maintBlockTitle(proj, months, true) }];
@@ -3911,7 +3929,7 @@ function maintToIcs(projectId) {
     closeMaintCalPicker();
     const proj = projectsList.find((p) => p.id === projectId);
     if (!proj || !maintNextDue(proj)) return;
-    const months = (proj.maintenance && proj.maintenance.months) || 12;
+    const months = proj.maintenance && proj.maintenance.once ? 0 : ((proj.maintenance && proj.maintenance.months) || 12);
     const blocks = maintBlocks(proj);
     if (!blocks.length) { showToast('לא נבחרו תזכורות לפרויקט הזה', 'error'); return; }
     const desc = ckIcsText(maintEventBody(proj));
@@ -3927,7 +3945,7 @@ function maintToIcs(projectId) {
             'DTSTAMP:' + stampNow,
             'DTSTART:' + d + 'T090000',
             'DTEND:' + d + 'T100000',
-            maintRrule(months, maintRepeatsOf(proj)),
+            ...(proj.maintenance && proj.maintenance.once ? [] : [maintRrule(months, maintRepeatsOf(proj))]),
             'SUMMARY:' + summary,
             'DESCRIPTION:' + desc,
             'URL:' + maintDeepLink(proj),
@@ -4443,8 +4461,8 @@ function renderProjectsList(list) {
                 <span class="project-status-badge status-badge-${status}"
                       onclick="cycleProjectStatus('${p.id}', event)"
                       title="לחץ לשינוי סטטוס">${status}</span>
-                <button class="btn btn-danger btn-small" onclick="deleteProject('${p.id}', event)" title="מחק פרויקט">
-                    <i class="fa-solid fa-trash-can"></i>
+                <button class="btn btn-danger btn-small" onclick="deleteProject('${p.id}', event)" title="העברה לסל המיחזור" aria-label="העברה לסל המיחזור">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                 </button>
             </div>
         `;
@@ -4657,7 +4675,9 @@ const THEME_META = {
     mid:   { cls: 'mid-theme',   icon: 'fa-adjust', label: 'DIM MODE',   name: 'מצב אמצע' },
     dark:  { cls: 'dark-theme',  icon: 'fa-moon',   label: 'DARK MODE',  name: 'מצב כהה' },
 };
-const THEME_CYCLE = ['auto', 'light', 'mid', 'dark'];
+// 'mid' was retired in V3 (visually identical to dark); saved 'mid' prefs
+// still resolve through THEME_META, they just aren't offered anymore.
+const THEME_CYCLE = ['auto', 'light', 'dark'];
 
 // The stored preference, which may be 'auto'.
 function themePref() {

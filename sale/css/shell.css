@@ -68,6 +68,10 @@ body {
 
 .nav-menu { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 
+/* Drawer-only destinations: the buttons exist for switchTab's active-state
+   bookkeeping but are never shown in the rail itself. */
+.nav-btn.nav-secondary { display: none !important; }
+
 .nav-btn {
   display: flex; flex-direction: column; align-items: center; gap: 3px;
   min-height: 54px; padding: var(--sp-2) 2px;

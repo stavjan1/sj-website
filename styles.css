@@ -209,6 +209,13 @@
    ============================================================ */
 
 /* ---------- AI assistant widget (.sj-assist-*) ---------- */
+/* The panel and overlays are INJECTED CLOSED and opened via a JS .open class —
+   V3.0 shipped them always-visible by mistake. Default must stay hidden. */
+.sj-assist-panel { display: none; }
+.sj-assist-panel.open { display: flex; }
+.sj-mil-overlay { display: none; }
+.sj-mil-overlay.open { display: flex; }
+
 .sj-assist-launcher {
   position: fixed; inset-block-end: calc(var(--sp-6) + env(safe-area-inset-bottom));
   inset-inline-end: var(--sp-6);

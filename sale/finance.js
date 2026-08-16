@@ -24,12 +24,20 @@
     let saveTimer = null;
 
     // ── data ───────────────────────────────────────────────────────────────
-    async function loadFinance() {
+    async function loadFinance(retried) {
         const token = authToken();
         if (!token) throw new Error('נדרשת התחברות');
         const res = await fetch('/api/finance', { headers: { Authorization: 'Bearer ' + token } });
+        if (res.status === 401 && !retried) {
+            // The app refreshes its Google token silently right after boot —
+            // wait for it once instead of failing on a token that just expired.
+            await new Promise(r => setTimeout(r, 2500));
+            return loadFinance(true);
+        }
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error((data.error && data.error.message) || 'שגיאה בטעינה');
+        if (!res.ok) throw new Error(res.status === 401
+            ? 'ההתחברות התיישנה — התנתקו והתחברו שוב, ואז פתחו את הלשונית מחדש'
+            : (data.error && data.error.message) || 'שגיאה בטעינה');
         fin = data.data || { accounts: [], entries: [], recurring: [], settings: {} };
         invoiceIncome = Array.isArray(data.invoiceIncome) ? data.invoiceIncome : [];
     }
@@ -128,7 +136,8 @@
             root.innerHTML = '<div class="empty"><h3>טוען נתונים…</h3></div>';
             try { await loadFinance(); }
             catch (e) {
-                root.innerHTML = `<div class="empty"><h3>לא הצלחתי לטעון</h3><p>${esc(e.message)}</p></div>`;
+                root.innerHTML = `<div class="empty"><h3>לא הצלחתי לטעון</h3><p>${esc(e.message)}</p>
+                    <button class="btn btn-quiet" onclick="renderFinance()">נסה שוב</button></div>`;
                 return;
             }
         }

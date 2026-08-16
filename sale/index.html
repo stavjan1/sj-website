@@ -1022,9 +1022,6 @@
                                         <button type="button" class="btn btn-secondary" id="theme-btn-light" onclick="setSystemTheme('light')" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; padding:10px;">
                                             <i class="fa-solid fa-sun"></i> בוקר
                                         </button>
-                                        <button type="button" class="btn btn-secondary" id="theme-btn-mid" onclick="setSystemTheme('mid')" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; padding:10px;">
-                                            <i class="fa-solid fa-adjust"></i> אמצע
-                                        </button>
                                         <button type="button" class="btn btn-secondary" id="theme-btn-dark" onclick="setSystemTheme('dark')" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; padding:10px;">
                                             <i class="fa-solid fa-moon"></i> לילה
                                         </button>
@@ -2093,6 +2090,7 @@
         <div class="ck-field">
             <label>כל כמה זמן חוזרים?</label>
             <div class="chip-row" id="maint-interval-row">
+                <button type="button" class="mchip" data-months="-1" onclick="maintPickInterval(-1)">חד-פעמי</button>
                 <button type="button" class="mchip" data-months="6" onclick="maintPickInterval(6)">חצי שנה</button>
                 <button type="button" class="mchip active" data-months="12" onclick="maintPickInterval(12)">שנה</button>
                 <button type="button" class="mchip" data-months="24" onclick="maintPickInterval(24)">שנתיים</button>
