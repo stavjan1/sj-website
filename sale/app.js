@@ -1663,6 +1663,10 @@ function updateBackButton() {
 }
 
 function switchTab(tabId, opts) {
+    // Pipeline is a view of the work list; leaving it re-marks the toggle.
+    if (tabId === 'projects' || tabId === 'statistics') setTimeout(() => {
+        if (typeof setProjectsView === 'function') setProjectsView(projectsView);
+    }, 0);
     // Remember where we came from, so the back arrow has somewhere to go.
     // A repeat of the same tab is not a step, and walking BACK must not push.
     if (!(opts && opts.fromBack)) {
@@ -2467,8 +2471,8 @@ function updateActiveProjectBanner(proj) {
 // are reserved (shown as "בקרוב") for the accounting flow.
 const PROJECT_RAIL_STAGES = [
     { tab: 'wizard',  label: 'אפיון ותמחור', icon: 'fa-compass-drafting' },
-    { tab: 'create',  label: 'עורך ההצעה',   icon: 'fa-file-invoice-dollar' },
-    { tab: 'reports', label: 'דוחות',        icon: 'fa-clipboard-check' },
+    { tab: 'create',  label: 'הצעת מחיר',    icon: 'fa-file-invoice-dollar' },
+    { tab: 'reports', label: 'דוח בדיקה',    icon: 'fa-clipboard-check' },
 ];
 // Accounting documents reachable straight from a project — enabled once the
 // project has a priced quote (else locked with a tooltip explaining why).
@@ -2573,8 +2577,16 @@ function startFirstProject() {
 let projectsView = 'list';
 function setProjectsView(view) {
     projectsView = view === 'grid' ? 'grid' : 'list';
+    // The history link is a door to old quotes, not a menu item — it appears
+    // under the list only when there is something behind it.
+    const hist = document.getElementById('projects-history-link');
+    if (hist) hist.hidden = !((appState.history || []).length);
     localStorage.setItem('sj_projects_view', projectsView);
-    document.querySelectorAll('.view-toggle').forEach((b) => b.classList.toggle('active', b.dataset.view === projectsView));
+    const onPipeline = !!document.querySelector('#panel-statistics.active');
+    document.querySelectorAll('.view-toggle').forEach((b) => {
+        if (!b.dataset.view) return;
+        b.classList.toggle('active', b.dataset.view === (onPipeline ? 'pipeline' : projectsView));
+    });
     const c = document.getElementById('projects-list-container');
     if (c) c.classList.toggle('grid-view', projectsView === 'grid');
     filterProjectsList();
@@ -4238,14 +4250,9 @@ function renderReminderBell() {
         bell.classList.toggle('has-due', n > 0);
         bell.setAttribute('aria-label', n === 0 ? 'תזכורות לקוחות — אין כרגע' : 'תזכורות לקוחות — ' + n + ' ממתינות');
     }
-    // The phone's bottom bar has room for five buttons, not six, so the mobile
-    // bell earns its slot only on days it has something to say.
-    const mob = document.getElementById('tab-reminders');
-    if (mob) {
-        mob.style.display = n > 0 ? '' : 'none';
-        const badge = document.getElementById('rb-count-mobile');
-        if (badge) badge.textContent = n > 9 ? '9+' : String(n);
-    }
+    // The bell used to be a rail item that appeared on days it had something
+    // to say — which meant the navigation changed shape under you. It is one
+    // button in the same corner of every screen now, and only the count moves.
     if (reminderPopOpen) renderReminderPopover();
 }
 
@@ -4521,7 +4528,11 @@ function renderProjectsList(list) {
         const status = p.status || 'טיוטה';
         const stage = getProjectStage(p);
         const so = STAGE_ORDER[stage] || 0;
-        const stepCls = (i) => i < so ? 'done' : (i === so ? 'current' : 'locked');
+        // Displayed steps are two; stored stages are still three. planning and
+        // pricing are the same conversation, so they share step 0, and "draft"
+        // (index 2) is the quote itself.
+        const shown = so >= 2 ? 2 : 0;
+        const stepCls = (i) => i < shown ? 'done' : (i === shown ? 'current' : 'locked');
         const card = document.createElement('div');
         card.className = `project-card ${isActive ? 'active' : ''}`;
         card.onclick = () => loadProject(p.id);
@@ -4549,17 +4560,13 @@ function renderProjectsList(list) {
                     </label>
                 </div>
             </div>
-            <div class="stage-chain" title="שרשרת העבודה של הפרויקט">
+            <div class="stage-chain" title="שלבי העבודה">
                 <button class="stage-step ${stepCls(0)}" onclick="openProjectStage('${p.id}','plan',event)">
-                    <i class="fa-solid fa-compass-drafting"></i> אפיון
-                </button>
-                <span class="stage-arrow">←</span>
-                <button class="stage-step ${stepCls(1)}" onclick="openProjectStage('${p.id}','price',event)">
-                    <i class="fa-solid fa-coins"></i> תמחור
+                    <i class="fa-solid fa-compass-drafting"></i> אפיון ותמחור
                 </button>
                 <span class="stage-arrow">←</span>
                 <button class="stage-step ${stepCls(2)}" onclick="openProjectStage('${p.id}','draft',event)">
-                    <i class="fa-solid fa-file-pdf"></i> הכנת טיוטה
+                    <i class="fa-solid fa-file-invoice-dollar"></i> הצעת מחיר
                 </button>
             </div>
             <div class="project-endcap">

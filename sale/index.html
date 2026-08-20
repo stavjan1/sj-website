@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=317">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=318">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,11 +26,11 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=317">
-    <link rel="stylesheet" href="../assets/ui.css?v=317">
-    <link rel="stylesheet" href="css/shell.css?v=317">
-    <link rel="stylesheet" href="css/panels.css?v=317">
-    <link rel="stylesheet" href="css/pdf.css?v=317">
+    <link rel="stylesheet" href="../assets/tokens.css?v=318">
+    <link rel="stylesheet" href="../assets/ui.css?v=318">
+    <link rel="stylesheet" href="css/shell.css?v=318">
+    <link rel="stylesheet" href="css/panels.css?v=318">
+    <link rel="stylesheet" href="css/pdf.css?v=318">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -96,14 +96,7 @@
                     <span>דוחות</span>
                 </button>
                 <div class="nav-proj-divider proj-tab"></div>
-                <!-- The bell takes a slot only on days it has something to say
-                     (renderReminderBell shows/hides it). -->
-                <button class="nav-btn mobile-core" id="tab-reminders" style="display:none;"
-                        onclick="toggleReminderPopover(event)" aria-label="תזכורות לקוחות">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-                    <span>תזכורות</span>
-                    <b class="nav-badge rb-count-mobile" id="rb-count-mobile">0</b>
-                </button>
+                
                 <button class="nav-btn" id="tab-checkups" onclick="switchTab('checkups')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 15l2 2 4-4"/></svg>
                     <span>שירות תקופתי</span>
@@ -112,10 +105,6 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="13" y2="16"/></svg>
                     <span>חשבונות</span>
                 </button>
-                <a class="nav-btn" href="/ask/" title="שאלת תמחור מהירה — בלי לפתוח פרויקט">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M13 2L4.5 13h6l-1.5 9L18.5 10h-6z"/></svg>
-                    <span>מצב מהיר</span>
-                </a>
                 <button class="nav-btn nav-more-btn" id="tab-more" onclick="toggleMoreDrawer()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
                     <span>עוד</span>
@@ -170,13 +159,20 @@
         <!-- Main Workspace -->
         <main class="main-content">
 
-            <!-- Back: the app had no way back, only jumps. Lives here rather
-                 than in the project banner because the banner only exists
-                 while a project is open. -->
-            <button type="button" class="ctx-back" id="ctx-back" onclick="goBackTab()" title="חזרה למסך הקודם" aria-label="חזרה למסך הקודם" hidden>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-                <span>חזרה</span>
-            </button>
+            <!-- One bar at the top of every screen: the way back, and the bell.
+                 A reminder is not a place you navigate to — it is a thing that
+                 wants your attention, so it lives in the same corner always. -->
+            <div class="ctx-bar">
+                <button type="button" class="ctx-back" id="ctx-back" onclick="goBackTab()" title="חזרה למסך הקודם" aria-label="חזרה למסך הקודם" hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    <span>חזרה</span>
+                </button>
+                <button type="button" class="ctx-bell" id="reminder-bell" onclick="toggleReminderPopover(event)"
+                        aria-expanded="false" aria-label="תזכורות לקוחות" title="תזכורות">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+                    <b class="rb-count" id="rb-count" hidden>0</b>
+                </button>
+            </div>
 
             <!-- In-project stage rail (desktop): vertical steps on the RTL start
                  (right) + a back button. Populated by renderProjectRail(). -->
@@ -211,6 +207,9 @@
                         </button>
                     </div>
 
+                    <p class="create-quick-hint">
+                        רק שאלה מהירה? <a href="/ask/">אפשר לשאול בלי לפתוח עבודה ←</a>
+                    </p>
                     <!-- Handoff from the public /ask/ quick-chat: continue that job as a full project -->
                     <div id="ask-handoff-banner"></div>
                     <!-- Arrived from a calendar reminder (?p=<project>) — offers the
@@ -248,6 +247,7 @@
                         <div class="view-toggles" id="view-toggles">
                             <button type="button" class="view-toggle active" data-view="list" onclick="setProjectsView('list')" title="תצוגת רשימה"><i class="fa-solid fa-list"></i></button>
                             <button type="button" class="view-toggle" data-view="grid" onclick="setProjectsView('grid')" title="תצוגת קוביות"><i class="fa-solid fa-table-cells-large"></i></button>
+                            <button type="button" class="view-toggle" data-view="pipeline" onclick="switchTab('statistics')" title="תצוגת צינור — לפי שלב"><i class="fa-solid fa-diagram-project"></i></button>
                         </div>
                         <button type="button" class="view-toggle" onclick="openRecycleBin()" title="סל המחזור"><i class="fa-solid fa-trash-can-arrow-up"></i></button>
                     </div>
@@ -258,6 +258,9 @@
                     <div id="projects-list-container" class="projects-list">
                         <!-- Dynamically loaded by script -->
                     </div>
+                    <p class="projects-history-link" id="projects-history-link" hidden>
+                        <a href="#" onclick="switchTab('history'); return false;">כל ההצעות שהופקו — היסטוריה ←</a>
+                    </p>
                 </div>
 
                 <!-- LEFT: KPI stats stacked in a column -->
@@ -776,7 +779,187 @@
                         </div>
                     </div>
                 </div>
-            </section>
+            
+                <!-- The document's design lives with the document. It used to
+                     sit under "פרטי העסק", next to the company address, which is
+                     a different kind of thing entirely. -->
+                <details class="quote-design">
+                    <summary><i class="fa-solid fa-palette" aria-hidden="true"></i> עיצוב ההצעה — לוגו, רקע ותבנית</summary>
+                    <div class="quote-design-body">
+<div class="section-card">
+                            <div class="card-header"><h3><i class="fa-solid fa-image"></i> לוגו ורקע</h3></div>
+                            <div class="card-body">
+                                <div class="form-grid-2">
+                                    <div class="form-group">
+                                        <label>לוגו החברה</label>
+                                        <input type="file" id="settings-logo-file" accept="image/*" style="display:none;" onchange="handleImageUpload(event, 'logo')">
+                                        <div class="file-uploader-box">
+                                            <button type="button" class="btn btn-secondary btn-small" onclick="document.getElementById('settings-logo-file').click()">בחר לוגו...</button>
+                                            <button type="button" class="btn btn-danger btn-small" onclick="clearUploadedImage('logo')">מחק</button>
+                                        </div>
+                                        <div class="img-preview-box" id="logo-settings-preview"></div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>תמונת רקע</label>
+                                        <input type="file" id="settings-bg-file" accept="image/*" style="display:none;" onchange="handleImageUpload(event, 'bg')">
+                                        <div class="file-uploader-box">
+                                            <button type="button" class="btn btn-secondary btn-small" onclick="document.getElementById('settings-bg-file').click()">בחר רקע...</button>
+                                            <button type="button" class="btn btn-danger btn-small" onclick="clearUploadedImage('bg')">מחק</button>
+                                        </div>
+                                        <div class="img-preview-box" id="bg-settings-preview"></div>
+                                    </div>
+                                </div>
+                                <div class="logo-styling-section" style="border-top:1px solid var(--border-color);padding-top:14px;margin-top:14px;">
+                                    <div class="form-grid-2">
+                                        <div class="form-group">
+                                            <label for="set-logo-align">יישור לוגו</label>
+                                            <select id="set-logo-align" onchange="updateLogoStyles()">
+                                                <option value="right">ימין</option>
+                                                <option value="center" selected>מרכז</option>
+                                                <option value="left">שמאל</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="set-logo-width">רוחב: <span id="val-logo-width">75px</span></label>
+                                            <input type="range" id="set-logo-width" min="40" max="300" value="75" oninput="updateLogoStyles()">
+                                        </div>
+                                    </div>
+                                    <div class="form-grid-2">
+                                        <div class="form-group">
+                                            <label for="set-logo-margin-top">מרווח עליון: <span id="val-logo-margin-top">0px</span></label>
+                                            <input type="range" id="set-logo-margin-top" min="0" max="100" value="0" oninput="updateLogoStyles()">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="set-logo-margin-bottom">מרווח תחתון: <span id="val-logo-margin-bottom">10px</span></label>
+                                            <input type="range" id="set-logo-margin-bottom" min="0" max="100" value="10" oninput="updateLogoStyles()">
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- (הטוגל "תמחור מפורט לפי סעיפים" עבר לעורך ההצעה עצמו —
+                                     שם מקבלים את ההחלטה, והבחירה האחרונה נזכרת להצעות חדשות) -->
+                            </div>
+                        </div>
+
+                        <!-- PDF Template Customizer & Miniature Live Preview -->
+                        <div class="section-card" id="pdf-customizer-card" style="margin-top:20px;">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-file-invoice text-accent"></i> עיצוב תבנית הצעת המחיר (דינמי)</h3>
+                            </div>
+                            <div class="card-body" style="display:flex; flex-direction:column; gap:20px;">
+                                <div class="customizer-layout" style="display:flex; gap:20px; flex-wrap:wrap;">
+                                    <!-- Controls Side -->
+                                    <div class="customizer-controls" style="flex:1; min-width:240px; display:flex; flex-direction:column; gap:12px;">
+                                        <div class="form-group">
+                                            <label for="pdf-font-family">גופן הצעה (Font Family)</label>
+                                            <select id="pdf-font-family" onchange="updatePdfCustomStyles()">
+                                                <option value="'Heebo', sans-serif">Heebo (מודרני ורשמי)</option>
+                                                <option value="'Rubik', sans-serif">Rubik (נקי וברור)</option>
+                                                <option value="'David Libre', serif">David (קלאסי / ספרותי)</option>
+                                                <option value="'Frank Ruhl Libre', serif">Frank Ruhl (מסורתי בעברית)</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-grid-2">
+                                            <div class="form-group">
+                                                <label for="pdf-font-size-body">גודל גופן סעיפים: <span id="val-pdf-font-size-body">12px</span></label>
+                                                <input type="range" id="pdf-font-size-body" min="10" max="18" value="12" oninput="updatePdfCustomStyles()">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="pdf-line-height">מרווח שורות (Line Spacing): <span id="val-pdf-line-height">1.4</span></label>
+                                                <input type="range" id="pdf-line-height" min="1.1" max="2.2" step="0.1" value="1.4" oninput="updatePdfCustomStyles()">
+                                            </div>
+                                        </div>
+                                        <div class="form-grid-2">
+                                            <div class="form-group">
+                                                <label for="pdf-primary-color">צבע ראשי (Primary)</label>
+                                                <input type="color" id="pdf-primary-color" value="#1e3a8a" onchange="updatePdfCustomStyles()" style="padding:0; height:36px; cursor:pointer;">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="pdf-secondary-color">צבע משני (Secondary)</label>
+                                                <input type="color" id="pdf-secondary-color" value="#3b82f6" onchange="updatePdfCustomStyles()" style="padding:0; height:36px; cursor:pointer;">
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="toggle-container" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; font-size:0.88rem;">
+                                                <input type="checkbox" id="pdf-show-watermark" checked onchange="updatePdfCustomStyles()" style="width:16px; height:16px;">
+                                                <span>הצג לוגו רקע עמום (סימן מים) מאחורי הטקסט</span>
+                                            </label>
+                                         </div>
+                                         <div class="form-group" style="margin-top:-6px;">
+                                             <label class="toggle-container" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; font-size:0.88rem;">
+                                                 <input type="checkbox" id="pdf-show-signature" onchange="updatePdfCustomStyles()" style="width:16px; height:16px;">
+                                                 <span>הצג שורת חתימה לאישור הלקוח ב-PDF</span>
+                                             </label>
+                                         </div>
+                                         <button type="button" class="btn btn-success" onclick="saveBusinessSettings()" style="margin-top:12px; width:100%;">
+                                             <i class="fa-solid fa-floppy-disk"></i> שמור עיצוב תבנית
+                                         </button>
+                                     </div>
+                                     
+                                     <!-- Live Mini Preview Side (styled like a miniature document) -->
+                                     <div class="customizer-preview-container" style="flex:1; min-width:240px; background:var(--bg-main); border:1px solid var(--border-color); border-radius:10px; padding:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; overflow:hidden;">
+                                         <div style="font-size:0.8rem; font-weight:700; color:var(--text-muted); margin-bottom:8px; display:flex; align-items:center; gap:5px;"><i class="fa-solid fa-laptop-code"></i> תצוגת תבנית מוקטנת (דינמי)</div>
+                                         
+                                         <!-- The mini doc container -->
+                                         <div id="mini-a4-preview-box" class="mini-a4-preview" style="width: 210px; height: 297px; background: #ffffff; color: #000; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); padding: 14px; position: relative; display: flex; flex-direction: column; justify-content: space-between; overflow:hidden; font-family:'Heebo';">
+                                             <!-- Mini Watermark -->
+                                             <div id="mini-pdf-watermark" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; opacity:0.04; pointer-events:none; z-index:1;">
+                                                 <svg viewBox="0 0 100 100" style="width:60%; height:60%; fill:currentColor; color: #1e3a8a;"><path d="M40 82 L62 46 L46 46 L58 14 L33 52 L50 52 Z"/></svg>
+                                             </div>
+                                             
+                                             <div style="z-index:2; position:relative; font-size:0.5rem; display:flex; flex-direction:column; gap:4px; height:100%;">
+                                                 <!-- Mini Header -->
+                                                 <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #cbd5e1; padding-bottom:4px; margin-bottom:6px;">
+                                                     <div style="display:flex; align-items:center; gap:3px;">
+                                                         <div id="mini-logo-color" style="width:8px; height:8px; border-radius:50%; background:#1e3a8a;"></div>
+                                                         <div style="font-weight:700; font-size:0.32rem;">SJ הנדסת חשמל</div>
+                                                     </div>
+                                                     <div style="font-size:0.28rem; color:#475569;">תאריך: 21/06/2026</div>
+                                                 </div>
+                                                 
+                                                 <!-- Mini Title -->
+                                                 <div style="text-align:center; margin-bottom:8px;">
+                                                     <div id="mini-title-color" style="font-weight:700; font-size:0.45rem; color:#1e3a8a; display:inline-block; border-bottom: 2px solid #3b82f6; padding-bottom:1px;">הצעת מחיר עבור פרויקט וילה</div>
+                                                 </div>
+                                                 
+                                                 <!-- Mini Body Text / Items -->
+                                                 <div id="mini-body-text-container" style="flex:1; display:flex; flex-direction:column; gap:3px; font-size:0.28rem; line-height:1.4; color:#334155;">
+                                                     <div style="font-weight:700;">1. התקנת לוח תלת-פאזי 3x25A:</div>
+                                                     <div style="margin-right:4px;">עבודה כולל חיווט ומפסקים תקניים.</div>
+                                                     <div style="font-weight:700; margin-top:2px;">2. ביצוע הארקת יסוד ובדיקה במגר:</div>
+                                                     <div style="margin-right:4px;">מדידה והפקת דוח רשמי לרישוי חברת חשמל.</div>
+                                                 </div>
+                                                 
+                                                 <!-- Mini Exclusions Box -->
+                                                 <div style="background:#f1f5f9; border-radius:2px; padding:3px; font-size:0.22rem; color:#ef4444; border:1px solid #e2e8f0; text-align:center;">
+                                                     המחיר אינו כולל חפירות או עבודות עפר !
+                                                 </div>
+                                                 
+                                                 <!-- Mini Signature Row representation -->
+                                                 <div id="mini-pdf-signature-row" style="display:none; justify-content:space-between; border-top:1px dashed #cbd5e1; padding-top:2px; margin-top:2px; font-size:0.18rem; color:#475569;">
+                                                     <div style="display:flex; flex-direction:column; gap:1px; width:45%;">
+                                                         <span style="font-weight:700;">חתימת לקוח:</span>
+                                                         <div style="border-bottom:0.5px solid #cbd5e1; height:6px;"></div>
+                                                     </div>
+                                                     <div style="display:flex; flex-direction:column; gap:1px; width:45%;">
+                                                         <span style="font-weight:700;">חתימת קבלן:</span>
+                                                         <div style="border-bottom:0.5px solid #cbd5e1; height:6px;"></div>
+                                                     </div>
+                                                 </div>
+                                                 
+                                                 <!-- Mini Footer / Pricing -->
+                                                 <div style="border-top:1px solid #cbd5e1; padding-top:4px; margin-top:6px; display:flex; justify-content:space-between; align-items:center;">
+                                                     <div style="font-size:0.25rem; font-weight:700;">סה"כ לתשלום:</div>
+                                                     <div id="mini-total-price" style="font-size:0.38rem; font-weight:900; color:#1e3a8a;">4,500 ₪</div>
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 </div>
+                             </div>
+                        </div>
+                    </div>
+                </details>
+</section>
 
             <!-- Tab: Statistics — pipeline funnel of projects by stage -->
             <section id="panel-statistics" class="content-panel">
@@ -1361,7 +1544,7 @@
             <section id="panel-business" class="content-panel">
                 <div class="section-header">
                     <h2><i class="fa-solid fa-briefcase"></i> פרטי העסק</h2>
-                    <p class="section-subtitle">הפרטים שמוטבעים בכל הצעה — ממלאים פעם אחת. עיצוב ההצעה נמצא בנפרד למטה.</p>
+                    <p class="section-subtitle">הפרטים שמוטבעים בכל הצעה — ממלאים פעם אחת. עיצוב ההצעה עצמה נמצא במסך "הצעת מחיר", ליד ההצעה.</p>
                 </div>
                 <div class="settings-grid settings-stack">
                     <div class="section-card">
@@ -1435,177 +1618,7 @@
                     </div>
                     <div style="display:flex;flex-direction:column;gap:20px;">
                         <!-- Logo & BG -->
-                        <div class="section-card">
-                            <div class="card-header"><h3><i class="fa-solid fa-image"></i> לוגו ורקע</h3></div>
-                            <div class="card-body">
-                                <div class="form-grid-2">
-                                    <div class="form-group">
-                                        <label>לוגו החברה</label>
-                                        <input type="file" id="settings-logo-file" accept="image/*" style="display:none;" onchange="handleImageUpload(event, 'logo')">
-                                        <div class="file-uploader-box">
-                                            <button type="button" class="btn btn-secondary btn-small" onclick="document.getElementById('settings-logo-file').click()">בחר לוגו...</button>
-                                            <button type="button" class="btn btn-danger btn-small" onclick="clearUploadedImage('logo')">מחק</button>
-                                        </div>
-                                        <div class="img-preview-box" id="logo-settings-preview"></div>
-                                    </div>
-                                    <div class="form-group">
-                                        <label>תמונת רקע</label>
-                                        <input type="file" id="settings-bg-file" accept="image/*" style="display:none;" onchange="handleImageUpload(event, 'bg')">
-                                        <div class="file-uploader-box">
-                                            <button type="button" class="btn btn-secondary btn-small" onclick="document.getElementById('settings-bg-file').click()">בחר רקע...</button>
-                                            <button type="button" class="btn btn-danger btn-small" onclick="clearUploadedImage('bg')">מחק</button>
-                                        </div>
-                                        <div class="img-preview-box" id="bg-settings-preview"></div>
-                                    </div>
-                                </div>
-                                <div class="logo-styling-section" style="border-top:1px solid var(--border-color);padding-top:14px;margin-top:14px;">
-                                    <div class="form-grid-2">
-                                        <div class="form-group">
-                                            <label for="set-logo-align">יישור לוגו</label>
-                                            <select id="set-logo-align" onchange="updateLogoStyles()">
-                                                <option value="right">ימין</option>
-                                                <option value="center" selected>מרכז</option>
-                                                <option value="left">שמאל</option>
-                                            </select>
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="set-logo-width">רוחב: <span id="val-logo-width">75px</span></label>
-                                            <input type="range" id="set-logo-width" min="40" max="300" value="75" oninput="updateLogoStyles()">
-                                        </div>
-                                    </div>
-                                    <div class="form-grid-2">
-                                        <div class="form-group">
-                                            <label for="set-logo-margin-top">מרווח עליון: <span id="val-logo-margin-top">0px</span></label>
-                                            <input type="range" id="set-logo-margin-top" min="0" max="100" value="0" oninput="updateLogoStyles()">
-                                        </div>
-                                        <div class="form-group">
-                                            <label for="set-logo-margin-bottom">מרווח תחתון: <span id="val-logo-margin-bottom">10px</span></label>
-                                            <input type="range" id="set-logo-margin-bottom" min="0" max="100" value="10" oninput="updateLogoStyles()">
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- (הטוגל "תמחור מפורט לפי סעיפים" עבר לעורך ההצעה עצמו —
-                                     שם מקבלים את ההחלטה, והבחירה האחרונה נזכרת להצעות חדשות) -->
-                            </div>
-                        </div>
-
-                        <!-- PDF Template Customizer & Miniature Live Preview -->
-                        <div class="section-card" id="pdf-customizer-card" style="margin-top:20px;">
-                            <div class="card-header">
-                                <h3><i class="fa-solid fa-file-invoice text-accent"></i> עיצוב תבנית הצעת המחיר (דינמי)</h3>
-                            </div>
-                            <div class="card-body" style="display:flex; flex-direction:column; gap:20px;">
-                                <div class="customizer-layout" style="display:flex; gap:20px; flex-wrap:wrap;">
-                                    <!-- Controls Side -->
-                                    <div class="customizer-controls" style="flex:1; min-width:240px; display:flex; flex-direction:column; gap:12px;">
-                                        <div class="form-group">
-                                            <label for="pdf-font-family">גופן הצעה (Font Family)</label>
-                                            <select id="pdf-font-family" onchange="updatePdfCustomStyles()">
-                                                <option value="'Heebo', sans-serif">Heebo (מודרני ורשמי)</option>
-                                                <option value="'Rubik', sans-serif">Rubik (נקי וברור)</option>
-                                                <option value="'David Libre', serif">David (קלאסי / ספרותי)</option>
-                                                <option value="'Frank Ruhl Libre', serif">Frank Ruhl (מסורתי בעברית)</option>
-                                            </select>
-                                        </div>
-                                        <div class="form-grid-2">
-                                            <div class="form-group">
-                                                <label for="pdf-font-size-body">גודל גופן סעיפים: <span id="val-pdf-font-size-body">12px</span></label>
-                                                <input type="range" id="pdf-font-size-body" min="10" max="18" value="12" oninput="updatePdfCustomStyles()">
-                                            </div>
-                                            <div class="form-group">
-                                                <label for="pdf-line-height">מרווח שורות (Line Spacing): <span id="val-pdf-line-height">1.4</span></label>
-                                                <input type="range" id="pdf-line-height" min="1.1" max="2.2" step="0.1" value="1.4" oninput="updatePdfCustomStyles()">
-                                            </div>
-                                        </div>
-                                        <div class="form-grid-2">
-                                            <div class="form-group">
-                                                <label for="pdf-primary-color">צבע ראשי (Primary)</label>
-                                                <input type="color" id="pdf-primary-color" value="#1e3a8a" onchange="updatePdfCustomStyles()" style="padding:0; height:36px; cursor:pointer;">
-                                            </div>
-                                            <div class="form-group">
-                                                <label for="pdf-secondary-color">צבע משני (Secondary)</label>
-                                                <input type="color" id="pdf-secondary-color" value="#3b82f6" onchange="updatePdfCustomStyles()" style="padding:0; height:36px; cursor:pointer;">
-                                            </div>
-                                        </div>
-                                        <div class="form-group">
-                                            <label class="toggle-container" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; font-size:0.88rem;">
-                                                <input type="checkbox" id="pdf-show-watermark" checked onchange="updatePdfCustomStyles()" style="width:16px; height:16px;">
-                                                <span>הצג לוגו רקע עמום (סימן מים) מאחורי הטקסט</span>
-                                            </label>
-                                         </div>
-                                         <div class="form-group" style="margin-top:-6px;">
-                                             <label class="toggle-container" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; font-size:0.88rem;">
-                                                 <input type="checkbox" id="pdf-show-signature" onchange="updatePdfCustomStyles()" style="width:16px; height:16px;">
-                                                 <span>הצג שורת חתימה לאישור הלקוח ב-PDF</span>
-                                             </label>
-                                         </div>
-                                         <button type="button" class="btn btn-success" onclick="saveBusinessSettings()" style="margin-top:12px; width:100%;">
-                                             <i class="fa-solid fa-floppy-disk"></i> שמור עיצוב תבנית
-                                         </button>
-                                     </div>
-                                     
-                                     <!-- Live Mini Preview Side (styled like a miniature document) -->
-                                     <div class="customizer-preview-container" style="flex:1; min-width:240px; background:var(--bg-main); border:1px solid var(--border-color); border-radius:10px; padding:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; overflow:hidden;">
-                                         <div style="font-size:0.8rem; font-weight:700; color:var(--text-muted); margin-bottom:8px; display:flex; align-items:center; gap:5px;"><i class="fa-solid fa-laptop-code"></i> תצוגת תבנית מוקטנת (דינמי)</div>
-                                         
-                                         <!-- The mini doc container -->
-                                         <div id="mini-a4-preview-box" class="mini-a4-preview" style="width: 210px; height: 297px; background: #ffffff; color: #000; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); padding: 14px; position: relative; display: flex; flex-direction: column; justify-content: space-between; overflow:hidden; font-family:'Heebo';">
-                                             <!-- Mini Watermark -->
-                                             <div id="mini-pdf-watermark" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; opacity:0.04; pointer-events:none; z-index:1;">
-                                                 <svg viewBox="0 0 100 100" style="width:60%; height:60%; fill:currentColor; color: #1e3a8a;"><path d="M40 82 L62 46 L46 46 L58 14 L33 52 L50 52 Z"/></svg>
-                                             </div>
-                                             
-                                             <div style="z-index:2; position:relative; font-size:0.5rem; display:flex; flex-direction:column; gap:4px; height:100%;">
-                                                 <!-- Mini Header -->
-                                                 <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #cbd5e1; padding-bottom:4px; margin-bottom:6px;">
-                                                     <div style="display:flex; align-items:center; gap:3px;">
-                                                         <div id="mini-logo-color" style="width:8px; height:8px; border-radius:50%; background:#1e3a8a;"></div>
-                                                         <div style="font-weight:700; font-size:0.32rem;">SJ הנדסת חשמל</div>
-                                                     </div>
-                                                     <div style="font-size:0.28rem; color:#475569;">תאריך: 21/06/2026</div>
-                                                 </div>
-                                                 
-                                                 <!-- Mini Title -->
-                                                 <div style="text-align:center; margin-bottom:8px;">
-                                                     <div id="mini-title-color" style="font-weight:700; font-size:0.45rem; color:#1e3a8a; display:inline-block; border-bottom: 2px solid #3b82f6; padding-bottom:1px;">הצעת מחיר עבור פרויקט וילה</div>
-                                                 </div>
-                                                 
-                                                 <!-- Mini Body Text / Items -->
-                                                 <div id="mini-body-text-container" style="flex:1; display:flex; flex-direction:column; gap:3px; font-size:0.28rem; line-height:1.4; color:#334155;">
-                                                     <div style="font-weight:700;">1. התקנת לוח תלת-פאזי 3x25A:</div>
-                                                     <div style="margin-right:4px;">עבודה כולל חיווט ומפסקים תקניים.</div>
-                                                     <div style="font-weight:700; margin-top:2px;">2. ביצוע הארקת יסוד ובדיקה במגר:</div>
-                                                     <div style="margin-right:4px;">מדידה והפקת דוח רשמי לרישוי חברת חשמל.</div>
-                                                 </div>
-                                                 
-                                                 <!-- Mini Exclusions Box -->
-                                                 <div style="background:#f1f5f9; border-radius:2px; padding:3px; font-size:0.22rem; color:#ef4444; border:1px solid #e2e8f0; text-align:center;">
-                                                     המחיר אינו כולל חפירות או עבודות עפר !
-                                                 </div>
-                                                 
-                                                 <!-- Mini Signature Row representation -->
-                                                 <div id="mini-pdf-signature-row" style="display:none; justify-content:space-between; border-top:1px dashed #cbd5e1; padding-top:2px; margin-top:2px; font-size:0.18rem; color:#475569;">
-                                                     <div style="display:flex; flex-direction:column; gap:1px; width:45%;">
-                                                         <span style="font-weight:700;">חתימת לקוח:</span>
-                                                         <div style="border-bottom:0.5px solid #cbd5e1; height:6px;"></div>
-                                                     </div>
-                                                     <div style="display:flex; flex-direction:column; gap:1px; width:45%;">
-                                                         <span style="font-weight:700;">חתימת קבלן:</span>
-                                                         <div style="border-bottom:0.5px solid #cbd5e1; height:6px;"></div>
-                                                     </div>
-                                                 </div>
-                                                 
-                                                 <!-- Mini Footer / Pricing -->
-                                                 <div style="border-top:1px solid #cbd5e1; padding-top:4px; margin-top:6px; display:flex; justify-content:space-between; align-items:center;">
-                                                     <div style="font-size:0.25rem; font-weight:700;">סה"כ לתשלום:</div>
-                                                     <div id="mini-total-price" style="font-size:0.38rem; font-weight:900; color:#1e3a8a;">4,500 ₪</div>
-                                                 </div>
-                                             </div>
-                                         </div>
-                                     </div>
-                                 </div>
-                             </div>
-                        </div>
+                        
                     </div>
                 </div>
             </section>
@@ -2005,8 +2018,8 @@
         <div class="more-drawer-handle"></div>
         <div class="more-drawer-grid">
             <button onclick="navFromDrawer('reports')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 13l2 2 4-4"/></svg><span>דוחות בדיקה</span></button>
-            <button onclick="navFromDrawer('history')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 3"/></svg><span>היסטוריית הצעות</span></button>
-            <button onclick="navFromDrawer('statistics')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="18" y1="20" x2="18" y2="14"/><line x1="3" y1="20" x2="21" y2="20"/></svg><span>סטטיסטיקה</span></button>
+
+
             <button onclick="navFromDrawer('archive')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>ארכיון לקוחות</span></button>
             <button onclick="navFromDrawer('checkups')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 15l2 2 4-4"/></svg><span>שירות תקופתי</span></button>
             <button onclick="navFromDrawer('accounting')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/></svg><span>הנהלת חשבונות</span></button>
@@ -2144,17 +2157,17 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/listcards.js?v=317"></script>
+    <script src="/assets/listcards.js?v=318"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=317"></script>
-    <script src="app.js?v=317"></script>
+    <script src="coverage.js?v=318"></script>
+    <script src="app.js?v=318"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=317"></script>
+    <script src="finance.js?v=318"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=317" defer></script>
-    <script src="/track.js?v=317" defer></script>
+    <script src="../assistant.js?v=318" defer></script>
+    <script src="/track.js?v=318" defer></script>
 </body>
 </html>

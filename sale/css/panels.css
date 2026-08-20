@@ -3224,10 +3224,34 @@ i[class^="fa-"], i[class*=" fa-"] {
 
 /* Back: one arrow at the start of the context header, shown only when there is
    somewhere to go back to. */
+.ctx-bar {
+    position: sticky; inset-block-start: 0; z-index: 6;
+    display: flex; align-items: center; gap: var(--sp-2);
+    padding-block: var(--sp-2); margin-block-end: var(--sp-2);
+    background: var(--bg);
+}
+.ctx-bell {
+    margin-inline-start: auto; position: relative;
+    width: 36px; height: 36px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: none; border: 1px solid transparent; border-radius: var(--r-pill);
+    color: var(--text-3); cursor: pointer;
+}
+.ctx-bell:hover { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+.ctx-bell svg { width: 19px; height: 19px; }
+.ctx-bell.has-due { color: var(--accent); }
+.ctx-bell .rb-count {
+    position: absolute; inset-block-start: 1px; inset-inline-end: 1px;
+    min-width: 17px; height: 17px; padding: 0 4px;
+    display: grid; place-items: center; border-radius: var(--r-pill);
+    background: var(--danger); color: #fff; font-size: 10px; font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+.ctx-bell .rb-count[hidden] { display: none; }
+
 .ctx-back {
-    position: sticky; inset-block-start: var(--sp-2); z-index: 5;
     display: inline-flex; align-items: center; gap: var(--sp-2);
-    min-height: 34px; padding: 0 var(--sp-3); margin-block-end: var(--sp-2);
+    min-height: 34px; padding: 0 var(--sp-3);
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-pill);
     color: var(--text-2); font: 600 var(--fs-xs) var(--font-ui); cursor: pointer;
 }
@@ -3250,3 +3274,22 @@ i[class^="fa-"], i[class*=" fa-"] {
     /* The rail is the bottom bar on a phone; the menu opens above it. */
     .account-menu { inset-inline: var(--sp-3) auto; inset-block-end: calc(72px + env(safe-area-inset-bottom)); width: auto; min-width: 230px; }
 }
+
+/* The quote's design, folded away under the editor. */
+.quote-design { margin-block-start: var(--sp-6); border-block-start: 1px solid var(--border); padding-block-start: var(--sp-4); }
+.quote-design > summary {
+    cursor: pointer; list-style: none; display: flex; align-items: center; gap: var(--sp-2);
+    font-size: var(--fs-sm); font-weight: 700; color: var(--text-2); padding: var(--sp-2) 0;
+}
+.quote-design > summary::-webkit-details-marker { display: none; }
+.quote-design > summary::before { content: '▸'; color: var(--text-3); }
+.quote-design[open] > summary::before { content: '▾'; }
+.quote-design > summary:hover { color: var(--text); }
+.quote-design > summary i { color: var(--accent); }
+.quote-design-body { display: flex; flex-direction: column; gap: var(--sp-4); padding-block-start: var(--sp-2); }
+
+/* The link to the old quotes, under the list — a door, not a menu item. */
+.projects-history-link { margin: var(--sp-4) 0 0; text-align: center; font-size: var(--fs-xs); }
+.projects-history-link a { color: var(--text-3); }
+.projects-history-link a:hover { color: var(--accent); }
+.projects-history-link[hidden] { display: none; }
