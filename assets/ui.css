@@ -18,7 +18,14 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, h4 { line-height: var(--lh-tight); margin: 0 0 var(--sp-4); font-weight: 700; }
+/* Headings carry the display face everywhere, not only in the few places that
+   asked for it by name — half the page in one family and half in another was
+   part of why nothing looked deliberate. */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  line-height: var(--lh-tight); margin: 0 0 var(--sp-4); font-weight: 700;
+  letter-spacing: -0.01em;
+}
 p { margin: 0 0 var(--sp-4); }
 img, svg, video { max-width: 100%; height: auto; }
 a { color: var(--accent); text-decoration: none; }
@@ -31,6 +38,21 @@ a:hover { color: var(--accent-strong); }
 }
 
 ::selection { background: var(--accent-soft); }
+
+/* ---------- scrollbars ----------
+   Every scrolling panel on the site was drawing the operating system's own
+   scrollbar — a grey trough with a raised block in it, which on Windows is
+   literally a 1990s control sitting inside a 2026 page. Same bar, in the
+   page's own colours, on both engines. */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong); border-radius: var(--r-pill);
+  border: 3px solid transparent; background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
 
 .num, .money { font-variant-numeric: tabular-nums; }
 

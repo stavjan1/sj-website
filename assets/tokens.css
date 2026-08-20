@@ -6,8 +6,11 @@
 
 :root {
   /* -- type -- */
-  --font-ui: "IBM Plex Sans Hebrew", "Heebo", -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Frank Ruhl Libre", "David Libre", serif;
+  --font-ui: "Heebo", "IBM Plex Sans Hebrew", -apple-system, "Segoe UI", sans-serif;
+  /* Display is a sans on purpose: the Hebrew serif fell back to David on
+     Windows and read as a 1997 dialog box. Rubik + Heebo is the pairing the
+     site carried for years before the rebuild. */
+  --font-display: "Rubik", "Heebo", sans-serif;
   --fs-xs: 0.8125rem;  /* 13 */
   --fs-sm: 0.9375rem;  /* 15 */
   --fs-md: 1rem;       /* 16 */

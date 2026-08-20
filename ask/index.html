@@ -19,23 +19,23 @@
 <link rel="icon" href="/sale/icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Hebrew:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Rubik:wght@500;700;900&display=swap" rel="stylesheet">
 <script src="/assets/listcards.js"></script>
 <style>
   :root{
     --bg:#FAFAF9; --panel:#FFFFFF; --line:#E7E5E4; --ink:#1C1917; --sub:#57534E; --muted:#79716B;
-    --accent:#A16207; --accent-ink:#fff; --me:#FEF3C7; --price:#854D0E;
+    --accent:#1B4B8F; --accent-ink:#fff; --me:#E6EDF7; --price:#133766;
   }
   @media (prefers-color-scheme: dark){
     :root{
       --bg:#0C0A09; --panel:#1C1917; --line:#292524; --ink:#FAFAF9; --sub:#D6D3D1; --muted:#A8A29E;
-      --accent:#F59E0B; --accent-ink:#1C1917; --me:#3B2F14; --price:#FCD34D;
+      --accent:#6ABF3C; --accent-ink:#1C1917; --me:#14301A; --price:#FCD34D;
     }
   }
   body.dim{ --bg:#0C0A09; --panel:#1C1917; --line:#292524; --ink:#FAFAF9; --sub:#D6D3D1; --muted:#A8A29E;
-    --accent:#F59E0B; --accent-ink:#1C1917; --me:#3B2F14; --price:#FCD34D; }
+    --accent:#6ABF3C; --accent-ink:#1C1917; --me:#14301A; --price:#FCD34D; }
   body.light{ --bg:#FAFAF9; --panel:#FFFFFF; --line:#E7E5E4; --ink:#1C1917; --sub:#57534E; --muted:#79716B;
-    --accent:#A16207; --accent-ink:#fff; --me:#FEF3C7; --price:#854D0E; }
+    --accent:#1B4B8F; --accent-ink:#fff; --me:#E6EDF7; --price:#133766; }
   /* Map the page theme onto the shared list-cards component (assets/listcards.js)
      — declared on body so the dim/light overrides above are picked up. */
   body{--zlc-bg:var(--bg); --zlc-panel:var(--panel); --zlc-line:var(--line);
@@ -660,6 +660,6 @@ input.addEventListener('input', ()=>{ input.style.height='auto'; input.style.hei
 document.getElementById('chips').addEventListener('click', e=>{ if(e.target.classList.contains('chip')) send(e.target.textContent); });
 input.focus();
 </script>
-    <script src="/track.js?v=308" defer></script>
+    <script src="/track.js?v=309" defer></script>
 </body>
 </html>

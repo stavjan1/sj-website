@@ -51,15 +51,13 @@
         bar.setAttribute('dir', 'rtl');
         // z-index stays under --z-modal (1000): the notice must never sit on top of
         // an open dialog (the reservist certificate) and swallow its buttons.
-        bar.style.cssText = 'position:fixed;bottom:0;right:0;left:0;z-index:100;' +
-          'background:rgba(20,20,25,0.97);border-top:1px solid rgba(255,255,255,0.1);' +
-          'color:#e4e4e7;font-size:13px;padding:10px 16px;display:flex;gap:12px;' +
-          'align-items:center;justify-content:center;flex-wrap:wrap;font-family:inherit;';
+        // Every colour comes from #sj-cookie-bar in styles.css. It used to be
+        // painted here inline in V2's blue, which is why one blue button kept
+        // appearing on a page with no blue in it.
         bar.innerHTML =
           '<span>האתר משתמש בעוגיות ובמדידה אנונימית לשיפור החוויה. ' +
-          '<a href="/privacy.html" style="color:#4ea8ff">למדיניות הפרטיות ולביטול המדידה</a></span>' +
-          '<button id="sj-cookie-ok" style="background:#2b74db;color:#fff;border:none;' +
-          'border-radius:8px;padding:6px 16px;font-size:13px;cursor:pointer;font-family:inherit">הבנתי</button>';
+          '<a href="/privacy.html">למדיניות הפרטיות ולביטול המדידה</a></span>' +
+          '<button id="sj-cookie-ok">הבנתי</button>';
         document.body.appendChild(bar);
         document.getElementById('sj-cookie-ok').onclick = function () {
           try { localStorage.setItem('sj_cookie_ok', '1'); } catch (e) {}

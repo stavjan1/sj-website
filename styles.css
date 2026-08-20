@@ -118,7 +118,7 @@
   text-shadow: 0 1px 3px rgb(8 17 31 / 0.55);
 }
 .hero-photo h1 { color: #FFFFFF; }
-.hero-photo .lede { color: rgb(255 255 255 / 0.92); }
+.hero-photo .lede { color: rgb(255 255 255 / 0.95); }
 .hero-photo .hero-kicker { color: rgb(255 255 255 / 0.7); }
 .hero-photo .hero-facts { color: rgb(255 255 255 / 0.74); }
 .hero-photo .hero-facts a { color: rgb(255 255 255 / 0.9); }
@@ -280,6 +280,10 @@
 .contact-list a, .contact-list div { display: flex; align-items: center; gap: var(--sp-3); color: var(--text); }
 .contact-list svg { width: 20px; height: 20px; color: var(--accent); flex: none; }
 .contact-list small { color: var(--text-3); display: block; }
+/* The row of Waze / Maps / Instagram / LinkedIn links under the address —
+   a container with no rule, so the chips ran together with only whitespace
+   between them. */
+.contact-chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-block-start: var(--sp-4); }
 
 /* ---------- footer ---------- */
 .site-footer { border-block-start: 1px solid var(--border); padding-block: var(--sp-8); color: var(--text-3); font-size: var(--fs-sm); }
@@ -503,49 +507,79 @@
   align-items: center; justify-content: center;
   padding: var(--sp-4); z-index: var(--z-modal);
 }
+/* The certificate is a document, not a dialog: olive field fading from top to
+   bottom, a double rule like a diploma, and everything visible at once — you
+   do not scroll a certificate, you look at it. Fixed dark colours in both
+   themes for the same reason a printed certificate does not change colour
+   with the room; the scroll is kept only as a safety net for a phone with a
+   large system font, and it now draws the page's own scrollbar. */
 .sj-mil-cert {
   position: relative;
-  background: var(--surface); color: var(--text);
-  border: 1px solid var(--border); border-radius: var(--r-md);
-  max-width: 460px; width: 100%; max-height: 90dvh; overflow-y: auto;
-  padding: var(--sp-6);
+  --cert-ink: #EDEFE4;
+  --cert-ink-2: #C6CCB0;
+  --cert-line: rgb(157 179 95 / 0.38);
+  background: linear-gradient(180deg, #2B3320 0%, #1E2416 55%, #141810 100%);
+  color: var(--cert-ink);
+  border: 1px solid var(--cert-line);
+  border-radius: var(--r-md);
+  box-shadow: inset 0 0 0 5px rgb(157 179 95 / 0.09), 0 24px 60px rgb(0 0 0 / 0.5);
+  max-width: 440px; width: 100%; max-height: 92dvh; overflow-y: auto;
+  padding: var(--sp-6) var(--sp-6) var(--sp-4);
+  text-align: center;
   overscroll-behavior: contain;
 }
-@media (min-width: 480px) { .sj-mil-cert { padding: var(--sp-8); } }
+@media (min-width: 480px) { .sj-mil-cert { padding: var(--sp-8) var(--sp-8) var(--sp-6); } }
 .sj-mil-close {
   position: absolute; inset-block-start: var(--sp-2); inset-inline-end: var(--sp-2);
-  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
   background: none; border: none; border-radius: var(--r-sm);
-  color: var(--text-3); cursor: pointer;
+  color: rgb(237 239 228 / 0.6); cursor: pointer;
 }
-.sj-mil-close:hover { color: var(--text); background: var(--surface-2); }
+.sj-mil-close:hover { color: var(--cert-ink); background: rgb(255 255 255 / 0.08); }
 .sj-mil-close svg { width: 18px; height: 18px; }
-.sj-mil-cert .sj-mil-emblem { display: block; width: 56px; height: auto; margin-block-end: var(--sp-3); }
-.sj-mil-eyebrow { color: var(--text-3); font-size: var(--fs-xs); font-weight: 500; margin-block-end: var(--sp-1); }
-.sj-mil-cert h2 { font-family: var(--font-display); font-size: var(--fs-xl); margin-block-end: var(--sp-3); }
+.sj-mil-cert .sj-mil-emblem { display: block; width: 54px; height: auto; margin: 0 auto var(--sp-2); }
+.sj-mil-eyebrow {
+  color: #9DB35F; font-size: var(--fs-xs); font-weight: 600;
+  letter-spacing: 0.08em; margin-block-end: var(--sp-1);
+}
+.sj-mil-cert h2 {
+  font-family: var(--font-display); font-size: var(--fs-lg); line-height: 1.3;
+  color: var(--cert-ink); margin-block-end: var(--sp-2); text-wrap: balance;
+}
 .sj-mil-rule { margin-block: var(--sp-3); }
-.sj-mil-rule span { display: block; height: 1px; background: var(--border); }
-.sj-mil-body { color: var(--text-2); font-size: var(--fs-sm); }
+.sj-mil-rule span {
+  display: block; height: 1px;
+  background: linear-gradient(to left, transparent, var(--cert-line) 20%, var(--cert-line) 80%, transparent);
+}
+.sj-mil-body { color: var(--cert-ink-2); font-size: var(--fs-sm); line-height: 1.6; margin: 0; }
 .sj-mil-cert ul {
-  margin: 0; padding-inline-start: 0; list-style: none;
-  display: grid; gap: var(--sp-2); color: var(--text-2); font-size: var(--fs-sm);
+  margin: var(--sp-3) 0 0; padding-inline-start: 0; list-style: none;
+  display: grid; gap: var(--sp-2); text-align: start;
+  color: var(--cert-ink-2); font-size: var(--fs-sm);
 }
 .sj-mil-cert ul li { display: flex; align-items: flex-start; gap: var(--sp-2); }
-.sj-mil-cert ul li svg { width: 16px; height: 16px; flex: none; color: var(--accent); margin-block-start: 3px; }
-.sj-mil-cert .sj-mil-sign { color: var(--text-3); font-size: var(--fs-sm); margin-block-start: var(--sp-4); }
-.sj-mil-cert .sj-mil-sign .who { color: var(--text-2); font-weight: 700; }
-.sj-mil-cert .sj-mil-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-block-start: var(--sp-6); }
+/* An SVG with only a viewBox stretches to its container — this is the rule
+   whose absence made the ticks fill the whole certificate. */
+.sj-mil-cert ul li svg { width: 15px; height: 15px; flex: none; color: #9DB35F; margin-block-start: 4px; }
+.sj-mil-cert .sj-mil-sign {
+  color: rgb(198 204 176 / 0.75); font-size: var(--fs-xs);
+  margin-block-start: var(--sp-4); padding-block-start: var(--sp-3);
+  border-block-start: 1px solid rgb(157 179 95 / 0.2);
+}
+.sj-mil-cert .sj-mil-sign .who { color: var(--cert-ink); font-weight: 700; font-size: var(--fs-sm); }
+.sj-mil-cert .sj-mil-sign .role { display: block; margin-block-start: 2px; }
+.sj-mil-cert .sj-mil-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-block-start: var(--sp-4); }
 .sj-mil-btn {
-  flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 0 var(--sp-4);
+  flex: 1 1 auto; min-width: 0; min-height: 42px; padding: 0 var(--sp-4);
   display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
-  border-radius: var(--r-sm); font: 500 var(--fs-sm) var(--font-ui);
+  border-radius: var(--r-sm); font: 600 var(--fs-sm) var(--font-ui);
   white-space: nowrap;
 }
 .sj-mil-btn svg { width: 18px; height: 18px; flex: none; }
-.sj-mil-btn.call { background: var(--accent); color: var(--on-accent); }
-.sj-mil-btn.call:hover { background: var(--accent-strong); color: var(--on-accent); }
-.sj-mil-btn.wa { background: var(--whatsapp); color: #fff; }
-.sj-mil-btn.wa:hover { filter: brightness(0.94); color: #fff; }
+.sj-mil-btn.call { background: #9DB35F; color: #171B10; }
+.sj-mil-btn.call:hover { background: #B0C56F; color: #171B10; }
+.sj-mil-btn.wa { background: rgb(255 255 255 / 0.08); color: var(--cert-ink); border: 1px solid var(--cert-line); }
+.sj-mil-btn.wa:hover { background: rgb(255 255 255 / 0.14); color: var(--cert-ink); }
 
 /* ---------- cookie notice bar ---------- */
 #sj-cookie-bar {
