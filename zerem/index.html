@@ -16,9 +16,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Rubik:wght@500;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/tokens.css?v=315">
-    <link rel="stylesheet" href="../assets/ui.css?v=315">
-    <link rel="stylesheet" href="../styles.css?v=315">
+    <link rel="stylesheet" href="../assets/tokens.css?v=316">
+    <link rel="stylesheet" href="../assets/ui.css?v=316">
+    <link rel="stylesheet" href="../styles.css?v=316">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2L4.5 13h6l-1.5 9L18.5 10h-6z' fill='%236ABF3C'/%3E%3C/svg%3E">
     <script type="application/ld+json">
     {
@@ -57,7 +57,7 @@
             color: var(--text);
         }
         .z-hero h1 { color: #FFFFFF; }
-        .z-hero .lede, .z-hero .z-step p { color: rgb(255 255 255 / 0.9); }
+        .z-hero .lede { color: rgb(255 255 255 / 0.9); }
         .z-hero .hero-facts { color: rgb(255 255 255 / 0.72); }
         .z-hero .hero-facts a { color: rgb(255 255 255 / 0.9); }
         .z-hero .btn-quiet { background: rgb(255 255 255 / 0.06); }
@@ -71,7 +71,7 @@
         .z-blueprint { position: absolute; inset-block: 0; inset-inline-end: 0; display: flex; gap: var(--sp-8); opacity: 0.55; pointer-events: none; }
         .z-blueprint svg { width: 200px; height: auto; }
         @media (max-width: 900px) { .z-blueprint { display: none; } }
-        .z-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--sp-4); margin-block-start: var(--sp-12); }
+        .z-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--sp-4); }
         .z-step h3 { display: flex; align-items: baseline; gap: var(--sp-2); font-size: var(--fs-lg); }
         .z-step .num { color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 700; }
         .z-step p { color: var(--text-2); font-size: var(--fs-sm); margin: 0; }
@@ -96,7 +96,15 @@
                 <svg class="brand-mark" viewBox="0 0 100 100" aria-hidden="true"><circle class="brand-ring" cx="50" cy="50" r="44" fill="none" stroke="currentColor" stroke-width="4" stroke-dasharray="7.5 4.5"/><path d="M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z" fill="currentColor"/></svg>
                 <span class="brand-text"><b>זרם</b><small>תוכנת הצעות מחיר</small></span>
             </a>
-            <nav class="site-nav" aria-label="ניווט">
+            <!-- Without these the mobile drawer has no handle: .site-nav is
+                 fixed and translated off-screen under 900px, so on a phone the
+                 three links were simply unreachable. Every other page carries
+                 the toggle and the scrim; this one was missed. -->
+            <button class="nav-toggle" id="nav-toggle" aria-label="פתיחת תפריט" aria-expanded="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+            </button>
+            <div class="nav-scrim" id="nav-scrim"></div>
+            <nav class="site-nav" id="site-nav" aria-label="ניווט">
                 <a href="/">אתר המשרד — SJ הנדסת חשמל</a>
                 <a href="/ask/">תמחור מהיר בצ'אט</a>
                 <a href="/sale/">כניסה למערכת</a>
@@ -167,7 +175,16 @@
                     <span>מוצר מבית <a href="/">SJ הנדסת חשמל</a></span>
                     <span>בלי כרטיס אשראי · בלי התקנה</span>
                 </div>
+            </div>
+        </section>
 
+        <!-- The three steps used to live INSIDE the dark opening band, which
+             made that band fill the whole first screen — on a light system the
+             page looked like it had no light mode at all until you scrolled.
+             The band is the headline and the buttons; the steps belong to the
+             page, and follow the theme like everything else. -->
+        <section class="section">
+            <div class="wrap">
                 <div class="z-steps" id="flow">
                     <div class="card z-step rv">
                         <h3><span class="num">1</span>תכנון העבודה</h3>
@@ -354,6 +371,7 @@
             })(window, document, 'clarity', 'script', 'xgux1eczkt');
         })();
     </script>
-    <script src="/track.js?v=315" defer></script>
+    <script src="/app.js?v=316"></script>
+    <script src="/track.js?v=316" defer></script>
 </body>
 </html>
