@@ -5083,6 +5083,121 @@ function trafficColumn(site, d) {
     </div>`;
 }
 
+// ---- The four counters, the way a mall counts a door --------------------
+//
+// One question, asked four times over four windows: how many came in. The big
+// number is entries (each day's visitor count, summed), not "unique people
+// this month" — the daily hash rotates by design, so a person cannot be
+// followed across days, and pretending otherwise would be a made-up number.
+// Everything else on the card is detail, and detail is folded away by default.
+
+const HE_MONTHS = ['ינו׳', 'פבר׳', 'מרץ', 'אפר׳', 'מאי', 'יוני', 'יולי', 'אוג׳', 'ספט׳', 'אוק׳', 'נוב׳', 'דצמ׳'];
+
+let _adminTrafficData = null;
+let _adminTrafficSite = 'site';
+
+const heNum = (n) => Number(n || 0).toLocaleString('he-IL');
+
+// Bar labels carry the month only — twelve columns on a phone is ~28px each,
+// and a label with a year in it overlaps its neighbour. The years are named
+// once, in the chart's title, where there is room for them.
+function monthLabel(ym, withYear) {
+    const [y, m] = ym.split('-');
+    return HE_MONTHS[Number(m) - 1] + (withYear ? ` ${y.slice(2)}׳` : '');
+}
+
+function vkpiTile(label, p, baseline) {
+    const d = p && p.delta;
+    const deltaHtml = (d === null || d === undefined)
+        ? `<span class="vk-delta vk-flat">${escapeHtml(baseline)}</span>`
+        : `<span class="vk-delta ${d > 0 ? 'up' : d < 0 ? 'down' : 'vk-flat'}">
+               ${d > 0 ? '↑' : d < 0 ? '↓' : ''} ${Math.abs(d).toLocaleString('he-IL')}%
+           </span><span class="vk-base">${escapeHtml(baseline)}</span>`;
+    return `<div class="vkpi">
+        <span class="vk-label">${escapeHtml(label)}</span>
+        <b class="vk-num">${heNum(p ? p.visitors : 0)}</b>
+        ${deltaHtml}
+        <span class="vk-views">${heNum(p ? p.views : 0)} צפיות בדפים</span>
+    </div>`;
+}
+
+// Bars as divs, not SVG: they reflow with the card on a phone, and the value
+// sits in the DOM where a screen reader and a text search can both find it.
+function monthsChart(months) {
+    const max = Math.max(1, ...months.map(m => m.visitors || 0));
+    const current = months.length ? months[months.length - 1].ym : '';
+    const bars = months.map(m => {
+        const h = Math.round(((m.visitors || 0) / max) * 100);
+        return `<div class="vbar-col${m.ym === current ? ' is-now' : ''}">
+            <span class="vbar-val">${m.visitors ? heNum(m.visitors) : ''}</span>
+            <div class="vbar-track"><div class="vbar-fill" style="height:${Math.max(h, m.visitors ? 3 : 0)}%"></div></div>
+            <span class="vbar-lbl">${escapeHtml(monthLabel(m.ym))}</span>
+        </div>`;
+    }).join('');
+    const spoken = months.map(m => `${monthLabel(m.ym, true)}: ${m.visitors || 0}`).join(', ');
+    const span = months.length
+        ? `${monthLabel(months[0].ym, true)} — ${monthLabel(months[months.length - 1].ym, true)}`
+        : '';
+    // The bars run LTR (oldest → newest) even on an RTL page: a time axis that
+    // flows the other way is the one thing every chart he has ever read does
+    // not do, and the month labels stay Hebrew inside their own columns.
+    return `<div class="vchart">
+        <h4 class="vchart-title">כניסות לפי חודש <span>${escapeHtml(span)}</span></h4>
+        <div class="vbars" role="img" aria-label="${escapeHtml('כניסות לפי חודש — ' + spoken)}">${bars}</div>
+        <p class="vchart-foot">החודש הנוכחי עדיין רץ — העמודה האחרונה חלקית.</p>
+    </div>`;
+}
+
+function visitorsPanelHtml(summary, siteKey) {
+    const s = (summary || {})[siteKey];
+    const tabs = TRAFFIC_SITES.map(t => `<button type="button" class="vswitch-btn${t.key === siteKey ? ' on' : ''}"
+            aria-pressed="${t.key === siteKey}" onclick="setTrafficSite('${t.key}')">
+            <i class="fa-solid ${t.icon}"></i> ${escapeHtml(t.label)}</button>`).join('');
+    if (!s) return `<div class="vsum"><div class="vswitch">${tabs}</div><p class="input-help">אין נתונים.</p></div>`;
+
+    const empty = !s.year.visitors && !s.month.visitors;
+    const body = empty
+        ? `<div class="vempty">
+               <b>עוד לא נספרה אף כניסה ${escapeHtml(siteKey === 'zerem' ? 'לזרם' : 'לאתר')} השנה.</b>
+               <span>המונה עובד — פשוט עוד לא נכנס אף אחד. הכניסות שלך לא נספרות בכוונה, אז בדיקה עצמית לא תזיז אותו.</span>
+           </div>`
+        : `<div class="vsum-kpis">
+               ${vkpiTile('מתחילת היום', s.today, 'מול אותו יום בשבוע שעבר')}
+               ${vkpiTile('מתחילת השבוע', s.week, 'מול השבוע שעבר, עד אותו יום')}
+               ${vkpiTile('מתחילת החודש', s.month, 'מול החודש שעבר, עד אותו תאריך')}
+               ${vkpiTile('מתחילת השנה', s.year, 'מ-1 בינואר')}
+           </div>
+           ${monthsChart(s.months || [])}`;
+
+    const capped = s.cappedDays
+        ? `<p class="input-help vsum-note">${s.cappedDays} ימים החודש הגיעו לתקרת המדידה היומית — המספר האמיתי גבוה יותר.</p>`
+        : '';
+    return `<div class="vsum">
+        <div class="vswitch">${tabs}</div>
+        ${body}
+        ${capped}
+        <p class="input-help vsum-note">כניסה = ביקור ביום. מי שנכנס גם מחר נספר שוב, בדיוק כמו מונה כניסות בקניון — מזהה המבקר מתחלף כל יום ואי אפשר (במכוון) לעקוב אחרי אדם בין ימים.</p>
+    </div>`;
+}
+
+function setTrafficSite(key) {
+    _adminTrafficSite = key;
+    const box = document.getElementById('admin-traffic-body');
+    if (box && _adminTrafficData) box.innerHTML = adminTrafficHtml(_adminTrafficData);
+}
+
+function adminTrafficHtml(d) {
+    const insights = (d.insights || []).length
+        ? `<div class="tinsights"><h4 class="tcol-title"><i class="fa-solid fa-lightbulb"></i> מה השתנה השבוע</h4>
+            <ul class="tlist tinsight-list">${d.insights.map(s => `<li><span class="tk">${escapeHtml(s)}</span></li>`).join('')}</ul></div>`
+        : '';
+    return visitorsPanelHtml(d.summary, _adminTrafficSite) + insights +
+        `<details class="vdetails">
+            <summary>פירוט מלא — דפים, מקורות תנועה ובוטים</summary>
+            <div class="tgrid">${TRAFFIC_SITES.map(s => trafficColumn(s, (d.sites || {})[s.key] || {})).join('')}</div>
+        </details>`;
+}
+
 async function renderAdminTraffic() {
     if (!isAdmin()) return;
     const box = document.getElementById('admin-traffic-body');
@@ -5090,16 +5205,13 @@ async function renderAdminTraffic() {
     const days = (document.getElementById('admin-traffic-days') || {}).value || '30';
     if (box) box.innerHTML = '<p class="input-help">טוען…</p>';
     try {
-        const res = await fetch(`/api/analytics?admin=1&days=${encodeURIComponent(days)}`, {
+        const res = await fetch(`/api/analytics?admin=1&summary=1&days=${encodeURIComponent(days)}`, {
             headers: { 'Authorization': 'Bearer ' + googleAccessToken },
         });
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
-        const insights = (d.insights || []).length
-            ? `<div class="tinsights"><h4 class="tcol-title"><i class="fa-solid fa-lightbulb"></i> מה השתנה השבוע</h4>
-                <ul class="tlist tinsight-list">${d.insights.map(s => `<li><span class="tk">${escapeHtml(s)}</span></li>`).join('')}</ul></div>`
-            : '';
-        if (box) box.innerHTML = insights + `<div class="tgrid">${TRAFFIC_SITES.map(s => trafficColumn(s, (d.sites || {})[s.key] || {})).join('')}</div>`;
+        _adminTrafficData = d;
+        if (box) box.innerHTML = adminTrafficHtml(d);
     } catch (e) {
         if (box) box.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה: ${escapeHtml(e.message)}</p>`;
     }
@@ -5378,46 +5490,85 @@ function reduceClarity(payload) {
     return out;
 }
 
+// ---- The heat map, reduced to the three questions it can actually answer --
+//
+// Clarity gives a dozen metrics; only a few of them change a decision on a
+// site this size, so the card answers three questions in Hebrew instead of
+// listing everything it received:
+//   1. Is there enough traffic for any of this to mean anything? (sessions)
+//   2. Where do people get stuck? (rage / dead clicks, quickbacks, errors)
+//   3. Which pages are actually being seen? (popular pages)
+// The heat map ITSELF — the coloured overlay — lives in Clarity and always
+// will; a screenshot of it here would be a picture, not a number. What belongs
+// here is the reading of it, plus a link straight to the real thing.
+
+// Below this many sessions a heat map is a picture of noise. Same floor the
+// analytics routine works to (ANALYTICS.md, rule 2) — one number, one place.
+const CLARITY_MIN_SESSIONS = 150;
+
+const CLARITY_HINTS = {
+    'קליקים בזעם': 'לחצו שוב ושוב על אותו מקום — משהו נראה כמו כפתור ולא הגיב.',
+    'קליקים מתים': 'לחצו על משהו שלא קורה בו כלום.',
+    'חזרה מהירה': 'נכנסו לדף וחזרו מיד — הדף לא ענה על מה שחיפשו.',
+    'גלילה מוגזמת': 'גללו הרבה מדי כדי למצוא — התוכן שהם חיפשו נמצא נמוך מדי.',
+    'שגיאות סקריפט': 'שגיאת קוד בדפדפן של המבקר — שווה בדיקה.',
+    'קליקים על שגיאה': 'לחצו על משהו שהחזיר שגיאה.',
+};
+
 async function renderAdminClarity() {
     const box = document.getElementById('admin-clarity-body');
     if (!box) return;
-    box.innerHTML = '<p class="input-help">טוען מפות חום…</p>';
-    const dash = '<p class="input-help" style="margin:10px 0 0;"><a href="https://clarity.microsoft.com/projects/view/xgux1eczkt/dashboard" target="_blank" rel="noopener">לצפייה בהקלטות ובמפת החום עצמה ב-Clarity ←</a></p>';
+    box.innerHTML = '<p class="input-help">טוען מפת חום…</p>';
+    const dash = '<p class="input-help" style="margin:10px 0 0;"><a href="https://clarity.microsoft.com/projects/view/xgux1eczkt/dashboard" target="_blank" rel="noopener">פתיחת מפת החום וההקלטות ב-Clarity ←</a></p>';
+    const shell = (inner) => `<div class="tclarity">
+        <h4 class="tcol-title"><i class="fa-solid fa-fire" aria-hidden="true"></i> מפת חום — מה קרה בפועל בדפים
+            <span class="input-help" style="font-weight:400;">(3 ימים אחרונים, מקור Clarity)</span></h4>
+        ${inner}${dash}</div>`;
     try {
         const res = await fetch('/api/clarity', { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
         const d = await res.json();
 
         if (!d.ok) {
             const why = d.error === 'token-not-set'
-                ? 'לא הוגדר טוקן. הדבק אותו בכרטיס "חיבור Clarity" למטה, ומפות החום יופיעו כאן.'
+                ? 'לא הוגדר טוקן. הדבק אותו בכרטיס "חיבור Clarity" למטה, ומפת החום תופיע כאן.'
                 : 'לא הצלחנו למשוך נתונים מ-Clarity כרגע (' + escapeHtml(String(d.error || '')) + ').';
-            box.innerHTML = `<div class="tclarity">
-                <h4 class="tcol-title"><i class="fa-solid fa-fire" aria-hidden="true"></i> מפות חום — אתר המשרד</h4>
-                <p class="input-help" style="margin:0;">${why}</p>${dash}</div>`;
+            box.innerHTML = shell(`<p class="input-help" style="margin:0;">${why}</p>`);
             return;
         }
 
         const data = reduceClarity(d.data);
+        const sessions = Number(data.sessions || 0);
+
+        // The verdict first, because it decides whether anything below is worth
+        // reading. Saying "not enough data" out loud beats a tidy card of
+        // numbers that quietly means nothing.
+        const verdict = sessions >= CLARITY_MIN_SESSIONS
+            ? `<div class="vheat-verdict ok"><b>יש מספיק תנועה כדי לקרוא את המפה.</b>
+                 <span>${heNum(sessions)} סשנים ב-3 ימים — הממצאים למטה אמינים.</span></div>`
+            : `<div class="vheat-verdict"><b>עדיין אין מספיק תנועה כדי שמפת חום תגיד משהו.</b>
+                 <span>${heNum(sessions)} סשנים ב-3 ימים, צריך בערך ${CLARITY_MIN_SESSIONS}. עד אז זו תמונה של רעש — לא של התנהגות.</span></div>`;
+
         const friction = Object.entries(data.friction || {});
         const frictionRows = friction.length
-            ? `<ul class="tlist">${friction.map(([k, v]) => `<li><span class="tk">${escapeHtml(clarityMetricLabel(k))}</span><span class="tv">${Number(v).toLocaleString('he-IL')}</span></li>`).join('')}</ul>`
-            : '<p class="input-help" style="margin:0;">אין ממצאי חיכוך ב-3 הימים האחרונים.</p>';
+            ? `<ul class="vheat-list">${friction.map(([k, v]) => {
+                   const label = clarityMetricLabel(k);
+                   return `<li><span class="vh-n">${heNum(v)}</span>
+                       <span class="vh-t"><b>${escapeHtml(label)}</b>
+                       <small>${escapeHtml(CLARITY_HINTS[label] || '')}</small></span></li>`;
+               }).join('')}</ul>`
+            : '<p class="input-help" style="margin:0;">אף אחד לא נתקע: אפס קליקים בזעם, אפס קליקים מתים, אפס שגיאות. ✓</p>';
+
         const pages = (data.pages || []).length
-            ? `<ul class="tlist">${data.pages.map(pg => `<li><span class="tk">${escapeHtml(pg.url)}</span><span class="tv">${Number(pg.views).toLocaleString('he-IL')}</span></li>`).join('')}</ul>`
+            ? `<h5 class="tsub">הדפים שנצפו בפועל</h5>
+               <ul class="tlist">${data.pages.map(pg => `<li><span class="tk">${escapeHtml(pg.url)}</span><span class="tv">${heNum(pg.views)}</span></li>`).join('')}</ul>`
             : '';
 
-        box.innerHTML = `<div class="tclarity">
-            <h4 class="tcol-title"><i class="fa-solid fa-fire" aria-hidden="true"></i> מפות חום — אתר המשרד <span class="input-help" style="font-weight:400;">(3 ימים אחרונים, מקור Clarity)</span></h4>
-            <div class="tkpis">
-                <div class="ask"><span class="asv">${Number(data.sessions || 0).toLocaleString('he-IL')}</span><span class="asl">סשנים</span></div>
-                <div class="ask"><span class="asv">${Number(data.bots || 0).toLocaleString('he-IL')}</span><span class="asl">בוטים</span></div>
-            </div>
+        box.innerHTML = shell(`${verdict}
             <h5 class="tsub">איפה נתקעים</h5>
             ${frictionRows}
-            ${pages ? '<h5 class="tsub">דפים פופולריים</h5>' + pages : ''}
-            ${dash}</div>`;
+            ${pages}`);
     } catch (e) {
-        box.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה במפות החום: ${escapeHtml(e.message)}</p>`;
+        box.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה במפת החום: ${escapeHtml(e.message)}</p>`;
     }
 }
 

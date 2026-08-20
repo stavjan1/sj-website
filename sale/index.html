@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=306">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=307">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,11 +26,11 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=306">
-    <link rel="stylesheet" href="../assets/ui.css?v=306">
-    <link rel="stylesheet" href="css/shell.css?v=306">
-    <link rel="stylesheet" href="css/panels.css?v=306">
-    <link rel="stylesheet" href="css/pdf.css?v=306">
+    <link rel="stylesheet" href="../assets/tokens.css?v=307">
+    <link rel="stylesheet" href="../assets/ui.css?v=307">
+    <link rel="stylesheet" href="css/shell.css?v=307">
+    <link rel="stylesheet" href="css/panels.css?v=307">
+    <link rel="stylesheet" href="css/pdf.css?v=307">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -1596,9 +1596,10 @@
                 <!-- Traffic + Clarity friction signals, site vs. זרם side by side -->
                 <div class="section-card" style="border-color:rgba(240,192,64,0.25);margin-bottom:20px;">
                     <div class="card-header flex-header">
-                        <h3><i class="fa-solid fa-chart-line" style="color:#f0c040;"></i> תנועה ומפות חום</h3>
+                        <h3><i class="fa-solid fa-chart-line" style="color:#f0c040;"></i> כמה נכנסו — תנועה ומפת חום</h3>
                         <div style="display:flex;gap:8px;align-items:center;">
-                            <select id="admin-traffic-days" class="model-select-input" onchange="renderAdminTraffic()" style="min-width:110px;">
+                            <select id="admin-traffic-days" class="model-select-input" onchange="renderAdminTraffic()"
+                                    aria-label="טווח לפירוט המלא (ארבעת המספרים הגדולים תמיד יום/שבוע/חודש/שנה)" style="min-width:110px;">
                                 <option value="7">7 ימים</option>
                                 <option value="30" selected>30 יום</option>
                                 <option value="90">90 יום</option>
@@ -2115,17 +2116,17 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/listcards.js?v=306"></script>
+    <script src="/assets/listcards.js?v=307"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=306"></script>
-    <script src="app.js?v=306"></script>
+    <script src="coverage.js?v=307"></script>
+    <script src="app.js?v=307"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=306"></script>
+    <script src="finance.js?v=307"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=306" defer></script>
-    <script src="/track.js?v=306" defer></script>
+    <script src="../assistant.js?v=307" defer></script>
+    <script src="/track.js?v=307" defer></script>
 </body>
 </html>

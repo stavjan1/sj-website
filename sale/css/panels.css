@@ -2136,6 +2136,132 @@ i[class^="fa-"], i[class*=" fa-"] {
 .au-proj-name { color: var(--text); }
 
 
+/* ---------------------------------------------------------------------------
+   Traffic card — "כמה נכנסו".
+   The four counters answer one question over four windows, in numbers meant to
+   be read at a glance; everything else (pages, sources, bots) is detail and
+   sits behind <details>. The .t* classes below belong to the older traffic
+   markup in app.js, which the V3 restyle never picked up — they were rendering
+   with browser defaults until now.
+   --------------------------------------------------------------------------- */
+.vsum { display: flex; flex-direction: column; gap: var(--sp-4); }
+
+.vswitch { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.vswitch-btn {
+    display: inline-flex; align-items: center; gap: var(--sp-2);
+    min-height: 40px; padding: 0 var(--sp-4);
+    background: var(--surface); color: var(--text-2);
+    border: 1px solid var(--border-strong); border-radius: var(--r-pill);
+    font: 600 var(--fs-sm) var(--font-ui); cursor: pointer;
+    transition: border-color var(--t-fast), color var(--t-fast), background-color var(--t-fast);
+}
+.vswitch-btn:hover { border-color: var(--accent); color: var(--text); }
+.vswitch-btn.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+
+/* min() on the track floor: twelve tiles of a hard 170px would overflow a
+   360px phone and shrink the whole page to fit. */
+.vsum-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr)); gap: var(--sp-3); }
+.vkpi {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+    padding: var(--sp-4); display: flex; flex-direction: column; gap: 2px; min-width: 0;
+}
+.vk-label { font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); }
+.vk-num {
+    font-size: clamp(1.9rem, 6vw, 2.6rem); font-weight: 800; line-height: 1.15;
+    color: var(--text); font-variant-numeric: tabular-nums;
+}
+.vk-delta { font-size: var(--fs-sm); font-weight: 700; }
+.vk-delta.up { color: var(--ok-text); }
+.vk-delta.down { color: var(--danger); }
+.vk-delta.vk-flat { color: var(--text-3); font-weight: 500; font-size: var(--fs-xs); }
+.vk-base, .vk-views { font-size: var(--fs-xs); color: var(--text-3); }
+.vk-views { margin-block-start: var(--sp-1); }
+
+.vchart { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-4) var(--sp-3) var(--sp-2); }
+.vchart-title { margin: 0 0 var(--sp-4); font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
+.vchart-title span { font-weight: 500; color: var(--text-3); font-size: var(--fs-xs); margin-inline-start: var(--sp-2); }
+/* Bars run LTR — oldest on the left — on an RTL page, because that is the
+   direction every chart he has ever read runs. Labels stay RTL per column. */
+.vbars { display: flex; align-items: flex-end; gap: 6px; direction: ltr; }
+.vbar-col { direction: rtl; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.vbar-val { font-size: var(--fs-xs); color: var(--text-2); font-variant-numeric: tabular-nums; min-height: 1em; }
+.vbar-track { width: 100%; height: 110px; display: flex; align-items: flex-end; }
+.vbar-fill { width: 100%; border-radius: 4px 4px 0 0; background: var(--accent); opacity: 0.45; }
+.vbar-col.is-now .vbar-fill { opacity: 1; }
+.vbar-lbl { font-size: var(--fs-xs); color: var(--text-3); white-space: nowrap; max-width: 100%; overflow: hidden; }
+.vbar-col.is-now .vbar-lbl { color: var(--text); font-weight: 700; }
+.vchart-foot { margin: var(--sp-2) 0 0; font-size: var(--fs-xs); color: var(--text-3); }
+
+.vempty {
+    background: var(--surface-2); border: 1px dashed var(--border-strong); border-radius: var(--r-md);
+    padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-1);
+}
+.vempty b { font-size: var(--fs-md); color: var(--text); }
+.vempty span { font-size: var(--fs-sm); color: var(--text-2); line-height: 1.6; }
+.vsum-note { margin: 0; line-height: 1.6; }
+
+.vdetails > summary {
+    cursor: pointer; list-style: none; padding: var(--sp-3) 2px;
+    font-size: var(--fs-sm); font-weight: 600; color: var(--text-2);
+}
+.vdetails > summary::-webkit-details-marker { display: none; }
+.vdetails > summary::before { content: '▸ '; }
+.vdetails[open] > summary::before { content: '▾ '; }
+.vdetails > summary:hover { color: var(--text); }
+
+/* Heat map: the verdict first, then friction in plain Hebrew. */
+.vheat-verdict {
+    background: var(--accent-soft); border: 1px solid var(--accent);
+    border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); margin-block-end: var(--sp-4);
+    display: flex; flex-direction: column; gap: var(--sp-1);
+}
+.vheat-verdict.ok { background: var(--surface-2); border-color: var(--ok-text); }
+.vheat-verdict b { font-size: var(--fs-sm); color: var(--text); }
+.vheat-verdict span { font-size: var(--fs-sm); color: var(--text-2); line-height: 1.6; }
+.vheat-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.vheat-list li { display: flex; gap: var(--sp-3); align-items: flex-start; }
+.vheat-list .vh-n {
+    flex: none; min-width: 46px; text-align: center;
+    font-size: var(--fs-lg); font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums;
+}
+.vheat-list .vh-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vheat-list .vh-t b { font-size: var(--fs-sm); color: var(--text); }
+.vheat-list .vh-t small { font-size: var(--fs-xs); color: var(--text-3); line-height: 1.5; }
+
+/* The older traffic detail markup (.t*), unstyled since the V3 restyle. */
+.tgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: var(--sp-4); }
+.tcol, .tclarity { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-4); }
+.tcol-title { margin: 0 0 var(--sp-3); font-size: var(--fs-sm); font-weight: 700; color: var(--text); display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+.tcol-title i { color: var(--accent); }
+.tkpis { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.tkpis .ask { flex: 1 1 88px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3); display: flex; flex-direction: column; gap: 2px; }
+.tkpis .asv { font-size: var(--fs-xl); font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.tkpis .asl { font-size: var(--fs-xs); color: var(--text-3); }
+.tspark { width: 100%; height: 44px; margin-block-start: var(--sp-3); display: block; }
+.tsub { margin: var(--sp-4) 0 var(--sp-2); font-size: var(--fs-xs); font-weight: 700; color: var(--text-3); }
+.tlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.tlist li { display: flex; justify-content: space-between; gap: var(--sp-3); align-items: baseline; font-size: var(--fs-sm); padding: 4px 0; border-block-end: 1px solid var(--border); }
+.tlist li:last-child { border-block-end: none; }
+.tlist .tk { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tlist .tv { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; flex: none; }
+.tinsights { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-4); }
+.tinsight-list li { border-block-end: none; padding: 3px 0; }
+.tinsight-list .tk { white-space: normal; color: var(--text); line-height: 1.6; }
+
+/* On a phone twelve columns are ~24px wide: every value and every month label
+   cannot fit, and half-overlapping text reads as a smudge. Keep the shape, the
+   current month's number, and every second label — the exact figures are in
+   the four counters above and in the chart's aria-label. */
+@media (max-width: 560px) {
+    .vbar-track { height: 80px; }
+    .vbar-val { display: none; }
+    .vbar-col.is-now .vbar-val { display: block; }
+    .vbar-col:nth-child(odd) .vbar-lbl { visibility: hidden; }
+    /* the hidden neighbour still holds its slot — let the shown label use it */
+    .vbar-lbl { overflow: visible; }
+}
+
+
 /* ============================================================================
    18. OVERLAYS — stern drawer, more-drawer sheet, reminder popover, toasts,
    fullscreen PDF preview chrome, upgrade modal

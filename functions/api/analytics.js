@@ -181,11 +181,177 @@ export async function onRequestGet(context) {
     out[site] = { series, total, uniques, bots, cappedDays, topPages: top(pages), topRefs: top(refs) };
   }
 
+  const wantSummary = url.searchParams.get('summary') === '1';
+  const summary = {};
+  if (wantSummary) {
+    for (const site of SITES) summary[site] = await visitorSummary(env, site);
+  }
+
   return jsonResponse({
     ok: true, days, sites: out,
+    summary: wantSummary ? summary : null,
     insights: await weeklyInsights(env),
     ai: await aiUsage(env, dates),
   });
+}
+
+// ---------------------------------------------------------------------------
+// Visitor summary — "how many came in today / this week / this month / this
+// year", plus a bar per month. The counter it answers is a turnstile count:
+// each day's unique-visitor number, added up. Someone who returns tomorrow is
+// counted twice, and that is deliberate rather than a weaker form of a unique
+// count — visitorHash rotates daily by construction (no identifier is stored),
+// so counting a person once across a month is not something this data CAN do.
+// A shopping-mall entry counter answers exactly this question, and the labels
+// in the panel say "כניסות" for that reason.
+//
+// All windows are built on the same UTC day keys the beacon writes under, so a
+// period is always exactly the days that were counted — never a re-slice that
+// could double-count or drop a day at the boundary.
+// ---------------------------------------------------------------------------
+
+const DAY_MS = 86400000;
+const CHART_MONTHS = 12;
+// Every day inside the current AND previous month, plus this week and last
+// week, fits in one 70-day batch — so a summary costs one parallel read of
+// bounded size, whatever today's date is.
+const RECENT_DAYS = 70;
+
+const isoDay = (t) => new Date(t).toISOString().slice(0, 10);
+
+// Pure, and exported so the date math can be tested away from KV. Israeli week
+// starts on Sunday, which getUTCDay() already numbers 0.
+export function periodWindows(todayIso) {
+  const t = Date.parse(todayIso + 'T00:00:00Z');
+  const today = new Date(t);
+  const range = (from, to) => {
+    const out = [];
+    for (let x = from; x <= to; x += DAY_MS) out.push(isoDay(x));
+    return out;
+  };
+
+  const weekStart = t - today.getUTCDay() * DAY_MS;
+  const monthStart = Date.parse(todayIso.slice(0, 8) + '01T00:00:00Z');
+
+  // Previous month, up to the same day of the month — clamped, so the 31st of
+  // a 31-day month compares against all 30 days of a 30-day one instead of
+  // silently spilling into this month.
+  const prevMonthEnd = monthStart - DAY_MS;
+  const prevMonthLen = new Date(prevMonthEnd).getUTCDate();
+  const prevMonthStart = prevMonthEnd - (prevMonthLen - 1) * DAY_MS;
+  const sameDayOfMonth = Math.min(today.getUTCDate(), prevMonthLen);
+
+  const months = [];
+  for (let i = CHART_MONTHS - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - i, 1));
+    months.push(d.toISOString().slice(0, 7));
+  }
+  const year = todayIso.slice(0, 4);
+
+  return {
+    today: { days: [todayIso], prevDays: [isoDay(t - 7 * DAY_MS)] },
+    week: { days: range(weekStart, t), prevDays: range(weekStart - 7 * DAY_MS, t - 7 * DAY_MS) },
+    month: {
+      days: range(monthStart, t),
+      prevDays: range(prevMonthStart, prevMonthStart + (sameDayOfMonth - 1) * DAY_MS),
+    },
+    months,
+    yearMonths: months.filter((m) => m.startsWith(year)),
+  };
+}
+
+export function daysOfMonth(ym, maxDay) {
+  const start = Date.parse(ym + '-01T00:00:00Z');
+  const len = new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)), 0)).getUTCDate();
+  const out = [];
+  for (let i = 0; i < len; i++) {
+    const d = isoDay(start + i * DAY_MS);
+    if (maxDay && d > maxDay) break;
+    out.push(d);
+  }
+  return out;
+}
+
+function dayTotals(raw) {
+  const rec = safeParse(raw, null);
+  return { views: rec ? (rec.total || 0) : 0, visitors: rec ? (rec.uniq || []).length : 0, capped: !!(rec && rec.capped) };
+}
+
+function addUp(dayKeys, map) {
+  return dayKeys.reduce((acc, d) => {
+    const v = map.get(d) || { views: 0, visitors: 0 };
+    return { views: acc.views + v.views, visitors: acc.visitors + v.visitors };
+  }, { views: 0, visitors: 0 });
+}
+
+// Percent change, or null when there is nothing to compare against. A previous
+// period of zero has no percentage — "+∞%" is not information.
+function delta(cur, prev) {
+  if (!prev) return null;
+  return Math.round(((cur - prev) / prev) * 1000) / 10;
+}
+
+function period(days, prevDays, map) {
+  const cur = addUp(days, map);
+  const prev = addUp(prevDays, map);
+  return { visitors: cur.visitors, views: cur.views, prev, delta: delta(cur.visitors, prev.visitors) };
+}
+
+// A finished month never changes, so it is computed once from its days and
+// then kept as a rollup. The current month is always recomputed — it is still
+// moving, and a cached "today" is worse than no number at all.
+async function monthTotals(env, site, ym, todayIso, recent) {
+  const currentYm = todayIso.slice(0, 7);
+  const key = `roll:${site}:${ym}`;
+  if (ym !== currentYm) {
+    const cached = safeParse(await env.SJ_DATA.get(key), null);
+    if (cached) return cached;
+  }
+
+  const days = daysOfMonth(ym, todayIso);
+  const missing = days.filter((d) => !recent.has(d));
+  if (missing.length) {
+    const raw = await Promise.all(missing.map((d) => env.SJ_DATA.get(dayHitsKey(site, d))));
+    missing.forEach((d, i) => recent.set(d, dayTotals(raw[i])));
+  }
+  const total = addUp(days, recent);
+
+  // Only a month that could still have daily records behind it is worth
+  // freezing: the day keys expire after 400 days, and a rollup of zeros
+  // written from expired data would outlive the truth it lost.
+  if (ym !== currentYm && Date.now() - Date.parse(ym + '-01T00:00:00Z') < 380 * DAY_MS) {
+    await env.SJ_DATA.put(key, JSON.stringify(total), { expirationTtl: 60 * 60 * 24 * 800 });
+  }
+  return total;
+}
+
+async function visitorSummary(env, site) {
+  const todayIso = dayKey();
+  const w = periodWindows(todayIso);
+
+  const recentKeys = [];
+  for (let i = RECENT_DAYS - 1; i >= 0; i--) recentKeys.push(isoDay(Date.now() - i * DAY_MS));
+  const raw = await Promise.all(recentKeys.map((d) => env.SJ_DATA.get(dayHitsKey(site, d))));
+  const map = new Map();
+  recentKeys.forEach((d, i) => map.set(d, dayTotals(raw[i])));
+
+  const months = [];
+  for (const ym of w.months) months.push({ ym, ...(await monthTotals(env, site, ym, todayIso, map)) });
+  const year = w.yearMonths.reduce((acc, ym) => {
+    const m = months.find((x) => x.ym === ym) || { views: 0, visitors: 0 };
+    return { views: acc.views + m.views, visitors: acc.visitors + m.visitors };
+  }, { views: 0, visitors: 0 });
+
+  return {
+    today: period(w.today.days, w.today.prevDays, map),
+    week: period(w.week.days, w.week.prevDays, map),
+    month: period(w.month.days, w.month.prevDays, map),
+    year,
+    months,
+    // A capped day under-reports, and the panel says so rather than showing a
+    // number that quietly stopped counting at the ceiling.
+    cappedDays: w.month.days.filter((d) => (map.get(d) || {}).capped).length,
+  };
 }
 
 // The AI pools, per day: how much each one served and when one went quiet.
