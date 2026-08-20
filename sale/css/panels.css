@@ -3170,3 +3170,83 @@ i[class^="fa-"], i[class*=" fa-"] {
     border-block-start: 1px solid var(--border);
 }
 #panel-projects .grid-view .project-card .project-meta { gap: var(--sp-1) var(--sp-2); }
+
+
+/* ============================================================================
+   The account menu, the back arrow, and two buttons that looked like 1997.
+   ============================================================================ */
+.sidebar-footer { position: relative; }
+.user-chip {
+    width: 100%; display: flex; align-items: center; gap: var(--sp-2);
+    background: none; border: 1px solid transparent; border-radius: var(--r-md);
+    padding: var(--sp-2); cursor: pointer; text-align: start;
+    transition: background-color var(--t-fast), border-color var(--t-fast);
+}
+.user-chip:hover, .user-chip[aria-expanded="true"] { background: var(--surface-2); border-color: var(--border); }
+
+/* Fixed, not absolute: the rail scrolls its own overflow, and an absolutely
+   positioned menu inside it came out as a 60px sliver. */
+.account-menu {
+    position: fixed; inset-block-end: var(--sp-4);
+    inset-inline-start: calc(76px + var(--sp-2)); width: 250px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-md); box-shadow: var(--shadow-1);
+    padding: var(--sp-2); z-index: calc(var(--z-drawer) + 3);
+    display: flex; flex-direction: column; gap: 2px;
+}
+.account-menu[hidden] { display: none; }
+.am-head {
+    display: flex; align-items: center; gap: var(--sp-2);
+    padding: var(--sp-2); margin-block-end: var(--sp-1);
+    border-block-end: 1px solid var(--border);
+}
+.am-avatar {
+    width: 38px; height: 38px; flex: none; border-radius: var(--r-pill);
+    background: var(--accent-soft) center/cover no-repeat; color: var(--accent);
+    display: flex; align-items: center; justify-content: center; font-weight: 800;
+}
+.am-avatar.has-photo { color: transparent; }
+.am-id { display: flex; flex-direction: column; min-width: 0; }
+.am-name { font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
+.am-mail { font-size: var(--fs-xs); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.am-item {
+    display: flex; align-items: center; gap: var(--sp-3);
+    min-height: 38px; padding: 0 var(--sp-3);
+    background: none; border: none; border-radius: var(--r-sm);
+    color: var(--text-2); font: 500 var(--fs-sm) var(--font-ui);
+    cursor: pointer; text-align: start; width: 100%;
+}
+.am-item i { width: 16px; text-align: center; color: var(--text-3); }
+.am-item:hover { background: var(--surface-2); color: var(--text); }
+.am-item.am-danger { color: var(--danger); }
+.am-item.am-danger i { color: var(--danger); }
+.am-item.am-danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+
+/* Back: one arrow at the start of the context header, shown only when there is
+   somewhere to go back to. */
+.ctx-back {
+    position: sticky; inset-block-start: var(--sp-2); z-index: 5;
+    display: inline-flex; align-items: center; gap: var(--sp-2);
+    min-height: 34px; padding: 0 var(--sp-3); margin-block-end: var(--sp-2);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-pill);
+    color: var(--text-2); font: 600 var(--fs-xs) var(--font-ui); cursor: pointer;
+}
+.ctx-back:hover { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+.ctx-back svg { width: 18px; height: 18px; }
+.ctx-back[hidden] { display: none; }
+
+/* The "+" beside the new-category field was a small square outlined box — the
+   shape Windows drew for a spin button. It is the round accent affordance the
+   rest of the app uses. */
+.projects-cats .cat-add .cat-add-btn {
+    width: 32px; height: 32px; flex: none; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: var(--r-pill); border: none;
+    background: var(--accent-soft); color: var(--accent);
+}
+.projects-cats .cat-add .cat-add-btn:hover { background: var(--accent); color: var(--on-accent); }
+
+@media (max-width: 768px) {
+    /* The rail is the bottom bar on a phone; the menu opens above it. */
+    .account-menu { inset-inline: var(--sp-3) auto; inset-block-end: calc(72px + env(safe-area-inset-bottom)); width: auto; min-width: 230px; }
+}

@@ -1099,6 +1099,7 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleEstimatePanel(localStorage.getItem('sj_hide_estimate') !== '0');
 
     const activeUser = getActiveUser();
+    authTrail('load', activeUser ? 'signed-in' : 'no-user → lock screen');
     if (!activeUser) {
         document.getElementById('lock-screen').style.display = 'flex';
         document.querySelector('.app-container').style.display = 'none';
@@ -1579,7 +1580,101 @@ function renderSubTabs(activeTabId) {
     ).join('');
 }
 
-function switchTab(tabId) {
+
+// ==========================================================================
+// The account menu and the back button.
+//
+// Theme, business details, settings, "back to the site" and signing out were
+// five controls spread across the rail and the "more" drawer. They are all one
+// thing — your account — so they sit behind your photo. And the app had no way
+// back: every screen was a jump with no return, which is why "where was I"
+// happened. switchTab remembers where you came from; the arrow walks it back.
+// ==========================================================================
+let navBackStack = [];
+
+function toggleAccountMenu(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('account-menu');
+    const chip = document.getElementById('sidebar-user-chip');
+    if (!menu) return;
+    const open = !menu.hasAttribute('hidden');
+    if (open) { closeAccountMenu(); return; }
+    // Admin only sees the admin row.
+    const adminItem = document.getElementById('am-admin-item');
+    if (adminItem) adminItem.hidden = !(typeof isAdmin === 'function' && isAdmin());
+    syncAccountMenuIdentity();
+    menu.removeAttribute('hidden');
+    if (chip) chip.setAttribute('aria-expanded', 'true');
+    setTimeout(() => document.addEventListener('click', closeAccountMenuOnce), 0);
+    document.addEventListener('keydown', closeAccountMenuOnEsc);
+}
+
+function closeAccountMenu() {
+    const menu = document.getElementById('account-menu');
+    const chip = document.getElementById('sidebar-user-chip');
+    if (menu) menu.setAttribute('hidden', '');
+    if (chip) chip.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('click', closeAccountMenuOnce);
+    document.removeEventListener('keydown', closeAccountMenuOnEsc);
+}
+function closeAccountMenuOnce(e) {
+    const menu = document.getElementById('account-menu');
+    if (menu && menu.contains(e.target)) return;
+    closeAccountMenu();
+}
+function closeAccountMenuOnEsc(e) { if (e.key === 'Escape') closeAccountMenu(); }
+
+function accountMenuGo(tabId) {
+    closeAccountMenu();
+    switchTab(tabId);
+}
+
+// The menu shows the same identity as the chip, plus the address, so you can
+// tell at a glance WHICH Google account this browser is signed into.
+function syncAccountMenuIdentity() {
+    const name = (document.getElementById('user-chip-name') || {}).textContent || 'משתמש';
+    const avatarSrc = document.getElementById('user-chip-avatar');
+    const amName = document.getElementById('am-name');
+    const amMail = document.getElementById('am-mail');
+    const amAvatar = document.getElementById('am-avatar');
+    if (amName) amName.textContent = name;
+    if (amMail) {
+        let mail = '';
+        try { mail = isGuestUser() ? 'מצב התנסות — הנתונים נשמרים במכשיר הזה' : (localStorage.getItem('gsi_email') || getActiveUser() || ''); } catch (e) {}
+        amMail.textContent = mail;
+    }
+    if (amAvatar && avatarSrc) {
+        amAvatar.style.backgroundImage = avatarSrc.style.backgroundImage;
+        amAvatar.textContent = avatarSrc.style.backgroundImage ? '' : (avatarSrc.textContent || '');
+        amAvatar.classList.toggle('has-photo', !!avatarSrc.style.backgroundImage);
+    }
+}
+
+function goBackTab() {
+    const prev = navBackStack.pop();
+    if (!prev) return;
+    switchTab(prev, { fromBack: true });
+    updateBackButton();
+}
+
+function updateBackButton() {
+    const btn = document.getElementById('ctx-back');
+    if (btn) btn.hidden = navBackStack.length === 0;
+}
+
+function switchTab(tabId, opts) {
+    // Remember where we came from, so the back arrow has somewhere to go.
+    // A repeat of the same tab is not a step, and walking BACK must not push.
+    if (!(opts && opts.fromBack)) {
+        const current = document.querySelector('.content-panel.active');
+        const from = current ? current.id.replace('panel-', '') : null;
+        if (from && from !== tabId) {
+            navBackStack.push(from);
+            if (navBackStack.length > 20) navBackStack.shift();
+        }
+    }
+    setTimeout(updateBackButton, 0);
+
     // Project-scoped tabs (chat / editor / reports) need an open project.
     if ((tabId === 'wizard' || tabId === 'create' || tabId === 'reports') && !activeProjectId) {
         showToast('אנא בחר או צור פרויקט תחילה בלשונית ניהול פרויקטים', 'error');
@@ -10852,6 +10947,27 @@ function forgetExpiredGoogleToken() {
     };
 })();
 
+
+// ==========================================================================
+// Auth trail — a local, 20-entry log of what the sign-in actually did.
+//
+// "The login page opens and closes sometimes" is not reproducible from the
+// outside: nothing in this file opens a Google window on its own (the silent
+// refresh uses prompt:'none', and every visible prompt hangs off a button).
+// So the app writes down what happened instead of guessing: each auth event,
+// with a timestamp, kept locally on this device and never sent anywhere.
+// ==========================================================================
+function authTrail(event, detail) {
+    try {
+        const log = JSON.parse(localStorage.getItem('sj_auth_trail') || '[]');
+        log.push({ t: new Date().toISOString(), e: event, d: detail || '' });
+        localStorage.setItem('sj_auth_trail', JSON.stringify(log.slice(-20)));
+    } catch (e) { /* a diagnostic must never break the thing it diagnoses */ }
+}
+function dumpAuthTrail() {
+    try { return JSON.parse(localStorage.getItem('sj_auth_trail') || '[]'); } catch (e) { return []; }
+}
+
 function mintGoogleAccessToken() {
     const clientId = localStorage.getItem('sj_global_google_client_id');
     if (!clientId || isGuestUser()) return;
@@ -10875,8 +10991,9 @@ function mintGoogleAccessToken() {
         // that's not possible, fail quietly with NO account-picker window (the
         // ID-token path already covers sync). This is the automatic refresh — the
         // explicit "connect" button still uses a visible prompt.
+        authTrail('silent-mint-request');
         tc.requestAccessToken({ prompt: 'none' });
-    } catch (e) { /* stay local-only */ }
+    } catch (e) { authTrail('silent-mint-throw', String(e && e.message)); }
 }
 
 function updateDriveStatus(connected) {
@@ -11685,6 +11802,7 @@ function getProfessionSystemInstruction() {
 // and guest buttons (the legacy manual login/register flow was removed).
 // ==========================================================================
 function handleUserLogout() {
+    authTrail('logout-clicked');
     if (!confirm('האם אתה בטוח שברצונך להתנתק ולנעול את המערכת?')) return;
 
     // Cancel any pending debounced cloud save so it can't fire after the
