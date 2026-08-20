@@ -363,46 +363,37 @@ i[class^="fa-"], i[class*=" fa-"] {
    05. PANEL: PROJECTS (#panel-projects)
    ============================================================================ */
 /* RTL grid: first track = rightmost → categories | list | KPIs */
-.projects-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr) 250px; gap: var(--sp-4); }
+.projects-layout { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: var(--sp-4); }
 .projects-main { display: flex; flex-direction: column; min-height: 0; }
 .projects-main #projects-list-container { flex: 1; min-height: 0; overflow-y: auto; }
 .projects-stats { display: flex; flex-direction: column; gap: var(--sp-3); min-height: 0; overflow-y: auto; }
 .projects-stats .metric-card { flex-shrink: 0; }
 
+/* A row of filters over the list, not a column beside it. */
 .projects-cats {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--r-md);
-    padding: var(--sp-2);
-    align-self: start;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-1);
+    padding-block: var(--sp-2);
+    margin-block-end: var(--sp-2);
 }
 .projects-cats .cat-head {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    font-size: var(--fs-xs);
-    font-weight: 700;
-    color: var(--text-2);
-    padding: var(--sp-1) var(--sp-2) var(--sp-2);
-    border-block-end: 1px solid var(--border);
-    margin-block-end: var(--sp-1);
+    display: flex; align-items: center; gap: var(--sp-1);
+    font-size: var(--fs-xs); font-weight: 700; color: var(--text-3);
+    padding-inline-end: var(--sp-2);
 }
 .projects-cats .cat-head i { color: var(--accent); }
-.cat-item { display: flex; align-items: center; gap: 2px; }
+.cat-item { display: flex; align-items: center; gap: 0; }
 .cat-item .cat-btn {
-    flex: 1;
     min-width: 0;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-2);
+    gap: var(--sp-1);
     background: none;
     border: none;
-    border-radius: var(--r-sm);
-    padding: 7px 10px;
+    border-radius: var(--r-pill);
+    padding: 5px 12px;
     color: var(--text-2);
     font: 500 var(--fs-sm)/1.2 var(--font-ui);
     text-align: start;
@@ -433,8 +424,8 @@ i[class^="fa-"], i[class*=" fa-"] {
 }
 .cat-item:hover .cat-del { opacity: 1; }
 .cat-item .cat-del:hover { color: var(--danger); }
-.projects-cats .cat-add { display: flex; gap: var(--sp-1); padding-block-start: var(--sp-2); margin-block-start: var(--sp-1); border-block-start: 1px solid var(--border); }
-.projects-cats .cat-add input { min-height: 34px; font-size: var(--fs-xs); }
+.projects-cats .cat-add { display: flex; gap: var(--sp-1); align-items: center; margin-inline-start: auto; }
+.projects-cats .cat-add input { min-height: 30px; width: 130px; font-size: var(--fs-xs); border-radius: var(--r-pill); }
 .projects-cats .cat-add .cat-add-btn { flex-shrink: 0; }
 
 .create-project-inline {
