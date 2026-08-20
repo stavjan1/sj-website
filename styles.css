@@ -8,7 +8,9 @@
 .wrap { max-width: 1080px; margin-inline: auto; padding-inline: var(--sp-6); }
 .section { padding-block: var(--sp-16); }
 .section-tight { padding-block: var(--sp-12); }
-.section-alt { background: var(--surface); border-block: 1px solid var(--border); }
+/* A band the eye can see the edge of — --surface is a hair off --bg in the
+   light theme, which is why every section looked like the same section. */
+.section-alt { background: var(--surface-2); border-block: 1px solid var(--border); }
 
 .section-head { max-width: 62ch; margin-block-end: var(--sp-8); }
 .section-head h2 { font-size: var(--fs-2xl); }
@@ -73,8 +75,104 @@
   .header-actions .btn { display: none; }
 }
 
-/* ---------- hero ---------- */
+/* ---------- hero ----------
+   V3 opened every page with type on a flat ground, and the page read as a
+   printed document: nothing to look at, nowhere for the eye to land. The
+   photographic band below is the one part of the site that does NOT follow
+   the viewer's theme — it is a night photograph with white type over it in
+   both themes, on purpose, because a photo that dims and brightens with the
+   theme is a photo nobody trusts. Every colour in it is therefore literal
+   rather than a token, and that is the whole exception. */
 .hero { padding-block: var(--sp-16); }
+
+.hero-photo {
+  position: relative; isolation: isolate; overflow: clip;
+  background: #08111F;
+  padding-block: clamp(var(--sp-16), 11vw, 120px);
+}
+.hero-photo-bg {
+  position: absolute; inset: 0; z-index: -1;
+  background-image: var(--hero-img, url("assets/hero_powerlines.webp"));
+  background-size: cover; background-position: center;
+}
+/* Two scrims: one across the reading direction (RTL — the type starts at the
+   right, so that edge is darkest), one from the bottom so the buttons keep
+   their contrast wherever the photo happens to be bright. */
+.hero-photo-bg::after {
+  content: ""; position: absolute; inset: 0;
+  background:
+    linear-gradient(to left, rgb(8 17 31 / 0.96) 0%, rgb(8 17 31 / 0.86) 38%, rgb(8 17 31 / 0.45) 100%),
+    linear-gradient(to top, rgb(8 17 31 / 0.7), transparent 55%);
+}
+/* A drawing grid, faint enough to be texture rather than pattern — the paper
+   the work is actually done on. */
+.hero-photo-bg::before {
+  content: ""; position: absolute; inset: 0; opacity: 0.5;
+  background-image:
+    repeating-linear-gradient(to right, rgb(255 255 255 / 0.05) 0 1px, transparent 1px 64px),
+    repeating-linear-gradient(to bottom, rgb(255 255 255 / 0.05) 0 1px, transparent 1px 64px);
+}
+/* A shadow behind type on a photograph is not decoration — it is what keeps
+   the sentence readable when the sky behind it happens to be bright. */
+.hero-photo h1, .hero-photo .lede, .hero-photo .hero-kicker, .hero-photo .hero-facts {
+  text-shadow: 0 1px 3px rgb(8 17 31 / 0.55);
+}
+.hero-photo h1 { color: #FFFFFF; }
+.hero-photo .lede { color: rgb(255 255 255 / 0.92); }
+.hero-photo .hero-kicker { color: rgb(255 255 255 / 0.7); }
+.hero-photo .hero-facts { color: rgb(255 255 255 / 0.74); }
+.hero-photo .hero-facts a { color: rgb(255 255 255 / 0.9); }
+.hero-photo .hero-facts a:hover { color: #FFFFFF; }
+.hero-photo .btn-quiet {
+  color: #FFFFFF; border-color: rgb(255 255 255 / 0.45); background: rgb(255 255 255 / 0.06);
+}
+.hero-photo .btn-quiet:hover { background: rgb(255 255 255 / 0.14); color: #FFFFFF; }
+
+/* ---------- a photograph mid-page ----------
+   Ten sections of text in a row is what made the page read as a document. One
+   band with a photograph behind it, halfway down, breaks the column the way
+   the old site did — same night treatment as the hero, so it reads as the
+   same site and not as a stock image dropped in. */
+.section-photo {
+  position: relative; isolation: isolate; overflow: clip;
+  background: #08111F; border-block: none;
+}
+.section-photo > .wrap { position: relative; }
+.section-photo .section-photo-bg {
+  position: absolute; inset: 0; z-index: -1;
+  background-image: var(--band-img); background-size: cover; background-position: center;
+}
+.section-photo .section-photo-bg::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(to left, rgb(8 17 31 / 0.94) 0%, rgb(8 17 31 / 0.82) 45%, rgb(8 17 31 / 0.55) 100%);
+}
+.section-photo h2 { color: #FFFFFF; }
+.section-photo .section-head p { color: rgb(255 255 255 / 0.9); }
+.section-photo h2, .section-photo .section-head p { text-shadow: 0 1px 3px rgb(8 17 31 / 0.55); }
+.section-photo .btn-quiet {
+  color: #FFFFFF; border-color: rgb(255 255 255 / 0.45); background: rgb(255 255 255 / 0.06);
+}
+.section-photo .btn-quiet:hover { background: rgb(255 255 255 / 0.14); color: #FFFFFF; }
+
+/* ---------- facts band ----------
+   The same three numbers were already on the page, set in small grey type
+   under the buttons, where they read as a footnote. A number that is proof
+   should be the size of proof. */
+.facts-band { background: #0F1E35; color: #FFFFFF; padding-block: var(--sp-8); }
+.facts-band .wrap { display: flex; flex-wrap: wrap; gap: var(--sp-6) var(--sp-12); }
+.facts-band .fact { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.facts-band .fact b {
+  font-family: var(--font-display); font-size: var(--fs-3xl); font-weight: 700; line-height: 1.1;
+  font-variant-numeric: tabular-nums; color: #FFFFFF;
+  direction: ltr; unicode-bidi: isolate;   /* "500+", not "+500" */
+}
+.facts-band .fact span { font-size: var(--fs-sm); color: rgb(255 255 255 / 0.72); }
+.facts-band .fact a { color: rgb(255 255 255 / 0.72); text-decoration: underline; text-underline-offset: 3px; }
+.facts-band .fact a:hover { color: #FFFFFF; }
+@media (max-width: 560px) {
+  .facts-band .wrap { gap: var(--sp-6); }
+  .facts-band .fact { flex: 1 1 40%; }
+}
 .hero h1 {
   font-family: var(--font-display);
   font-size: clamp(var(--fs-3xl), 6vw, var(--fs-4xl));
