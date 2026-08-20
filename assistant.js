@@ -59,8 +59,24 @@
           '<a href="/privacy.html">למדיניות הפרטיות ולביטול המדידה</a></span>' +
           '<button id="sj-cookie-ok">הבנתי</button>';
         document.body.appendChild(bar);
+
+        // The bar spans the bottom of the screen, and the two floating buttons
+        // live there too — on a phone it covered the chat launcher completely,
+        // so the one control that opens the assistant could not be tapped
+        // until the notice was dismissed. Publish the bar's real height and
+        // let the buttons sit above it.
+        var lift = function () {
+          document.body.style.setProperty('--sj-cookie-h', bar.offsetHeight + 'px');
+        };
+        lift();
+        document.body.classList.add('sj-has-cookiebar');
+        window.addEventListener('resize', lift);
+
         document.getElementById('sj-cookie-ok').onclick = function () {
           try { localStorage.setItem('sj_cookie_ok', '1'); } catch (e) {}
+          window.removeEventListener('resize', lift);
+          document.body.classList.remove('sj-has-cookiebar');
+          document.body.style.removeProperty('--sj-cookie-h');
           bar.remove();
         };
       });

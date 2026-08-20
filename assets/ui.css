@@ -238,6 +238,12 @@ a:hover { color: var(--accent-strong); }
 }
 @media (max-width: 480px) {
   .sj-assist-panel { inset: auto 0 0 0; width: 100%; height: 82dvh; border-radius: var(--r-md) var(--r-md) 0 0; }
+  /* The notice bar is injected after the panel and shares its layer, so it
+     landed on top of the panel's input row — the one part you have to reach. */
+  body.sj-has-cookiebar .sj-assist-panel {
+    inset-block-end: var(--sj-cookie-h, 0px);
+    height: calc(82dvh - var(--sj-cookie-h, 0px));
+  }
 }
 /* Every selector below was read off assistant.js. The V3 restyle was written
    against class names the widget does not render (.sj-assist-body / -msg /
@@ -363,6 +369,13 @@ a:hover { color: var(--accent-strong); }
 .sj-assist-ef-msg.err { color: var(--danger); }
 .sj-assist-contact { display: grid; gap: var(--sp-2); padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg); }
 
+
+/* While the cookie notice is up it owns the bottom of the screen; the floats
+   move above it rather than under it. */
+body.sj-has-cookiebar .sj-assist-launcher,
+body.sj-has-cookiebar .float-wa {
+  inset-block-end: calc(var(--sp-4) + var(--sj-cookie-h, 0px) + env(safe-area-inset-bottom));
+}
 
 /* In the app the bottom bar owns the bottom of the screen on a phone. */
 @media (max-width: 768px) {
