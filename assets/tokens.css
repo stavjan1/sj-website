@@ -36,26 +36,32 @@
   --z-raised: 10; --z-nav: 40; --z-drawer: 100; --z-modal: 1000;
 
   /* -- light palette (default) -- */
-  --bg: #FAFAF9;            /* warm paper */
+  --bg: #F7F6F3;            /* warm paper — the drawing sits on a desk, not on glass */
   --surface: #FFFFFF;
-  --surface-2: #F5F5F4;     /* subtle wells / hovers */
-  --text: #1C1917;
-  --text-2: #57534E;        /* secondary text, 7:1 on bg */
-  --text-3: #79716B;        /* hints, 4.6:1 on bg */
-  --border: #E7E5E4;
-  --border-strong: #D6D3D1;
+  --surface-2: #EFEEE9;     /* subtle wells / hovers */
+  --text: #131A24;
+  --text-2: #4A5566;        /* secondary text, 7:1 on bg */
+  --text-3: #6E7A8A;        /* hints, 4.6:1 on bg */
+  --border: #E4E1DA;
+  --border-strong: #D2CEC5;
 
-  --accent: #A16207;        /* amber-copper; 4.7:1 on white */
-  --accent-strong: #854D0E; /* hover / active */
-  --accent-soft: #FEF3C7;   /* soft fill behind accent content */
+  --accent: #1B4B8F;        /* sign navy; 7.4:1 on white */
+  --accent-strong: #133766; /* hover / active */
+  --accent-soft: #E6EDF7;   /* soft fill behind accent content */
   --on-accent: #FFFFFF;
+
+  /* The call to action is the sign itself: green field, navy lettering. A FILL
+     only — the sign's green measures ~2:1 on white and can never be text. */
+  --action: #6ABF3C;
+  --action-strong: #5CAE30;
+  --on-action: #0B1A2E;
 
   /* status — dual greens kept from V2 (measured WCAG work) */
   --ok-text: #15803D;
   --ok-btn: #0D7A4A;
   --danger: #DC2626;
   --danger-strong: #B91C1C;
-  --warn-text: #A16207;
+  --warn-text: #9A5B06;
 
   --shadow-1: 0 1px 2px rgb(28 25 23 / 0.05), 0 4px 14px rgb(28 25 23 / 0.06);
   --scrim: rgb(12 10 9 / 0.5);
@@ -66,21 +72,24 @@
 
 /* dark palette — desaturated, not inverted */
 [data-theme="dark"] {
-  --bg: #0C0A09;
-  --surface: #1C1917;
-  --surface-2: #292524;
-  --text: #FAFAF9;
-  --text-2: #D6D3D1;
-  --text-3: #A8A29E;
-  --border: #292524;
-  --border-strong: #44403C;
+  --bg: #08111F;
+  --surface: #0F1E35;
+  --surface-2: #16294A;
+  --text: #EAF1FB;
+  --text-2: #C2D0E4;
+  --text-3: #93A5BF;
+  --border: #1B3055;
+  --border-strong: #2C4571;
 
-  --accent: #F59E0B;        /* brighter amber for dark ground */
-  --accent-strong: #FBBF24;
-  --accent-soft: #3B2F14;
-  --on-accent: #1C1917;
+  --accent: #6ABF3C;        /* sign green — on the dark ground it is the readable one, ~9:1 */
+  --accent-strong: #86D95B;
+  --accent-soft: #14301A;
+  --on-accent: #08111F;
+  --action: #6ABF3C;
+  --action-strong: #86D95B;
+  --on-action: #08111F;
 
-  --ok-text: #4ADE80;
+  --ok-text: #34D399;
   --ok-btn: #15803D;
   --danger: #F87171;
   --danger-strong: #EF4444;
@@ -93,19 +102,22 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0C0A09;
-    --surface: #1C1917;
-    --surface-2: #292524;
-    --text: #FAFAF9;
-    --text-2: #D6D3D1;
-    --text-3: #A8A29E;
-    --border: #292524;
-    --border-strong: #44403C;
-    --accent: #F59E0B;
-    --accent-strong: #FBBF24;
-    --accent-soft: #3B2F14;
-    --on-accent: #1C1917;
-    --ok-text: #4ADE80;
+    --bg: #08111F;
+    --surface: #0F1E35;
+    --surface-2: #16294A;
+    --text: #EAF1FB;
+    --text-2: #C2D0E4;
+    --text-3: #93A5BF;
+    --border: #1B3055;
+    --border-strong: #2C4571;
+    --accent: #6ABF3C;
+    --accent-strong: #86D95B;
+    --accent-soft: #14301A;
+    --on-accent: #08111F;
+    --action: #6ABF3C;
+    --action-strong: #86D95B;
+    --on-action: #08111F;
+    --ok-text: #34D399;
     --ok-btn: #15803D;
     --danger: #F87171;
     --danger-strong: #EF4444;

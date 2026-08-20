@@ -249,24 +249,128 @@
 @media (max-width: 480px) {
   .sj-assist-panel { inset: auto 0 0 0; width: 100%; height: 82dvh; border-radius: var(--r-md) var(--r-md) 0 0; }
 }
-.sj-assist-head { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-block-end: 1px solid var(--border); font-weight: 700; }
-.sj-assist-head .sj-assist-close { margin-inline-start: auto; background: none; border: none; cursor: pointer; color: var(--text-3); padding: var(--sp-1); }
-.sj-assist-body { flex: 1; overflow-y: auto; padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-2); }
-.sj-assist-msg { max-width: 85%; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md); font-size: var(--fs-sm); line-height: 1.5; }
-.sj-assist-msg.user { align-self: flex-start; background: var(--accent-soft); color: var(--text); }
-.sj-assist-msg.bot { align-self: flex-end; background: var(--surface-2); color: var(--text); }
-.sj-assist-chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); padding: 0 var(--sp-4) var(--sp-2); }
-.sj-assist-note { font-size: var(--fs-xs); color: var(--text-3); text-align: center; padding: var(--sp-1) var(--sp-4); }
-.sj-assist-inputrow { display: flex; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-block-start: 1px solid var(--border); }
-.sj-assist-inputrow input {
-  flex: 1; min-height: 40px; padding: 0 var(--sp-3); font: 400 var(--fs-sm) var(--font-ui);
-  color: var(--text); background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+/* Every selector below was read off assistant.js. The V3 restyle was written
+   against class names the widget does not render (.sj-assist-body / -msg /
+   -inputrow / -chips), so the panel shipped with browser defaults: the three
+   head buttons collapsed into a floating cluster on top of the title, and the
+   bubbles had no bubble at all. */
+.sj-assist-head {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4); border-block-end: 1px solid var(--border);
 }
-.sj-assist-inputrow button {
-  min-height: 40px; padding: 0 var(--sp-4); border: none; border-radius: var(--r-sm);
-  background: var(--accent); color: var(--on-accent); font: 500 var(--fs-sm) var(--font-ui); cursor: pointer;
+.sj-assist-head-id { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.sj-assist-avatar {
+  width: 34px; height: 34px; flex: none; border-radius: var(--r-pill);
+  background: var(--accent-soft); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
 }
-.sj-assist-inputrow button:disabled { opacity: 0.45; }
+.sj-assist-titles { display: flex; flex-direction: column; min-width: 0; }
+.sj-assist-title { font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
+.sj-assist-sub { display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--text-3); }
+.sj-assist-dot { width: 7px; height: 7px; border-radius: var(--r-pill); background: var(--ok-text); flex: none; }
+
+.sj-assist-head-actions { display: flex; align-items: center; gap: 2px; margin-inline-start: auto; }
+.sj-assist-iconbtn {
+  width: 34px; height: 34px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: none; border-radius: var(--r-sm);
+  color: var(--text-3); cursor: pointer;
+  transition: background-color var(--t-fast), color var(--t-fast);
+}
+.sj-assist-iconbtn:hover { background: var(--surface-2); color: var(--text); }
+
+.sj-assist-log {
+  flex: 1; overflow-y: auto; padding: var(--sp-4);
+  display: flex; flex-direction: column; gap: var(--sp-2);
+}
+.sj-assist-bubble {
+  max-width: 88%; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md);
+  font-size: var(--fs-sm); line-height: 1.55; white-space: normal; overflow-wrap: anywhere;
+}
+/* Incoming on the start side, the reply on the other — the arrangement every
+   Hebrew messaging app already taught the reader. */
+.sj-assist-bubble.bot { align-self: flex-start; background: var(--surface-2); color: var(--text); }
+.sj-assist-bubble.user { align-self: flex-end; background: var(--accent-soft); color: var(--text); }
+.sj-assist-bubble strong { font-weight: 700; }
+
+.sj-assist-typing { display: flex; align-items: center; gap: 5px; padding: var(--sp-3); }
+.sj-assist-typing span {
+  width: 6px; height: 6px; border-radius: var(--r-pill); background: var(--text-3);
+  animation: sj-assist-blink 1.2s infinite ease-in-out;
+}
+.sj-assist-typing span:nth-child(2) { animation-delay: 0.16s; }
+.sj-assist-typing span:nth-child(3) { animation-delay: 0.32s; }
+@keyframes sj-assist-blink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sj-assist-typing span { animation: none; opacity: 0.5; } }
+
+.sj-assist-suggest { display: flex; flex-wrap: wrap; gap: var(--sp-2); padding: 0 var(--sp-4) var(--sp-2); }
+.sj-assist-suggest:empty { display: none; }
+.sj-assist-chip {
+  min-height: 32px; padding: 0 var(--sp-3);
+  background: var(--surface); color: var(--text-2);
+  border: 1px solid var(--border-strong); border-radius: var(--r-pill);
+  font: 500 var(--fs-xs) var(--font-ui); cursor: pointer;
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.sj-assist-chip:hover { border-color: var(--accent); color: var(--text); }
+
+.sj-assist-escalate {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4); border-block-start: 1px solid var(--border);
+  font-size: var(--fs-xs); color: var(--text-3);
+}
+.sj-assist-tosj {
+  min-height: 32px; padding: 0 var(--sp-3); white-space: nowrap;
+  background: var(--accent-soft); color: var(--accent-strong);
+  border: 1px solid var(--accent); border-radius: var(--r-sm);
+  font: 700 var(--fs-xs) var(--font-ui); cursor: pointer;
+}
+.sj-assist-tosj:hover { background: var(--accent); color: var(--on-accent); }
+
+.sj-assist-inputbar {
+  display: flex; align-items: flex-end; gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4); border-block-start: 1px solid var(--border);
+}
+.sj-assist-inputbar textarea {
+  flex: 1; min-height: 40px; max-height: 120px; resize: none;
+  padding: var(--sp-2) var(--sp-3); font: 400 var(--fs-sm)/1.45 var(--font-ui);
+  color: var(--text); background: var(--bg);
+  border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+}
+.sj-assist-send {
+  width: 40px; height: 40px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: var(--r-sm);
+  background: var(--accent); color: var(--on-accent); cursor: pointer;
+}
+.sj-assist-send:disabled { opacity: 0.45; cursor: default; }
+.sj-assist-disclaimer {
+  padding: 0 var(--sp-4) var(--sp-3); font-size: var(--fs-xs); color: var(--text-3);
+  text-align: center; line-height: 1.5;
+}
+.sj-assist-note { font-size: var(--fs-xs); color: var(--text-3); text-align: center; padding: var(--sp-1) 0; }
+
+/* "Send me this conversation" — a form inside the log, not a second dialog. */
+.sj-assist-emailform {
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--bg);
+}
+.sj-assist-ef-title { font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
+.sj-assist-ef-name, .sj-assist-ef-email {
+  min-height: 40px; padding: 0 var(--sp-3); font: 400 var(--fs-sm) var(--font-ui);
+  color: var(--text); background: var(--surface);
+  border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+}
+.sj-assist-ef-row { display: flex; gap: var(--sp-2); }
+.sj-assist-ef-send, .sj-assist-ef-cancel {
+  min-height: 38px; padding: 0 var(--sp-4); border-radius: var(--r-sm);
+  font: 600 var(--fs-sm) var(--font-ui); cursor: pointer;
+}
+.sj-assist-ef-send { background: var(--accent); color: var(--on-accent); border: none; }
+.sj-assist-ef-cancel { background: transparent; color: var(--text-2); border: 1px solid var(--border-strong); }
+.sj-assist-ef-msg { font-size: var(--fs-xs); color: var(--text-3); }
+.sj-assist-ef-msg.err { color: var(--danger); }
 .sj-assist-contact { display: grid; gap: var(--sp-2); padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg); }
 
 /* ---------- reservist emblem (.sj-mil-*) — original design, recolored ---------- */

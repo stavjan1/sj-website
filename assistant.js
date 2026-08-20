@@ -159,8 +159,7 @@
     launcher.id = 'sj-assist-launcher';
     launcher.setAttribute('aria-label', 'פתיחת העוזר ההנדסי של SJ');
     launcher.innerHTML =
-      '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>' +
-      '<span class="sj-assist-bolt">⚡</span>';
+      '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>';
     launcher.addEventListener('click', toggle);
 
     // Panel
@@ -189,9 +188,9 @@
       '<div class="sj-assist-log" id="sj-assist-log" aria-live="polite"></div>' +
       '<div class="sj-assist-suggest" id="sj-assist-suggest"></div>' +
       (MODE === 'public'
-        ? '<div class="sj-assist-escalate" id="sj-assist-escalate" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 14px;border-top:1px solid rgba(255,255,255,0.07);">' +
-            '<span style="font-size:12px;color:#9aa6c0;">לא מרוצה מהתשובה?</span>' +
-            '<button type="button" id="sj-assist-tosj" style="background:rgba(43,116,219,0.16);color:#7fb0ff;border:1px solid rgba(43,116,219,0.45);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">שלח הודעה אל SJ ✉️</button>' +
+        ? '<div class="sj-assist-escalate" id="sj-assist-escalate">' +
+            '<span>לא מרוצה מהתשובה?</span>' +
+            '<button type="button" class="sj-assist-tosj" id="sj-assist-tosj">שליחת הודעה אל SJ</button>' +
           '</div>'
         : '') +
       '<div class="sj-assist-inputbar">' +
@@ -299,7 +298,7 @@
     if (!from || !used || from === used) return;
     var fl = CONFIG.providerLabels[from] || from;
     var ul = CONFIG.providerLabels[used] || used;
-    els.log.appendChild(el('div', 'sj-assist-note', 'עברנו אוטומטית ל-' + ul + ' ⚡'));
+    els.log.appendChild(el('div', 'sj-assist-note', 'עברנו אוטומטית ל-' + ul));
     scrollDown();
   }
 
@@ -315,7 +314,7 @@
     clearSuggestions();
     var form = el('div', 'sj-assist-emailform');
     form.innerHTML =
-      '<div class="sj-assist-ef-title">' + (toSJ ? '✉️ נעביר את שיחתך ל-SJ — נחזור אליך בהקדם' : '✉️ נשמח לשלוח לך את סיכום השיחה למייל') + '</div>' +
+      '<div class="sj-assist-ef-title">' + (toSJ ? 'נעביר את שיחתך ל-SJ — נחזור אליך בהקדם' : 'נשמח לשלוח לך את סיכום השיחה למייל') + '</div>' +
       '<input type="text" class="sj-assist-ef-name" placeholder="שם מלא" autocomplete="name">' +
       '<input type="email" class="sj-assist-ef-email" placeholder="כתובת מייל" autocomplete="email">' +
       '<div class="sj-assist-ef-row">' +

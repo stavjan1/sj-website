@@ -47,8 +47,9 @@ a:hover { color: var(--accent-strong); }
 .btn:active { transform: translateY(1px); }
 .btn svg { width: 18px; height: 18px; flex: none; }
 
-.btn-primary { background: var(--accent); color: var(--on-accent); }
-.btn-primary:hover { background: var(--accent-strong); color: var(--on-accent); }
+/* The one place the sign's green is a field rather than a line. */
+.btn-primary { background: var(--action); color: var(--on-action); font-weight: 700; }
+.btn-primary:hover { background: var(--action-strong); color: var(--on-action); }
 
 .btn-quiet { background: transparent; color: var(--text); border-color: var(--border-strong); }
 .btn-quiet:hover { background: var(--surface-2); color: var(--text); }
@@ -105,6 +106,7 @@ a:hover { color: var(--accent-strong); }
   font-size: var(--fs-sm); cursor: pointer;
   transition: border-color var(--t-fast), background-color var(--t-fast), color var(--t-fast);
 }
+.chip svg { width: 15px; height: 15px; flex: none; }
 .chip:hover { border-color: var(--accent); color: var(--text); }
 .chip[aria-pressed="true"], .chip.on {
   background: var(--accent-soft); border-color: var(--accent); color: var(--text);
