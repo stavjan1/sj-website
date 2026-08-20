@@ -49,7 +49,9 @@
         var bar = document.createElement('div');
         bar.id = 'sj-cookie-bar';
         bar.setAttribute('dir', 'rtl');
-        bar.style.cssText = 'position:fixed;bottom:0;right:0;left:0;z-index:9998;' +
+        // z-index stays under --z-modal (1000): the notice must never sit on top of
+        // an open dialog (the reservist certificate) and swallow its buttons.
+        bar.style.cssText = 'position:fixed;bottom:0;right:0;left:0;z-index:100;' +
           'background:rgba(20,20,25,0.97);border-top:1px solid rgba(255,255,255,0.1);' +
           'color:#e4e4e7;font-size:13px;padding:10px 16px;display:flex;gap:12px;' +
           'align-items:center;justify-content:center;flex-wrap:wrap;font-family:inherit;';
