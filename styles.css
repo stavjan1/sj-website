@@ -5,7 +5,15 @@
    ============================================================ */
 
 /* ---------- layout scaffolding ---------- */
-.wrap { max-width: 1080px; margin-inline: auto; padding-inline: var(--sp-6); }
+/* The column grows with the screen instead of sitting at one fixed width:
+   on a large or scaled display 1080px left the sides empty and the page felt
+   like it was printed on a narrower sheet than the monitor. Text blocks keep
+   their own ch-based caps, so the lines never get long — only the grids get
+   wider, which is where the extra room is worth something. */
+.wrap {
+  max-width: 1240px; margin-inline: auto; padding-inline: var(--sp-6);
+}
+@media (min-width: 1700px) { .wrap { max-width: 1400px; } }
 .section { padding-block: var(--sp-16); }
 .section-tight { padding-block: var(--sp-12); }
 /* A band the eye can see the edge of — --surface is a hair off --bg in the
@@ -25,9 +33,23 @@
   display: flex; align-items: center; gap: var(--sp-6);
   min-height: 64px;
 }
-.brand { display: flex; align-items: center; gap: var(--sp-2); color: var(--text); font-weight: 700; font-size: var(--fs-lg); }
-.brand svg { width: 22px; height: 22px; color: var(--accent); }
+/* The lockup from the old site, which he missed by name: SJ set over the
+   discipline, and the dashed ring turning slowly around the bolt so the mark
+   is alive rather than printed. 24 seconds a turn — noticed only if you look
+   at it, which is the point. */
+.brand { display: flex; align-items: center; gap: var(--sp-2); color: var(--text); }
+.brand-mark { width: 34px; height: 34px; flex: none; color: var(--accent); }
+.brand-ring { transform-origin: 50% 50%; animation: sj-brand-ring 24s linear infinite; }
+@keyframes sj-brand-ring { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .brand-ring { animation: none; } }
+.brand-text { display: flex; flex-direction: column; line-height: 1; min-width: 0; }
+.brand-text b {
+  font-family: var(--font-display); font-size: 1.3rem; font-weight: 900;
+  letter-spacing: 0.03em; color: var(--text);
+}
+.brand-text small { font-size: var(--fs-xs); font-weight: 500; color: var(--text-2); margin-block-start: 3px; white-space: nowrap; }
 .brand:hover { color: var(--text); }
+.brand:hover .brand-mark { color: var(--accent-strong); }
 
 .site-nav { display: flex; align-items: center; gap: var(--sp-1); margin-inline-start: auto; }
 .site-nav a {
@@ -374,12 +396,12 @@
   border: 1px solid var(--cert-line);
   border-radius: var(--r-md);
   box-shadow: inset 0 0 0 5px rgb(157 179 95 / 0.09), 0 24px 60px rgb(0 0 0 / 0.5);
-  max-width: 440px; width: 100%; max-height: 92dvh; overflow-y: auto;
-  padding: var(--sp-6) var(--sp-6) var(--sp-4);
+  max-width: 460px; width: 100%; max-height: 94dvh; overflow-y: auto;
+  padding: var(--sp-8) var(--sp-6) var(--sp-6);
   text-align: center;
   overscroll-behavior: contain;
 }
-@media (min-width: 480px) { .sj-mil-cert { padding: var(--sp-8) var(--sp-8) var(--sp-6); } }
+@media (min-width: 480px) { .sj-mil-cert { padding: var(--sp-12) var(--sp-8) var(--sp-8); } }
 .sj-mil-close {
   position: absolute; inset-block-start: var(--sp-2); inset-inline-end: var(--sp-2);
   width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
@@ -389,24 +411,30 @@
 .sj-mil-close:hover { color: var(--cert-ink); background: rgb(255 255 255 / 0.08); }
 .sj-mil-close svg { width: 18px; height: 18px; }
 .sj-mil-cert .sj-mil-emblem { display: block; width: 54px; height: auto; margin: 0 auto var(--sp-2); }
+/* Slot for the two saluting figures, the way a seal opens a document. The
+   artwork itself is still to come — the drop-in is two square images inside
+   .sj-mil-salutes and one line in reserve.js. */
+.sj-mil-salutes { display: flex; justify-content: center; gap: var(--sp-4); margin-block-end: var(--sp-6); }
+.sj-mil-salutes img, .sj-mil-salute { width: 76px; height: 76px; flex: none; border-radius: 50%; }
+@media (max-width: 380px) { .sj-mil-salutes img, .sj-mil-salute { width: 64px; height: 64px; } }
 .sj-mil-eyebrow {
   color: #9DB35F; font-size: var(--fs-xs); font-weight: 600;
-  letter-spacing: 0.08em; margin-block-end: var(--sp-1);
+  letter-spacing: 0.12em; margin-block-end: var(--sp-3);
 }
 .sj-mil-cert h2 {
-  font-family: var(--font-display); font-size: var(--fs-lg); line-height: 1.3;
-  color: var(--cert-ink); margin-block-end: var(--sp-2); text-wrap: balance;
+  font-family: var(--font-display); font-size: var(--fs-xl); line-height: 1.35;
+  color: var(--cert-ink); margin-block-end: var(--sp-4); text-wrap: balance;
 }
-.sj-mil-rule { margin-block: var(--sp-3); }
+.sj-mil-rule { margin-block: var(--sp-4); }
 .sj-mil-rule span {
   display: block; height: 1px;
   background: linear-gradient(to left, transparent, var(--cert-line) 20%, var(--cert-line) 80%, transparent);
 }
-.sj-mil-body { color: var(--cert-ink-2); font-size: var(--fs-sm); line-height: 1.6; margin: 0; }
+.sj-mil-body { color: var(--cert-ink-2); font-size: var(--fs-sm); line-height: 1.75; margin: 0; }
 .sj-mil-cert ul {
-  margin: var(--sp-3) 0 0; padding-inline-start: 0; list-style: none;
-  display: grid; gap: var(--sp-2); text-align: start;
-  color: var(--cert-ink-2); font-size: var(--fs-sm);
+  margin: var(--sp-6) 0 0; padding-inline-start: 0; list-style: none;
+  display: grid; gap: var(--sp-3); text-align: start;
+  color: var(--cert-ink-2); font-size: var(--fs-sm); line-height: 1.6;
 }
 .sj-mil-cert ul li { display: flex; align-items: flex-start; gap: var(--sp-2); }
 /* An SVG with only a viewBox stretches to its container — this is the rule
@@ -414,12 +442,12 @@
 .sj-mil-cert ul li svg { width: 15px; height: 15px; flex: none; color: #9DB35F; margin-block-start: 4px; }
 .sj-mil-cert .sj-mil-sign {
   color: rgb(198 204 176 / 0.75); font-size: var(--fs-xs);
-  margin-block-start: var(--sp-4); padding-block-start: var(--sp-3);
+  margin-block-start: var(--sp-6); padding-block-start: var(--sp-4);
   border-block-start: 1px solid rgb(157 179 95 / 0.2);
 }
 .sj-mil-cert .sj-mil-sign .who { color: var(--cert-ink); font-weight: 700; font-size: var(--fs-sm); }
 .sj-mil-cert .sj-mil-sign .role { display: block; margin-block-start: 2px; }
-.sj-mil-cert .sj-mil-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-block-start: var(--sp-4); }
+.sj-mil-cert .sj-mil-actions { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-block-start: var(--sp-6); }
 .sj-mil-btn {
   flex: 1 1 auto; min-width: 0; min-height: 42px; padding: 0 var(--sp-4);
   display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
