@@ -65,7 +65,6 @@ function showAdminTabIfNeeded() {
 // The "עוד" drawer is gone: four destinations fit in the rail, and a drawer
 // with ten entries is a menu that gave up. These stay as no-ops/aliases so any
 // leftover caller keeps working instead of throwing.
-const MOBILE_CORE_TABS = ['projects', 'wizard', 'create'];
 function toggleMoreDrawer() { /* no drawer any more */ }
 function openMoreDrawer() { /* no drawer any more */ }
 function closeMoreDrawer() { /* no drawer any more */ }
@@ -2737,12 +2736,15 @@ function persistSettings() {
 // column derived from its status (+ workflow stage for drafts). A completed job
 // ('הושלם') sits in "בוצע" until an invoice is issued, which flips the
 // awaitingPayment flag → "ממתין לתשלום"; marking paid sets status 'שולם'.
+// The column names are the stage names from the rest of the app — a project
+// cannot be called one thing on its row and another in the pipeline. The two
+// off-palette hexes were V2 leftovers.
 const PIPELINE_COLS = [
-    { key: 'planning', label: 'אפיון',        icon: 'fa-compass-drafting', accent: '#8aa0d8' },
-    { key: 'quote',    label: 'הצעה',         icon: 'fa-file-invoice',     accent: 'var(--warn-text)' },
-    { key: 'executed', label: 'בוצע',         icon: 'fa-helmet-safety',    accent: '#34c759' },
+    { key: 'planning', label: 'אפיון ותמחור', icon: 'fa-compass-drafting', accent: 'var(--text-3)' },
+    { key: 'quote',    label: 'הצעת מחיר',    icon: 'fa-file-invoice-dollar', accent: 'var(--accent)' },
+    { key: 'executed', label: 'בוצע',         icon: 'fa-helmet-safety',    accent: 'var(--ok-text)' },
     { key: 'awaiting', label: 'ממתין לתשלום', icon: 'fa-hourglass-half',   accent: 'var(--warn-text)' },
-    { key: 'paid',     label: 'שולם',         icon: 'fa-sack-dollar',      accent: '#22d3ee' },
+    { key: 'paid',     label: 'שולם',         icon: 'fa-shekel-sign',      accent: 'var(--ok-text)' },
 ];
 
 function projectPipelineStage(p) {
@@ -11864,15 +11866,7 @@ function updateUserProfileUI() {
         }
     }
 
-    // Mirror the identity into the desktop top-bar user chip.
-    const tnUser = document.getElementById('topnav-username');
-    if (tnUser) tnUser.textContent = shownName;
-    const tnAvatar = document.getElementById('topnav-avatar');
-    if (tnAvatar) {
-        const pic = isGuest ? null : localStorage.getItem('gsi_picture');
-        if (pic) { tnAvatar.src = pic; tnAvatar.style.display = ''; }
-        else { tnAvatar.style.display = 'none'; }
-    }
+    // (The desktop top bar was removed in V3; the account chip is the identity.)
 
     const profileNameDisplay = document.getElementById('profile-username-display');
     if (profileNameDisplay) profileNameDisplay.textContent = isGuest ? 'אורח' : displayName;

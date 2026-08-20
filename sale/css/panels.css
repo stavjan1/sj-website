@@ -2,7 +2,7 @@
    ZEREM — content panels, V3 restyle.            sale/css/panels.css
    Styles everything INSIDE <section class="content-panel"> of sale/index.html
    plus the app-level overlays that belong to panel content (stern drawer,
-   more-drawer sheet, reminder popover, toasts, lock/splash/auth, modals).
+   reminder popover, toasts, lock/splash/auth, modals).
 
    Load order: tokens.css → ui.css → shell css → THIS FILE.
    Law: every color comes from /assets/tokens.css. No hex, no gradients,
@@ -2254,7 +2254,7 @@ i[class^="fa-"], i[class*=" fa-"] {
 
 
 /* ============================================================================
-   18. OVERLAYS — stern drawer, more-drawer sheet, reminder popover, toasts,
+   18. OVERLAYS — stern drawer, reminder popover, toasts,
    fullscreen PDF preview chrome, upgrade modal
    ============================================================================ */
 /* Stern pricing drawer — slides in from the inline-end (left in RTL) */
@@ -2306,46 +2306,7 @@ i[class^="fa-"], i[class*=" fa-"] {
 .stern-card-price { font-weight: 700; color: var(--ok-text); font-size: var(--fs-md); white-space: nowrap; }
 
 /* Mobile "עוד" bottom sheet (sits above the 65px bottom bar) */
-#more-drawer-backdrop { display: none; position: fixed; inset: 0; background: var(--scrim); z-index: calc(var(--z-drawer) + 1); }
-#more-drawer-backdrop.open { display: block; }
-@media (max-width: 768px) {
-#more-drawer {
-    /* Hidden via display (like the backdrop) — the transform/visibility pair
-       proved flaky under some renderers; display cannot half-apply. */
-    display: none;
-    position: fixed;
-    inset-inline: 0;
-    inset-block-end: 65px;
-    z-index: calc(var(--z-drawer) + 2);
-    background: var(--surface);
-    border-block-start: 1px solid var(--border);
-    border-start-start-radius: var(--r-md);
-    border-start-end-radius: var(--r-md);
-    padding: var(--sp-2) var(--sp-4) var(--sp-4);
-    box-shadow: var(--shadow-1);
-}
-#more-drawer.open { display: block; }
-}
-/* Desktop (>=769px): shell.css turns the same drawer into a side sheet. */
-.more-drawer-handle { width: 42px; height: 4px; border-radius: var(--r-pill); background: var(--border-strong); margin: 0 auto var(--sp-3); }
-.more-drawer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
-.more-drawer-grid button, .more-drawer-grid a {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--r-sm);
-    color: var(--text);
-    font: 600 var(--fs-sm)/1.2 var(--font-ui);
-    padding: var(--sp-3);
-    min-height: 48px;
-    cursor: pointer;
-    text-decoration: none;
-    text-align: start;
-}
-.more-drawer-grid button:active, .more-drawer-grid a:active { border-color: var(--accent); }
-.more-drawer-grid i { color: var(--accent) !important; width: 20px; text-align: center; }
+/* (the "עוד" sheet was deleted in waves B–C — the rail holds all four) */
 
 /* Reminder popover (positioned by JS under the bell; sheet on phones) */
 .reminder-pop {
@@ -3311,3 +3272,6 @@ i[class^="fa-"], i[class*=" fa-"] {
 }
 .subtab .sub-count[hidden] { display: none; }
 @media (max-width: 560px) { .subtab { padding: 0 var(--sp-3); font-size: var(--fs-xs); } }
+
+/* The pipeline carries the same view switch as the list it is a view of. */
+.pipeline-views { display: flex; gap: var(--sp-1); margin-block-end: var(--sp-3); }

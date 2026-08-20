@@ -175,37 +175,9 @@ body.in-project #project-banner { display: flex; }
    them outside a project stage, at any width. */
 body:not(.in-project-stage) .project-rail { display: none !important; }
 
-/* ---------- more-drawer: bottom sheet on phone, side sheet on desktop ---------- */
-@media (min-width: 769px) {
-  #more-drawer {
-    position: fixed; inset-block: 0; inset-inline-start: 76px;
-    width: 280px;
-    /* The sheet rests BESIDE the rail, so sliding it out by its own width
-       leaves exactly the rail's width of it on screen — 76px of closed drawer
-       sitting on top of the icon rail, which is why the rail looked missing.
-       It has to travel its own width PLUS the rail. visibility is belt and
-       braces: whatever the arithmetic, a closed drawer draws nothing. */
-    transform: translateX(calc(100% + 76px));
-    visibility: hidden;
-    background: var(--surface); border-inline-end: 1px solid var(--border);
-    transition: transform var(--t-med), visibility 0s linear var(--t-med);
-    /* MUST outrank the shared backdrop (z-drawer + 1 in panels.css) — with the
-       drawer below it, clicks land on the backdrop and every item is dead. */
-    z-index: calc(var(--z-drawer) + 2); overflow-y: auto; padding: var(--sp-6) var(--sp-4);
-  }
-  [dir="rtl"] #more-drawer { transform: translateX(calc(100% + 76px)); }
-  /* The RTL base rule above is (1,1,1) specific — the open state must match
-     it or it silently loses the cascade and the drawer opens as a sliver. */
-  #more-drawer.open, [dir="rtl"] #more-drawer.open {
-    transform: none; visibility: visible; transition: transform var(--t-med), visibility 0s;
-  }
-  #more-drawer-backdrop {
-    position: fixed; inset: 0; background: var(--scrim);
-    opacity: 0; pointer-events: none; transition: opacity var(--t-med);
-    z-index: calc(var(--z-drawer) - 1);
-  }
-  #more-drawer-backdrop.open { opacity: 1; pointer-events: auto; }
-}
+/* The "עוד" drawer was deleted with waves B–C: four destinations fit both the
+   rail and a phone's bottom bar, so the sheet, its backdrop and their two
+   breakpoints of rules have nothing left to open. */
 
 /* ---------- mobile: rail becomes the bottom bar ---------- */
 @media (max-width: 768px) {
