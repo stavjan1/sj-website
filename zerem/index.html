@@ -16,9 +16,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Rubik:wght@500;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/tokens.css?v=309">
-    <link rel="stylesheet" href="../assets/ui.css?v=309">
-    <link rel="stylesheet" href="../styles.css?v=309">
+    <link rel="stylesheet" href="../assets/tokens.css?v=310">
+    <link rel="stylesheet" href="../assets/ui.css?v=310">
+    <link rel="stylesheet" href="../styles.css?v=310">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2L4.5 13h6l-1.5 9L18.5 10h-6z' fill='%236ABF3C'/%3E%3C/svg%3E">
     <script type="application/ld+json">
     {
@@ -35,8 +35,40 @@
     </script>
     <style>
         /* zerem-page specifics on top of the shared marketing layer */
-        .z-hero { position: relative; overflow: hidden; }
-        .z-blueprint { position: absolute; inset-block: 0; inset-inline-end: 0; display: flex; gap: var(--sp-8); opacity: 0.5; pointer-events: none; }
+
+        /* The same opening band the office site got, with the drawing standing
+           in for the photograph — a photo of power lines would say nothing
+           about a piece of software, while the plan IS the product. The band
+           is dark in both themes, like the hero on the office site, and the
+           tokens are redefined ON the band so the blueprint SVG (which paints
+           itself with var(--accent) and var(--border-strong)) and the step
+           cards follow it without a single extra selector. */
+        .z-hero {
+            position: relative; overflow: clip; isolation: isolate;
+            background: #08111F;
+            padding-block: clamp(var(--sp-16), 10vw, 104px);
+            --text: #FFFFFF;
+            --text-2: rgb(255 255 255 / 0.9);
+            --text-3: rgb(255 255 255 / 0.6);
+            --accent: #6ABF3C;
+            --surface: rgb(255 255 255 / 0.06);
+            --border: rgb(255 255 255 / 0.14);
+            --border-strong: rgb(255 255 255 / 0.3);
+            color: var(--text);
+        }
+        .z-hero h1 { color: #FFFFFF; }
+        .z-hero .lede, .z-hero .z-step p { color: rgb(255 255 255 / 0.9); }
+        .z-hero .hero-facts { color: rgb(255 255 255 / 0.72); }
+        .z-hero .hero-facts a { color: rgb(255 255 255 / 0.9); }
+        .z-hero .btn-quiet { background: rgb(255 255 255 / 0.06); }
+        /* A drawing grid under the whole band, the paper the plan sits on. */
+        .z-hero::before {
+            content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0.5;
+            background-image:
+                repeating-linear-gradient(to right, rgb(255 255 255 / 0.05) 0 1px, transparent 1px 64px),
+                repeating-linear-gradient(to bottom, rgb(255 255 255 / 0.05) 0 1px, transparent 1px 64px);
+        }
+        .z-blueprint { position: absolute; inset-block: 0; inset-inline-end: 0; display: flex; gap: var(--sp-8); opacity: 0.55; pointer-events: none; }
         .z-blueprint svg { width: 200px; height: auto; }
         @media (max-width: 900px) { .z-blueprint { display: none; } }
         .z-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--sp-4); margin-block-start: var(--sp-12); }
@@ -320,6 +352,6 @@
             })(window, document, 'clarity', 'script', 'xgux1eczkt');
         })();
     </script>
-    <script src="/track.js?v=309" defer></script>
+    <script src="/track.js?v=310" defer></script>
 </body>
 </html>

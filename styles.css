@@ -85,6 +85,37 @@
    rather than a token, and that is the whole exception. */
 .hero { padding-block: var(--sp-16); }
 
+/* ---------- facts band ----------
+   The same three numbers were already on the page, set in small grey type
+   under the buttons, where they read as a footnote. A number that is proof
+   should be the size of proof. */
+.facts-band { background: #0F1E35; color: #FFFFFF; padding-block: var(--sp-8); }
+.facts-band .wrap { display: flex; flex-wrap: wrap; gap: var(--sp-6) var(--sp-12); }
+.facts-band .fact { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.facts-band .fact b {
+  font-family: var(--font-display); font-size: var(--fs-3xl); font-weight: 700; line-height: 1.1;
+  font-variant-numeric: tabular-nums; color: #FFFFFF;
+  direction: ltr; unicode-bidi: isolate;   /* "500+", not "+500" */
+}
+.facts-band .fact span { font-size: var(--fs-sm); color: rgb(255 255 255 / 0.72); }
+.facts-band .fact a { color: rgb(255 255 255 / 0.72); text-decoration: underline; text-underline-offset: 3px; }
+.facts-band .fact a:hover { color: #FFFFFF; }
+@media (max-width: 560px) {
+  .facts-band .wrap { gap: var(--sp-6); }
+  .facts-band .fact { flex: 1 1 40%; }
+}
+.hero h1 {
+  font-family: var(--font-display);
+  font-size: clamp(var(--fs-3xl), 6vw, var(--fs-4xl));
+  max-width: 18ch;
+  margin-block-end: var(--sp-4);
+}
+.hero .lede { font-size: var(--fs-xl); color: var(--text-2); max-width: 44ch; margin-block-end: var(--sp-8); }
+.hero-actions { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-block-end: var(--sp-8); }
+.hero-facts { display: flex; flex-wrap: wrap; gap: var(--sp-6); color: var(--text-3); font-size: var(--fs-sm); }
+.hero-facts a { color: var(--text-3); text-decoration: underline; text-underline-offset: 3px; }
+.hero-facts a:hover { color: var(--text); }
+
 .hero-photo {
   position: relative; isolation: isolate; overflow: clip;
   background: #08111F;
@@ -119,8 +150,8 @@
 }
 .hero-photo h1 { color: #FFFFFF; }
 .hero-photo .lede { color: rgb(255 255 255 / 0.95); }
-.hero-photo .hero-kicker { color: rgb(255 255 255 / 0.7); }
-.hero-photo .hero-facts { color: rgb(255 255 255 / 0.74); }
+.hero-photo .hero-kicker { color: rgb(255 255 255 / 0.82); }
+.hero-photo .hero-facts { color: rgb(255 255 255 / 0.85); }
 .hero-photo .hero-facts a { color: rgb(255 255 255 / 0.9); }
 .hero-photo .hero-facts a:hover { color: #FFFFFF; }
 .hero-photo .btn-quiet {
@@ -154,36 +185,6 @@
 }
 .section-photo .btn-quiet:hover { background: rgb(255 255 255 / 0.14); color: #FFFFFF; }
 
-/* ---------- facts band ----------
-   The same three numbers were already on the page, set in small grey type
-   under the buttons, where they read as a footnote. A number that is proof
-   should be the size of proof. */
-.facts-band { background: #0F1E35; color: #FFFFFF; padding-block: var(--sp-8); }
-.facts-band .wrap { display: flex; flex-wrap: wrap; gap: var(--sp-6) var(--sp-12); }
-.facts-band .fact { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
-.facts-band .fact b {
-  font-family: var(--font-display); font-size: var(--fs-3xl); font-weight: 700; line-height: 1.1;
-  font-variant-numeric: tabular-nums; color: #FFFFFF;
-  direction: ltr; unicode-bidi: isolate;   /* "500+", not "+500" */
-}
-.facts-band .fact span { font-size: var(--fs-sm); color: rgb(255 255 255 / 0.72); }
-.facts-band .fact a { color: rgb(255 255 255 / 0.72); text-decoration: underline; text-underline-offset: 3px; }
-.facts-band .fact a:hover { color: #FFFFFF; }
-@media (max-width: 560px) {
-  .facts-band .wrap { gap: var(--sp-6); }
-  .facts-band .fact { flex: 1 1 40%; }
-}
-.hero h1 {
-  font-family: var(--font-display);
-  font-size: clamp(var(--fs-3xl), 6vw, var(--fs-4xl));
-  max-width: 18ch;
-  margin-block-end: var(--sp-4);
-}
-.hero .lede { font-size: var(--fs-xl); color: var(--text-2); max-width: 44ch; margin-block-end: var(--sp-8); }
-.hero-actions { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-block-end: var(--sp-8); }
-.hero-facts { display: flex; flex-wrap: wrap; gap: var(--sp-6); color: var(--text-3); font-size: var(--fs-sm); }
-.hero-facts a { color: var(--text-3); text-decoration: underline; text-underline-offset: 3px; }
-.hero-facts a:hover { color: var(--text); }
 
 /* ---------- cards grid ---------- */
 /* min() on the track floor: without it a 340px minimum is a hard 340px even on a
@@ -320,160 +321,10 @@
    Injected widgets — class contracts owned by assistant.js / reserve.js
    ============================================================ */
 
-/* ---------- AI assistant widget (.sj-assist-*) ---------- */
-/* The panel and overlays are INJECTED CLOSED and opened via a JS .open class —
-   V3.0 shipped them always-visible by mistake. Default must stay hidden. */
-.sj-assist-panel { display: none; }
-.sj-assist-panel.open { display: flex; }
+/* The reservist overlay is INJECTED CLOSED and opened via a JS .open class —
+   V3.0 shipped it always-visible by mistake. Default must stay hidden. */
 .sj-mil-overlay { display: none; }
 .sj-mil-overlay.open { display: flex; }
-
-.sj-assist-launcher {
-  position: fixed; inset-block-end: calc(var(--sp-6) + env(safe-area-inset-bottom));
-  inset-inline-end: var(--sp-6);
-  min-height: 48px; padding: 0 var(--sp-4);
-  display: flex; align-items: center; gap: var(--sp-2);
-  background: var(--text); color: var(--bg);
-  border: none; border-radius: var(--r-pill); cursor: pointer;
-  font: 500 var(--fs-sm) var(--font-ui);
-  box-shadow: var(--shadow-1); z-index: var(--z-raised);
-}
-.sj-assist-launcher:hover { opacity: 0.9; }
-.sj-assist-panel {
-  /* display comes ONLY from the .open toggle above — never set it here */
-  position: fixed; inset-block-end: calc(84px + env(safe-area-inset-bottom)); inset-inline-end: var(--sp-6);
-  width: min(380px, calc(100vw - var(--sp-8)));
-  height: min(560px, 75vh);
-  flex-direction: column;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
-  box-shadow: var(--shadow-1); z-index: var(--z-drawer); overflow: hidden;
-}
-@media (max-width: 480px) {
-  .sj-assist-panel { inset: auto 0 0 0; width: 100%; height: 82dvh; border-radius: var(--r-md) var(--r-md) 0 0; }
-}
-/* Every selector below was read off assistant.js. The V3 restyle was written
-   against class names the widget does not render (.sj-assist-body / -msg /
-   -inputrow / -chips), so the panel shipped with browser defaults: the three
-   head buttons collapsed into a floating cluster on top of the title, and the
-   bubbles had no bubble at all. */
-.sj-assist-head {
-  display: flex; align-items: center; gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4); border-block-end: 1px solid var(--border);
-}
-.sj-assist-head-id { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
-.sj-assist-avatar {
-  width: 34px; height: 34px; flex: none; border-radius: var(--r-pill);
-  background: var(--accent-soft); color: var(--accent);
-  display: flex; align-items: center; justify-content: center;
-}
-.sj-assist-titles { display: flex; flex-direction: column; min-width: 0; }
-.sj-assist-title { font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
-.sj-assist-sub { display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--text-3); }
-.sj-assist-dot { width: 7px; height: 7px; border-radius: var(--r-pill); background: var(--ok-text); flex: none; }
-
-.sj-assist-head-actions { display: flex; align-items: center; gap: 2px; margin-inline-start: auto; }
-.sj-assist-iconbtn {
-  width: 34px; height: 34px; flex: none;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: none; border: none; border-radius: var(--r-sm);
-  color: var(--text-3); cursor: pointer;
-  transition: background-color var(--t-fast), color var(--t-fast);
-}
-.sj-assist-iconbtn:hover { background: var(--surface-2); color: var(--text); }
-
-.sj-assist-log {
-  flex: 1; overflow-y: auto; padding: var(--sp-4);
-  display: flex; flex-direction: column; gap: var(--sp-2);
-}
-.sj-assist-bubble {
-  max-width: 88%; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md);
-  font-size: var(--fs-sm); line-height: 1.55; white-space: normal; overflow-wrap: anywhere;
-}
-/* Incoming on the start side, the reply on the other — the arrangement every
-   Hebrew messaging app already taught the reader. */
-.sj-assist-bubble.bot { align-self: flex-start; background: var(--surface-2); color: var(--text); }
-.sj-assist-bubble.user { align-self: flex-end; background: var(--accent-soft); color: var(--text); }
-.sj-assist-bubble strong { font-weight: 700; }
-
-.sj-assist-typing { display: flex; align-items: center; gap: 5px; padding: var(--sp-3); }
-.sj-assist-typing span {
-  width: 6px; height: 6px; border-radius: var(--r-pill); background: var(--text-3);
-  animation: sj-assist-blink 1.2s infinite ease-in-out;
-}
-.sj-assist-typing span:nth-child(2) { animation-delay: 0.16s; }
-.sj-assist-typing span:nth-child(3) { animation-delay: 0.32s; }
-@keyframes sj-assist-blink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .sj-assist-typing span { animation: none; opacity: 0.5; } }
-
-.sj-assist-suggest { display: flex; flex-wrap: wrap; gap: var(--sp-2); padding: 0 var(--sp-4) var(--sp-2); }
-.sj-assist-suggest:empty { display: none; }
-.sj-assist-chip {
-  min-height: 32px; padding: 0 var(--sp-3);
-  background: var(--surface); color: var(--text-2);
-  border: 1px solid var(--border-strong); border-radius: var(--r-pill);
-  font: 500 var(--fs-xs) var(--font-ui); cursor: pointer;
-  transition: border-color var(--t-fast), color var(--t-fast);
-}
-.sj-assist-chip:hover { border-color: var(--accent); color: var(--text); }
-
-.sj-assist-escalate {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-4); border-block-start: 1px solid var(--border);
-  font-size: var(--fs-xs); color: var(--text-3);
-}
-.sj-assist-tosj {
-  min-height: 32px; padding: 0 var(--sp-3); white-space: nowrap;
-  background: var(--accent-soft); color: var(--accent-strong);
-  border: 1px solid var(--accent); border-radius: var(--r-sm);
-  font: 700 var(--fs-xs) var(--font-ui); cursor: pointer;
-}
-.sj-assist-tosj:hover { background: var(--accent); color: var(--on-accent); }
-
-.sj-assist-inputbar {
-  display: flex; align-items: flex-end; gap: var(--sp-2);
-  padding: var(--sp-3) var(--sp-4); border-block-start: 1px solid var(--border);
-}
-.sj-assist-inputbar textarea {
-  flex: 1; min-height: 40px; max-height: 120px; resize: none;
-  padding: var(--sp-2) var(--sp-3); font: 400 var(--fs-sm)/1.45 var(--font-ui);
-  color: var(--text); background: var(--bg);
-  border: 1px solid var(--border-strong); border-radius: var(--r-sm);
-}
-.sj-assist-send {
-  width: 40px; height: 40px; flex: none;
-  display: inline-flex; align-items: center; justify-content: center;
-  border: none; border-radius: var(--r-sm);
-  background: var(--accent); color: var(--on-accent); cursor: pointer;
-}
-.sj-assist-send:disabled { opacity: 0.45; cursor: default; }
-.sj-assist-disclaimer {
-  padding: 0 var(--sp-4) var(--sp-3); font-size: var(--fs-xs); color: var(--text-3);
-  text-align: center; line-height: 1.5;
-}
-.sj-assist-note { font-size: var(--fs-xs); color: var(--text-3); text-align: center; padding: var(--sp-1) 0; }
-
-/* "Send me this conversation" — a form inside the log, not a second dialog. */
-.sj-assist-emailform {
-  display: flex; flex-direction: column; gap: var(--sp-2);
-  padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md);
-  background: var(--bg);
-}
-.sj-assist-ef-title { font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
-.sj-assist-ef-name, .sj-assist-ef-email {
-  min-height: 40px; padding: 0 var(--sp-3); font: 400 var(--fs-sm) var(--font-ui);
-  color: var(--text); background: var(--surface);
-  border: 1px solid var(--border-strong); border-radius: var(--r-sm);
-}
-.sj-assist-ef-row { display: flex; gap: var(--sp-2); }
-.sj-assist-ef-send, .sj-assist-ef-cancel {
-  min-height: 38px; padding: 0 var(--sp-4); border-radius: var(--r-sm);
-  font: 600 var(--fs-sm) var(--font-ui); cursor: pointer;
-}
-.sj-assist-ef-send { background: var(--accent); color: var(--on-accent); border: none; }
-.sj-assist-ef-cancel { background: transparent; color: var(--text-2); border: 1px solid var(--border-strong); }
-.sj-assist-ef-msg { font-size: var(--fs-xs); color: var(--text-3); }
-.sj-assist-ef-msg.err { color: var(--danger); }
-.sj-assist-contact { display: grid; gap: var(--sp-2); padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg); }
 
 /* ---------- reservist emblem (.sj-mil-*) — original design, recolored ---------- */
 /* Every class here is injected by reserve.js: badge, certificate dialog and all
@@ -580,21 +431,6 @@
 .sj-mil-btn.call:hover { background: #B0C56F; color: #171B10; }
 .sj-mil-btn.wa { background: rgb(255 255 255 / 0.08); color: var(--cert-ink); border: 1px solid var(--cert-line); }
 .sj-mil-btn.wa:hover { background: rgb(255 255 255 / 0.14); color: var(--cert-ink); }
-
-/* ---------- cookie notice bar ---------- */
-#sj-cookie-bar {
-  position: fixed; inset-block-end: 0; inset-inline: 0;
-  background: var(--surface); border-block-start: 1px solid var(--border);
-  padding: var(--sp-3) var(--sp-4); z-index: var(--z-drawer);
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3);
-  font-size: var(--fs-sm); color: var(--text-2);
-}
-#sj-cookie-bar a { text-decoration: underline; }
-#sj-cookie-bar button {
-  margin-inline-start: auto; min-height: 36px; padding: 0 var(--sp-4);
-  background: var(--text); color: var(--bg); border: none; border-radius: var(--r-sm);
-  font: 500 var(--fs-sm) var(--font-ui); cursor: pointer;
-}
 
 /* ---------- print ---------- */
 @media print {

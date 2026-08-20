@@ -44,7 +44,7 @@
   --surface-2: #EFEEE9;     /* subtle wells / hovers */
   --text: #131A24;
   --text-2: #4A5566;        /* secondary text, 7:1 on bg */
-  --text-3: #6E7A8A;        /* hints, 4.6:1 on bg */
+  --text-3: #5D6A7C;        /* hints — 4.6:1 on the DARKEST light surface (#EFEEE9), not just on --bg */
   --border: #E4E1DA;
   --border-strong: #D2CEC5;
 
@@ -69,8 +69,12 @@
   --shadow-1: 0 1px 2px rgb(28 25 23 / 0.05), 0 4px 14px rgb(28 25 23 / 0.06);
   --scrim: rgb(12 10 9 / 0.5);
 
-  /* -- WhatsApp (real brand action, allowed) -- */
-  --whatsapp: #1FAF5A;      /* darkened for 3:1 on white */
+  /* -- WhatsApp (real brand action, allowed) --
+     Two values for the same brand, for the same reason --ok-text and --ok-btn
+     are two: the round float carries an icon and only needs 3:1, while a
+     button with white words on it needs 4.5:1 and #1FAF5A gives 2.86. */
+  --whatsapp: #1FAF5A;      /* icon-only float: 3:1 on white */
+  --whatsapp-btn: #0F7A40;  /* white text on it: 5.4:1 */
 }
 
 /* dark palette — desaturated, not inverted */
@@ -101,6 +105,7 @@
   --shadow-1: 0 0 0 1px rgb(255 255 255 / 0.04);
   --scrim: rgb(0 0 0 / 0.6);
   --whatsapp: #25D366;
+  --whatsapp-btn: #0F7A40;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -128,5 +133,6 @@
     --shadow-1: 0 0 0 1px rgb(255 255 255 / 0.04);
     --scrim: rgb(0 0 0 / 0.6);
     --whatsapp: #25D366;
+    --whatsapp-btn: #0F7A40;
   }
 }

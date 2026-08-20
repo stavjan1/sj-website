@@ -9,23 +9,29 @@
    app.js applies body classes (light-theme / mid-theme / dark-theme) via its
    settings system, and an inline pre-paint script sets light/dark from the OS.
    Tokens follow the body class; 'mid' collapses into dark. */
+/* The values below MUST track assets/tokens.css. They are repeated (not
+   inherited) because the app switches theme by body class while the marketing
+   pages switch by [data-theme]; when the palette moved to the sign's navy and
+   green, this copy was the reason /sale stayed amber. */
 body.light-theme {
-  --bg: #FAFAF9; --surface: #FFFFFF; --surface-2: #F5F5F4;
-  --text: #1C1917; --text-2: #57534E; --text-3: #79716B;
-  --border: #E7E5E4; --border-strong: #D6D3D1;
-  --accent: #A16207; --accent-strong: #854D0E; --accent-soft: #FEF3C7; --on-accent: #FFFFFF;
-  --ok-text: #15803D; --ok-btn: #0D7A4A; --danger: #DC2626; --danger-strong: #B91C1C; --warn-text: #A16207;
-  --shadow-1: 0 1px 2px rgb(28 25 23 / 0.05), 0 4px 14px rgb(28 25 23 / 0.06);
-  --scrim: rgb(12 10 9 / 0.5); --whatsapp: #1FAF5A;
+  --bg: #F7F6F3; --surface: #FFFFFF; --surface-2: #EFEEE9;
+  --text: #131A24; --text-2: #4A5566; --text-3: #5D6A7C;
+  --border: #E4E1DA; --border-strong: #D2CEC5;
+  --accent: #1B4B8F; --accent-strong: #133766; --accent-soft: #E6EDF7; --on-accent: #FFFFFF;
+  --action: #6ABF3C; --action-strong: #5CAE30; --on-action: #0B1A2E;
+  --ok-text: #15803D; --ok-btn: #0D7A4A; --danger: #DC2626; --danger-strong: #B91C1C; --warn-text: #9A5B06;
+  --shadow-1: 0 1px 2px rgb(19 26 36 / 0.06), 0 4px 14px rgb(19 26 36 / 0.07);
+  --scrim: rgb(8 17 31 / 0.55); --whatsapp: #1FAF5A; --whatsapp-btn: #0F7A40;
 }
 body.dark-theme, body.mid-theme {
-  --bg: #0C0A09; --surface: #1C1917; --surface-2: #292524;
-  --text: #FAFAF9; --text-2: #D6D3D1; --text-3: #A8A29E;
-  --border: #292524; --border-strong: #44403C;
-  --accent: #F59E0B; --accent-strong: #FBBF24; --accent-soft: #3B2F14; --on-accent: #1C1917;
-  --ok-text: #4ADE80; --ok-btn: #15803D; --danger: #F87171; --danger-strong: #EF4444; --warn-text: #FCD34D;
-  --shadow-1: 0 0 0 1px rgb(255 255 255 / 0.04);
-  --scrim: rgb(0 0 0 / 0.6); --whatsapp: #25D366;
+  --bg: #08111F; --surface: #0F1E35; --surface-2: #16294A;
+  --text: #EAF1FB; --text-2: #C2D0E4; --text-3: #93A5BF;
+  --border: #1B3055; --border-strong: #2C4571;
+  --accent: #6ABF3C; --accent-strong: #86D95B; --accent-soft: #14301A; --on-accent: #08111F;
+  --action: #6ABF3C; --action-strong: #86D95B; --on-action: #08111F;
+  --ok-text: #34D399; --ok-btn: #15803D; --danger: #F87171; --danger-strong: #EF4444; --warn-text: #FCD34D;
+  --shadow-1: 0 0 0 1px rgb(255 255 255 / 0.05);
+  --scrim: rgb(0 0 0 / 0.62); --whatsapp: #25D366; --whatsapp-btn: #0F7A40;
 }
 /* legacy box-theme classes are harmless no-ops in V3 */
 body.boxes-light, body.boxes-dark { }

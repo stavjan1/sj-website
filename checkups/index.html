@@ -11,32 +11,33 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2L4.5 13h6l-1.5 9L18.5 10h-6z' fill='%236ABF3C'/%3E%3C/svg%3E">
     <style>
         :root {
-            --bg: #FAFAF9;
+            --bg: #F7F6F3;
             --card: #FFFFFF;
-            --card-hover: #F5F5F4;
-            --border: #E7E5E4;
-            --text: #1C1917;
-            --muted: #79716B;
-            --blue: #1B4B8F;   /* legacy var name — now the V3 amber accent */
+            --card-hover: #EFEEE9;
+            --border: #E4E1DA;
+            --text: #131A24;
+            --muted: #5D6A7C;
+            --blue: #1B4B8F;   /* legacy var name — the V3 sign navy */
             --amber: #1B4B8F;
+            --on-primary: #FFFFFF;
             --red: #DC2626;
             --green: #15803D;
             --radius: 12px;
         }
         @media (prefers-color-scheme: dark) {
             :root {
-                --bg: #0C0A09;
-                --card: #1C1917;
-                --card-hover: #292524;
-                --border: #292524;
-                --text: #FAFAF9;
-                --muted: #A8A29E;
+                --bg: #08111F;
+                --card: #0F1E35;
+                --card-hover: #16294A;
+                --border: #1B3055;
+                --text: #EAF1FB;
+                --muted: #93A5BF;
                 --blue: #6ABF3C;
                 --amber: #FCD34D;
+                --on-primary: #08111F;
                 --red: #F87171;
                 --green: #4ADE80;
             }
-            .btn.primary { color: #1C1917; }
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -70,7 +71,7 @@
             transition: background 0.15s;
         }
         .btn:hover { background: var(--card-hover); }
-        .btn.primary { background: var(--blue); border-color: var(--blue); font-weight: 500; }
+        .btn.primary { background: var(--blue); border-color: var(--blue); color: var(--on-primary); font-weight: 500; }
         .btn.primary:hover { filter: brightness(0.92); }
         .btn.small { padding: 5px 10px; font-size: 0.78rem; }
         .btn.danger:hover { border-color: var(--red); color: var(--red); }
@@ -291,7 +292,7 @@
     <div id="toast"></div>
 </div>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="app.js?v=309"></script>
-    <script src="/track.js?v=309" defer></script>
+<script src="app.js?v=310"></script>
+    <script src="/track.js?v=310" defer></script>
 </body>
 </html>
