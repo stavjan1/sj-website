@@ -3104,3 +3104,69 @@ i[class^="fa-"], i[class*=" fa-"] {
 /* A fresh account has no categories yet, and the column drew an empty bordered
    box above the list. Nothing to show, nothing to draw. */
 .projects-cats:empty { display: none; }
+
+
+/* ============================================================================
+   V3.1 — the rest of the screens, in one pass.
+   ============================================================================ */
+
+/* Every search field in the app had its placeholder printed under the
+   magnifier: the icon-clearing padding lives on `.search-bar input` (0,1,1)
+   while the panel form rule that sets `padding` outright is (0,2,1), so it
+   won the cascade on specificity no matter the order. Same selectors, scoped
+   to the panel, so they outrank it. */
+.content-panel .search-bar input,
+.content-panel .project-search-input-wrap input,
+.content-panel .chat-search-wrap input,
+.ck-toolbar .search-bar input { padding-inline-start: var(--sp-8); }
+
+/* "4פרויקטים" — the number and its label were two inline spans with nothing
+   between them. A figure sits above its label, like every other KPI here. */
+.pipe-stat { display: flex; flex-direction: column; gap: 2px; }
+.pipe-stat-num { line-height: 1.15; font-variant-numeric: tabular-nums; }
+
+/* Numbered steps as a numeral in a chip, not as a keycap emoji. */
+.syscat-step-n {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; margin-inline-end: var(--sp-1);
+    border-radius: var(--r-pill); background: var(--accent-soft); color: var(--accent);
+    font-size: var(--fs-xs); font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.acct-soon-icon { font-size: 2rem; color: var(--text-3); margin-block-end: var(--sp-2); }
+
+/* Destructive actions that sit INSIDE a screen (wipe the catalog, sign out)
+   are rare and irreversible-looking; they were the loudest thing on their
+   screen. Red on hover, quiet until then. A red fill stays where it belongs:
+   the confirmation dialog, where it is the whole point. */
+#panel-settings .btn-danger,
+#panel-catalog .btn-danger {
+    background: transparent; color: var(--danger);
+    border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+}
+#panel-settings .btn-danger:hover,
+#panel-catalog .btn-danger:hover { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+/* The tiles view did nothing: setProjectsView toggles .grid-view on the list,
+   and the only rules for that class were in the legacy sale/styles.css, which
+   the app has not loaded since the V3 split. Same failure as the chat widget
+   and the certificate ticks — a class with nobody listening. */
+#panel-projects .projects-list.grid-view {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+    gap: var(--sp-3);
+    align-content: start;
+}
+#panel-projects .projects-list.grid-view .project-card {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: var(--sp-3);
+}
+#panel-projects .grid-view .project-card .project-info { grid-column: 1; grid-row: 1; }
+#panel-projects .grid-view .project-card .stage-chain { grid-column: 1; grid-row: 2; }
+#panel-projects .grid-view .project-card .project-endcap {
+    grid-column: 1; grid-row: 3; width: 100%;
+    justify-content: space-between;
+    padding-block-start: var(--sp-2);
+    border-block-start: 1px solid var(--border);
+}
+#panel-projects .grid-view .project-card .project-meta { gap: var(--sp-1) var(--sp-2); }

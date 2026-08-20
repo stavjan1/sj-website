@@ -121,8 +121,8 @@ function adminRefreshStatus() {
     const hasKey = !!getGeminiApiKey();
     const hasKey2 = !!getGeminiApiKeyBackup();
     if (keyEl) { keyEl.textContent = hasKey ? 'מוגדר ✓' : 'לא מוגדר'; keyEl.style.color = hasKey ? 'var(--color-success)' : 'var(--color-danger)'; }
-    if (key2El) { key2El.textContent = hasKey2 ? 'מוגדר ✓' : 'לא מוגדר'; key2El.style.color = hasKey2 ? 'var(--color-success)' : '#f0c040'; }
-    if (cloudEl) { cloudEl.textContent = googleAccessToken ? 'פעיל ✓' : 'לא מחובר'; cloudEl.style.color = googleAccessToken ? 'var(--color-success)' : '#f0c040'; }
+    if (key2El) { key2El.textContent = hasKey2 ? 'מוגדר ✓' : 'לא מוגדר'; key2El.style.color = hasKey2 ? 'var(--color-success)' : 'var(--warn-text)'; }
+    if (cloudEl) { cloudEl.textContent = googleAccessToken ? 'פעיל ✓' : 'לא מחובר'; cloudEl.style.color = googleAccessToken ? 'var(--color-success)' : 'var(--warn-text)'; }
 
     // Pre-fill existing values
     const keyInput = document.getElementById('admin-gemini-key');
@@ -229,7 +229,7 @@ function _applyAdminImport(report) {
     items.forEach(it => { if (upsertCatalogItem(it)) added++; });
     savePriceCatalog();
     if (status) {
-        status.style.display = 'block'; status.style.color = problems.length ? '#f0c040' : 'var(--color-success)';
+        status.style.display = 'block'; status.style.color = problems.length ? 'var(--warn-text)' : 'var(--color-success)';
         status.innerHTML = `✓ נוספו ${added} פריטים למאגר האישי.` +
             (headerSkipped ? ' שורת כותרת דולגה.' : '') +
             (problems.length ? `<br>${problems.length} שורות בפורמט לא מתאים.` : '');
@@ -322,7 +322,7 @@ async function adminRefreshUserList() {
             </div>`;
         }).join('');
     } catch (e) {
-        container.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה: ${e.message}</p>`;
+        container.innerHTML = `<p class="input-help" style="color:var(--danger);">שגיאה: ${e.message}</p>`;
     }
 }
 
@@ -350,7 +350,7 @@ async function adminToggleUser(btn) {
             : '<p class="input-help" style="margin:6px 0;">אין פרויקטים.</p>');
         body.dataset.loaded = '1';
     } catch (e) {
-        body.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה: ${e.message}</p>`;
+        body.innerHTML = `<p class="input-help" style="color:var(--danger);">שגיאה: ${e.message}</p>`;
     }
 }
 
@@ -429,7 +429,7 @@ function updateQuotaUI() {
     const arc = document.getElementById('quota-arc');
     if (arc) {
         arc.style.strokeDashoffset = offset;
-        arc.style.stroke = pct >= 100 ? '#f05252' : pct >= 75 ? '#f0c040' : 'var(--color-accent)';
+        arc.style.stroke = pct >= 100 ? 'var(--danger)' : pct >= 75 ? 'var(--warn-text)' : 'var(--color-accent)';
     }
     // No percent, no engine name — just how many AI requests were used today.
     const pctEl = document.getElementById('quota-pct');
@@ -701,7 +701,7 @@ function _adminTierStatus(msg, ok) {
     const el = document.getElementById('admin-tier-status');
     if (!el) return;
     el.style.display = '';
-    el.style.color = ok ? 'var(--color-success)' : '#f05252';
+    el.style.color = ok ? 'var(--color-success)' : 'var(--danger)';
     el.textContent = msg;
 }
 async function adminLookupTier() {
@@ -2655,9 +2655,9 @@ function persistSettings() {
 // awaitingPayment flag → "ממתין לתשלום"; marking paid sets status 'שולם'.
 const PIPELINE_COLS = [
     { key: 'planning', label: 'אפיון',        icon: 'fa-compass-drafting', accent: '#8aa0d8' },
-    { key: 'quote',    label: 'הצעה',         icon: 'fa-file-invoice',     accent: '#f0c040' },
+    { key: 'quote',    label: 'הצעה',         icon: 'fa-file-invoice',     accent: 'var(--warn-text)' },
     { key: 'executed', label: 'בוצע',         icon: 'fa-helmet-safety',    accent: '#34c759' },
-    { key: 'awaiting', label: 'ממתין לתשלום', icon: 'fa-hourglass-half',   accent: '#fb923c' },
+    { key: 'awaiting', label: 'ממתין לתשלום', icon: 'fa-hourglass-half',   accent: 'var(--warn-text)' },
     { key: 'paid',     label: 'שולם',         icon: 'fa-sack-dollar',      accent: '#22d3ee' },
 ];
 
@@ -2716,8 +2716,8 @@ function renderStatistics() {
     if (head) head.innerHTML = `
         <div class="pipe-stat"><span class="pipe-stat-num">${totalCount}</span><span class="pipe-stat-lbl">פרויקטים</span></div>
         <div class="pipe-stat"><span class="pipe-stat-num">${nis(totalValue)}</span><span class="pipe-stat-lbl">שווי צבר כולל</span></div>
-        <div class="pipe-stat"><span class="pipe-stat-num" style="color:#fb923c">${nis(openValue)}</span><span class="pipe-stat-lbl">פתוח (טרם שולם)</span></div>
-        <div class="pipe-stat"><span class="pipe-stat-num" style="color:#22d3ee">${nis(paidValue)}</span><span class="pipe-stat-lbl">שולם</span></div>`;
+        <div class="pipe-stat"><span class="pipe-stat-num" style="color:var(--warn-text)">${nis(openValue)}</span><span class="pipe-stat-lbl">פתוח (טרם שולם)</span></div>
+        <div class="pipe-stat"><span class="pipe-stat-num" style="color:var(--ok-text)">${nis(paidValue)}</span><span class="pipe-stat-lbl">שולם</span></div>`;
 }
 
 function pipelineAdvance(projectId, to, e) {
@@ -2776,7 +2776,7 @@ function renderAccounting() {
     const root = document.getElementById('acct-root');
     if (!root) return;
     if (!isSignedIn()) {
-        root.innerHTML = `<div class="acct-soon"><div class="acct-soon-icon">🔒</div><h3>נדרשת התחברות</h3>
+        root.innerHTML = `<div class="acct-soon"><div class="acct-soon-icon"><i class="fa-solid fa-lock" aria-hidden="true"></i></div><h3>נדרשת התחברות</h3>
             <p>התחבר עם חשבון Google כדי להפיק חשבוניות ולנהל חשבונות — הנתונים מסתנכרנים בין המכשירים.</p></div>`;
         return;
     }
@@ -2840,8 +2840,8 @@ function acctCashflowHtml() {
         </div>
         <div class="acct-kpis">
             <div class="acct-kpi"><span class="ak-num">${nisFmt(totalIssued)}</span><span class="ak-lbl">סה"כ הופק</span></div>
-            <div class="acct-kpi"><span class="ak-num" style="color:#22c984">${nisFmt(totalReceived)}</span><span class="ak-lbl">התקבל</span></div>
-            <div class="acct-kpi"><span class="ak-num" style="color:#fb923c">${nisFmt(totalIssued - totalReceived)}</span><span class="ak-lbl">פתוח</span></div>
+            <div class="acct-kpi"><span class="ak-num" style="color:var(--ok-text)">${nisFmt(totalReceived)}</span><span class="ak-lbl">התקבל</span></div>
+            <div class="acct-kpi"><span class="ak-num" style="color:var(--warn-text)">${nisFmt(totalIssued - totalReceived)}</span><span class="ak-lbl">פתוח</span></div>
             <div class="acct-kpi"><span class="ak-num">${paidDocs.length}</span><span class="ak-lbl">מסמכים</span></div>
         </div>
         <div class="cf-chart">${rows}</div>
@@ -2921,7 +2921,7 @@ function acctCreateHtml() {
                 <button class="btn btn-accent" id="acct-submit" onclick="acctSubmitDocument()"><i class="fa-solid fa-paper-plane"></i> הפק ב-SmartBee</button>
             </div>
             <p class="input-help" style="margin-top:8px;">המסמך מופק דרך SmartBee ומקבל מספר רשמי. מוגבל ל-${(5000).toLocaleString('he-IL')} ₪ למסמך בשלב זה.</p>
-            <p class="input-help" style="margin-top:6px;"><i class="fa-solid fa-palette" style="color:#2bb58a;"></i> מסמכי SmartBee מופקים בצבע <b style="color:#2bb58a;">טורקיז</b> כברירת מחדל. לשינוי הצבע יש להתחבר לאתר שלהם: <a href="https://test.smartbee.co.il" target="_blank" rel="noopener" dir="ltr">test.smartbee.co.il</a></p>
+            <p class="input-help" style="margin-top:6px;"><i class="fa-solid fa-palette" style="color:var(--ok-text);"></i> מסמכי SmartBee מופקים בצבע <b style="color:var(--ok-text);">טורקיז</b> כברירת מחדל. לשינוי הצבע יש להתחבר לאתר שלהם: <a href="https://test.smartbee.co.il" target="_blank" rel="noopener" dir="ltr">test.smartbee.co.il</a></p>
         </div>
         <div class="acct-preview-pane">
             <div class="designer-preview-label"><i class="fa-solid fa-eye"></i> כך ייראה המסמך</div>
@@ -3222,7 +3222,7 @@ async function acctLoadProvider() {
         _acctProviderSel = (d.current && d.current.provider) || 'smartbee';
         acctRenderProvider(d.current);
     } catch (e) {
-        root.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה: ${e.message}</p>`;
+        root.innerHTML = `<p class="input-help" style="color:var(--danger);">שגיאה: ${e.message}</p>`;
     }
 }
 function acctRenderProvider(current) {
@@ -3247,7 +3247,7 @@ function acctRenderProvider(current) {
         <div class="acct-sub">בחר ספק חשבוניות</div>
         <div class="prov-cards">${cards}</div>
         ${selMeta ? `<div class="acct-sub" style="margin-top:14px;">פרטי חיבור — ${escapeHtml(selMeta.name)}</div>${fields || '<p class="input-help">אין צורך בפרטים — משתמשים בחשבון המערכת.</p>'}` : ''}
-        ${current && current.hasCredentials ? '<p class="input-help" style="color:#22c984;margin-top:6px;">✓ פרטי חיבור שמורים</p>' : ''}
+        ${current && current.hasCredentials ? '<p class="input-help" style="color:var(--ok-text);margin-top:6px;">✓ פרטי חיבור שמורים</p>' : ''}
         <button class="btn btn-accent btn-small" style="margin-top:12px;" onclick="acctSaveProvider()"><i class="fa-solid fa-check"></i> שמור ספק</button>`;
 }
 function acctSelectProvider(id) { _acctProviderSel = id; acctRenderProvider(null); }
@@ -3435,14 +3435,14 @@ function renderFollowupReminders() {
         const isPayment = (p.status || '') === 'הושלם';
         const hasContact = !!(p.clientEmail || p.clientPhone);
         const contactLine = hasContact
-            ? `<span class="fu-contact">${p.clientEmail ? '📧 ' + escapeHtml(p.clientEmail) : ''}${p.clientEmail && p.clientPhone ? ' · ' : ''}${p.clientPhone ? '📱 ' + escapeHtml(p.clientPhone) : ''}</span>`
+            ? `<span class="fu-contact">${p.clientEmail ? '<i class="fa-solid fa-envelope" aria-hidden="true"></i> ' + escapeHtml(p.clientEmail) : ''}${p.clientEmail && p.clientPhone ? ' · ' : ''}${p.clientPhone ? '<i class="fa-solid fa-mobile-screen" aria-hidden="true"></i> ' + escapeHtml(p.clientPhone) : ''}</span>`
             : `<span class="fu-contact-capture">
                 <input type="email" id="fu-email-${p.id}" placeholder="אימייל הלקוח" onclick="event.stopPropagation()">
                 <input type="tel" id="fu-phone-${p.id}" placeholder="נייד הלקוח" onclick="event.stopPropagation()">
                 <button class="btn btn-secondary btn-small" onclick="saveFollowupContact('${p.id}', event)">שמור</button>
                </span>`;
         const advanceBtn = isPayment
-            ? `<button class="btn btn-secondary btn-small" onclick="setProjectStatus('${p.id}', 'שולם', event)" title="הלקוח שילם">💰 סמן שולם</button>`
+            ? `<button class="btn btn-secondary btn-small" onclick="setProjectStatus('${p.id}', 'שולם', event)" title="הלקוח שילם"><i class="fa-solid fa-coins" aria-hidden="true"></i> סמן שולם</button>`
             : `<button class="btn btn-secondary btn-small" onclick="setProjectStatus('${p.id}', 'הושלם', event)" title="ההצעה אושרה">✓ סמן הושלם</button>`;
         return `<div class="followup-row">
             <div class="fu-info">
@@ -5023,7 +5023,7 @@ async function renderAdminStats() {
             ? `<table class="admin-stats-tbl"><thead><tr><th>סוג עבודה</th><th>מקצוע</th><th>דגימות</th><th>טווח (עבודה)</th><th>חציון</th><th>עם שם</th></tr></thead><tbody>${rows}</tbody></table>`
             : '<p class="input-help">עוד לא נאספו נתונים. כל הורדת PDF תתחיל למלא את הטבלה.</p>';
     } catch (e) {
-        if (kpis) kpis.innerHTML = `<span class="input-help" style="color:#f05252;">שגיאה: ${e.message}</span>`;
+        if (kpis) kpis.innerHTML = `<span class="input-help" style="color:var(--danger);">שגיאה: ${e.message}</span>`;
     }
 }
 async function adminSetStatsLive(on) {
@@ -5213,7 +5213,7 @@ async function renderAdminTraffic() {
         _adminTrafficData = d;
         if (box) box.innerHTML = adminTrafficHtml(d);
     } catch (e) {
-        if (box) box.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה: ${escapeHtml(e.message)}</p>`;
+        if (box) box.innerHTML = `<p class="input-help" style="color:var(--danger);">שגיאה: ${escapeHtml(e.message)}</p>`;
     }
     if (clarityBox) renderAdminClarity();
     renderAdminAi();
@@ -5254,7 +5254,7 @@ async function renderAdminAi() {
         _adminAiData = d.ai || null;
         box.innerHTML = _adminAiData ? aiPanelHtml(_adminAiData) : '<p class="input-help">אין נתונים עדיין.</p>';
     } catch (e) {
-        box.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה: ${escapeHtml(e.message)}</p>`;
+        box.innerHTML = `<p class="input-help" style="color:var(--danger);">שגיאה: ${escapeHtml(e.message)}</p>`;
     }
 }
 
@@ -5360,7 +5360,7 @@ async function renderAdminModels() {
         _modelsData = d;
         box.innerHTML = modelsPanelHtml(d);
     } catch (e) {
-        box.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה: ${escapeHtml(e.message)}</p>`;
+        box.innerHTML = `<p class="input-help" style="color:var(--danger);">שגיאה: ${escapeHtml(e.message)}</p>`;
     }
 }
 
@@ -5423,7 +5423,7 @@ async function runModelTraps(which) {
             </div>${rows}
             <p class="input-help">המלכודות מסננות כשלים שכבר ראינו — הן לא תעודת איכות. עבר = שווה מבט אנושי, לא "מאושר".</p>`;
     } catch (e) {
-        box.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה: ${escapeHtml(e.message)}</p>`;
+        box.innerHTML = `<p class="input-help" style="color:var(--danger);">שגיאה: ${escapeHtml(e.message)}</p>`;
     }
 }
 
@@ -5568,7 +5568,7 @@ async function renderAdminClarity() {
             ${frictionRows}
             ${pages}`);
     } catch (e) {
-        box.innerHTML = `<p class="input-help" style="color:#f05252;">שגיאה במפת החום: ${escapeHtml(e.message)}</p>`;
+        box.innerHTML = `<p class="input-help" style="color:var(--danger);">שגיאה במפת החום: ${escapeHtml(e.message)}</p>`;
     }
 }
 
@@ -5946,7 +5946,7 @@ function maybeShowBizGate() {
     m.className = 'upgrade-modal-backdrop';
     m.innerHTML = `
         <div class="onboard-box" role="dialog" aria-modal="true">
-            <div class="ob-bolt">💼</div>
+            <div class="ob-bolt"><i class="fa-solid fa-briefcase" aria-hidden="true"></i></div>
             <h2>שההצעות יישאו את השם שלך?</h2>
             <p class="ob-sub">שם העסק, טלפון ולוגו יופיעו על כל הצעה ודוח שתפיק — ממלאים פעם אחת וזהו.
             אפשר גם לדלג ולמלא מתי שבא לך, שום דבר לא נחסם.</p>
@@ -6574,7 +6574,7 @@ function _applyCatalogImport(report) {
     }
     if (capSkipped) parts.push(`${capSkipped} שורות דולגו — המאגר במסלול שלך מוגבל ל-${capNow} פריטים.`);
     if (capSkipped && capNow < PERSONAL_CATALOG_MAX) setTimeout(() => showUpgradeModal('catalog'), 600);
-    show(problems.length || capSkipped ? '#f0c040' : 'var(--color-success)', parts.join('<br>'));
+    show(problems.length || capSkipped ? 'var(--warn-text)' : 'var(--color-success)', parts.join('<br>'));
     showToast(`${added} פריטים יובאו למאגר`);
 }
 
