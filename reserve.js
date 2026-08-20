@@ -118,13 +118,29 @@
     var cert = overlay.querySelector('.sj-mil-cert');
     var prevOverflow = '';
 
+    // A certificate is looked at, not scrolled — so when the screen is short
+    // (a laptop at 125% system scaling is the common case) the whole card is
+    // scaled down to fit instead of being cut off. Below 0.62 it stops
+    // shrinking and the overlay scrolls, because past that nothing is legible.
+    function fit() {
+      cert.style.transform = 'none';
+      var avail = window.innerHeight - 24;
+      var h = cert.offsetHeight;
+      if (!h) return;
+      var s = Math.min(1, avail / h);
+      cert.style.transform = s < 0.999 ? 'scale(' + Math.max(0.62, s).toFixed(3) + ')' : 'none';
+    }
+
     function open() {
       prevOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
       overlay.classList.add('open');
+      fit();
+      window.addEventListener('resize', fit);
       closeBtn.focus();
     }
     function close() {
+      window.removeEventListener('resize', fit);
       overlay.classList.remove('open');
       document.body.style.overflow = prevOverflow;
       badge.focus();

@@ -3030,3 +3030,86 @@ i[class^="fa-"], i[class*=" fa-"] {
 .metric-info { display: flex; flex-direction: column; min-width: 0; }
 .metric-label { font-size: var(--fs-xs); color: var(--text-3); font-weight: 500; }
 .metric-value { font-size: var(--fs-xl); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+
+/* ============================================================================
+   V3.1 — the projects list, calmed down.
+   The row had a border around every word and a second border inside it: each
+   chip was a bordered pill wrapping a <select> that drew its own box and its
+   own arrow. Add the stage buttons, the status pill and a red-filled delete,
+   and one project carried nine outlines. Rule for this screen: a box means
+   "this is a control you are about to press" — everything else is text.
+   ============================================================================ */
+
+/* Three lines, aligned: name + status · one meta line · the stage chain. */
+#panel-projects .project-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--sp-2) var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+}
+#panel-projects .project-card .project-info { grid-column: 1; grid-row: 1; flex: initial; }
+#panel-projects .project-card .project-endcap { grid-column: 2; grid-row: 1; margin-inline-start: 0; }
+#panel-projects .project-card .stage-chain {
+    grid-column: 1 / -1; grid-row: 2;
+    justify-content: flex-start; flex: initial;
+}
+#panel-projects .project-title { font-size: var(--fs-md); line-height: 1.35; }
+#panel-projects .project-meta { gap: var(--sp-1) var(--sp-2); color: var(--text-3); }
+
+/* Chips: an icon and a word. The control appears when you point at it. */
+#panel-projects .proj-cat-chip,
+#panel-projects .proj-client-chip {
+    border-color: transparent; background: transparent; padding: 2px 6px;
+    color: var(--text-3);
+    transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+#panel-projects .proj-cat-chip:hover,
+#panel-projects .proj-client-chip:hover,
+#panel-projects .proj-cat-chip:focus-within,
+#panel-projects .proj-client-chip:focus-within {
+    background: var(--surface-2); border-color: var(--border);
+}
+#panel-projects .proj-cat-chip.has-cat,
+#panel-projects .proj-client-chip.has-cat { color: var(--accent); background: transparent; border-color: transparent; }
+#panel-projects .proj-cat-select {
+    border: none; background-color: transparent; box-shadow: none;
+    min-height: 24px; padding-block: 0; padding-inline-end: 0;
+    color: inherit; font-size: var(--fs-xs); font-weight: 500;
+}
+#panel-projects .proj-cat-select:focus { outline: none; }
+
+/* The stage chain reads as a path, not as three buttons in a row. */
+#panel-projects .stage-step {
+    border: 1px solid transparent; background: none; color: var(--text-3);
+    padding: 4px 10px; border-radius: var(--r-pill); font-weight: 600;
+}
+#panel-projects .stage-step:hover { background: var(--surface-2); color: var(--text); border-color: transparent; }
+#panel-projects .stage-step.done { color: var(--ok-text); border-color: transparent; }
+#panel-projects .stage-step.current { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+#panel-projects .stage-step.locked { opacity: 0.45; }
+#panel-projects .stage-arrow { color: var(--border-strong); }
+
+/* Deleting is rare and irreversible-looking; it should not be the loudest
+   thing on the row. Red on hover, quiet until then. */
+#panel-projects .project-endcap .btn-danger {
+    background: transparent; color: var(--text-3); border: 1px solid transparent;
+    padding-inline: var(--sp-2);
+}
+#panel-projects .project-endcap .btn-danger:hover { background: transparent; color: var(--danger); }
+
+/* The toolbar above the list: one search field with a box, sort and filter as
+   text. Five outlined pills in a row was most of the noise on the screen. */
+#panel-projects .project-search-row .btn-secondary {
+    background: transparent; border-color: transparent; color: var(--text-3); font-weight: 600;
+}
+#panel-projects .project-search-row .btn-secondary:hover { color: var(--text); background: var(--surface-2); }
+#panel-projects .project-search-row .btn-secondary.active,
+#panel-projects .project-search-row .btn-secondary[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); }
+#panel-projects .project-filter-select { border-color: transparent; background-color: transparent; color: var(--text-3); }
+#panel-projects .project-filter-select:hover { border-color: var(--border); background-color: var(--surface-2); }
+
+/* A fresh account has no categories yet, and the column drew an empty bordered
+   box above the list. Nothing to show, nothing to draw. */
+.projects-cats:empty { display: none; }

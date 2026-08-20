@@ -179,17 +179,26 @@ body:not(.in-project-stage) .project-rail { display: none !important; }
 @media (min-width: 769px) {
   #more-drawer {
     position: fixed; inset-block: 0; inset-inline-start: 76px;
-    width: 280px; transform: translateX(100%); /* RTL: off toward the rail */
+    width: 280px;
+    /* The sheet rests BESIDE the rail, so sliding it out by its own width
+       leaves exactly the rail's width of it on screen — 76px of closed drawer
+       sitting on top of the icon rail, which is why the rail looked missing.
+       It has to travel its own width PLUS the rail. visibility is belt and
+       braces: whatever the arithmetic, a closed drawer draws nothing. */
+    transform: translateX(calc(100% + 76px));
+    visibility: hidden;
     background: var(--surface); border-inline-end: 1px solid var(--border);
-    transition: transform var(--t-med);
+    transition: transform var(--t-med), visibility 0s linear var(--t-med);
     /* MUST outrank the shared backdrop (z-drawer + 1 in panels.css) — with the
        drawer below it, clicks land on the backdrop and every item is dead. */
     z-index: calc(var(--z-drawer) + 2); overflow-y: auto; padding: var(--sp-6) var(--sp-4);
   }
-  [dir="rtl"] #more-drawer { transform: translateX(100%); }
+  [dir="rtl"] #more-drawer { transform: translateX(calc(100% + 76px)); }
   /* The RTL base rule above is (1,1,1) specific — the open state must match
      it or it silently loses the cascade and the drawer opens as a sliver. */
-  #more-drawer.open, [dir="rtl"] #more-drawer.open { transform: none; }
+  #more-drawer.open, [dir="rtl"] #more-drawer.open {
+    transform: none; visibility: visible; transition: transform var(--t-med), visibility 0s;
+  }
   #more-drawer-backdrop {
     position: fixed; inset: 0; background: var(--scrim);
     opacity: 0; pointer-events: none; transition: opacity var(--t-med);

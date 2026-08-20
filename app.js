@@ -2,12 +2,28 @@
 // Loaded by every marketing page. No dependencies.
 
 document.addEventListener('DOMContentLoaded', () => {
+    initThemeToggle();
     initMobileNav();
     initReveal();
     initShowMore('btn-show-more-services', '.extra-service-card', 'הצג עוד שירותים', 'הצג פחות');
     initShowMore('btn-show-more-guides', '.extra-guide-card', 'הצג עוד מדריכים', 'הצג פחות');
     initContactForm();
 });
+
+// The site follows the operating system by default; this is the manual
+// override, remembered per browser. Nothing is stored until it is used, so a
+// visitor who never touches it keeps following their system.
+function initThemeToggle() {
+    const btn = document.getElementById('theme-toggle');
+    if (!btn) return;
+    const systemDark = () => window.matchMedia('(prefers-color-scheme: dark)').matches;
+    btn.addEventListener('click', () => {
+        const now = document.documentElement.getAttribute('data-theme') || (systemDark() ? 'dark' : 'light');
+        const next = now === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        try { localStorage.setItem('sj_theme', next); } catch (e) { /* private mode */ }
+    });
+}
 
 function initMobileNav() {
     const toggle = document.getElementById('nav-toggle');
