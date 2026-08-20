@@ -219,7 +219,7 @@ body:not(.in-project-stage) .project-rail { display: none !important; }
     z-index: var(--z-nav);
     overflow: visible;
   }
-  .sidebar-logo, .sidebar-footer, .nav-proj-label { display: none; }
+  .sidebar-logo, .nav-proj-label { display: none; }
   .nav-menu { flex-direction: row; justify-content: space-around; gap: 0; width: 100%; }
   .nav-btn { flex: 1; min-height: 60px; border-radius: 0; }
   .nav-btn.active::before {
@@ -228,7 +228,15 @@ body:not(.in-project-stage) .project-rail { display: none !important; }
   }
   .step-num { display: none; }
   /* only the field-core tabs + "more" live in the bar */
-  .nav-btn:not(.mobile-core):not(.nav-more-btn):not(#tab-reminders) { display: none; }
+  /* Four destinations fit a phone's bottom bar, which is exactly why the
+     drawer could go. Project-scoped tabs still appear only inside a project
+     (.proj-tab is toggled by the app), so the bar never holds more than five. */
+  .nav-btn.mobile-hide { display: none; }
+  /* The account lives in the bar as your photo alone — the name and role are
+     in the menu it opens, and a phone bar has no room to say them twice. */
+  .sidebar-footer { display: flex; align-items: center; padding: 0 var(--sp-1); }
+  .sidebar-footer .user-chip { width: auto; padding: var(--sp-1); }
+  .sidebar-footer .user-chip-info { display: none; }
   .main-content { padding: var(--sp-4) var(--sp-4) calc(76px + env(safe-area-inset-bottom)); }
   #project-banner { padding-inline: var(--sp-4); }
 }

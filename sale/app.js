@@ -53,43 +53,23 @@ function signupMailNote(d) {
 function showAdminTabIfNeeded() {
     const adminTab = document.getElementById('tab-admin');
     if (adminTab) adminTab.style.display = isAdmin() ? 'flex' : 'none';
-    const drawerAdmin = document.getElementById('more-drawer-admin');
-    if (drawerAdmin) drawerAdmin.style.display = isAdmin() ? 'flex' : 'none';
-    // Finance dashboard (תזרים) — owner only, same gate.
-    const financeTab = document.getElementById('tab-finance');
-    if (financeTab) financeTab.style.display = isAdmin() ? 'flex' : 'none';
-    const drawerFinance = document.getElementById('more-drawer-finance');
-    if (drawerFinance) drawerFinance.style.display = isAdmin() ? 'flex' : 'none';
+    // The cash view is owner-only, and it is a sub-view of כסף now rather than
+    // a menu entry of its own.
+    const flowTab = document.getElementById('money-tab-flow');
+    if (flowTab) flowTab.hidden = !isAdmin();
     // Signing in as the owner excludes this device from the traffic counters
     // from here on — otherwise Stav's own visits are the traffic.
     if (isAdmin()) { try { localStorage.setItem('sj_notrack', '1'); } catch (e) {} }
 }
 
-// ==========================================================================
-// Mobile "עוד" drawer — the tabs beyond the field workflow (projects/chat/quote)
-// ==========================================================================
+// The "עוד" drawer is gone: four destinations fit in the rail, and a drawer
+// with ten entries is a menu that gave up. These stay as no-ops/aliases so any
+// leftover caller keeps working instead of throwing.
 const MOBILE_CORE_TABS = ['projects', 'wizard', 'create'];
-
-function toggleMoreDrawer() {
-    const drawer = document.getElementById('more-drawer');
-    if (!drawer) return;
-    drawer.classList.contains('open') ? closeMoreDrawer() : openMoreDrawer();
-}
-
-function openMoreDrawer() {
-    document.getElementById('more-drawer')?.classList.add('open');
-    document.getElementById('more-drawer-backdrop')?.classList.add('open');
-}
-
-function closeMoreDrawer() {
-    document.getElementById('more-drawer')?.classList.remove('open');
-    document.getElementById('more-drawer-backdrop')?.classList.remove('open');
-}
-
-function navFromDrawer(tabId) {
-    closeMoreDrawer();
-    switchTab(tabId);
-}
+function toggleMoreDrawer() { /* no drawer any more */ }
+function openMoreDrawer() { /* no drawer any more */ }
+function closeMoreDrawer() { /* no drawer any more */ }
+function navFromDrawer(tabId) { switchTab(tabId); }
 
 function adminSaveGeminiKey() {
     const key = (document.getElementById('admin-gemini-key')?.value || '').trim();
@@ -1122,7 +1102,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (vatSel) vatSel.addEventListener('change', () => rememberQuotePref('vatType', vatSel.value));
         markActivePdfTemplate(); // highlight the saved design template pill
         setProjectsView(localStorage.getItem('sj_projects_view') || 'list'); // restore list/grid choice
-        syncTopNav('projects'); // seed the desktop top-bar world + sub-tab row
         setTimeout(showWelcomeOnboarding, 900); // first-run walkthrough (once)
         setTimeout(checkAskHandoff, 1100); // continue a job from the /ask/ quick-chat
     }
@@ -1524,62 +1503,12 @@ function formatHebrewDate(dateString) {
 // content panels are unchanged; this only regroups how you reach them. The old
 // sidebar stays as the MOBILE nav; the top bar takes over on desktop.
 // ==========================================================================
-const NAV_WORLDS = {
-    projects:   { label: 'ניהול פרויקטים', icon: 'fa-folder-open', tabs: [
-        { id: 'projects',   label: 'פרויקטים',        icon: 'fa-list-check' },
-        { id: 'statistics', label: 'סטטיסטיקה',       icon: 'fa-chart-column' },
-        { id: 'archive',    label: 'ארכיון לקוחות',   icon: 'fa-users' },
-        { id: 'history',    label: 'היסטוריית הצעות', icon: 'fa-clock-rotate-left' },
-        { id: 'checkups',   label: 'שירות תקופתי',    icon: 'fa-calendar-check' },
-    ] },
-    accounting: { label: 'הנהלת חשבונות', icon: 'fa-file-invoice-dollar', bee: true, tabs: [
-        { id: 'accounting', label: 'חשבוניות וסליקה', icon: 'fa-receipt' },
-    ] },
-    prefs:      { label: 'העדפות', icon: 'fa-sliders', tabs: [
-        { id: 'business', label: 'פרטי עסק',      icon: 'fa-briefcase' },
-        { id: 'catalog',  label: 'מאגר מחירים',   icon: 'fa-tags' },
-        { id: 'settings', label: 'הגדרות מערכת',  icon: 'fa-gear' },
-    ] },
-};
-const TAB_WORLD = {
-    projects: 'projects', wizard: 'projects', create: 'projects', reports: 'projects',
-    history: 'projects', statistics: 'projects', checkups: 'projects', archive: 'projects',
-    accounting: 'accounting',
-    business: 'prefs', catalog: 'prefs', settings: 'prefs', admin: 'prefs',
-};
-let activeWorld = 'projects';
-
-function switchWorld(world) {
-    if (!NAV_WORLDS[world]) return;
-    activeWorld = world;
-    let target;
-    if (world === 'projects') target = activeProjectId ? 'wizard' : 'projects';
-    else if (world === 'accounting') target = 'accounting';
-    else target = 'business';
-    switchTab(target); // switchTab re-syncs the world + sub-tab row
-}
-function syncTopNav(tabId) {
-    const world = TAB_WORLD[tabId] || 'projects';
-    activeWorld = world;
-    document.querySelectorAll('.topnav-world').forEach(b => b.classList.toggle('active', b.dataset.world === world));
-    renderSubTabs(tabId);
-}
-function renderSubTabs(activeTabId) {
-    const row = document.getElementById('topnav-sub');
-    if (!row) return;
-    let tabs = (NAV_WORLDS[activeWorld].tabs || []).slice();
-    if (activeWorld === 'prefs' && isAdmin()) tabs.push({ id: 'admin', label: 'ניהול (Admin)', icon: 'fa-shield-halved' });
-    // Inside an open project the flow steps live in the right-side stage rail
-    // (renderProjectRail), not here — keeps the top sub-row for world-level tabs.
-    let cur = activeTabId || (document.querySelector('.content-panel.active') || {}).id?.replace('panel-', '') || 'projects';
-    // While inside a project (wizard/create/reports), keep "פרויקטים" the active,
-    // hugged sub-tab so it's clear which world you're in.
-    if (['wizard', 'create', 'reports'].includes(cur)) cur = 'projects';
-    row.innerHTML = tabs.map(t =>
-        `<button class="topnav-sub-btn ${t.step ? 'is-step' : ''} ${t.id === cur ? 'active' : ''}" data-tab="${t.id}" onclick="switchTab('${t.id}')"><i class="fa-solid ${t.icon}"></i> ${t.label}</button>`
-    ).join('');
-}
-
+// The desktop top bar and its world/sub-tab machinery were removed in the V3
+// shell; NAV_WORLDS, TAB_WORLD, switchWorld, syncTopNav and renderSubTabs were
+// left behind, describing a navigation that no longer exists — and a stale map
+// of screens is worse than none, because tests and people both read it as the
+// truth. The rail is the navigation now: four destinations and the project's
+// own stage rail.
 
 // ==========================================================================
 // The account menu and the back button.
@@ -1662,7 +1591,64 @@ function updateBackButton() {
     if (btn) btn.hidden = navBackStack.length === 0;
 }
 
+
+// ==========================================================================
+// לקוחות and כסף — one destination each, two views inside.
+//
+// The client archive and the periodic-service list were separate screens over
+// the same people; invoices and the cash view were separate screens over the
+// same money. Neither renderer changed — they draw into two views of one
+// panel now, and the old tab names still work so every deep link, reminder
+// and toast that says switchTab('checkups') lands where it always did.
+// ==========================================================================
+function setClientsView(view) {
+    const list = document.getElementById('clients-view-list');
+    const chk = document.getElementById('clients-view-checkups');
+    if (!list || !chk) return;
+    const onChk = view === 'checkups';
+    list.hidden = onChk;
+    chk.hidden = !onChk;
+    document.querySelectorAll('#panel-clients .subtab').forEach((b) => {
+        const on = b.dataset.sub === (onChk ? 'checkups' : 'list');
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', String(on));
+    });
+    try { onChk ? renderCheckups() : renderClientArchive(); } catch (e) {}
+}
+
+function setMoneyView(view) {
+    const docs = document.getElementById('money-view-docs');
+    const flow = document.getElementById('money-view-flow');
+    if (!docs || !flow) return;
+    const onFlow = view === 'flow';
+    docs.hidden = onFlow;
+    flow.hidden = !onFlow;
+    document.querySelectorAll('#panel-money .subtab').forEach((b) => {
+        const on = b.dataset.sub === (onFlow ? 'flow' : 'docs');
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', String(on));
+    });
+    try { onFlow ? (window.renderFinance && window.renderFinance()) : renderAccounting(); } catch (e) {}
+}
+
+// How many clients are due — the number on the "שירות תקופתי" view.
+function updateClientsDueCount() {
+    const el = document.getElementById('clients-due-count');
+    if (!el) return;
+    let n = 0;
+    try { n = (typeof ckDueSoonClients === 'function' ? ckDueSoonClients() : []).length; } catch (e) { n = 0; }
+    el.textContent = n > 99 ? '99+' : String(n);
+    el.hidden = !n;
+}
+
 function switchTab(tabId, opts) {
+    // Old names, new homes. Every existing caller keeps working.
+    let subView = null;
+    if (tabId === 'archive') { tabId = 'clients'; subView = 'list'; }
+    else if (tabId === 'checkups') { tabId = 'clients'; subView = 'checkups'; }
+    else if (tabId === 'accounting') { tabId = 'money'; subView = 'docs'; }
+    else if (tabId === 'finance') { tabId = 'money'; subView = 'flow'; }
+
     // Pipeline is a view of the work list; leaving it re-marks the toggle.
     if (tabId === 'projects' || tabId === 'statistics') setTimeout(() => {
         if (typeof setProjectsView === 'function') setProjectsView(projectsView);
@@ -1702,9 +1688,6 @@ function switchTab(tabId, opts) {
     });
     const targetTabBtn = document.getElementById(`tab-${tabId}`);
     if (targetTabBtn) targetTabBtn.classList.add('active');
-    // On mobile, tabs living inside the "עוד" drawer light up the More button.
-    const moreBtn = document.getElementById('tab-more');
-    if (moreBtn) moreBtn.classList.toggle('active', !MOBILE_CORE_TABS.includes(tabId));
     
     // Update content panels visibility
     document.querySelectorAll('.content-panel').forEach(panel => {
@@ -1716,9 +1699,7 @@ function switchTab(tabId, opts) {
     if (tabId === 'history') {
         renderHistoryList();
     }
-    if (tabId === 'archive') {
-        renderClientArchive();
-    }
+
     if (tabId === 'create') {
         ensureQuoteNumber();
         requestAnimationFrame(fitQuotePreview); // scale the A4 preview to fit the pane
@@ -1746,20 +1727,16 @@ function switchTab(tabId, opts) {
     if (tabId === 'statistics') {
         renderStatistics();
     }
-    if (tabId === 'checkups') {
-        renderCheckups();
+    if (tabId === 'clients') {
+        setClientsView(subView || 'list');
+        updateClientsDueCount();
     }
-    if (tabId === 'accounting') {
-        renderAccounting();
-    }
-    if (tabId === 'finance') {
-        try { window.renderFinance && window.renderFinance(); } catch (e) {}
+    if (tabId === 'money') {
+        setMoneyView(subView || 'docs');
     }
     if (tabId === 'wizard') {
         try { renderPricingEngine(); } catch (e) {}
     }
-    // Keep the top-bar world + sub-tab row in sync with whatever panel is shown.
-    syncTopNav(tabId);
     // Refresh the in-project rail's active step (desktop stage nav).
     updateProjectRail();
 }
@@ -2517,7 +2494,7 @@ function openAccountingForProject(projectId, docType) {
     acctDraftProjectId = projectId;
     acctSection = 'create';
     acctVatBasis = 'exclude';
-    switchWorld('accounting');
+    switchTab('money');
     setTimeout(() => {
         const dt = document.getElementById('acct-doctype');
         if (dt && docType) dt.value = docType;

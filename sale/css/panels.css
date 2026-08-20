@@ -3293,3 +3293,21 @@ i[class^="fa-"], i[class*=" fa-"] {
 .projects-history-link a { color: var(--text-3); }
 .projects-history-link a:hover { color: var(--accent); }
 .projects-history-link[hidden] { display: none; }
+
+/* Sub-views inside a destination: one place, two ways of looking at it. */
+.subtabs { display: flex; gap: var(--sp-1); margin-block-end: var(--sp-4); border-block-end: 1px solid var(--border); }
+.subtab {
+    position: relative; min-height: 40px; padding: 0 var(--sp-4);
+    background: none; border: none; border-block-end: 2px solid transparent;
+    color: var(--text-3); font: 600 var(--fs-sm) var(--font-ui); cursor: pointer;
+    display: inline-flex; align-items: center; gap: var(--sp-2);
+}
+.subtab:hover { color: var(--text); }
+.subtab.active { color: var(--text); border-block-end-color: var(--accent); }
+.subtab .sub-count {
+    min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-pill);
+    background: var(--accent-soft); color: var(--accent);
+    display: inline-grid; place-items: center; font-size: 11px; font-weight: 800;
+}
+.subtab .sub-count[hidden] { display: none; }
+@media (max-width: 560px) { .subtab { padding: 0 var(--sp-3); font-size: var(--fs-xs); } }
