@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
 
 import {
   hydrate, norm, searchMaterials, categoryStats, renderMaterialsBlock,
-  renderTaxonomyBlock,
+  renderTaxonomyBlock, searchMaterialsMulti, extractItemQueries,
 } from '../functions/api/_materials.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -239,6 +239,81 @@ test('a rating matches with or without its unit letter', () => {
     assert.ok(r.some((h) => /מא"ז|אוטומט|מפ"ז/.test(h.name)),
       `${q} returned non-breakers: ${r.map((h) => h.name).join(' | ')}`);
   }
+});
+
+// --------------------------------------------------------------------------
+// Retrieval on a real pricing handoff — where this search actually earns its pay
+// --------------------------------------------------------------------------
+
+// The pricing turn does not send "כבל 5x6". It sends the approved scope plus a
+// product list, ~500 characters. Searched as one blob, the coverage weight
+// (covered/concepts)² collapsed — an item matching the two words that mattered
+// scored (2/60)² and lost to anything sharing six incidental words. Measured
+// output was charging stations and cable lugs, with none of the actual BOM.
+const HANDOFF = `אשר את התמחור לפרויקט: התקנת עמדת טעינה לרכב חשמלי 11kW תלת פאזי בבית משותף.
+אפיון מאושר: המרחק מלוח הדירה לחניה כ-25 מטר, מעבר דרך פיר תקשורת קיים ואז תעלה בחניון,
+קידוח אחד דרך קיר בטון, יש מקום פנוי בלוח, חיבור תלת פאזי 3x25.
+רשימת מוצרים: עמדת טעינה 11kW, כבל N2XY 5x4, ממסר פחת Type A-EV 4x40 30mA, מא"ז 3x20,
+מפסק פקט, צינור מריכף 16, צינור גמיש לבן PG 21 לפניות, קופסת חיבורים, נעלי כבל.`;
+
+test('a job description is cut into the items it is made of', () => {
+  const qs = extractItemQueries(HANDOFF);
+  assert.ok(qs.length >= 8, `only ${qs.length} item queries from a 9-item list`);
+  const joined = qs.join(' | ');
+  assert.ok(/PG 21/.test(joined), `PG 21 not extracted: ${joined}`);
+  assert.ok(/מריכף 16/.test(joined), `מריכף 16 not extracted: ${joined}`);
+  // The prose above the list must not survive as a "product".
+  assert.ok(!qs.some((q) => q.length > 60));
+});
+
+test('every line of a real BOM gets found', () => {
+  const hits = searchMaterialsMulti(db, extractItemQueries(HANDOFF), 3, 45);
+  const must = [
+    ['PG 21',      /PG\s?21|EL-022/],
+    ['מריכף 16',   /מריכף 16/],
+    ['כבל 5x4',    /5X4|5x4/],
+    ['ממסר פחת',   /^ממסר פחת/],
+    ['מפסק פקט',   /פקט/],
+    ['מא"ז 3x20',  /3X20|3x20/],
+  ];
+  const missing = must.filter(([, rx]) => !hits.some((h) => rx.test(h.name))).map(([n]) => n);
+  assert.equal(missing.length, 0,
+    `BOM lines the search could not find, all of which ARE in the catalog: ${missing.join(', ')}`);
+});
+
+test('the block sizes itself to the job, not to the catalog', () => {
+  // This is the whole answer to "don't flood the model": a 3-item job must not
+  // cost what a 20-item job costs.
+  const small = searchMaterialsMulti(db, extractItemQueries('רשימת מוצרים: כבל N2XY 5x6, מא"ז 3x25'), 3, 45);
+  const big = searchMaterialsMulti(db, extractItemQueries(HANDOFF), 3, 45);
+  assert.ok(small.length < big.length / 2,
+    `a 2-item job returned ${small.length} rows against ${big.length} for a 9-item job`);
+});
+
+test('a misspelling still finds the product', () => {
+  // Hebrew typos are mostly homophone swaps (ח/כ, ט/ת, א/ע/ה) plus dropped
+  // letters. Both classes are repaired against the catalog's own vocabulary.
+  for (const [typo, rx] of [['מולטמטר', /מולטימטר/], ['אלקטרודה', /אלקטרודה/]]) {
+    const hits = searchMaterials(db, typo, 3);
+    assert.ok(hits.length > 0, `no hits for ${typo}`);
+    assert.ok(hits.some((h) => rx.test(h.name)), `${typo} → ${hits.map((h) => h.name).join(' | ')}`);
+  }
+});
+
+test('the quoted and unquoted spellings are the same query', () => {
+  // Stav must not be forced to type the gershayim.
+  const a = searchMaterials(db, 'מא"ז 16A', 5).map((h) => h.sku).join();
+  const b = searchMaterials(db, 'מאז 16A', 5).map((h) => h.sku).join();
+  assert.equal(a, b);
+  assert.ok(a.length > 0);
+});
+
+test('the block warns that a per-metre price is not a per-metre purchase', () => {
+  // Field correction from Stav: corrugated conduit is priced per metre but sold
+  // by the coil. Multiplying metres by the per-metre price understates the buy.
+  const hits = searchMaterials(db, 'צינור שרשורי 25', 5);
+  const block = renderMaterialsBlock(db, hits, []);
+  assert.ok(block.includes('אינו אומר שאפשר לקנות מטר'), 'pack-size caveat missing');
 });
 
 // --------------------------------------------------------------------------
