@@ -39,6 +39,15 @@ test('the index declares its price basis', () => {
   assert.equal(raw.meta.supplier.id, 'erco');
 });
 
+test('the unit rules were scored, not just trusted', () => {
+  // 5,216 rows get their unit from a category rule and nothing downstream can
+  // tell whether those rules are any good — the output looks identical either
+  // way. The builder scores them against the 731 units read off real product
+  // pages and stamps the result here; it refuses to write the file below 90%.
+  assert.ok(raw.meta.unit_accuracy === null || raw.meta.unit_accuracy >= 0.9,
+    `unit rules scored ${raw.meta.unit_accuracy} against page-verified truth`);
+});
+
 test('the catalog is big enough to be the catalog', () => {
   // A partial harvest (network died halfway, category renamed upstream) still
   // produces a valid file. Only a floor catches that.
@@ -211,6 +220,24 @@ test('a digit in the query does not match a longer number', () => {
   const hits = searchMaterials(db, 'לוח 12 מקום', 20);
   for (const h of hits) {
     assert.ok(!/1212/.test(h.name), `substring digit match leaked back in: ${h.name}`);
+  }
+});
+
+test('a rating matches with or without its unit letter', () => {
+  // Found live: "ממסר פחת 4x40" did not whole-match "ממסר פחת 4X40A", fell back
+  // to substring scoring, and ranked pre-assembled service boxes — whose names
+  // contain a bare "4X40" — above the RCD itself.
+  const hits = searchMaterials(db, 'ממסר פחת 4x40 30mA', 5);
+  assert.ok(hits.length > 0, 'no hits at all');
+  assert.ok(/^ממסר פחת/.test(hits[0].name),
+    `top hit is not an RCD: ${hits.map((h) => h.name).join(' | ')}`);
+
+  // Both directions of the same equivalence.
+  for (const q of ['מא"ז 16A', 'מא"ז 1x16']) {
+    const r = searchMaterials(db, q, 5);
+    assert.ok(r.length > 0, `no hits for ${q}`);
+    assert.ok(r.some((h) => /מא"ז|אוטומט|מפ"ז/.test(h.name)),
+      `${q} returned non-breakers: ${r.map((h) => h.name).join(' | ')}`);
   }
 });
 

@@ -26,3 +26,7 @@ sale/backgrounds/*
 # committed — data/materials/index.json and taxonomy.json.
 data/materials/raw/
 data/materials/erco.json
+
+# Python bytecode from the supplier scripts
+__pycache__/
+*.pyc

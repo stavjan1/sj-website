@@ -49,11 +49,28 @@ export async function loadMaterials(request) {
 // The on-disk form is columnar to keep the file small. Expand it once into the
 // shape the scorer wants, with the searchable text pre-normalized so the hot
 // loop is pure string compare.
+// Electrical ratings are written with or without their unit letter, and both
+// forms are normal: "ממסר פחת 4X40A" on the shelf, "ממסר פחת 4x40" in the
+// question. Without this, the two are different tokens, and the query fell back
+// to loose substring matching — which ranked a pre-assembled service box whose
+// name happened to contain a bare "4X40" above the RCD the user asked for.
+const RATING = /^([\d.]+(?:x[\d.]+)*)(a|v|w|va|ma|kw|kv|ka|kva|mm|hz)$/;
+
+function ratingVariants(token) {
+  const m = RATING.exec(token);
+  return m ? [m[1]] : [];
+}
+
 export function hydrate(raw) {
   const cats = raw.cats || [];
   const units = raw.units || ['יחידה'];
   const items = (raw.items || []).map((r) => {
     const [sku, name, price, unitIdx, catIdx, attrs] = r;
+    const searchable = norm(name + ' ' + (attrs || ''));
+    // Index both spellings of every rating, so whichever one the user types is
+    // a whole-token hit rather than a weak substring one.
+    const toks = new Set(searchable.split(' '));
+    for (const t of [...toks]) for (const v of ratingVariants(t)) toks.add(v);
     return {
       sku,
       name,
@@ -65,8 +82,8 @@ export function hydrate(raw) {
       // merely LIVES in "אלקטרודות ואביזרי הארקה" scored the same as the
       // earthing electrode itself, and won the tiebreak by being cheaper. What
       // the product is called is stronger evidence than where it is filed.
-      hay: norm(name + ' ' + (attrs || '')),
-      toks: new Set(norm(name + ' ' + (attrs || '')).split(' ')),
+      hay: searchable,
+      toks,
       catHay: norm(cats[catIdx] || ''),
       skuNorm: norm(sku),
     };

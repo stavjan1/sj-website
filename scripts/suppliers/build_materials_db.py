@@ -72,10 +72,39 @@ PER_UNIT_LEAF = (
     "cable-lugs", "cord-end", "shrink", "electrodes", "splices",
 )
 
-# Name fragments beat the category either way — the supplier states it outright.
-PER_METRE_NAME_HINTS = ("מטר כבל", "למטר", "לפי מטר", "מחיר למטר")
+# Name-based rules run in three tiers, and the ORDER is the whole point. It was
+# calibrated against the 746 units read off real product pages by erco_units.py:
+# a single flat list scored 86% against that truth, and the misses were all
+# ordering collisions — "פס הארקת יסוד בגליל" is a roll (a piece) while
+# "פס הארקת יסוד" is priced per metre, and both contain the same words.
+
+# Tier 1 — packaging. If it comes as a roll, a drum or a boxed set, the price is
+# for that package however length-like the product is.
+PACKAGED_HINTS = ("גליל", "תוף", "חבילה של", "סליל", "מארז", "אריזה", "סט ")
+
+# ...unless the product IS a length of cable. "כבל נאופרן 5X6 - תוף" and
+# "כבל גילוי אש 2X1X0.8 - תוף 500מ'" are still priced per metre; the drum is the
+# minimum order quantity, not the unit of sale. Page truth was unanimous on this
+# and it was the whole remaining error after the tiers were ordered.
+LENGTH_GOODS_PREFIXES = ("כבל", "חוט", "מוליך", "פס הארקת", "פנדל")
+
+# Top-of-path slugs for the cable departments. Used only to confirm that a
+# product NAMED like cable is also FILED as cable.
+CABLE_DEPARTMENTS = ("cables-wires", "kblim", "multimedia-cables")
+
+# Tier 2 — sold by length, stated in the name. "בחיתוך" (cut to order) is the
+# one that mattered: every heat-shrink sleeve sold that way is per metre, and
+# the tier-3 word "שרוול" was calling all of them pieces.
+PER_METRE_NAME_HINTS = (
+    "מטר כבל", "למטר", "לפי מטר", "מחיר למטר", "בחיתוך", "פס הארקת יסוד",
+    # A tray cover is cut from the same stock as the tray and priced the same
+    # way; only tier order kept it out, because tier 3 claims every "מכסה".
+    "מכסה למחורצת", "מכסה לתעלה", "מכסה לתעלת", "מכסה להסתעפות",
+    "פס צבירה", "פס השוואה",
+)
+
+# Tier 3 — discrete parts that live inside cable and conduit categories.
 PER_UNIT_NAME_HINTS = (
-    "גליל", "תוף", "חבילה של", "סליל", "מארז", "אריזה", "סט ",
     "נעל כבל", "שרוול", "סופית", "מהדק", "מחבר", "אלקטרודה", "מופה",
     "מפצלת", "זרוע", "מכסה", "פינה", "הסתעפות", "תמיכה", "מחזיק", "נשם",
     "אטם", "מחיצה", "תושבת", "בורג", "אום", "דסקית",
@@ -86,6 +115,11 @@ def infer_unit(name, cat_paths):
     """Return (unit, source). `source` is what the caller shows the model, so a
     guess is never presented with the same confidence as a stated fact."""
     n = name or ""
+    is_length_goods = n.startswith(LENGTH_GOODS_PREFIXES)
+    if not is_length_goods:
+        for hint in PACKAGED_HINTS:
+            if hint in n:
+                return "יחידה", "name"
     for hint in PER_METRE_NAME_HINTS:
         if hint in n:
             return "מטר", "name"
@@ -93,7 +127,18 @@ def infer_unit(name, cat_paths):
         if hint in n:
             return "יחידה", "name"
 
+    full = " ".join(cat_paths).lower()
     leaf = (cat_paths[-1] if cat_paths else "").lower()
+
+    # A thing called "כבל" that is filed in the cable department is sold by the
+    # metre. Full stop — that is how the trade buys it, and the leaf-slug list
+    # cannot keep up with the naming ("flame-retardant-cable", "pendal-cables",
+    # every new speciality range ERCO adds). The name prefix is what makes this
+    # safe: "כבל לעמדת טעינה ציבורית 5 מטר" is a finished lead, and it lives
+    # under טעינה לרכב, not under כבלי חשמל, so it never reaches this rule.
+    if n.startswith(LENGTH_GOODS_PREFIXES) and any(
+            dep in full for dep in CABLE_DEPARTMENTS):
+        return "מטר", "name"
     for frag in PER_UNIT_LEAF:
         if frag in leaf:
             return "יחידה", "category"
@@ -353,6 +398,32 @@ def build_index(items):
     }
 
 
+UNIT_ACCURACY_FLOOR = 0.90
+
+
+def unit_accuracy(items, page_units):
+    """Score the unit RULES against the units read off real product pages.
+
+    This is the only honest measure of the guesswork in this file. 5,216 of the
+    rows get their unit from a category rule, and nothing downstream can tell
+    whether those rules are good — the output looks identical either way. The
+    746 page-verified SKUs are a held-out truth set, and the rules score 94% on
+    them. When someone edits a hint list and that number drops, the build should
+    stop rather than ship a catalog that prices lugs by the metre.
+
+    Returns None when the enrichment file is absent (a bare harvest), because a
+    missing truth set is not a failing one."""
+    checked = agreed = 0
+    for it in items:
+        truth = page_units.get(it["sku"])
+        if truth not in ("מטר", "יחידה"):
+            continue
+        guess, _ = infer_unit(it["name"], [it["cat_slug"]])
+        checked += 1
+        agreed += (guess == truth)
+    return (agreed / checked) if checked else None
+
+
 def check_invariants(items):
     """Assert here, where both numbers are still in hand.
 
@@ -380,8 +451,15 @@ def main():
         sys.exit("Harvest produced no usable items.")
     check_invariants(items)
 
+    acc = unit_accuracy(items, load_page_units())
+    if acc is not None and acc < UNIT_ACCURACY_FLOOR:
+        sys.exit("Unit rules score %.1f%% against the page-verified truth set, "
+                 "below the %.0f%% floor. Fix the hint lists in this file before "
+                 "shipping." % (acc * 100, UNIT_ACCURACY_FLOOR * 100))
+
     taxonomy = build_taxonomy(items)
     index = build_index(items)
+    index["meta"]["unit_accuracy"] = round(acc, 3) if acc is not None else None
 
     write(os.path.join(OUT_DIR, "erco.json"),
           {"meta": index["meta"], "items": items})
@@ -391,6 +469,7 @@ def main():
 
     inferred = sum(1 for it in items if it["unit_src"] == "category")
     print("items          : %d" % len(items))
+    print("unit accuracy  : %s" % ("%.1f%% (vs page truth)" % (acc * 100) if acc is not None else "n/a"))
     print("categories     : %d" % len(taxonomy))
     print("units inferred : %d (%.0f%%)" % (inferred, 100.0 * inferred / len(items)))
     print("price range    : %.2f - %.2f ₪ (ex-VAT)"

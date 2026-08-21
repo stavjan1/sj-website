@@ -16,7 +16,8 @@
    "unit",
    "cat",
    "attrs"
-  ]
+  ],
+  "unit_accuracy": 0.941
  },
  "categories": [
   {
