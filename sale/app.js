@@ -5011,6 +5011,27 @@ window.addEventListener('resize', () => {
     window._zoomFixT = setTimeout(() => applyDisplayZoomFix(), 150);
 });
 
+// The on-screen keyboard is the one thing 100dvh does not account for: iOS
+// shrinks the VISUAL viewport and leaves the layout viewport alone, so a
+// bottom-docked composer ends up under the keys. visualViewport reports the
+// real visible height, and the app is sized from --appvh, so handing it that
+// number lifts the whole column above the keyboard while typing.
+function syncKeyboardViewport() {
+    try {
+        const vv = window.visualViewport;
+        if (!vv || !window.matchMedia('(max-width: 860px)').matches) return;
+        const root = document.documentElement;
+        // 120px of slack: the address bar collapsing is not a keyboard.
+        const open = vv.height < window.innerHeight - 120;
+        if (open) root.style.setProperty('--appvh', Math.round(vv.height) + 'px');
+        else if (!document.body.style.zoom) root.style.removeProperty('--appvh');
+    } catch (e) { /* non-fatal */ }
+}
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', syncKeyboardViewport);
+    window.visualViewport.addEventListener('scroll', syncKeyboardViewport);
+}
+
 // ===== Theme & Custom Background Handlers =====
 // Product decision (Stav, 04/07): LIGHT is the default for everyone; a manual
 // choice (the sun/moon flip button or Settings) persists per user.
