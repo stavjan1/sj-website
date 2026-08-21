@@ -45,7 +45,7 @@ for (const c of cases) {
   // Written to disk, not just printed: a 2,000-word Hebrew answer scrolls out of
   // a terminal, and every one of these costs real AI quota — losing it to a pipe
   // means paying twice for the same answer.
-  const outDir = new URL('../../data/field-research/live-answers/', ROOT);
+  const outDir = new URL('data/field-research/live-answers/', ROOT);
   mkdirSync(outDir, { recursive: true });
   writeFileSync(new URL(`case-${c.num}.md`, outDir),
     `# מקרה ${c.num} — ${c.title}
