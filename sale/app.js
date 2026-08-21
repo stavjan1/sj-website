@@ -1489,7 +1489,11 @@ function getTodayDateString() {
 // Helper: Format date for Hebrew display (DD/MM/YYYY)
 function formatHebrewDate(dateString) {
     if (!dateString) return '';
-    const parts = dateString.split('-');
+    // Dates arrive as YYYY-MM-DD from this app, but a project restored from a
+    // backup or written by an older version can carry a full ISO timestamp.
+    // Splitting on "-" alone turned that into "20T07:27:09.347Z/08/2026" on
+    // the card, so cut the time off first.
+    const parts = String(dateString).split('T')[0].split('-');
     if (parts.length !== 3) return dateString;
     return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
@@ -2286,6 +2290,7 @@ function createNewProject(opts) {
         name: name,
         autoName: autoName,
         created: getTodayDateString(),
+        touched: Date.now(),
         status: 'טיוטה',
         // Workflow: plan → price → draft. Planning first, so the pricing agent
         // later receives the FULL product list (incl. accessories), not just
@@ -2742,6 +2747,109 @@ function assignProjectClient(projectId, value) {
     showToast(c ? 'שויך ללקוח: ' + c.name : 'השיוך ללקוח הוסר');
 }
 
+// ── Drafts that never went anywhere ─────────────────────────────────────────
+//
+// Every sentence typed on the home screen opens a work. That is what makes the
+// home worth using, and it is also what fills the list with conversations that
+// stopped after two messages, sitting next to jobs that have a customer and a
+// price. Stav asked for a way to sort them; a "not sorted" button would be a
+// second inbox to empty, so nothing here asks him to sort anything.
+//
+// The list already knows which is which. A draft that never reached a price,
+// never got a customer, and has not been touched for a week drops out of the
+// main list on its own, onto a folded shelf at the bottom: continue it, or
+// throw it away. Everything above the shelf is real work.
+const STALE_DRAFT_DAYS = 7;
+
+function projectLastActivity(p) {
+    if (!p) return 0;
+    const touched = Number(p.touched) || 0;
+    const changed = Number(p.statusChangedAt) || 0;
+    // `created` is a YYYY-MM-DD string; a restored backup can carry a full ISO
+    // timestamp, so cut the time off before parsing either way.
+    const created = p.created ? Date.parse(String(p.created).split('T')[0]) : 0;
+    return Math.max(touched, changed, created || 0);
+}
+
+function projectIdleDays(p) {
+    const last = projectLastActivity(p);
+    if (!last) return 0;
+    return Math.max(0, Math.floor((Date.now() - last) / 86400000));
+}
+
+// Conservative on purpose: anything that looks like a decision (a price, a
+// customer, a status of its own, a materials list, the project you have open
+// right now) keeps the work in the main list, however old it is.
+function isStaleDraft(p) {
+    if (!p || p.id === activeProjectId) return false;
+    if ((p.status || 'טיוטה') !== 'טיוטה') return false;
+    if (getProjectStage(p) !== 'planning') return false;
+    if ((p.materials || []).length) return false;
+    if (Number(p.laborPrice) > 0) return false;
+    if (p.quoteData && Number(p.quoteData.finalPrice) > 0) return false;
+    if (p.clientId) return false;
+    return projectIdleDays(p) >= STALE_DRAFT_DAYS;
+}
+
+// An auto-named draft is called "פרויקט חדש", which tells you nothing on a
+// shelf of them. Show the sentence that opened it instead.
+function draftPreview(p) {
+    const hist = (p && p.planChatHistory) || [];
+    for (const m of hist) {
+        if (m.role !== 'user' || m.hidden) continue;
+        const t = ((m.parts && m.parts[0] && m.parts[0].text) || '').trim();
+        if (t) return t.length > 70 ? t.slice(0, 70) + '…' : t;
+    }
+    return (p && p.name) || 'טיוטה';
+}
+
+function idleLabel(days) {
+    if (days >= 30) return 'לפני יותר מחודש';
+    if (days >= 14) return 'לפני שבועיים';
+    return `לפני ${days} ימים`;
+}
+
+function touchProject(p) { if (p) p.touched = Date.now(); }
+
+function staleDraftsHtml(stale) {
+    const rows = stale.map(p => `
+        <div class="ss-row">
+            <button type="button" class="ss-open" onclick="loadProject('${p.id}')">
+                <span class="ss-name">${escapeHtml(draftPreview(p))}</span>
+                <span class="ss-meta">${escapeHtml(idleLabel(projectIdleDays(p)))}</span>
+            </button>
+            <button type="button" class="ss-del" onclick="deleteProject('${p.id}', event)" title="העברה לסל המחזור" aria-label="מחיקה">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>
+            </button>
+        </div>`).join('');
+    return `
+        <details class="stale-shelf">
+            <summary>
+                <span class="ss-caret" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                </span>
+                <span class="ss-title">טיוטות שנשארו באוויר</span>
+                <span class="ss-count">${stale.length}</span>
+                <span class="ss-note">שיחות שלא הגיעו למחיר, בלי נגיעה מעל שבוע</span>
+            </summary>
+            <div class="ss-rows">${rows}</div>
+            <button type="button" class="ss-clear" onclick="deleteStaleDrafts()">מחיקת כל הטיוטות (${stale.length})</button>
+        </details>`;
+}
+
+function deleteStaleDrafts() {
+    const stale = projectsList.filter(isStaleDraft);
+    if (!stale.length) return;
+    if (!confirm(`להעביר ${stale.length} טיוטות לסל המחזור? אפשר לשחזר מהסל.`)) return;
+    const ids = new Set(stale.map(p => p.id));
+    const now = new Date().toISOString();
+    stale.forEach(p => trashedProjectsList.push({ ...p, _deletedAt: now }));
+    projectsList = projectsList.filter(p => !ids.has(p.id));
+    saveProjects();
+    filterProjectsList();
+    showToast(`${stale.length} טיוטות הועברו לסל המחזור`);
+}
+
 // Show only the work that comes back. A filter, not a screen: the same project
 // in two places is two places to keep in step.
 let repeatFilterOn = false;
@@ -2777,19 +2885,39 @@ function renderProjectCategories() {
             </button>
             ${removable ? `<button class="cat-del" title="הסר קטגוריה" onclick="removeProjectCategory('${encodeURIComponent(key)}')"><i class="fa-solid fa-xmark"></i></button>` : ''}
         </div>`;
-    let html = `<div class="cat-head"><i class="fa-solid fa-tags"></i> קטגוריות</div>`;
-    html += item('הכל', null, total, activeCategoryFilter === null, false);
-    cats.forEach(c => { html += item(c, c, countFor(c), activeCategoryFilter === c, true); });
-    html += `<div class="cat-add">
-        <input type="text" id="new-cat-name" placeholder="קטגוריה חדשה…" maxlength="30" onkeydown="if(event.key==='Enter')addProjectCategory()">
-        <button class="cat-add-btn" title="הוסף" onclick="addProjectCategory()"><i class="fa-solid fa-plus"></i></button>
-    </div>`;
-    box.innerHTML = html;
+    // The chips scroll; the add control does not. On a phone the whole row used
+    // to scroll as one, which pushed the "+" clean off the screen: the button
+    // was there, at x = -63, and no one could reach it.
+    let chips = `<div class="cat-head"><i class="fa-solid fa-tags"></i> קטגוריות</div>`;
+    chips += item('הכל', null, total, activeCategoryFilter === null, false);
+    cats.forEach(c => { chips += item(c, c, countFor(c), activeCategoryFilter === c, true); });
+    box.innerHTML = `<div class="cats-scroll">${chips}</div>
+        <div class="cat-add" id="cat-add">
+            <input type="text" id="new-cat-name" placeholder="קטגוריה חדשה…" maxlength="30" onkeydown="if(event.key==='Enter')addProjectCategory()">
+            <button class="cat-add-btn" title="הוסף קטגוריה" aria-label="הוסף קטגוריה" onclick="catAddClick(event)"><i class="fa-solid fa-plus"></i></button>
+        </div>`;
 }
 
 function setCategoryFilter(catEnc) {
     activeCategoryFilter = (catEnc === null || catEnc === 'null') ? null : decodeURIComponent(catEnc);
     filterProjectsList();
+}
+
+// On a narrow screen the name field stays folded behind the "+", so the filter
+// row is chips and one button. First press opens the field, second press adds.
+function catAddClick(e) {
+    if (e) e.stopPropagation();
+    const wrap = document.getElementById('cat-add');
+    const inp = document.getElementById('new-cat-name');
+    const narrow = window.matchMedia('(max-width: 900px)').matches;
+    if (!wrap || !inp) return;
+    if (narrow && !wrap.classList.contains('open')) {
+        wrap.classList.add('open');
+        inp.focus();
+        return;
+    }
+    if (narrow && !inp.value.trim()) { wrap.classList.remove('open'); return; }
+    addProjectCategory();
 }
 
 function addProjectCategory() {
@@ -2870,7 +2998,11 @@ function renderStatistics() {
     const nis = (n) => '₪' + Math.round(n).toLocaleString('he-IL');
     const cols = {};
     PIPELINE_COLS.forEach(c => cols[c.key] = []);
-    (projectsList || []).forEach(p => { (cols[projectPipelineStage(p)] || cols.planning).push(p); });
+    // The board is the money in flight. A conversation that stopped a week ago
+    // and never reached a price is not in flight, and counting it in the first
+    // column made the funnel look busier than the work actually is.
+    (projectsList || []).filter(p => !isStaleDraft(p))
+        .forEach(p => { (cols[projectPipelineStage(p)] || cols.planning).push(p); });
 
     board.innerHTML = PIPELINE_COLS.map(c => {
         const items = cols[c.key];
@@ -4602,6 +4734,15 @@ function renderProjectsList(list) {
         return;
     }
 
+    // Stale drafts leave the main list and go to the shelf at the bottom. A
+    // search or a filter is a deliberate hunt, so nothing is hidden then.
+    const hunting = !!(document.getElementById('project-search-q')?.value || '').trim()
+        || (document.getElementById('project-status-filter')?.value || 'all') !== 'all'
+        || !!activeCategoryFilter || repeatFilterOn;
+    const stale = hunting ? [] : list.filter(isStaleDraft);
+    const staleIds = new Set(stale.map(p => p.id));
+    if (stale.length) list = list.filter(p => !staleIds.has(p.id));
+
     const cats = getProjectCategories();
     const catOptions = (sel) => cats.map(c =>
         `<option value="${escapeHtml(c)}" ${sel === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
@@ -4622,9 +4763,12 @@ function renderProjectsList(list) {
         card.className = `project-card ${isActive ? 'active' : ''}`;
         card.onclick = () => loadProject(p.id);
 
+        // An auto-named work is still called "פרויקט חדש" until the agent titles
+        // it, which is unreadable on a list of them: show the opening sentence.
+        const cardTitle = (p.autoName && p.name === 'פרויקט חדש') ? draftPreview(p) : p.name;
         card.innerHTML = `
             <div class="project-info">
-                <div class="project-title">${escapeHtml(p.name)}</div>
+                <div class="project-title">${escapeHtml(cardTitle)}</div>
                 <div class="project-meta">
                     <span><i class="fa-solid fa-calendar"></i> ${formatHebrewDate(p.created)}</span>
                     ${maintBadgeHtml(p)}
@@ -4665,6 +4809,19 @@ function renderProjectsList(list) {
         `;
         container.appendChild(card);
     });
+
+    if (stale.length) {
+        if (!list.length) {
+            const note = document.createElement('p');
+            note.className = 'input-help';
+            note.style.cssText = 'text-align:center;padding:16px 0 0;';
+            note.textContent = 'כל מה שפתוח כרגע הוא טיוטות שנעצרו. פתח אחת מהן, או התחל עבודה חדשה מהבית.';
+            container.appendChild(note);
+        }
+        const shelf = document.createElement('div');
+        shelf.innerHTML = staleDraftsHtml(stale);
+        container.appendChild(shelf.firstElementChild);
+    }
 }
 
 // ==========================================================================
@@ -4722,6 +4879,7 @@ function syncCurrentQuoteToProject() {
     if (!activeProjectId) return;
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (proj) {
+        touchProject(proj);
         // NOTE: this REPLACES quoteData with exactly the keys below, anything
         // else stored on it is destroyed the next time the user types. Put
         // per-project state on the project itself, not here.
@@ -9277,6 +9435,9 @@ async function sendChatMessage() {
 
     const activeProject = projectsList.find(p => p.id === activeProjectId);
     if (!activeProject) return;
+    // Typing to the agent is the clearest sign the work is alive; it is what
+    // keeps it off the stale-drafts shelf.
+    touchProject(activeProject);
 
     // Attach and clear the pending site photos (given to the AI as vision).
     const photos = pendingChatPhotos.slice();

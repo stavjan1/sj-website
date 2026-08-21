@@ -8,10 +8,10 @@
     <!-- App area: kept out of search results (it has its own built-in login) -->
     <meta name="robots" content="noindex">
 
-    <!-- Google Fonts: IBM Plex Sans Hebrew for UI (Heebo fallback), David/Frank Ruhl for the PDF sheets -->
+    <!-- Google Fonts: Assistant for UI text, Rubik for headings, David/Frank Ruhl for the PDF sheets -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Rubik:wght@500;700;900&family=David+Libre:wght@400;700&family=Frank+Ruhl+Libre:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Heebo:wght@400;500;700&family=Rubik:wght@500;700;900&family=David+Libre:wght@400;700&family=Frank+Ruhl+Libre:wght@300;400;500;700;900&display=swap" rel="stylesheet">
 
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
@@ -361,6 +361,7 @@
                             <button type="button" class="home-send" id="home-send" onclick="startWorkFromHome()" aria-label="התחל">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
                             </button>
+                            <p class="home-hint">Enter שולח, Shift+Enter שורה חדשה</p>
                         </div>
                         <div class="home-chips">
                             <button type="button" class="chip" onclick="fillHomeExample(this)">התקנת עמדת טעינה 15 מטר מהלוח</button>

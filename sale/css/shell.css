@@ -48,10 +48,18 @@ body {
 }
 .main-content {
   flex: 1; min-width: 0;
+  /* A flex column, which panels.css §20 assumes and V3 forgot to declare: the
+     wizard panel flex-fills what is left under the context bar, so the chat
+     scrolls inside itself and its composer stays on screen. Everything else
+     keeps its natural height and scrolls the page as before. */
+  display: flex; flex-direction: column;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: var(--sp-6);
 }
+.main-content > .ctx-bar,
+.main-content > .active-project-banner { flex: none; }
+.content-panel.active { flex: 0 0 auto; }
 
 /* ---------- icon rail (the old .sidebar, reborn) ---------- */
 .sidebar {

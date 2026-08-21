@@ -372,7 +372,7 @@ i[class^="fa-"], i[class*=" fa-"] {
 /* A row of filters over the list, not a column beside it. */
 .projects-cats {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: var(--sp-1);
     padding-block: var(--sp-2);
@@ -424,7 +424,8 @@ i[class^="fa-"], i[class*=" fa-"] {
 }
 .cat-item:hover .cat-del { opacity: 1; }
 .cat-item .cat-del:hover { color: var(--danger); }
-.projects-cats .cat-add { display: flex; gap: var(--sp-1); align-items: center; margin-inline-start: auto; }
+.cats-scroll { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1); min-width: 0; flex: 1; }
+.projects-cats .cat-add { display: flex; gap: var(--sp-1); align-items: center; flex: none; margin-inline-start: auto; }
 .projects-cats .cat-add input { min-height: 30px; width: 130px; font-size: var(--fs-xs); border-radius: var(--r-pill); }
 .projects-cats .cat-add .cat-add-btn { flex-shrink: 0; }
 
@@ -806,12 +807,15 @@ i[class^="fa-"], i[class*=" fa-"] {
     gap: var(--sp-3);
     background: var(--bg);
 }
+/* The agent's answers are paragraphs, not labels: read at 15px in a tight
+   line they turn into a wall, which is exactly what made this chat harder to
+   read than any other chat on the machine. Body size, generous leading. */
 .chat-bubble {
     max-width: 85%;
     padding: var(--sp-3) var(--sp-4);
     border-radius: var(--r-md);
-    font-size: var(--fs-sm);
-    line-height: var(--lh-body);
+    font-size: var(--fs-md);
+    line-height: 1.7;
     word-wrap: break-word;
     white-space: pre-wrap;
 }
@@ -943,7 +947,8 @@ i[class^="fa-"], i[class*=" fa-"] {
 .chat-input-area textarea {
     flex-grow: 1;
     resize: none;
-    min-height: 44px;
+    min-height: 56px;
+    font: 400 var(--fs-md)/1.6 var(--font-ui);
 }
 .chat-input-area button, .chat-input-area .chat-attach-btn {
     flex-shrink: 0;
@@ -2663,6 +2668,11 @@ i[class^="fa-"], i[class*=" fa-"] {
     #panel-projects .projects-stats .metric-card { padding: var(--sp-3) !important; }
 
     /* Wizard: chat fills the panel; the estimate column owns ONE scroll */
+    /* height:100% is what actually pins the composer. Without it the panel grew
+       to fit the whole conversation, the page scrolled instead of the chat,
+       and the input row ended up 900px below the fold: you had to scroll down
+       to type. Now the messages scroll and the composer stays where a chat
+       composer belongs. */
     #panel-wizard.active {
         display: flex;
         flex-direction: column;
@@ -2754,11 +2764,41 @@ i[class^="fa-"], i[class*=" fa-"] {
     .preview-side { height: auto; min-height: 480px; }
 
     /* ==== Chat as a full screen ==== */
-    /* The chat panel is the strict one: it does not scroll at all — its
-       message log does, so the composer stays pinned above the keyboard. */
+    /* The chat panel is the strict one: it does not scroll at all, its message
+       log does, so the composer stays pinned above the keyboard. With the
+       estimate column open the two stack and the page scrolls again, so the
+       strict column only applies while the chat is alone on screen. */
     #panel-wizard.active { overflow: hidden; }
-    .model-quota-bar { padding: var(--sp-1) 0; }
-    .quota-ring-wrap { transform: scale(0.72); transform-origin: right center; }
+    #panel-wizard.active.hide-estimate {
+        display: flex; flex-direction: column;
+        flex: 1 1 auto; min-height: 0;
+    }
+    #panel-wizard.hide-estimate .split-view { flex: 1 1 auto; min-height: 0; height: auto; }
+    #panel-wizard.hide-estimate .control-side {
+        display: flex; flex-direction: column;
+        height: 100%; min-height: 0; overflow: hidden;
+    }
+    #panel-wizard.hide-estimate .chat-container { flex: 1 1 auto; height: auto; min-height: 0; }
+    #panel-wizard.hide-estimate .chat-messages { min-height: 0; }
+    #panel-wizard.hide-estimate .chat-input-area { position: static; inset-block-end: auto; }
+    /* The column already stops above the bottom bar, so the panel does not
+       need to reserve a second one. */
+    #panel-wizard.active.hide-estimate { padding-block-end: calc(72px + env(safe-area-inset-bottom, 0px)); }
+    #panel-wizard.active:not(.hide-estimate) { flex: 0 0 auto; }
+    /* Everything above the conversation is chrome, and on a 390px screen it was
+       eating 230px before the first bubble: title, subtitle, model pills, the
+       quota ring, the rail and a breadcrumb. The context bar already names the
+       project and the rail already names the stage, so the chat panel drops
+       its heading and squeezes the rest into one short row. */
+    /* The heading block only (the model pills and the quota ring live in the
+       same header row and stay). Its inline display:flex means the header
+       itself cannot be hidden from a stylesheet anyway. */
+    #panel-wizard.active > .section-header > div:first-child { display: none; }
+    #panel-wizard.active > .section-header { margin-block-end: var(--sp-2); }
+    .model-quota-bar { padding: 0; gap: var(--sp-2); flex-wrap: nowrap; }
+    .model-quota-bar .model-class-btn { min-height: 32px; padding: 0 var(--sp-2); font-size: var(--fs-xs); }
+    .quota-ring-wrap { transform: scale(0.66); transform-origin: right center; margin-inline-start: auto; }
+    #panel-wizard .stage-hint { display: none; }
     .chat-search-wrap { display: none; }            /* search is a desktop tool */
     .chat-mode-toggle {
         position: sticky;
@@ -2803,13 +2843,19 @@ i[class^="fa-"], i[class*=" fa-"] {
 
     /* ==== Projects: cats become a horizontal strip; stats a 2×2 grid ==== */
     .projects-layout { grid-template-columns: 1fr; }
-    .projects-cats { order: 0; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; gap: var(--sp-2); padding: var(--sp-2); }
+    .projects-cats { order: 0; flex-direction: row; flex-wrap: nowrap; gap: var(--sp-1); }
+    .cats-scroll { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+    .cats-scroll::-webkit-scrollbar { display: none; }
     .projects-cats .cat-head { border-block-end: none; margin: 0; padding: 0 var(--sp-1) 0 0; align-self: center; flex-shrink: 0; }
     .projects-cats .cat-item { flex-shrink: 0; }
     .projects-cats .cat-item .cat-btn { white-space: nowrap; }
     .projects-cats .cat-del { display: none; }
     .projects-cats .cat-add { order: 99; margin: 0; padding: 0; border-block-start: none; border-inline-start: 1px solid var(--border); padding-inline-start: var(--sp-2); flex-shrink: 0; }
-    .projects-cats .cat-add input { width: 110px; flex: 0 0 auto; }
+    /* Folded behind the "+" until asked for: on a phone the row is chips and
+       one button, and the name field appears only when you press it. */
+    .projects-cats .cat-add input { display: none; width: 118px; flex: 0 0 auto; }
+    .projects-cats .cat-add.open { flex-wrap: wrap; }
+    .projects-cats .cat-add.open input { display: block; }
     .projects-main { order: 1; }
     .projects-stats { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); order: 2; }
     .create-project-inline { flex-wrap: wrap; }
@@ -2947,7 +2993,10 @@ i[class^="fa-"], i[class*=" fa-"] {
 .project-card .project-endcap { display: flex; align-items: center; gap: var(--sp-2); margin-inline-start: auto; }
 .proj-cat-chip { max-width: 180px; }
 .proj-cat-chip .proj-cat-select { max-width: 140px; text-overflow: ellipsis; }
-#projects-list-container, #panel-projects { min-width: 0; }
+/* The whole chain, not just the ends: .projects-main sits between the panel
+   and the list, and its automatic min-width let one long row inside the list
+   push every card past the edge of a phone screen. */
+#projects-list-container, #panel-projects, .projects-main { min-width: 0; }
 @media (max-width: 1100px) {
     .project-card .stage-chain { flex-basis: 100%; order: 3; }
 }
@@ -3310,23 +3359,37 @@ i[class^="fa-"], i[class*=" fa-"] {
 }
 .home-sub { margin: 0 0 var(--sp-6); font-size: var(--fs-lg); color: var(--text-2); }
 
-/* The box is the screen: big, quiet, and the only thing asking for your hand. */
+/* The box is the screen: big, quiet, and the only thing asking for your hand.
+   It is deliberately taller than a form field. A one-line input asks for a
+   line; a box this size asks for the story of the job, which is what the
+   agent actually needs. Once you send, the conversation takes over and the
+   composer is the short one docked at the bottom of the chat. */
 .home-ask {
-    display: flex; align-items: flex-end; gap: var(--sp-2);
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end;
+    gap: var(--sp-2);
     background: var(--surface); border: 1px solid var(--border-strong);
-    border-radius: var(--r-md); padding: var(--sp-3);
+    border-radius: 16px; padding: var(--sp-4);
     box-shadow: var(--shadow-1);
-    transition: border-color var(--t-fast);
+    transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
-.home-ask:focus-within { border-color: var(--accent); }
+.home-ask:focus-within { border-color: var(--accent); box-shadow: var(--shadow-1), 0 0 0 3px var(--accent-soft); }
 .home-ask textarea {
-    flex: 1; min-height: 64px; max-height: 220px; resize: none;
+    grid-column: 1 / -1;
+    min-height: 132px; max-height: 320px; resize: none;
     border: none !important; background: transparent !important; box-shadow: none;
-    padding: var(--sp-2); font: 400 var(--fs-lg)/1.55 var(--font-ui); color: var(--text);
+    padding: 0 var(--sp-1); font: 400 var(--fs-lg)/1.65 var(--font-ui); color: var(--text);
 }
 .home-ask textarea:focus { outline: none; }
+/* The bottom edge of the box is one row: the hint on the reading side, the
+   send button on the other, the way every chat composer is built. */
+.home-hint {
+    grid-column: 1; grid-row: 2; align-self: center; margin: 0;
+    padding-inline-start: var(--sp-1);
+    font-size: var(--fs-xs); color: var(--text-3);
+}
 .home-send {
-    width: 44px; height: 44px; flex: none; border: none; border-radius: var(--r-pill);
+    grid-column: 2; grid-row: 2; align-self: center;
+    width: 48px; height: 48px; flex: none; border: none; border-radius: var(--r-pill);
     background: var(--action, var(--accent)); color: var(--on-action, var(--on-accent));
     display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
 }
@@ -3355,7 +3418,10 @@ i[class^="fa-"], i[class*=" fa-"] {
 
 @media (max-width: 860px) {
     .home-wrap { grid-template-columns: minmax(0, 1fr); gap: var(--sp-6); min-height: 0; }
-    .home-main { min-height: 0; padding-block-start: var(--sp-8); }
+    .home-main { min-height: 0; padding-block-start: var(--sp-6); }
+    .home-ask { padding: var(--sp-3); }
+    .home-ask textarea { min-height: 104px; font-size: var(--fs-md); }
+    .home-send { width: 44px; height: 44px; }
     .home-side { padding-block-start: 0; border-block-start: 1px solid var(--border); padding-block: var(--sp-4) 0; }
 }
 
@@ -3383,3 +3449,63 @@ i[class^="fa-"], i[class*=" fa-"] {
     margin-block-end: 0; padding-inline: 0;
 }
 #panel-create .work-item-form-row:hover { background: var(--surface-2); }
+
+/* ============================================================================
+   Drafts that never went anywhere.
+   A shelf, not an inbox: folded shut, quieter than a project card, and it only
+   exists on screen when there is something on it.
+   ============================================================================ */
+.stale-shelf {
+    /* min-width:0 is load-bearing: the list container is a grid track whose
+       automatic minimum is the widest child's min-content, so one long draft
+       sentence in here stretched every project card past the screen edge. */
+    min-width: 0;
+    margin-block-start: var(--sp-5);
+    border: 1px dashed var(--border);
+    border-radius: var(--r-md);
+    background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+}
+.stale-shelf > summary {
+    display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); min-width: 0;
+    padding: var(--sp-3) var(--sp-4);
+    cursor: pointer; list-style: none;
+    font: 600 var(--fs-sm)/1.3 var(--font-ui); color: var(--text-2);
+}
+.stale-shelf > summary::-webkit-details-marker { display: none; }
+.ss-caret { display: inline-flex; color: var(--text-3); transition: transform var(--t-fast); }
+.stale-shelf[open] .ss-caret { transform: rotate(180deg); }
+.ss-count {
+    min-width: 22px; padding: 0 6px; border-radius: var(--r-pill);
+    background: var(--surface); border: 1px solid var(--border);
+    font: 700 var(--fs-xs)/20px var(--font-ui); color: var(--text-2); text-align: center;
+}
+.ss-note { font: 400 var(--fs-xs)/1.3 var(--font-ui); color: var(--text-3); }
+.ss-rows { display: flex; flex-direction: column; min-width: 0; padding: 0 var(--sp-3) var(--sp-2); }
+.ss-row { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.ss-open {
+    flex: 1; display: flex; align-items: baseline; gap: var(--sp-3);
+    background: none; border: none; cursor: pointer; text-align: start;
+    padding: var(--sp-2) var(--sp-2); border-radius: var(--r-sm); min-width: 0;
+}
+.ss-open:hover { background: var(--surface); }
+.ss-name {
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font: 400 var(--fs-sm) var(--font-ui); color: var(--text-2);
+}
+.ss-meta { flex: none; font: 400 var(--fs-xs) var(--font-ui); color: var(--text-3); }
+.ss-del {
+    flex: none; width: 32px; height: 32px; display: inline-flex; align-items: center;
+    justify-content: center; border-radius: var(--r-sm);
+    background: none; border: 1px solid transparent; color: var(--text-3); cursor: pointer;
+}
+.ss-del:hover { color: var(--danger); border-color: var(--border); background: var(--surface); }
+.ss-clear {
+    margin: 0 var(--sp-4) var(--sp-3); background: none; border: none; cursor: pointer;
+    font: 600 var(--fs-xs) var(--font-ui); color: var(--text-3);
+    padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm);
+}
+.ss-clear:hover { color: var(--danger); background: var(--surface); }
+
+@media (max-width: 560px) {
+    .ss-note { display: none; }
+}
