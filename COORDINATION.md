@@ -78,3 +78,9 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
   for logging it. Nothing else of Session B's is version-stamped: the materials
   data is served from `/data/materials/` and the API, neither of which is cached
   by asset version.
+- 2026-08-21 (round 2) — Session B made ONE surgical edit inside `sale/app.js`:
+  two identical copies of a line in the profession system prompt that told the
+  model to INVENT ארכה prices ("כאילו חיפשת באתרים כמו ארכה") now tell it to use
+  the real ארכה catalog that the server attaches. Text-only change inside a
+  template string, lines ~11753 and ~11838, nothing structural, no display code.
+  Also appended a section to `functions/api/_pricing_map.js` (field corrections).

@@ -54,8 +54,13 @@ export const TIER_NAMES = ['guest', 'free', 'pro', 'business'];
 // deciding to: nobody wants to redeploy on a hunch. `config:models` in KV
 // overrides these, so the switch is an admin action taken AFTER the trap suite
 // has been run against the candidate — evidence first, then one click.
+// 2026-08-21: gemini-2.5-flash began returning 404 "no longer available to new
+// users", and because 404 was not a retriable status the pricing chat answered
+// every question with a Google error string instead of falling back. Google's
+// own message named gemini-3.6-flash as the replacement, so that is what this
+// is — the version Google pointed at, not a guess at the newest number.
 export const MODEL_CLASS = {
-  basic: { provider: 'gemini', model: 'gemini-2.5-flash' },
+  basic: { provider: 'gemini', model: 'gemini-3.6-flash' },
   advanced: { provider: 'gemini', model: 'gemini-2.5-pro' },
 };
 

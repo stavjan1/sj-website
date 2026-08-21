@@ -69,7 +69,17 @@ const FALLBACK_SEQUENCE = ['gemini', 'deepseek', 'grok', 'cloudflare'];
 
 // Statuses that mean "this provider can't serve right now — try the next":
 // 429 quota/rate, 401/403 bad/expired key, 402 no balance, 5xx upstream.
-const RETRIABLE = [429, 401, 402, 403, 500, 502, 503];
+//
+// 404 is on the list because of what it cost on 2026-08-21: Google retired
+// gemini-2.5-flash for new users and answered every call with a 404, and since
+// 404 was not retriable that error string went straight to the customer. The
+// pricing chat was down while still looking up. A configured model going away
+// is exactly the case fallback exists for, and this was the second retirement
+// to break it (gemini-2.0-flash did the same on 2026-06-01).
+//
+// A 404 from a wrong path now fails over instead of surfacing, which is the
+// right trade: a working answer from the next provider beats a raw error.
+const RETRIABLE = [404, 429, 401, 402, 403, 500, 502, 503];
 
 const SSE_HEADERS = {
   'Content-Type': 'text/event-stream; charset=utf-8',
