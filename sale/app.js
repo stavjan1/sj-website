@@ -2218,11 +2218,13 @@ function renderHome() {
 
     const box = document.getElementById('home-recent');
     if (!box) return;
-    const recent = (projectsList || []).slice(0, 4);
+    // "Continue where you left off" means work you are actually in the middle
+    // of, so a conversation that stopped a week ago is not offered here either.
+    const recent = (projectsList || []).filter((p) => !isStaleDraft(p)).slice(0, 4);
     box.innerHTML = recent.length
         ? recent.map((p) => `
             <button type="button" class="home-recent-item" onclick="openRecentProject('${p.id}')">
-                <span class="hr-name">${escapeHtml(p.name)}</span>
+                <span class="hr-name">${escapeHtml((p.autoName && p.name === 'פרויקט חדש') ? draftPreview(p) : p.name)}</span>
                 <span class="hr-meta">${escapeHtml(p.status || 'טיוטה')} · ${escapeHtml(formatHebrewDate(p.created) || '')}</span>
             </button>`).join('')
         : '<p class="home-empty">עוד לא פתחת עבודה. תאר אחת ונתחיל.</p>';
@@ -8455,6 +8457,7 @@ function setSpecAnswer(fieldId, value, source) {
     if (!proj) return;
     ensureSpec(proj).answers[fieldId] = { value, source: source || 'user', skipped: false };
     specEditingField = null;   // the edit is made; let the card move on
+    touchProject(proj);
     saveProjects();
     renderSpecCard(proj);
     updatePlanActionBar(proj);
@@ -8465,6 +8468,7 @@ function skipSpecField(fieldId) {
     if (!proj) return;
     ensureSpec(proj).answers[fieldId] = { value: '', source: 'user', skipped: true };
     specEditingField = null;   // the edit is made; let the card move on
+    touchProject(proj);
     saveProjects();
     renderSpecCard(proj);
     updatePlanActionBar(proj);
@@ -10222,6 +10226,7 @@ function toggleMaterialChecked(idx, checked) {
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (proj && proj.materials && proj.materials[idx]) {
         proj.materials[idx].checked = checked;
+        touchProject(proj);
         saveProjects();
     }
 }

@@ -69,9 +69,21 @@
   .mt-opt.cur{background:var(--accent); color:var(--accent-ink)}
   a.mt-opt:hover{color:var(--ink)}
   @media (max-width:430px){ .h-cta{gap:6px} .mt-opt{padding:6px 8px} }
+  /* Four controls and a two-line brand do not fit a phone header: the name
+     stays on one line and the tagline steps aside, since the screen under it
+     asks the same question in bigger type. */
+  @media (max-width:600px){
+    .h-title{white-space:nowrap}
+    .h-sub{display:none}
+    .h-cta{flex-wrap:wrap; justify-content:flex-end; row-gap:6px}
+  }
   main{flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px}
   .wrap{width:100%; max-width:720px; margin:0 auto; display:flex; flex-direction:column; gap:12px}
   .intro{text-align:center; color:var(--sub); padding:22px 8px 6px}
+  /* On the empty screen the invitation sits in the middle of the space it has,
+     instead of hugging the header with a hole under it. The moment an answer
+     arrives the log fills from the top like any chat. */
+  main:has(> .wrap > .intro:only-child){justify-content:center}
   .intro h1{font-size:1.35rem; color:var(--ink); margin-bottom:8px; font-weight:800}
   .intro p{font-size:.92rem; line-height:1.6; max-width:440px; margin:0 auto}
   .chips{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:14px}
