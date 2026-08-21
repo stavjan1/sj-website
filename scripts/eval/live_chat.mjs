@@ -5,7 +5,7 @@
 // "did it use what it was told?". Run it on a few cases, not all 24.
 //
 //   node scripts/eval/live_chat.mjs 1 5 19
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { hydrate, searchMaterials, searchMaterialsMulti, extractItemQueries,
          categoryStats, renderMaterialsBlock, consumableQueries } from '../../functions/api/_materials.js';
 const ROOT = new URL('../../', import.meta.url);
@@ -38,16 +38,24 @@ for (const c of cases) {
   const res = await fetch('https://www.sj-eng.co.il/api/chat', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ messages:[{role:'system',content:system},{role:'user',content:c.msg}],
-      max_tokens: 1600, stream:false }),
+      max_tokens: 3000, stream:false }),
   });
   const data = await res.json().catch(()=>({}));
   const txt = data?.choices?.[0]?.message?.content;
   // Written to disk, not just printed: a 2,000-word Hebrew answer scrolls out of
   // a terminal, and every one of these costs real AI quota — losing it to a pipe
   // means paying twice for the same answer.
-  const outDir = new URL('../../data/field-research/live-answers/', ROOT);
+  const outDir = new URL('data/field-research/live-answers/', ROOT);
   mkdirSync(outDir, { recursive: true });
-  writeFileSync(new URL(`case-${c.num}.md`, outDir),
+  // Never let a failed call destroy a transcript that cost quota to produce.
+  // A 429 overwrote two good answers with error text before this existed, and
+  // the quota to regenerate them was already spent.
+  const dest = new URL(`case-${c.num}.md`, outDir);
+  if (!txt && existsSync(dest)) {
+    console.log(`[${res.status}] case ${c.num} — keeping the existing transcript`);
+    continue;
+  }
+  writeFileSync(dest,
     `# מקרה ${c.num} — ${c.title}
 
 ## ההודעה

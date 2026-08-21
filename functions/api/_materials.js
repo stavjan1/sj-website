@@ -207,7 +207,13 @@ const SYNONYM_SEED = {
   פחת: ['ממסר'],
   ממסר: ['פחת'],
   שרשורי: ['שרשור', 'צינור'],
-  מרירון: ['מריכף', 'ykc', 'יקע'],
+  // NOT a synonym for מריכף, however similar the words look. ERCO carries them
+  // as two separate categories with different sizes and different prices —
+  // "צינור מרירון" (20/25/32, ~2-4.75 ₪/m) and "צינור מריכף/י.ק.ע" (16 upward,
+  // ~0.93-1.27 ₪/m). Mapping one to the other put the wrong conduit in every
+  // charger quote, which is exactly the sort of substitution nobody notices
+  // until the van is unloaded.
+  יקע: ['ykc'],
   דוד: ['מחמם'],
   שקע: ['תקע', 'בית'],
   תקע: ['שקע'],
@@ -433,9 +439,15 @@ export function extractItemQueries(text, max = 24) {
 const JOB_CONSUMABLES = [
   {
     when: /עמדת טעינה|טעינה לרכב|רכב חשמלי|wallbox|charger/i,
-    items: ['צינור גמיש לבן PG 21', 'צינור מריכף 16', 'מפסק פקט',
+    // מרירון for a charger, per Stav — not מריכף, which is a different conduit.
+    items: ['צינור גמיש לבן PG 21', 'צינור מרירון', 'מפסק פקט',
             'ממסר פחת 4x40 30mA', 'נעל כבל', 'שרוול מתכווץ', 'מהדק כבל',
-            'שילוט מעגלים'],
+            'שילוט מעגלים',
+            // The model picks the cross-section itself, and it does that AFTER
+            // retrieval has run — so a charger quote priced 5x6 cable "from
+            // memory" at 28 ₪/m while the catalog held it at 17.54. Seeding the
+            // three sections a charger actually uses closes that gap.
+            'כבל N2XY 5x4', 'כבל N2XY 5x6', 'כבל N2XY 5x10'],
   },
   {
     when: /לוח|מודול|מא"ז|מאז|פחת|ארון חשמל/,
@@ -458,6 +470,29 @@ const JOB_CONSUMABLES = [
             'צינור גמיש לבן PG 21'],
   },
 ];
+
+// The closing checklist.
+//
+// Item-level reminders fix item-level omissions. They do not fix the omissions
+// that are about the QUOTE rather than about a part — and measured on live
+// answers, the biggest one was the inspector: the pricing map carries the fee
+// and says it must be its own line, and two full, otherwise-excellent quotes
+// still never mentioned it. Being present in a 40KB prompt is not the same as
+// being acted on.
+//
+// So this rides last. It is deliberately short, it is entirely rules rather
+// than data, and it asks for an explicit statement on each point so silence
+// stops being an available answer.
+export function renderQuoteChecklist() {
+  return `# לפני שאתה שולח את ההצעה — עבור על החמישה האלה ואמור משהו על כל אחד
+נתונים בלבד. אלה לא המלצות, אלה הדברים שהצעות מחיר נופלות עליהם בפועל.
+
+1. **חשמלאי בודק** — שורה נפרדת, תמיד, גם כשלא שאלו. המחיר תלוי בסוג המתקן: עמדת טעינה ~600 ₪, דירה ~1,500 ₪, בית פרטי/וילה גבוה יותר ותלוי גודל, עסק/3X63 ומעלה גבוה משמעותית. אם אתה לא יודע לאיזה מתקן מדובר — שאל, אל תנקוב במספר. אם החלטת שלא נדרש בודק — אמור את זה במפורש ולמה.
+2. **מע"מ** — כתוב "לפני מע"מ" ליד הסכום. לא בהערת שוליים.
+3. **חומרים כלולים או לא** — אמור זאת בשורה אחת. "כולל חומר" ו"עבודה בלבד" הם שני מחירים שונים לגמרי, וזו הטעות שהכי מייצרת ויכוח מול לקוח.
+4. **מה לא כלול** — תיקון ליקויים קיימים, עבודות גבס/צבע אחרי חציבה, פינוי פסולת, אגרות חח"י. מנה את מה שרלוונטי לעבודה הזו.
+5. **מה עוד לא ידוע** — אם נשאר משתנה שמזיז את המחיר במאות שקלים (אורך מסלול, סוג קיר, מקום בלוח), אמור מהו ומה ההנחה שהנחת. הצעה עם הנחה מוצהרת שווה יותר מהצעה שנשמעת בטוחה ומתבררת כלא נכונה.`;
+}
 
 export function consumableQueries(text) {
   const out = [];

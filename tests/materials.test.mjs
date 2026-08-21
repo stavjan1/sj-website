@@ -15,7 +15,7 @@ import { dirname, join } from 'node:path';
 
 import {
   hydrate, norm, searchMaterials, categoryStats, renderMaterialsBlock,
-  renderTaxonomyBlock, searchMaterialsMulti, extractItemQueries,
+  renderTaxonomyBlock, searchMaterialsMulti, extractItemQueries, consumableQueries,
 } from '../functions/api/_materials.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -288,6 +288,25 @@ test('the block sizes itself to the job, not to the catalog', () => {
   const big = searchMaterialsMulti(db, extractItemQueries(HANDOFF), 3, 45);
   assert.ok(small.length < big.length / 2,
     `a 2-item job returned ${small.length} rows against ${big.length} for a 9-item job`);
+});
+
+test('מרירון and מריכף are not treated as the same conduit', () => {
+  // Stav's correction: a charger run uses מרירון. They look alike and ERCO
+  // carries them as two separate categories at different sizes and prices, so a
+  // synonym between them silently swaps the conduit in every charger quote.
+  const mr = searchMaterials(db, 'צינור מרירון', 5);
+  assert.ok(mr.length > 0, 'no מרירון found at all');
+  assert.ok(mr.every((h) => /מרירון/.test(h.name)),
+    `מרירון query returned other conduit: ${mr.map((h) => h.name).join(' | ')}`);
+
+  const mk = searchMaterials(db, 'צינור מריכף 16', 5);
+  assert.ok(mk.some((h) => /מריכף 16/.test(h.name)), 'מריכף 16 no longer findable');
+});
+
+test('a charger job is reminded about מרירון, not מריכף', () => {
+  const qs = consumableQueries('התקנת עמדת טעינה לרכב חשמלי בבית פרטי');
+  assert.ok(qs.some((q) => /מרירון/.test(q)), `charger consumables: ${qs.join(' | ')}`);
+  assert.ok(!qs.some((q) => /מריכף/.test(q)), 'מריכף should not be a charger default');
 });
 
 test('a misspelling still finds the product', () => {
