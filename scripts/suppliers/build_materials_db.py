@@ -92,6 +92,16 @@ LENGTH_GOODS_PREFIXES = ("כבל", "חוט", "מוליך", "פס הארקת", "�
 # product NAMED like cable is also FILED as cable.
 CABLE_DEPARTMENTS = ("cables-wires", "kblim", "multimedia-cables")
 
+# "3x1.5", "5X6", "3*25+16" — the shape of a conductor spec.
+CROSS_SECTION_RE = re.compile(r"\d+\s*[xX×*]\s*\d")
+# "5 מטר", "50 מ'", "500מ'" — a lead that states how long it is.
+FINISHED_LENGTH_RE = re.compile(r"\d+(?:\.\d+)?\s*(?:מטר|מ')")
+# ...but a stated length next to a packaging word is the size of the DRUM, not
+# of the product: "כבל מכשור שחור 1X2X18 AWG כ\"מ - תוף 500מ'" is 500 metres of
+# cable at 1.95 ₪ each, not a 1.95 ₪ drum. These arrived through the backfill
+# with no category at all, so nothing else could have caught them.
+PACKAGING_WORDS = ("תוף", "גליל", "סליל", "חבילה", "חב'", "מארז", 'כ"מ')
+
 # Tier 2 — sold by length, stated in the name. "בחיתוך" (cut to order) is the
 # one that mattered: every heat-shrink sleeve sold that way is per metre, and
 # the tier-3 word "שרוול" was calling all of them pieces.
@@ -138,6 +148,22 @@ def infer_unit(name, cat_paths):
     # under טעינה לרכב, not under כבלי חשמל, so it never reaches this rule.
     if n.startswith(LENGTH_GOODS_PREFIXES) and any(
             dep in full for dep in CABLE_DEPARTMENTS):
+        return "מטר", "name"
+
+    # ...and the same conclusion without trusting the category at all, because
+    # the category is sometimes simply wrong: ERCO files its 16 UV-rated N2XY
+    # ranges under kli-ebvdh/power-tools/accessories-3 — power tool accessories
+    # — so "כבל N2XY 5x6 FR UV" came out priced per piece at 32 ₪.
+    #
+    # A name that is "כבל" plus a cross-section is bulk cable. The finished-lead
+    # guard is what keeps this honest: "כבל לעמדת טעינה ציבורית 5 מטר ... 3*16A"
+    # also carries a cross-section, but it states its own length, and a thing
+    # that states its length is sold as that thing.
+    states_own_length = bool(FINISHED_LENGTH_RE.search(n)) and not any(
+        w in n for w in PACKAGING_WORDS)
+    if (n.startswith(LENGTH_GOODS_PREFIXES)
+            and CROSS_SECTION_RE.search(n)
+            and not states_own_length):
         return "מטר", "name"
     for frag in PER_UNIT_LEAF:
         if frag in leaf:

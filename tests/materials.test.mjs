@@ -255,6 +255,29 @@ test('discrete parts are not priced by the metre', () => {
     `sold per metre but shouldn't be: ${perMetreOffenders.slice(0, 5).map((i) => i.name).join(' | ')}`);
 });
 
+test('a miscategorised cable is still priced as cable', () => {
+  // ERCO files its UV-rated N2XY ranges under power-TOOL accessories, and the
+  // category rule faithfully reproduced that: "כבל N2XY 5x6 FR UV" came out at
+  // 32 ₪ per piece. The shape of the name has to be able to overrule the shelf
+  // it was put on.
+  const uv = db.items.filter((it) => /^כבל N2XY .*UV/.test(it.name));
+  assert.ok(uv.length >= 10, `only ${uv.length} UV cable rows — range may have moved`);
+  const perPiece = uv.filter((it) => it.unit !== 'מטר');
+  assert.equal(perPiece.length, 0,
+    `UV cable priced per piece: ${perPiece.slice(0, 4).map((i) => i.name).join(' | ')}`);
+});
+
+test('a finished lead is not priced by the metre', () => {
+  // The mirror image, and the reason the rule above cannot be "anything called
+  // כבל is per metre": an extension lead states its own length and is sold as
+  // one object. A drum that states ITS length is still bulk cable.
+  const leads = db.items.filter((it) => /^כבל מאריך|^כבל קומקום|^כבל טעינה/.test(it.name));
+  assert.ok(leads.length >= 5, `only ${leads.length} finished leads found`);
+  const perMetre = leads.filter((it) => it.unit === 'מטר');
+  assert.equal(perMetre.length, 0,
+    `finished lead priced per metre: ${perMetre.slice(0, 4).map((i) => i.name).join(' | ')}`);
+});
+
 test('cable really is priced by the metre', () => {
   const cables = db.items.filter((it) => /^כבל \d/.test(it.name) && /מוליך נחושת/.test(it.cat));
   assert.ok(cables.length > 20, `only ${cables.length} power cables found`);
