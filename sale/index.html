@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=323">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=324">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,11 +26,11 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=323">
-    <link rel="stylesheet" href="../assets/ui.css?v=323">
-    <link rel="stylesheet" href="css/shell.css?v=323">
-    <link rel="stylesheet" href="css/panels.css?v=323">
-    <link rel="stylesheet" href="css/pdf.css?v=323">
+    <link rel="stylesheet" href="../assets/tokens.css?v=324">
+    <link rel="stylesheet" href="../assets/ui.css?v=324">
+    <link rel="stylesheet" href="css/shell.css?v=324">
+    <link rel="stylesheet" href="css/panels.css?v=324">
+    <link rel="stylesheet" href="css/pdf.css?v=324">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -71,9 +71,13 @@
             </a>
 
             <nav class="nav-menu">
+                <button class="nav-btn" id="tab-home" onclick="switchTab('home')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg>
+                    <span>בית</span>
+                </button>
                 <button class="nav-btn mobile-core active" id="tab-projects" onclick="switchTab('projects')">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
-                    <span>פרויקטים</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 5h18"/><path d="M3 12h18"/><path d="M3 19h12"/></svg>
+                    <span>עבודות</span>
                 </button>
                 <!-- Project workspace tabs: exist ONLY while a project is open
                      (guided, chronological flow — Stav 04/07). -->
@@ -342,8 +346,39 @@
             </div>
             </section>
 
+            <!-- The way in is a question, not a dashboard. Everything that used
+                 to greet you here — counters, toolbar, categories, the list — is
+                 one click away in "עבודות"; what is left is the only thing you
+                 actually arrived to do. -->
+            <section id="panel-home" class="content-panel active">
+                <div class="home-wrap">
+                    <div class="home-main">
+                        <h1 class="home-hi"><span id="home-greeting">שלום</span></h1>
+                        <p class="home-sub">מה העבודה שאתה מתמחר עכשיו?</p>
+                        <div class="home-ask">
+                            <textarea id="home-input" rows="1" placeholder="תאר את העבודה במילים שלך — למשל: החלפת לוח חשמל בדירת 4 חדרים"
+                                      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();startWorkFromHome();}"></textarea>
+                            <button type="button" class="home-send" id="home-send" onclick="startWorkFromHome()" aria-label="התחל">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                            </button>
+                        </div>
+                        <div class="home-chips">
+                            <button type="button" class="chip" onclick="fillHomeExample(this)">התקנת עמדת טעינה 15 מטר מהלוח</button>
+                            <button type="button" class="chip" onclick="fillHomeExample(this)">החלפת לוח חשמל בדירת 4 חדרים</button>
+                            <button type="button" class="chip" onclick="fillHomeExample(this)">הוספת 6 נקודות חשמל בסלון</button>
+                            <button type="button" class="chip" onclick="fillHomeExample(this)">בדיקת תקלה — קצר במעגל</button>
+                        </div>
+                    </div>
+                    <aside class="home-side" aria-label="אחרונות">
+                        <div class="home-side-head">ממשיכים מאיפה שעצרת</div>
+                        <div class="home-recent" id="home-recent"></div>
+                        <button type="button" class="home-all" onclick="switchTab('projects')">כל העבודות ←</button>
+                    </aside>
+                </div>
+            </section>
+
             <!-- Tab: Projects Manager -->
-            <section id="panel-projects" class="content-panel active">
+            <section id="panel-projects" class="content-panel">
                 <div class="section-header">
                     <h2><i class="fa-solid fa-folder-open"></i> ניהול פרויקטים</h2>
                     <p class="section-subtitle">נהל את שלב התמחור והצעת המחיר לכל לקוח תחת פרויקט ייעודי.</p>
@@ -356,28 +391,6 @@
                      categories yet that rail was an empty box taking a fifth of
                      the width, and a filter belongs with what it filters. -->
                 <div class="projects-main">
-                    <!-- The app used to open by asking for a NAME, which is the one
-                         thing you do not know yet when a customer has just called.
-                         It asks for the work now: you describe it, the agent
-                         answers, and the project is what the conversation becomes —
-                         including its name, which the agent writes from your words. -->
-                    <div class="create-project-inline">
-                        <i class="fa-solid fa-bolt text-accent" aria-hidden="true"></i>
-                        <input type="text" id="new-project-name" placeholder="מה העבודה? תאר במשפט — למשל: החלפת לוח חשמל בדירת 4 חדרים" onkeydown="if(event.key==='Enter')startWorkFromDescription()">
-                        <button class="btn btn-accent" onclick="startWorkFromDescription()">
-                            <i class="fa-solid fa-arrow-left"></i> בוא נתחיל
-                        </button>
-                    </div>
-                    <div class="create-examples" aria-label="דוגמאות">
-                        <button type="button" class="chip" onclick="fillWorkExample(this)">התקנת עמדת טעינה 15 מטר מהלוח</button>
-                        <button type="button" class="chip" onclick="fillWorkExample(this)">החלפת לוח חשמל בדירת 4 חדרים</button>
-                        <button type="button" class="chip" onclick="fillWorkExample(this)">הוספת 6 נקודות חשמל בסלון</button>
-                        <button type="button" class="chip" onclick="fillWorkExample(this)">בדיקת תקלה — קצר במעגל</button>
-                    </div>
-
-                    <p class="create-quick-hint">
-                        רק שאלה מהירה? <a href="/ask/">אפשר לשאול בלי לפתוח עבודה ←</a>
-                    </p>
                     <!-- Handoff from the public /ask/ quick-chat: continue that job as a full project -->
                     <div id="ask-handoff-banner"></div>
                     <!-- Arrived from a calendar reminder (?p=<project>) — offers the
@@ -2184,17 +2197,17 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/listcards.js?v=323"></script>
+    <script src="/assets/listcards.js?v=324"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=323"></script>
-    <script src="app.js?v=323"></script>
+    <script src="coverage.js?v=324"></script>
+    <script src="app.js?v=324"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=323"></script>
+    <script src="finance.js?v=324"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=323" defer></script>
-    <script src="/track.js?v=323" defer></script>
+    <script src="../assistant.js?v=324" defer></script>
+    <script src="/track.js?v=324" defer></script>
 </body>
 </html>

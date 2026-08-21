@@ -3294,3 +3294,67 @@ i[class^="fa-"], i[class*=" fa-"] {
     color: inherit; font-size: var(--fs-xs); font-weight: 500;
 }
 .banner-client[hidden] { display: none; }
+
+
+/* ============================================================================
+   The home. One question in the middle, and what you were doing beside it.
+   ============================================================================ */
+.home-wrap {
+    display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: var(--sp-8);
+    align-items: start; min-height: min(70vh, 620px);
+}
+.home-main { display: flex; flex-direction: column; justify-content: center; min-height: min(60vh, 520px); }
+.home-hi {
+    margin: 0 0 var(--sp-1); font-size: clamp(1.8rem, 4.5vw, 2.6rem); font-weight: 700;
+    color: var(--text); letter-spacing: -0.02em;
+}
+.home-sub { margin: 0 0 var(--sp-6); font-size: var(--fs-lg); color: var(--text-2); }
+
+/* The box is the screen: big, quiet, and the only thing asking for your hand. */
+.home-ask {
+    display: flex; align-items: flex-end; gap: var(--sp-2);
+    background: var(--surface); border: 1px solid var(--border-strong);
+    border-radius: var(--r-md); padding: var(--sp-3);
+    box-shadow: var(--shadow-1);
+    transition: border-color var(--t-fast);
+}
+.home-ask:focus-within { border-color: var(--accent); }
+.home-ask textarea {
+    flex: 1; min-height: 64px; max-height: 220px; resize: none;
+    border: none !important; background: transparent !important; box-shadow: none;
+    padding: var(--sp-2); font: 400 var(--fs-lg)/1.55 var(--font-ui); color: var(--text);
+}
+.home-ask textarea:focus { outline: none; }
+.home-send {
+    width: 44px; height: 44px; flex: none; border: none; border-radius: var(--r-pill);
+    background: var(--action, var(--accent)); color: var(--on-action, var(--on-accent));
+    display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.home-send:hover { filter: brightness(1.05); }
+.home-send svg { width: 20px; height: 20px; }
+.home-chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-block-start: var(--sp-4); }
+
+.home-side { display: flex; flex-direction: column; gap: var(--sp-2); padding-block-start: var(--sp-6); }
+.home-side-head { font-size: var(--fs-xs); font-weight: 700; color: var(--text-3); letter-spacing: .06em; }
+.home-recent { display: flex; flex-direction: column; gap: var(--sp-1); }
+.home-recent-item {
+    display: flex; flex-direction: column; gap: 2px; text-align: start;
+    padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm);
+    background: none; border: 1px solid transparent; cursor: pointer;
+}
+.home-recent-item:hover { background: var(--surface-2); border-color: var(--border); }
+.hr-name { font-size: var(--fs-sm); font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hr-meta { font-size: var(--fs-xs); color: var(--text-3); }
+.home-empty { font-size: var(--fs-sm); color: var(--text-3); margin: 0; }
+.home-all {
+    align-self: flex-start; background: none; border: none; cursor: pointer;
+    color: var(--accent); font: 600 var(--fs-xs) var(--font-ui); padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-sm);
+}
+.home-all:hover { background: var(--surface-2); }
+
+@media (max-width: 860px) {
+    .home-wrap { grid-template-columns: minmax(0, 1fr); gap: var(--sp-6); min-height: 0; }
+    .home-main { min-height: 0; padding-block-start: var(--sp-8); }
+    .home-side { padding-block-start: 0; border-block-start: 1px solid var(--border); padding-block: var(--sp-4) 0; }
+}

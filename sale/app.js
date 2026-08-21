@@ -1101,6 +1101,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (vatSel) vatSel.addEventListener('change', () => rememberQuotePref('vatType', vatSel.value));
         markActivePdfTemplate(); // highlight the saved design template pill
         setProjectsView(localStorage.getItem('sj_projects_view') || 'list'); // restore list/grid choice
+        switchTab('home'); // the way in is the question, not the list
         setTimeout(showWelcomeOnboarding, 900); // first-run walkthrough (once)
         setTimeout(checkAskHandoff, 1100); // continue a job from the /ask/ quick-chat
     }
@@ -1726,6 +1727,9 @@ function switchTab(tabId, opts) {
     if (tabId === 'statistics') {
         renderStatistics();
     }
+    if (tabId === 'home') {
+        renderHome();
+    }
     if (tabId === 'clients') {
         setClientsView(subView || 'list');
         updateClientsDueCount();
@@ -2189,6 +2193,59 @@ window.sjDataRecovery = {
     }
 };
 
+
+// ==========================================================================
+// The home: one question.
+//
+// The app used to open on a dashboard — counters, a toolbar, category chips
+// and a list — none of which is what you came to do. You came because someone
+// asked you what a job costs. So that is the whole screen: a greeting, a box,
+// and beside it the jobs you were in the middle of.
+// ==========================================================================
+function renderHome() {
+    const greet = document.getElementById('home-greeting');
+    if (greet) {
+        const h = new Date().getHours();
+        const part = h < 5 ? 'לילה טוב' : h < 12 ? 'בוקר טוב' : h < 17 ? 'צהריים טובים' : h < 21 ? 'ערב טוב' : 'לילה טוב';
+        let name = '';
+        try { name = (localStorage.getItem('gsi_name') || '').split(' ')[0] || ''; } catch (e) {}
+        greet.textContent = name ? `${part}, ${name}` : part;
+    }
+
+    const box = document.getElementById('home-recent');
+    if (!box) return;
+    const recent = (projectsList || []).slice(0, 4);
+    box.innerHTML = recent.length
+        ? recent.map((p) => `
+            <button type="button" class="home-recent-item" onclick="openRecentProject('${p.id}')">
+                <span class="hr-name">${escapeHtml(p.name)}</span>
+                <span class="hr-meta">${escapeHtml(p.status || 'טיוטה')} · ${escapeHtml(formatHebrewDate(p.created) || '')}</span>
+            </button>`).join('')
+        : '<p class="home-empty">עוד לא פתחת עבודה. תאר אחת ונתחיל.</p>';
+}
+
+function openRecentProject(id) {
+    loadProject(id);
+    switchTab('wizard');
+}
+
+function fillHomeExample(btn) {
+    const input = document.getElementById('home-input');
+    if (!input) return;
+    input.value = btn.textContent.trim();
+    input.focus();
+}
+
+// The home's box and the list's box do the same thing; this is the one the
+// home uses.
+function startWorkFromHome() {
+    const input = document.getElementById('home-input');
+    const text = (input && input.value || '').trim();
+    if (!text) { input && input.focus(); return; }
+    input.value = '';
+    createNewProject({ describe: text });
+}
+
 // The home screen asks for the WORK, not for a name: you type what the customer
 // asked for, and the conversation starts on the spot. The project is what that
 // conversation becomes — the agent titles it from your own words.
@@ -2208,7 +2265,7 @@ function fillWorkExample(btn) {
 function createNewProject(opts) {
     opts = opts || {};
     const input = document.getElementById('new-project-name');
-    const typed = (input.value || '').trim();
+    const typed = ((input && input.value) || '').trim();
     // Naming a job before describing it was the first thing the app asked for
     // and the first place people stalled. An unnamed project is legal now; the
     // characterization agent titles it from the description (see applySpecPrefill).
@@ -2269,7 +2326,7 @@ function createNewProject(opts) {
     projectsList.unshift(newProj);
     saveProjects();
     filterProjectsList();
-    input.value = '';
+    if (input) input.value = '';
     
     loadProject(newProj.id);
     if (!describing) showToast(autoName ? 'פרויקט חדש נפתח — תאר את העבודה והשם ייקבע לבד' : `פרויקט "${name}" נוצר בהצלחה`);
@@ -4515,6 +4572,9 @@ function _followupIcs(proj, when) {
 
 function renderProjectsList(list) {
     if (!list) list = projectsList;
+    // The home's "continue where you left off" reads the same list, and the
+    // cloud pull can land after the first paint.
+    try { if (document.getElementById('home-recent')) renderHome(); } catch (e) {}
     const container = document.getElementById('projects-list-container');
     if (!container) return;
 
