@@ -207,7 +207,13 @@ const SYNONYM_SEED = {
   פחת: ['ממסר'],
   ממסר: ['פחת'],
   שרשורי: ['שרשור', 'צינור'],
-  מרירון: ['מריכף', 'ykc', 'יקע'],
+  // NOT a synonym for מריכף, however similar the words look. ERCO carries them
+  // as two separate categories with different sizes and different prices —
+  // "צינור מרירון" (20/25/32, ~2-4.75 ₪/m) and "צינור מריכף/י.ק.ע" (16 upward,
+  // ~0.93-1.27 ₪/m). Mapping one to the other put the wrong conduit in every
+  // charger quote, which is exactly the sort of substitution nobody notices
+  // until the van is unloaded.
+  יקע: ['ykc'],
   דוד: ['מחמם'],
   שקע: ['תקע', 'בית'],
   תקע: ['שקע'],
@@ -433,7 +439,8 @@ export function extractItemQueries(text, max = 24) {
 const JOB_CONSUMABLES = [
   {
     when: /עמדת טעינה|טעינה לרכב|רכב חשמלי|wallbox|charger/i,
-    items: ['צינור גמיש לבן PG 21', 'צינור מריכף 16', 'מפסק פקט',
+    // מרירון for a charger, per Stav — not מריכף, which is a different conduit.
+    items: ['צינור גמיש לבן PG 21', 'צינור מרירון', 'מפסק פקט',
             'ממסר פחת 4x40 30mA', 'נעל כבל', 'שרוול מתכווץ', 'מהדק כבל',
             'שילוט מעגלים'],
   },
