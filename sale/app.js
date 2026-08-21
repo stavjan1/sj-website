@@ -6568,10 +6568,21 @@ function ensureProjectPricing(proj) {
     if (!p._daysEdited) p.days = Math.max(1, Math.ceil((Number(p.hours) || 8) / 8));
     return p;
 }
+// Money the customer pays that is NOT your work and NOT your material: the
+// inspector, the utility's connection fees, a dig permit, a skip. It is a
+// pass-through — it carries no markup (you are not reselling the inspector) and
+// no risk premium (a fee does not get riskier because there was no deposit), so
+// it is added after both, never inside them.
+function projectFeesCost(proj) {
+    return ((proj && proj.fees) || [])
+        .reduce((sum, f) => sum + (Number(f && f.price) || 0), 0);
+}
+
 // Both labor methods computed together so the user sees a RANGE:
 //  A) hours × rate × complexity × urgency   B) daily-profit-target × work-days.
 // Materials (cost×markup) are shared; a risk premium applies to the whole total
-// when it's a high-exposure job with no advance payment.
+// when it's a high-exposure job with no advance payment; fees ride on top of
+// both, untouched.
 function pricingCalc(proj) {
     const rules = getPricingRules();
     const p = ensureProjectPricing(proj);
@@ -6581,9 +6592,10 @@ function pricingCalc(proj) {
     const laborA = (Number(p.hours) || 0) * (Number(p.rate) || 0) * cx * urg;
     const laborB = (Number(p.dailyTarget) || 0) * (Number(p.days) || 0);
     const riskMult = p.noAdvance ? 1 + (Number(rules.riskPct) || 0) / 100 : 1;
-    const totalA = (matPrice + laborA) * riskMult;
-    const totalB = (matPrice + laborB) * riskMult;
-    return { matPrice, laborA, laborB, riskMult, totalA, totalB, lo: Math.min(totalA, totalB), hi: Math.max(totalA, totalB) };
+    const feesTotal = projectFeesCost(proj);
+    const totalA = (matPrice + laborA) * riskMult + feesTotal;
+    const totalB = (matPrice + laborB) * riskMult + feesTotal;
+    return { matPrice, laborA, laborB, riskMult, feesTotal, totalA, totalB, lo: Math.min(totalA, totalB), hi: Math.max(totalA, totalB) };
 }
 
 function renderPricingEngine() {
@@ -6612,6 +6624,10 @@ function renderPricingEngine() {
             <label>תוספת רווח %</label>
             <input type="number" step="1" value="${Math.round(Number(p.markup) || 0)}" oninput="pricingInput('markup', this.value)">
             <span class="pe-out">מחיר חומרים: <b id="pe-matprice">${pricingNis(c.matPrice)}</b></span>
+        </div>
+        <div class="pe-row">
+            <label>אגרות ובודק</label>
+            <span class="pe-out">מועבר ללקוח כמו שהוא, בלי תוספת רווח: <b id="pe-fees">${pricingNis(c.feesTotal)}</b></span>
         </div>
 
         <div class="pe-methods">
@@ -6670,6 +6686,7 @@ function pricingUpdateTotals() {
     const c = pricingCalc(proj);
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     set('pe-matprice', pricingNis(c.matPrice));
+    set('pe-fees', pricingNis(c.feesTotal));
     set('pe-laborA', pricingNis(c.laborA));
     set('pe-laborB', pricingNis(c.laborB));
     set('pe-lo', pricingNis(c.lo));
@@ -9622,6 +9639,16 @@ function applyMaterialsFromResponse(activeProject, responseText) {
             renderMaterialsChecklist(activeProject.materials);
         }
 
+        // Fees: the inspector, utility charges, permits. Same trust-boundary
+        // clamping as materials — this is model output and it gets persisted.
+        if (Array.isArray(parsed.fees) && parsed.fees.length > 0) {
+            activeProject.fees = parsed.fees.map(f => ({
+                name: String(f && f.name == null ? '' : f.name).slice(0, 200),
+                price: Number(f && f.price) || 0,
+                note: String(f && f.note == null ? '' : f.note).slice(0, 400),
+            })).filter(f => f.name);
+        }
+
         if (Array.isArray(parsed.blindSpots) && parsed.blindSpots.length > 0) {
             const tipsBox = document.getElementById('wizard-tips-box');
             if (tipsBox) {
@@ -12074,7 +12101,7 @@ function getProfessionSystemInstruction() {
 # פלט JSON לעדכון הדשבורד הצדדי (רק כשרלוונטי)
 המערכת מציגה בצד 3 כרטיסיות שמתמלאות מהשיחה: "אפיון הפרויקט", "כתב כמויות" (חומרים+עבודה) ו"ארגז הכלים". כדי לעדכן אותן, סיים את התשובה בגוש JSON בתוך בלוק \`\`\`json ... \`\`\`, אך ורק כשיש לך תוכן רלוונטי:
 - בשלב 1 (שאלות בלבד), אל תוסיף JSON כלל.
-- בשלב 2 (תמחור): כלול scope (תגיות אפיון), materials, laborPriceEstimate, laborHoursEstimate, blindSpots.
+- בשלב 2 (תמחור): כלול scope (תגיות אפיון), materials, fees, laborPriceEstimate, laborHoursEstimate, blindSpots.
 - בשלב 3 (כלים), כלול tools.
 שלח רק את השדות הרלוונטיים לשלב הנוכחי. המבנה:
 {
@@ -12084,6 +12111,9 @@ function getProfessionSystemInstruction() {
   "blindSpots": ["נקודת עיוורון ראשונה", "נקודת עיוורון שנייה"],
   "materials": [
     { "name": "שם החומר/האביזר", "price": 25, "details": "כמות והערה (למשל: 15 מטר)", "checked": true }
+  ],
+  "fees": [                                                  // תשלומים שאינם עבודה ואינם חומר: בודק, אגרות חח"י, היתרים, פינוי פסולת.
+    { "name": "חשמלאי בודק", "price": 600, "note": "שורה נפרדת — לא כלול בהתקנה" }
   ],
   "tools": [
     { "name": "פטישון עם איזמל שטוח", "checked": false }    // כלי עבודה (אופציונלי, שלב 3)
