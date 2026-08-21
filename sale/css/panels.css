@@ -3358,3 +3358,28 @@ i[class^="fa-"], i[class*=" fa-"] {
     .home-main { min-height: 0; padding-block-start: var(--sp-8); }
     .home-side { padding-block-start: 0; border-block-start: 1px solid var(--border); padding-block: var(--sp-4) 0; }
 }
+
+/* ============================================================================
+   The quote editor's item rows — the same rule as the work list: a filled red
+   box is for a confirmation dialog, not for the twelfth row of a document you
+   are still writing.
+   ============================================================================ */
+#panel-create .work-item-form-row .btn-danger {
+    background: transparent !important; color: var(--text-3) !important;
+    border: 1px solid transparent !important;
+}
+#panel-create .work-item-form-row .btn-danger:hover {
+    background: color-mix(in srgb, var(--danger) 14%, transparent) !important;
+    color: var(--danger) !important;
+}
+#panel-create .work-item-actions .wi-move {
+    background: transparent; border-color: transparent; color: var(--text-3);
+}
+#panel-create .work-item-actions .wi-move:hover { background: var(--surface); border-color: var(--border); color: var(--text); }
+/* The row is a line in a document, not a card in a gallery. */
+#panel-create .work-item-form-row {
+    background: transparent; border-color: transparent;
+    border-block-end: 1px solid var(--border); border-radius: 0;
+    margin-block-end: 0; padding-inline: 0;
+}
+#panel-create .work-item-form-row:hover { background: var(--surface-2); }

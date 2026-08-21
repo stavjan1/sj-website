@@ -1701,6 +1701,8 @@ function switchTab(tabId, opts) {
     }
 
     if (tabId === 'create') {
+        // Where the business details actually matter: this document carries them.
+        setTimeout(maybeShowBizGate, 800);
         ensureQuoteNumber();
         requestAnimationFrame(fitQuotePreview); // scale the A4 preview to fit the pane
         refreshBenchmarkBar(); // "עבודה כזו תומחרה ב-X" (only if admin went live)
@@ -2343,8 +2345,10 @@ function createNewProject(opts) {
             sendChatMessage();
         }, 260);
     }
-    // First project ever → one soft, skippable nudge to fill business details.
-    if (projectsList.length === 1) setTimeout(maybeShowBizGate, 1200);
+    // The nudge to fill in business details used to fire here, 1.2s after the
+    // first project opened — which is while you are waiting for the agent's
+    // first answer. You asked a question and got a form. It waits for the quote
+    // screen now, where your name is about to be printed on something.
 }
 
 // ── Handoff from the public /ask/ quick-chat ──────────────────────────────
@@ -6957,15 +6961,21 @@ function initNewQuote() {
 
 function fillFormFromState() {
     const q = appState.currentQuote;
-    
-    document.getElementById('form-client-name').value = q.clientName;
-    document.getElementById('form-client-sub').value = q.clientSub;
-    document.getElementById('form-quote-number').value = q.quoteNumber;
-    document.getElementById('form-quote-date').value = q.date;
-    document.getElementById('form-quote-subject').value = q.subject;
-    document.getElementById('form-base-price').value = q.basePrice;
-    document.getElementById('form-vat-type').value = q.vatType;
-    document.getElementById('form-summary').value = q.summary;
+
+    // Assigning undefined to an <input> stores the STRING "undefined", and the
+    // A4 preview then printed "הצעת מחיר ל-undefined" on a customer's document.
+    // Any field a project predates — or that the agent left empty — comes
+    // through as undefined, so every one of them is coerced here.
+    const val = (v, fallback) => (v === undefined || v === null ? (fallback === undefined ? '' : fallback) : v);
+
+    document.getElementById('form-client-name').value = val(q.clientName);
+    document.getElementById('form-client-sub').value = val(q.clientSub);
+    document.getElementById('form-quote-number').value = val(q.quoteNumber);
+    document.getElementById('form-quote-date').value = val(q.date, getTodayDateString());
+    document.getElementById('form-quote-subject').value = val(q.subject);
+    document.getElementById('form-base-price').value = val(q.basePrice, 0);
+    document.getElementById('form-vat-type').value = val(q.vatType, 'exempt');
+    document.getElementById('form-summary').value = val(q.summary);
     
     const container = document.getElementById('work-items-container');
     container.innerHTML = '';
