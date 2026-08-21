@@ -15,6 +15,7 @@
 import { generate } from './_ai.js';
 import { getPricingMap } from './_pricing_map.js';
 import { getKitBlock } from './_electrical_kit.js';
+import { getMaterialsBlock, getTaxonomyBlock } from './_materials.js';
 import {
   ADMIN_EMAIL, loadModelClass, loadTierConfig, getTierForEmail,
   verifyGoogleEmail, bearerToken, dayKey, rateLimit,
@@ -107,6 +108,45 @@ export async function onRequestPost(context) {
   // per request rather than always — pricing chats don't need the parts bin.
   const kit = getKitBlock(typeof body.jobKit === 'string' ? body.jobKit.slice(0, 40) : '');
   if (kit) messages.push({ role: 'system', content: kit });
+
+  // Paired with the kit, and only with it: the kit says what a job of this
+  // family needs, the taxonomy says what the supply market actually stocks and
+  // what each family costs. Together they are the difference between a parts
+  // list written from memory and one written against a real shelf. Pricing
+  // turns don't get it — they get the item-level lookup below instead.
+  if (kit) {
+    try {
+      const taxonomy = await getTaxonomyBlock(request);
+      if (taxonomy) messages.push({ role: 'system', content: taxonomy });
+    } catch { /* catalog is an enhancement, never a dependency */ }
+  }
+
+  // Real supplier prices for whatever this turn is about (the ERCO/ארכה
+  // catalog, ~7,000 priced items — see ./_materials.js). The pricing map above
+  // teaches the model how to reason about a job; this hands it the actual cost
+  // of the parts, so material lines come from a price list instead of a memory
+  // of one.
+  //
+  // Only the last couple of user turns feed the lookup: an eight-message thread
+  // about a panel swap would otherwise drag in every item mentioned along the
+  // way and bury what is being asked about now. Renders to nothing when nothing
+  // matches, so off-topic chats pay no token cost for this.
+  if (body.materials !== false) {
+    try {
+      const recent = body.messages
+        .filter((m) => m && m.role === 'user' && typeof m.content === 'string')
+        .slice(-2)
+        .map((m) => m.content)
+        .join(' \n ')
+        .slice(0, 1200);
+      const materials = await getMaterialsBlock(request, recent, 45);
+      if (materials) messages.push({ role: 'system', content: materials });
+    } catch {
+      // The catalog is an enhancement, never a dependency: if the index is
+      // missing or malformed, the chat answers exactly as it did before this
+      // existed rather than failing the request.
+    }
+  }
 
   return generate(env, {
     provider,

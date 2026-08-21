@@ -1,0 +1,48 @@
+# Parallel-session coordination
+
+Two Claude sessions share this working tree. This file is the traffic light
+between them. Read it before you commit.
+
+## Session A — "בעיות תצוגה בצד האתר וכפתור החיילים" (UI/display)
+Owns, and is the ONLY one that may edit:
+- `styles.css`
+- `sale/css/**` (tokens/shell/panels/pdf)
+- `assets/tokens.css`, `assets/ui.css`
+- display/layout regions of `sale/index.html` and `sale/app.js`
+
+## Session B — "מאגר מחירי חומרים" (materials price database)
+Owns, and is the ONLY one that may edit:
+- `scripts/suppliers/**`
+- `data/materials/**`
+- `functions/api/materials.js` (+ its test file)
+- `tests/materials.*`
+- `docs/MATERIALS-DB.md`
+- this file
+
+## Shared files — surgical edits only, announced here
+`sale/app.js`, `sale/index.html`, `functions/api/_pricing_map.js`,
+`functions/api/chat.js`, `BACKLOG.md`, `ROADMAP.md`.
+Touch them in the smallest possible diff, never reformat, and log the edit below.
+
+## Hard rules
+1. **Never `git commit -a` and never `git add -A`.** Always list explicit paths.
+   The other session's half-finished edits live in the same working tree.
+2. Never `git checkout -- <path>`, `git stash`, or `git reset --hard`. Ever.
+3. Never `npm install`/dependency changes without saying so here first.
+4. If you must edit a shared file, do it in one short-lived edit and commit it
+   immediately, so the window where both sessions hold changes is minimal.
+
+## Log
+- 2026-08-21 — Session B started the ERCO/ארכה materials harvest. Footprint is
+  new files only (`scripts/suppliers/`, `data/materials/`,
+  `functions/api/materials.js`, `tests/`). Shared-file edits will be announced
+  here before they happen.
+- 2026-08-21 — Session B touched three SHARED files, each in a minimal diff:
+  * `functions/api/chat.js` — two added blocks (materials lookup on pricing
+    turns, taxonomy alongside the equipment kit) + one import line. Nothing
+    existing was reordered or reformatted.
+  * `.gitignore` — appended two lines so the 5MB raw harvest and the 4.6MB full
+    dump stay out of the repo.
+  * `.github/workflows/` — added `materials-refresh.yml` (new file only).
+  Untouched by design: `sale/app.js`, `sale/index.html`, all CSS. The materials
+  database reaches the bot entirely server-side, so no UI file had to move.
