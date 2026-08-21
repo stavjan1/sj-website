@@ -20,14 +20,18 @@
 import { readFileSync } from 'node:fs';
 import {
   hydrate, searchMaterials, searchMaterialsMulti, extractItemQueries,
-  categoryStats, renderMaterialsBlock, consumableQueries,
+  categoryStats, renderMaterialsBlock, consumableQueries, renderQuoteChecklist,
 } from '../../functions/api/_materials.js';
 import { DEFAULT_PRICING_MAP } from '../../functions/api/_pricing_map.js';
+import { detectJobType, renderCoverageBlock } from '../../functions/api/_coverage.js';
+import { renderPanelSizerBlock } from '../../functions/api/_panel_sizer.js';
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => readFileSync(new URL(p, ROOT), 'utf8');
 
 const db = hydrate(JSON.parse(read('data/materials/index.json')));
+const COVERAGE = JSON.parse(read('data/coverage/checklists.json'));
+const PANEL_JOB = /לוח חשמל|לוח דירתי|החלפת לוח|ארון חשמל|מודול|מקומות בלוח|מא"ז|מאז|ממסר פחת|מגען|שעון שבת|תלת פאזי|תלת-פאזי/;
 
 // --------------------------------------------------------------------------
 // The client-side blocks
