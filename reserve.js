@@ -97,7 +97,8 @@
           '<img src="/assets/salute-a.png" alt="" aria-hidden="true" onerror="this.closest(\'.sj-mil-salutes\').remove()">' +
           '<img src="/assets/salute-b.png" alt="" aria-hidden="true" onerror="this.closest(\'.sj-mil-salutes\').remove()">' +
         '</div>' +
-        emblem('sj-mil-emblem') +
+        // The medal stays on the tab that opens this — one seal per document is
+        // enough, and the two figures are the seal here.
         '<div class="sj-mil-eyebrow">' + COPY.eyebrow + '</div>' +
         '<h2 id="sj-mil-h">' + COPY.title + '</h2>' +
         '<div class="sj-mil-rule"><span></span></div>' +

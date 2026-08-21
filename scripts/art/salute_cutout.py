@@ -22,10 +22,22 @@ import numpy as np
 
 SENTINEL = (255, 0, 255)      # a colour the artwork cannot contain
 TOLERANCE = 42                # per-channel distance that still counts as paper
-TARGET_H = 512
+TARGET_H = 512            # a ceiling, never an upscale
+
+
+def already_cut(img: Image.Image) -> bool:
+    """Transparent along the border already? Then the background is gone, and
+    flood-filling would only risk eating the figures' dark outline."""
+    if img.mode not in ('RGBA', 'LA'):
+        return False
+    a = np.array(img.convert('RGBA'))[:, :, 3]
+    border = np.concatenate([a[0], a[-1], a[:, 0], a[:, -1]])
+    return bool((border < 8).mean() > 0.9)
 
 
 def cut_background(img: Image.Image) -> Image.Image:
+    if already_cut(img):
+        return img.convert('RGBA')
     rgb = img.convert('RGB')
     w, h = rgb.size
     # Fill from a ring of points around the border, not just the corners: the
@@ -84,8 +96,11 @@ def main():
     order = list(reversed(runs))
     for name, (x0, x1) in zip(('a', 'b'), order):
         fig = trim(cut.crop((x0, 0, x1, cut.height)))
-        scale = TARGET_H / fig.height
-        fig = fig.resize((max(1, round(fig.width * scale)), TARGET_H), Image.LANCZOS)
+        # Never enlarge: blowing a 370px figure up to 512 only softens it.
+        target = min(TARGET_H, fig.height)
+        if fig.height != target:
+            scale = target / fig.height
+            fig = fig.resize((max(1, round(fig.width * scale)), target), Image.LANCZOS)
         out = pathlib.Path('assets') / f'salute-{name}.png'
         fig.save(out, optimize=True)
         print(f'{out}  {fig.width}x{fig.height}  {out.stat().st_size // 1024} KB')
