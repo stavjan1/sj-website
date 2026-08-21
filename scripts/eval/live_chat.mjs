@@ -38,7 +38,7 @@ for (const c of cases) {
   const res = await fetch('https://www.sj-eng.co.il/api/chat', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ messages:[{role:'system',content:system},{role:'user',content:c.msg}],
-      max_tokens: 1600, stream:false }),
+      max_tokens: 6000, stream:false }),
   });
   const data = await res.json().catch(()=>({}));
   const txt = data?.choices?.[0]?.message?.content;

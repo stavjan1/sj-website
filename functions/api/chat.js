@@ -15,7 +15,7 @@
 import { generate } from './_ai.js';
 import { getPricingMap } from './_pricing_map.js';
 import { getKitBlock } from './_electrical_kit.js';
-import { getMaterialsBlock, getTaxonomyBlock } from './_materials.js';
+import { getMaterialsBlock, getTaxonomyBlock, renderQuoteChecklist } from './_materials.js';
 import { renderPanelSizerBlock } from './_panel_sizer.js';
 import {
   ADMIN_EMAIL, loadModelClass, loadTierConfig, getTierForEmail,
@@ -122,6 +122,15 @@ export async function onRequestPost(context) {
     } catch { /* catalog is an enhancement, never a dependency */ }
   }
 
+  // Panel work only: the DIN module table and the counting rules. This is the
+  // one number a whole panel quote multiplies by — ~150 ₪ per equipped module —
+  // and it is arithmetic, which is what a language model is worst at. Asked in
+  // prose it will say "about 24" for a panel that needs 36. Gated on the text
+  // actually being about a panel so every other job pays nothing for it.
+  if (PANEL_JOB.test(lastUserText(body.messages))) {
+    messages.push({ role: 'system', content: renderPanelSizerBlock() });
+  }
+
   // Real supplier prices for whatever this turn is about (the ERCO/ארכה
   // catalog, ~7,000 priced items — see ./_materials.js). The pricing map above
   // teaches the model how to reason about a job; this hands it the actual cost
@@ -132,15 +141,6 @@ export async function onRequestPost(context) {
   // about a panel swap would otherwise drag in every item mentioned along the
   // way and bury what is being asked about now. Renders to nothing when nothing
   // matches, so off-topic chats pay no token cost for this.
-  // Panel work only: the DIN module table and the counting rules. This is the
-  // one number a whole panel quote multiplies by — ~150 ₪ per equipped module —
-  // and it is arithmetic, which is what a language model is worst at. Asked in
-  // prose it will say "about 24" for a panel that needs 36. Gated on the text
-  // actually being about a panel so every other job pays nothing for it.
-  if (PANEL_JOB.test(lastUserText(body.messages))) {
-    messages.push({ role: 'system', content: renderPanelSizerBlock() });
-  }
-
   if (body.materials !== false) {
     try {
       const recent = body.messages
@@ -157,6 +157,12 @@ export async function onRequestPost(context) {
       // existed rather than failing the request.
     }
   }
+
+  // Last block in, and that is the point: measured on live answers, the
+  // inspector fee was in the prompt and absent from the quote. Recency is the
+  // cheapest lever there is for "you must actually say something about this".
+  // Skipped for the characterization stage, which is not writing a quote yet.
+  if (!kit) messages.push({ role: 'system', content: renderQuoteChecklist() });
 
   return generate(env, {
     provider,
