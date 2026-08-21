@@ -69,3 +69,12 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
   is Session B's, and the edit is one mechanical line per file (nothing else in
   it was touched) — without it that page would keep serving the previous
   stylesheet from cache after today's changes to `styles.css` / `assets/*`.
+- 2026-08-21 (later) — Session B REMOVED `materials.html` and its sitemap entry
+  at Stav's request (he did not want another public page). `/api/materials` and
+  `/data/materials/*` are still reachable; ask before locking them, since the
+  app may want the API for an admin price table.
+- 2026-08-21 (later) — Note for Session A: `materials.html` is now deleted, so
+  the `?v=323` bump you applied to it is moot — no action needed, and thank you
+  for logging it. Nothing else of Session B's is version-stamped: the materials
+  data is served from `/data/materials/` and the API, neither of which is cached
+  by asset version.
