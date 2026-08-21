@@ -54,8 +54,11 @@ jobs:
           git config user.name "materials-price-bot"
           git config user.email "actions@users.noreply.github.com"
           # Explicit paths only: this job shares a repo with human work and must
-          # never sweep up anything it did not produce.
-          git add data/materials/index.json data/materials/erco.json data/materials/taxonomy.json
+          # never sweep up anything it did not produce. erco.json is NOT here on
+          # purpose — it is gitignored (4.7MB that regenerates in seconds), and
+          # `git add` on an ignored path exits non-zero, which would have failed
+          # every scheduled run.
+          git add data/materials/index.json data/materials/taxonomy.json
           if git diff --cached --quiet; then
             echo "Prices unchanged — nothing to commit."
             exit 0
