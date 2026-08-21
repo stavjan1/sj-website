@@ -2189,14 +2189,33 @@ window.sjDataRecovery = {
     }
 };
 
-function createNewProject() {
+// The home screen asks for the WORK, not for a name: you type what the customer
+// asked for, and the conversation starts on the spot. The project is what that
+// conversation becomes — the agent titles it from your own words.
+function startWorkFromDescription() {
     const input = document.getElementById('new-project-name');
-    const typed = input.value.trim();
+    const text = (input.value || '').trim();
+    createNewProject({ describe: text });
+}
+
+function fillWorkExample(btn) {
+    const input = document.getElementById('new-project-name');
+    if (!input) return;
+    input.value = btn.textContent.trim();
+    input.focus();
+}
+
+function createNewProject(opts) {
+    opts = opts || {};
+    const input = document.getElementById('new-project-name');
+    const typed = (input.value || '').trim();
     // Naming a job before describing it was the first thing the app asked for
     // and the first place people stalled. An unnamed project is legal now; the
     // characterization agent titles it from the description (see applySpecPrefill).
-    const name = typed || 'פרויקט חדש';
-    const autoName = !typed;
+    // When the text IS the description, it never becomes the name.
+    const describing = !!opts.describe;
+    const name = (describing || !typed) ? 'פרויקט חדש' : typed;
+    const autoName = describing || !typed;
 
     // Plan gate: the free plan allows a fixed number of simultaneous projects.
     const projCap = tierLimit('projects');
@@ -2253,8 +2272,20 @@ function createNewProject() {
     input.value = '';
     
     loadProject(newProj.id);
-    showToast(autoName ? 'פרויקט חדש נפתח — תאר את העבודה והשם ייקבע לבד' : `פרויקט "${name}" נוצר בהצלחה`);
+    if (!describing) showToast(autoName ? 'פרויקט חדש נפתח — תאר את העבודה והשם ייקבע לבד' : `פרויקט "${name}" נוצר בהצלחה`);
     switchTab('wizard'); // Auto switch to pricing chat
+
+    // Started from a description: hand it straight to the planning agent, so the
+    // first thing you see is an answer rather than an empty box asking again.
+    if (describing && opts.describe) {
+        setTimeout(() => {
+            const chatInput = document.getElementById('chat-user-input');
+            if (!chatInput) return;
+            try { setChatMode('plan', newProj); } catch (e) {}
+            chatInput.value = opts.describe;
+            sendChatMessage();
+        }, 260);
+    }
     // First project ever → one soft, skippable nudge to fill business details.
     if (projectsList.length === 1) setTimeout(maybeShowBizGate, 1200);
 }
@@ -2430,6 +2461,21 @@ function updateActiveProjectBanner(proj) {
     } else {
         bannerName.textContent = 'אין פרויקט פעיל (בחר או צור פרויקט תחילה)';
         bannerStatus.style.display = 'none';
+    }
+
+    // Who the job is for, editable from inside the job.
+    const clientWrap = document.getElementById('banner-client');
+    const clientSel = document.getElementById('banner-client-select');
+    if (clientWrap && clientSel) {
+        clientWrap.hidden = !proj;
+        if (proj) {
+            const opts = ['<option value="">ללא לקוח</option>']
+                .concat((clientsList || []).map((c) =>
+                    `<option value="${escapeHtml(c.id)}" ${proj.clientId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`))
+                .concat('<option value="__new">+ לקוח חדש…</option>');
+            clientSel.innerHTML = opts.join('');
+            clientWrap.classList.toggle('has-client', !!proj.clientId);
+        }
     }
 
     // Project-scoped navigation: the wizard/editor tabs exist only while a

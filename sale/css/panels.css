@@ -3275,3 +3275,22 @@ i[class^="fa-"], i[class*=" fa-"] {
 
 /* The pipeline carries the same view switch as the list it is a view of. */
 .pipeline-views { display: flex; gap: var(--sp-1); margin-block-end: var(--sp-3); }
+
+/* Examples under the work box — the fastest way to understand what to type. */
+.create-examples { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-block-start: var(--sp-2); }
+.create-examples .chip { font-size: var(--fs-xs); }
+
+/* The client selector in the project's context bar. */
+.banner-client {
+    display: inline-flex; align-items: center; gap: var(--sp-1);
+    padding: 2px 8px; border-radius: var(--r-pill);
+    border: 1px solid transparent; color: var(--text-3); font-size: var(--fs-xs);
+}
+.banner-client:hover, .banner-client:focus-within { background: var(--surface-2); border-color: var(--border); }
+.banner-client.has-client { color: var(--accent); }
+.banner-client select {
+    border: none; background: transparent; box-shadow: none;
+    min-height: 24px; padding-block: 0; padding-inline-end: 0; width: auto; max-width: 160px;
+    color: inherit; font-size: var(--fs-xs); font-weight: 500;
+}
+.banner-client[hidden] { display: none; }
