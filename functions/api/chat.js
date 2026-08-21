@@ -16,6 +16,7 @@ import { generate } from './_ai.js';
 import { getPricingMap } from './_pricing_map.js';
 import { getKitBlock } from './_electrical_kit.js';
 import { getMaterialsBlock, getTaxonomyBlock } from './_materials.js';
+import { renderPanelSizerBlock } from './_panel_sizer.js';
 import {
   ADMIN_EMAIL, loadModelClass, loadTierConfig, getTierForEmail,
   verifyGoogleEmail, bearerToken, dayKey, rateLimit,
@@ -131,6 +132,15 @@ export async function onRequestPost(context) {
   // about a panel swap would otherwise drag in every item mentioned along the
   // way and bury what is being asked about now. Renders to nothing when nothing
   // matches, so off-topic chats pay no token cost for this.
+  // Panel work only: the DIN module table and the counting rules. This is the
+  // one number a whole panel quote multiplies by — ~150 ₪ per equipped module —
+  // and it is arithmetic, which is what a language model is worst at. Asked in
+  // prose it will say "about 24" for a panel that needs 36. Gated on the text
+  // actually being about a panel so every other job pays nothing for it.
+  if (PANEL_JOB.test(lastUserText(body.messages))) {
+    messages.push({ role: 'system', content: renderPanelSizerBlock() });
+  }
+
   if (body.materials !== false) {
     try {
       const recent = body.messages
@@ -161,6 +171,20 @@ export async function onRequestPost(context) {
     thinkingBudget,
     stream: body.stream === true,
   });
+}
+
+// Words that mean this conversation is about a consumer unit. "מודול" and
+// "מקום" are in because that is how the size question is actually asked
+// ("כמה מקום צריך?"), not just by naming the board.
+const PANEL_JOB = /לוח חשמל|לוח דירתי|החלפת לוח|ארון חשמל|מודול|מקומות בלוח|מא"ז|מאז|ממסר פחת|מגען|שעון שבת|תלת פאזי|תלת-פאזי/;
+
+function lastUserText(messages) {
+  return (messages || [])
+    .filter((m) => m && m.role === 'user' && typeof m.content === 'string')
+    .slice(-2)
+    .map((m) => m.content)
+    .join(' ')
+    .slice(0, 2000);
 }
 
 function json(obj, status) {
