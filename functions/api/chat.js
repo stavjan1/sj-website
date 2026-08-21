@@ -42,7 +42,7 @@ export async function onRequestPost(context) {
   // now-public /ask/ AI endpoint from spam / cost bombs. 12/min per IP is far
   // above real use; admin exempt. Fails open if KV isn't bound.
   if (!isAdmin && !(await rateLimit(env, request, 'chat', 12))) {
-    return json({ error: { code: 'RATE', message: 'יותר מדי בקשות בזמן קצר — המתן דקה ונסה שוב.' } }, 429);
+    return json({ error: { code: 'RATE', message: 'יותר מדי בקשות בזמן קצר, המתן דקה ונסה שוב.' } }, 429);
   }
   const tier = await getTierForEmail(env, email);
   const config = await loadTierConfig(env);
@@ -64,8 +64,8 @@ export async function onRequestPost(context) {
             tier,
             limit,
             message: email
-              ? `הגעת למכסת ${limit} בקשות ה-AI היומית של המסלול שלך. המכסה מתאפסת בחצות — או ששדרוג מסלול פותח אותה מיד.`
-              : `הגעת למכסת ${limit} הבקשות היומית למשתמשי אורח. התחברות עם Google מגדילה את המכסה — חינם.`,
+              ? `הגעת למכסת ${limit} בקשות ה-AI היומית של המסלול שלך. המכסה מתאפסת בחצות, או ששדרוג מסלול פותח אותה מיד.`
+              : `הגעת למכסת ${limit} הבקשות היומית למשתמשי אורח. התחברות עם Google מגדילה את המכסה, חינם.`,
           },
         }, 429);
       }

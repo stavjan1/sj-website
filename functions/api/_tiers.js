@@ -195,7 +195,7 @@ export async function adminGate(request) {
   const email = await verifyGoogleEmail(bearerToken(request));
   const deny = (status, body) => ({ ok: false, status, body, response: jsonResponse(body, status) });
   if (!email) {
-    return deny(401, { error: { message: 'ההתחברות פגה — התחבר שוב לגוגל.', code: 'auth-expired' } });
+    return deny(401, { error: { message: 'ההתחברות פגה, התחבר שוב לגוגל.', code: 'auth-expired' } });
   }
   if (email.toLowerCase() !== ADMIN_EMAIL) {
     return deny(403, { error: { message: 'אין הרשאה.' } });

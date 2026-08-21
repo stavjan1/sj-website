@@ -52,7 +52,7 @@ export async function onRequestGet(context) {
                     id: 'inv_' + (inv.id || inv.docNumber || invoiceIncome.length),
                     date: d.toISOString().slice(0, 10),
                     amount: Number(inv.total) || 0,
-                    desc: (inv.docLabel || 'מסמך') + (inv.customer && inv.customer.name ? ' — ' + inv.customer.name : ''),
+                    desc: (inv.docLabel || 'מסמך') + (inv.customer && inv.customer.name ? ', ' + inv.customer.name : ''),
                     category: 'הכנסות',
                     source: 'zerem',
                     paid: !!inv.paid,

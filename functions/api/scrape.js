@@ -14,7 +14,7 @@ const MAX_CONTENT = 35000; // chars of page text fed to the extractor (token gua
 
 const EXTRACT_PROMPT = `אתה מחלץ מחירים ומחירונים מדפי ספקים ומחירוני עבודות. מהתוכן הבא של דף אינטרנט, חלץ כל מוצר או סעיף עבודה נבדל שיש לו מחיר ברור.
 החזר אך ורק JSON במבנה: {"items":[{"name":"שם המוצר או שם העבודה/השירות","price":<מספר בש"ח>,"unit":"יחידה/מטר/אריזה/נקודה/שעה (אם ידוע)"}]}.
-כללים: price הוא מספר בלבד (ללא ₪ או פסיקים). התעלם מתפריטים, ניווט, דמי משלוח, סכומי ביניים, ופריטים ללא מחיר ברור. אל תמציא מחירים. אם אין מוצרים או עבודות עם מחיר — החזר {"items":[]}.`;
+כללים: price הוא מספר בלבד (ללא ₪ או פסיקים). התעלם מתפריטים, ניווט, דמי משלוח, סכומי ביניים, ופריטים ללא מחיר ברור. אל תמציא מחירים. אם אין מוצרים או עבודות עם מחיר, החזר {"items":[]}.`;
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -65,7 +65,7 @@ export async function onRequestPost(context) {
       content = htmlToText(html);
     }
   } catch (e) {
-    return json({ error: { message: 'לא הצלחתי למשוך את הדף: ' + e.message + '. ייתכן שהאתר חוסם סריקה — אפשר להזין מחירים ידנית, או להגדיר FIRECRAWL_API_KEY.' } }, 502);
+    return json({ error: { message: 'לא הצלחתי למשוך את הדף: ' + e.message + '. ייתכן שהאתר חוסם סריקה: אפשר להזין מחירים ידנית, או להגדיר FIRECRAWL_API_KEY.' } }, 502);
   }
 
   content = content.replace(/\s+/g, ' ').trim().slice(0, MAX_CONTENT);

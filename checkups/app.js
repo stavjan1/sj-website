@@ -146,11 +146,11 @@ function render() {
             <div class="interval">${intervalLabel(c.months)}${c.last ? `<br><small>אחרונה: ${fmtDate(c.last)}</small>` : ''}</div>
             <div class="due">${dueHtml}</div>
             <div class="actions">
-                <button class="icon-btn cal ${c.eventId ? 'synced' : ''}" title="${c.eventId ? 'מסונכרן ליומן Google — לחץ לעדכון' : 'הוסף תזכורת ליומן Google'}" onclick="syncCalendar('${c.id}')">📅</button>
+                <button class="icon-btn cal ${c.eventId ? 'synced' : ''}" title="${c.eventId ? 'מסונכרן ליומן Google · לחץ לעדכון' : 'הוסף תזכורת ליומן Google'}" onclick="syncCalendar('${c.id}')">📅</button>
                 <button class="icon-btn" title="הורדת תזכורת לאייפון / Apple Calendar (קובץ ICS)" onclick="downloadIcs('${c.id}')">⬇</button>
                 ${c.phone ? `<button class="icon-btn" title="וואטסאפ ללקוח" style="color:#25d366" onclick="whatsapp('${c.id}')">💬</button>` : ''}
                 ${c.email ? `<button class="icon-btn" title="טיוטת מייל ללקוח" onclick="mailto('${c.id}')">✉</button>` : ''}
-                <button class="icon-btn" title="הבדיקה בוצעה — קדם לתאריך הבא" onclick="markDone('${c.id}')">✔</button>
+                <button class="icon-btn" title="הבדיקה בוצעה · קדם לתאריך הבא" onclick="markDone('${c.id}')">✔</button>
                 <button class="icon-btn" title="עריכה" onclick="openEditor('${c.id}')">✏</button>
                 <button class="icon-btn danger" title="מחיקה" onclick="removeClient('${c.id}')">✕</button>
             </div>
@@ -225,7 +225,7 @@ function markDone(id) {
     c.updatedAt = Date.now();
     persist();
     render();
-    toast('עודכן — הבדיקה הבאה: ' + fmtDate(nextDue(c)) +
+    toast('עודכן · הבדיקה הבאה: ' + fmtDate(nextDue(c)) +
         (c.eventId ? '. כדאי ללחוץ 📅 לעדכן גם את היומן' : ''));
 }
 
@@ -271,7 +271,7 @@ async function cloudSave() {
             headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
             body: JSON.stringify({ data: { clients } }),
         });
-        if (res.status === 401) { logoutLocal(); toast('פג תוקף החיבור ל-Google — התחבר שוב'); }
+        if (res.status === 401) { logoutLocal(); toast('פג תוקף החיבור ל-Google, התחבר שוב'); }
     } catch { /* offline — local copy is intact, next change retries */ }
 }
 
@@ -299,7 +299,7 @@ async function cloudLoad() {
 
 function loginGoogle() {
     if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
-        toast('Google עדיין נטען — נסה שוב עוד רגע');
+        toast('Google עדיין נטען · נסה שוב עוד רגע');
         return;
     }
     const tc = google.accounts.oauth2.initTokenClient({
@@ -379,7 +379,7 @@ function rruleFor(months) {
 function eventBody(c) {
     const due = nextDue(c);
     return {
-        summary: '⚡ ' + (c.type || 'בדיקה תקופתית') + ' — ' + c.name,
+        summary: '⚡ ' + (c.type || 'בדיקה תקופתית') + ', ' + c.name,
         location: c.site || undefined,
         description: [
             c.phone ? 'טלפון: ' + c.phone : '',
@@ -429,7 +429,7 @@ async function syncCalendar(id) {
         if (!res) res = await fetch(base, { method: 'POST', headers, body });
         if (res.status === 401 || res.status === 403) {
             localStorage.removeItem(CAL_TOKEN_KEY);
-            toast('ההרשאה ליומן פגה — לחץ שוב על 📅');
+            toast('ההרשאה ליומן פגה · לחץ שוב על 📅');
             return;
         }
         const ev = await res.json();
@@ -440,7 +440,7 @@ async function syncCalendar(id) {
         render();
         toast('תזכורת חוזרת נקבעה ביומן Google (' + fmtDate(nextDue(c)) + ')');
     } catch {
-        toast('הוספת התזכורת ליומן נכשלה — נסה שוב');
+        toast('הוספת התזכורת ליומן נכשלה, נסה שוב');
     }
 }
 
@@ -458,7 +458,7 @@ function downloadIcs(id) {
     const due = nextDue(c);
     if (!due) { toast('קודם קבע תאריך בדיקה (עריכה ✏)'); return; }
     const dt = due.replace(/-/g, '');
-    const summary = icsText((c.type || 'בדיקה תקופתית') + ' — ' + c.name);
+    const summary = icsText((c.type || 'בדיקה תקופתית') + ', ' + c.name);
     const desc = icsText([c.phone ? 'טלפון: ' + c.phone : '', c.notes || ''].filter(Boolean).join('\n'));
     const ics = [
         'BEGIN:VCALENDAR',
@@ -495,7 +495,7 @@ function whatsapp(id) {
     if (digits.startsWith('0')) digits = '972' + digits.slice(1);
     const due = nextDue(c);
     const msg = 'שלום, כאן סתיו מ-SJ הנדסת חשמל. מתקרב מועד הבדיקה התקופתית למתקן החשמל אצלכם' +
-        (due ? ' (' + fmtDate(due) + ')' : '') + ' — אשמח שנתאם מועד שנוח לכם.';
+        (due ? ' (' + fmtDate(due) + ')' : '') + ' · אשמח שנתאם מועד שנוח לכם.';
     window.open('https://wa.me/' + digits + '?text=' + encodeURIComponent(msg), '_blank');
 }
 
@@ -580,7 +580,7 @@ function renderDueStrip() {
     if (due.length === 0) { el.innerHTML = ''; return; }
     el.innerHTML = `
         <div class="strip">
-            <div class="strip-title">🔔 תזכורות לשליחה — הבדיקה מתקרבת</div>
+            <div class="strip-title">🔔 תזכורות לשליחה · הבדיקה מתקרבת</div>
             <div class="strip-chips">
                 ${due.slice(0, 8).map((c) => {
                     const days = daysUntil(nextDue(c));
@@ -599,13 +599,13 @@ function renderDueStrip() {
 function reminderText(c) {
     const due = nextDue(c);
     return 'שלום, כאן סתיו מ-SJ הנדסת חשמל. מתקרב מועד הבדיקה התקופתית למתקן החשמל אצלכם' +
-        (due ? ' (' + fmtDate(due) + ')' : '') + ' — אשמח שנתאם מועד שנוח לכם.';
+        (due ? ' (' + fmtDate(due) + ')' : '') + ' · אשמח שנתאם מועד שנוח לכם.';
 }
 
 function mailto(id) {
     const c = clients.find((x) => x.id === id);
     if (!c || !c.email) return;
-    const subject = 'תיאום ' + (c.type || 'בדיקה תקופתית') + ' — מתקן החשמל';
+    const subject = 'תיאום ' + (c.type || 'בדיקה תקופתית') + ' · מתקן החשמל';
     const body = reminderText(c) + '\n\nבברכה,\nSJ הנדסת חשמל';
     // Opens the mail app with a ready draft — review and send manually.
     window.location.href = 'mailto:' + encodeURIComponent(c.email) +

@@ -44,7 +44,7 @@
         }
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(res.status === 401
-            ? 'ההתחברות התיישנה — התנתקו והתחברו שוב, ואז פתחו את הלשונית מחדש'
+            ? 'ההתחברות התיישנה · התנתקו והתחברו שוב, ואז פתחו את הלשונית מחדש'
             : (data.error && data.error.message) || 'שגיאה בטעינה');
         fin = data.data || { accounts: [], entries: [], recurring: [], settings: {} };
         invoiceIncome = Array.isArray(data.invoiceIncome) ? data.invoiceIncome : [];
@@ -61,9 +61,9 @@
                 body: JSON.stringify({ data: fin }),
             });
             if (!res.ok && typeof showToast === 'function' && !useKeepalive) {
-                showToast(res.status === 401 ? 'השמירה נכשלה — ההתחברות פגה, רעננו והתחברו שוב' : 'שמירת הנתונים הפיננסיים נכשלה', 'error');
+                showToast(res.status === 401 ? 'השמירה נכשלה, ההתחברות פגה, רעננו והתחברו שוב' : 'שמירת הנתונים הפיננסיים נכשלה', 'error');
             }
-        } catch (e) { if (typeof showToast === 'function' && !useKeepalive) showToast('שמירת הנתונים הפיננסיים נכשלה — בדקו חיבור', 'error'); }
+        } catch (e) { if (typeof showToast === 'function' && !useKeepalive) showToast('שמירת הנתונים הפיננסיים נכשלה, בדקו חיבור', 'error'); }
     }
     function scheduleSave() {
         clearTimeout(saveTimer);
@@ -132,7 +132,7 @@
         const gridVals = [min, (min + max) / 2, max];
         // RTL page, LTR time axis inside the SVG — dates flow left→right.
         return `
-        <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="עקומת מזומן — 60 יום אחורה ו-30 קדימה" style="width:100%;height:auto;direction:ltr;">
+        <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="עקומת מזומן · 60 יום אחורה ו-30 קדימה" style="width:100%;height:auto;direction:ltr;">
             ${gridVals.map(v => `<line x1="${PAD}" x2="${W - PAD}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="var(--border)" stroke-width="1"/>
             <text x="${PAD - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--text-3)">${Math.round(v / 1000)}k</text>`).join('')}
             ${min < 0 ? `<line x1="${PAD}" x2="${W - PAD}" y1="${zeroY.toFixed(1)}" y2="${zeroY.toFixed(1)}" stroke="var(--danger)" stroke-width="1" stroke-dasharray="2 4"/>` : ''}
@@ -188,14 +188,14 @@
 
         <div class="card fin-chart-card">
             <h3>עקומת המזומן · עבר וצפי</h3>
-            ${((fin.entries || []).length || (fin.accounts || []).length) ? curveSvg() : '<div class="empty"><h3>אין עדיין נתונים לעקומה</h3><p>הוסיפו חשבון עם יתרה ותנועות — או ייבאו CSV — והעקומה תופיע כאן.</p></div>'}
+            ${((fin.entries || []).length || (fin.accounts || []).length) ? curveSvg() : '<div class="empty"><h3>אין עדיין נתונים לעקומה</h3><p>הוסיפו חשבון עם יתרה ותנועות, או ייבאו CSV, והעקומה תופיע כאן.</p></div>'}
             <div class="fin-legend"><span><i class="fin-dot solid"></i> בפועל</span><span><i class="fin-dot dashed"></i> צפי (חיובים קבועים + מסמכים פתוחים)</span></div>
         </div>
 
         <div class="fin-grid">
             <div class="card">
                 <h3>חיובים קרובים</h3>
-                ${upcoming.length ? `<ul class="fin-list">${upcoming.map(u => `<li><span>${esc(u.name)}</span><span class="num">${fmtILS(u.amount)}</span><small>${esc(u.next)}</small></li>`).join('')}</ul>` : '<p class="fin-muted">אין חיובים קבועים. הוסיפו למטה — שכירות, תוכנות, ביטוחים.</p>'}
+                ${upcoming.length ? `<ul class="fin-list">${upcoming.map(u => `<li><span>${esc(u.name)}</span><span class="num">${fmtILS(u.amount)}</span><small>${esc(u.next)}</small></li>`).join('')}</ul>` : '<p class="fin-muted">אין חיובים קבועים. הוסיפו למטה, שכירות, תוכנות, ביטוחים.</p>'}
             </div>
             <div class="card">
                 <h3>תנועות אחרונות</h3>
@@ -246,11 +246,11 @@
                 <p class="fin-muted">הכנסות נמשכות אוטומטית מהמסמכים שהפקת במערכת (הנהלת חשבונות).</p>
                 <div class="fin-connector">
                     <b>בנקאות פתוחה (Financy)</b>
-                    <p class="fin-muted">חיבור קריאה-בלבד לבנקים ולאשראי, בפיקוח בנק ישראל — היתרות והתנועות יתעדכנו לבד. דורש הרשמה חד-פעמית שלך ב-financy.open-finance.ai; אחרי שיהיו מפתחות, החיבור כאן.</p>
+                    <p class="fin-muted">חיבור קריאה-בלבד לבנקים ולאשראי, בפיקוח בנק ישראל, היתרות והתנועות יתעדכנו לבד. דורש הרשמה חד-פעמית שלך ב-financy.open-finance.ai; אחרי שיהיו מפתחות, החיבור כאן.</p>
                 </div>
                 <div class="fin-connector">
                     <b>טיפ: בוט ההוצאות של SUMIT בוואטסאפ</b>
-                    <p class="fin-muted">שולחים צילום קבלה לוואטסאפ של SUMIT — והכל מתויק לבד באתר שלהם, חינם. נוח להצמיד את השיחה למעלה ולשמור קבלות מהשטח בשנייה.</p>
+                    <p class="fin-muted">שולחים צילום קבלה לוואטסאפ של SUMIT, והכל מתויק לבד באתר שלהם, חינם. נוח להצמיד את השיחה למעלה ולשמור קבלות מהשטח בשנייה.</p>
                 </div>
             </div>
         </div>`;
@@ -376,7 +376,7 @@
         const u = activeUser();
         if (!u || u === 'guest') {
             // Keep the token in the URL so the link still works after sign-in.
-            if (typeof showToast === 'function') showToast('כדי לייבא את הדוח מהטלגרם — התחברו עם Google ופתחו את הקישור שוב', 'error');
+            if (typeof showToast === 'function') showToast('כדי לייבא את הדוח מהטלגרם, התחברו עם Google ופתחו את הקישור שוב', 'error');
             return;
         }
         try { history.replaceState({}, '', location.pathname); } catch { }
@@ -385,7 +385,7 @@
             if (!res.ok) throw new Error();
             const raw = await res.text();
             if (raw.length > 3.5 * 1024 * 1024) {
-                if (typeof showToast === 'function') showToast('הדוח גדול מדי לייבוא — פתחו אותו בקישור הצפייה וההדפסה', 'error');
+                if (typeof showToast === 'function') showToast('הדוח גדול מדי לייבוא, פתחו אותו בקישור הצפייה וההדפסה', 'error');
                 return;
             }
             const rec = JSON.parse(raw);
@@ -401,7 +401,7 @@
                 findings: rec.findings, summary: rec.summary || '', savedAt: Date.now(),
             });
             localStorage.setItem(key, JSON.stringify(reports.slice(0, 30)));
-            if (typeof showToast === 'function') showToast('דוח הליקויים מהטלגרם נשמר — פתחו אותו בלשונית הדוחות');
+            if (typeof showToast === 'function') showToast('דוח הליקויים מהטלגרם נשמר, פתחו אותו בלשונית הדוחות');
         } catch {
             if (typeof showToast === 'function') showToast('לא הצלחתי לייבא את הדוח מהטלגרם', 'error');
         }

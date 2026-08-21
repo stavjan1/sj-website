@@ -101,7 +101,7 @@ export async function onRequestPost(context) {
   if (!env.RESEND_API_KEY) {
     return jsonResponse({
       ok: false,
-      reason: 'לא הוגדר RESEND_API_KEY במשתני הסביבה של Cloudflare — בלעדיו לא נשלח דבר.',
+      reason: 'לא הוגדר RESEND_API_KEY במשתני הסביבה של Cloudflare, בלעדיו לא נשלח דבר.',
     });
   }
 
@@ -110,7 +110,7 @@ export async function onRequestPost(context) {
     subject: '⚡ בדיקת מייל מזרם',
     text: `זו הודעת בדיקה שנשלחה מפאנל הניהול של זרם.
 
-אם היא הגיעה — ההתראה על נרשם חדש תגיע גם היא, דרך אותו נתיב בדיוק.`,
+אם היא הגיעה, ההתראה על נרשם חדש תגיע גם היא, דרך אותו נתיב בדיוק.`,
   });
 
   return jsonResponse({

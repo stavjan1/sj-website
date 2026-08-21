@@ -54,10 +54,10 @@ export async function onRequestPost(context) {
 
   const lines = items.length
     ? items.map((it) => `• ${it.name} — ${it.price}₪${it.unit ? ' / ' + it.unit : ''}`).join('\n')
-    : (fileText ? `קובץ מצורף (${fileName}):\n${'-'.repeat(20)}\n${fileText}` : `נשלח שם קובץ בלבד: ${fileName} — יש ליצור קשר עם השולח להעברתו.`);
+    : (fileText ? `קובץ מצורף (${fileName}):\n${'-'.repeat(20)}\n${fileText}` : `נשלח שם קובץ בלבד: ${fileName}, יש ליצור קשר עם השולח להעברתו.`);
   const contact = [
     `שם: ${name}`,
-    email ? `אימייל: ${email}` : 'אימייל: (אורח — לא מחובר)',
+    email ? `אימייל: ${email}` : 'אימייל: (אורח · לא מחובר)',
     phone ? `טלפון: ${phone}` : 'טלפון: לא סופק',
     profession ? `תחום: ${profession}` : null,
   ].filter(Boolean).join('\n');
@@ -66,8 +66,8 @@ export async function onRequestPost(context) {
     endpoint: WEB3FORMS_ENDPOINT,
     payload: {
       access_key: WEB3FORMS_KEY,
-      subject: `מחירון שהתקבל לשיתוף — ${name}` + (items.length ? ` (${items.length} פריטים)` : ` (קובץ: ${fileName})`),
-      from_name: 'שיתוף מאגר מחירים — SJ',
+      subject: `מחירון שהתקבל לשיתוף, ${name}` + (items.length ? ` (${items.length} פריטים)` : ` (קובץ: ${fileName})`),
+      from_name: 'שיתוף מאגר מחירים · SJ',
       email: email || 'info@sj-eng.co.il',
       name,
       message: `התקבל מחירון לשיתוף עם המערכת.\n\nפרטי השולח:\n${contact}\n\n${'='.repeat(30)}\n${items.length ? `מחירון (${items.length} פריטים):\n` : ''}${lines}`,

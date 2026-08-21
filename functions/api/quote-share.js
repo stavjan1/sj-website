@@ -70,7 +70,7 @@ export async function onRequest(context) {
     const token = new URL(request.url).searchParams.get('t') || '';
     if (!/^[a-z0-9]{8,20}$/i.test(token)) return json({ error: { message: 'קישור לא תקין.' } }, 400);
     const stored = await env.SJ_DATA.get('share:' + token);
-    if (!stored) return json({ error: { message: 'ההצעה לא נמצאה — ייתכן שהקישור שגוי.' } }, 404);
+    if (!stored) return json({ error: { message: 'ההצעה לא נמצאה, ייתכן שהקישור שגוי.' } }, 404);
     // Public endpoint: never expose the owner's Google account email (internal
     // bookkeeping only) to whoever holds the link.
     const data = safeParse(stored);

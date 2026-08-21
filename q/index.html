@@ -97,7 +97,7 @@
 
         function render(q, sheet) {
             const biz = q.business || {};
-            document.title = 'הצעת מחיר ' + (q.quoteNumber || '') + (biz.name ? ' — ' + biz.name : '');
+            document.title = 'הצעת מחיר ' + (q.quoteNumber || '') + (biz.name ? ', ' + biz.name : '');
             const phoneDigits = String(biz.phone || '').replace(/[^\d]/g, '');
             const waPhone = phoneDigits.startsWith('0') ? '972' + phoneDigits.slice(1) : phoneDigits;
             const items = (q.items || []).map(it => `
@@ -137,12 +137,12 @@
                     ${biz.phone ? `<a class="qs-btn call" href="tel:${esc(biz.phone)}">${esc(biz.phone)}</a>` : ''}
                     ${waPhone ? `<a class="qs-btn wa" target="_blank" rel="noopener" href="https://wa.me/${waPhone}?text=${encodeURIComponent('היי, בקשר להצעת מחיר ' + (q.quoteNumber || ''))}">וואטסאפ</a>` : ''}
                 </div>
-                <div class="qs-foot">הופק באמצעות <a href="/zerem/">זרם — תוכנת הצעות המחיר</a></div>
+                <div class="qs-foot">הופק באמצעות <a href="/zerem/">זרם · תוכנת הצעות המחיר</a></div>
             `;
         }
 
         load();
     </script>
-    <script src="/track.js?v=328" defer></script>
+    <script src="/track.js?v=329" defer></script>
 </body>
 </html>

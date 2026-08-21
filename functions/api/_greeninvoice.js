@@ -22,7 +22,7 @@ const GI_DOC_TYPE = {
   InvoiceReceipt: 320,   // חשבונית מס/קבלה
   Receipt: 400,          // קבלה
   RefundInvoice: 330,    // חשבונית זיכוי
-  ReceiptRefund: 330,    // (זיכוי — GI has no distinct receipt-refund)
+  ReceiptRefund: 330,    // (זיכוי, GI has no distinct receipt-refund)
 };
 // Our receipt payment method → Green Invoice payment type code.
 const GI_PAY_TYPE = { cash: 1, check: 2, creditCard: 3, wireTransfer: 4, other: 11 };

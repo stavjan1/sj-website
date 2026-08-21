@@ -433,12 +433,12 @@ async function weeklyInsights(env) {
     const cur = await readWeek(site, 0);
     const prev = await readWeek(site, 7);
 
-    if (!cur.views && !prev.views) { notes.push(`${label}: אין עדיין נתוני תנועה — המונה נאסף מהיום שהועלה.`); continue; }
+    if (!cur.views && !prev.views) { notes.push(`${label}: אין עדיין נתוני תנועה, המונה נאסף מהיום שהועלה.`); continue; }
 
     if (prev.views > 0) {
       const pct = Math.round(((cur.views - prev.views) / prev.views) * 100);
       const dir = pct > 0 ? 'עלייה' : pct < 0 ? 'ירידה' : 'ללא שינוי';
-      notes.push(`${label}: ${cur.views.toLocaleString('he-IL')} צפיות השבוע מול ${prev.views.toLocaleString('he-IL')} בשבוע שעבר — ${dir}${pct ? ' של ' + Math.abs(pct) + '%' : ''}.`);
+      notes.push(`${label}: ${cur.views.toLocaleString('he-IL')} צפיות השבוע מול ${prev.views.toLocaleString('he-IL')} בשבוע שעבר, ${dir}${pct ? ' של ' + Math.abs(pct) + '%' : ''}.`);
     } else {
       notes.push(`${label}: ${cur.views.toLocaleString('he-IL')} צפיות השבוע (שבוע ראשון עם נתונים).`);
     }
@@ -450,12 +450,12 @@ async function weeklyInsights(env) {
       if (Math.abs(d) > Math.abs(bestDelta)) { bestDelta = d; bestPage = p; }
     }
     if (bestPage && Math.abs(bestDelta) >= 3) {
-      notes.push(`${label}: ${bestDelta > 0 ? 'הדף שעלה הכי הרבה' : 'הדף שירד הכי הרבה'} — ${bestPage} (${bestDelta > 0 ? '+' : ''}${bestDelta}).`);
+      notes.push(`${label}: ${bestDelta > 0 ? 'הדף שעלה הכי הרבה' : 'הדף שירד הכי הרבה'}, ${bestPage} (${bestDelta > 0 ? '+' : ''}${bestDelta}).`);
     }
 
     // A referrer that appeared out of nowhere is usually someone sharing a link.
     const fresh = Object.keys(cur.refs).filter(r => r !== 'direct' && !prev.refs[r] && cur.refs[r] >= 2);
-    if (fresh.length) notes.push(`${label}: מקור תנועה חדש השבוע — ${fresh.slice(0, 3).join(', ')}.`);
+    if (fresh.length) notes.push(`${label}: מקור תנועה חדש השבוע, ${fresh.slice(0, 3).join(', ')}.`);
 
     // Silence is worth naming: a live site with a dead day usually means the
     // beacon broke, not that nobody came.
@@ -464,7 +464,7 @@ async function weeklyInsights(env) {
       const rec = safeParse(await env.SJ_DATA.get(dayHitsKey(site, dayAt(i))), null);
       if (!rec || !rec.total) dead.push(dayAt(i));
     }
-    if (cur.views > 0 && dead.length >= 3) notes.push(`${label}: ${dead.length} ימים בלי אף צפייה השבוע — שווה לוודא שהמדידה עובדת.`);
+    if (cur.views > 0 && dead.length >= 3) notes.push(`${label}: ${dead.length} ימים בלי אף צפייה השבוע, שווה לוודא שהמדידה עובדת.`);
   }
 
   return notes;

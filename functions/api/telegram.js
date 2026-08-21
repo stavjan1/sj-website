@@ -25,7 +25,7 @@ const MAX_FINDINGS = 40;
 const TOKEN_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
 
 // Verbatim from the app's REPORT_TYPES.defects — the two must stay in sync.
-const DEFECTS_TITLE = 'דוח ליקויים — בדיקת מתקן חשמל';
+const DEFECTS_TITLE = 'דוח ליקויים · בדיקת מתקן חשמל';
 const DEFECTS_INTRO = 'בעת הבדיקה נמצאו ליקויים בטיחותיים במתקן החשמל, כמפורט בטבלת הממצאים שלהלן. יש לטפל בליקויים באמצעות חשמלאי בעל רישיון מתאים.';
 const DEFECTS_WARNING = 'אישור הבדיקה יינתן רק לאחר השלמת הטיפול בכל הליקויים המפורטים בדוח זה ואישורם על ידי הגורם המוסמך.';
 
@@ -37,7 +37,7 @@ const HELP_TEXT = [
     '2. במהלך הסיור שולחים תמונה של כל ליקוי, ובכיתוב שלה שורה אחת: מיקום - מה הליקוי',
     '3. בסוף כותבים: סיים',
     '',
-    'הבוט מסדר הכל לדוח מוכן — עם קישור לצפייה ולהדפסה, וכפתור ייבוא למערכת.',
+    'הבוט מסדר הכל לדוח מוכן: עם קישור לצפייה ולהדפסה, וכפתור ייבוא למערכת.',
     'לביטול באמצע: בטל',
 ].join('\n');
 
@@ -142,7 +142,7 @@ async function normalizeFindings(env, sess) {
             messages: [
                 {
                     role: 'system',
-                    content: 'אתה מסדר הערות שטח של חשמלאי בודק לטבלת דוח ליקויים. לכל שורה החזר אובייקט עם location (מיקום קצר, למשל "לוח ראשי", "חדר משאבות") ו-desc (תיאור הליקוי, משפט מקצועי אחד-שניים, בלי להמציא עובדות שלא נכתבו). אם אין מיקום — השאר location ריק. החזר אך ורק JSON תקין: מערך באורך זהה למספר השורות, באותו סדר.',
+                    content: 'אתה מסדר הערות שטח של חשמלאי בודק לטבלת דוח ליקויים. לכל שורה החזר אובייקט עם location (מיקום קצר, למשל "לוח ראשי", "חדר משאבות") ו-desc (תיאור הליקוי, משפט מקצועי אחד-שניים, בלי להמציא עובדות שלא נכתבו). אם אין מיקום, השאר location ריק. החזר אך ורק JSON תקין: מערך באורך זהה למספר השורות, באותו סדר.',
                 },
                 { role: 'user', content: raw },
             ],
@@ -216,7 +216,7 @@ async function finalizeReport(env, chatId, sess) {
 
     const base = 'https://www.sj-eng.co.il';
     await say(env, chatId, [
-        `הדוח מוכן — ${findings.length} ממצאים.`,
+        `הדוח מוכן · ${findings.length} ממצאים.`,
         '',
         `לצפייה והדפסה (מהדפדפן אפשר לשמור כ-PDF):`,
         `${base}/api/telegram?view=${token}`,
@@ -238,7 +238,7 @@ async function handleUpdate(env, update) {
     // Closed bot: only allow-listed chats may use it.
     const allowed = String(env.TELEGRAM_ALLOWED_CHATS || '').split(',').map(s => s.trim()).filter(Boolean);
     if (!allowed.includes(String(chatId))) {
-        await say(env, chatId, `הבוט הזה פרטי. מזהה הצ'אט שלך: ${chatId}\nכדי לאשר אותו — מוסיפים את המזהה למשתנה TELEGRAM_ALLOWED_CHATS בהגדרות האתר.`);
+        await say(env, chatId, `הבוט הזה פרטי. מזהה הצ'אט שלך: ${chatId}\nכדי לאשר אותו, מוסיפים את המזהה למשתנה TELEGRAM_ALLOWED_CHATS בהגדרות האתר.`);
         return;
     }
 
@@ -267,7 +267,7 @@ async function handleUpdate(env, update) {
         try {
             await finalizeReport(env, chatId, sess);
         } catch (e) {
-            await say(env, chatId, 'משהו נכשל בהכנת הדוח. נסו "סיים" שוב; אם זה חוזר — שלחו פחות תמונות לדוח אחד.');
+            await say(env, chatId, 'משהו נכשל בהכנת הדוח. נסו "סיים" שוב; אם זה חוזר, שלחו פחות תמונות לדוח אחד.');
         }
         return;
     }
@@ -276,7 +276,7 @@ async function handleUpdate(env, update) {
     // the command as a finding of the old report (a stale morning session
     // would swallow the afternoon site's report otherwise).
     if (sess && sess.findings.length && text && START_RE.test(text) && !sess.pendingCaption) {
-        await say(env, chatId, `יש דוח פתוח לפרויקט "${sess.title}" עם ${sess.findings.length} ממצאים.\nכתבו "סיים" כדי לסגור אותו, או "בטל" כדי למחוק אותו — ואז נפתח את החדש.`);
+        await say(env, chatId, `יש דוח פתוח לפרויקט "${sess.title}" עם ${sess.findings.length} ממצאים.\nכתבו "סיים" כדי לסגור אותו, או "בטל" כדי למחוק אותו: ואז נפתח את החדש.`);
         return;
     }
 
@@ -286,7 +286,7 @@ async function handleUpdate(env, update) {
             sess = { title: 'פרויקט ללא שם', site: '', findings: [], startedAt: Date.now() };
         }
         if (sess.findings.length >= MAX_FINDINGS) {
-            await say(env, chatId, `הגעת ל-${MAX_FINDINGS} ממצאים — זה המקסימום לדוח אחד. כתבו "סיים" ואפשר לפתוח דוח נוסף.`);
+            await say(env, chatId, `הגעת ל-${MAX_FINDINGS} ממצאים, זה המקסימום לדוח אחד. כתבו "סיים" ואפשר לפתוח דוח נוסף.`);
             return;
         }
         const photo = pickPhoto(msg.photo);

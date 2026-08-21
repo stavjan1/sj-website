@@ -83,7 +83,7 @@ function initContactForm() {
         e.preventDefault();
         const phone = form.querySelector('[name="phone"]');
         if (phone && !/^[0-9\-+ ]{9,15}$/.test(phone.value.trim())) {
-            if (feedback) { feedback.textContent = 'מספר הטלפון לא נראה תקין — בדקו אותו רגע.'; feedback.className = 'form-feedback status-danger'; }
+            if (feedback) { feedback.textContent = 'מספר הטלפון לא נראה תקין, בדקו אותו רגע.'; feedback.className = 'form-feedback status-danger'; }
             phone.focus();
             return;
         }

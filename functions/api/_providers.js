@@ -35,7 +35,7 @@ export const PROVIDERS = {
   },
   sumit: {
     id: 'sumit', name: 'SUMIT', status: 'active', badge: 'בונוס וואטסאפ',
-    note: 'בונוס: חיבור ל-SUMIT מפעיל אצלם סוכן וואטסאפ חינמי (לכל החיים, ללא הגבלה) — מצלמים קבלת הוצאה ונשלחת בוואטסאפ, ונכנסת אוטומטית לקטגוריית ההוצאות שלך. חיבור: מזהה חברה (CompanyID) + API Key מחשבון SUMIT (מפתחים → API).',
+    note: 'בונוס: חיבור ל-SUMIT מפעיל אצלם סוכן וואטסאפ חינמי (לכל החיים, ללא הגבלה): מצלמים קבלת הוצאה ונשלחת בוואטסאפ, ונכנסת אוטומטית לקטגוריית ההוצאות שלך. חיבור: מזהה חברה (CompanyID) + API Key מחשבון SUMIT (מפתחים → API).',
     fields: [
       { key: 'companyId', label: 'מזהה חברה (CompanyID)' },
       { key: 'apiKey', label: 'API Key' },
