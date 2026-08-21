@@ -180,6 +180,17 @@ function dataUrlToInlinePart(dataUrl) {
   return { inline_data: { mime_type: m[1].toLowerCase(), data: m[2] } };
 }
 
+// Which Gemini generations accept thinkingBudget: 0. Kept as an explicit
+// allowlist rather than "anything not 3.x", so a model nobody has tested is
+// treated as unable to disable thinking — the safe assumption, since guessing
+// wrong here returns 400 on every single request.
+const THINKING_OFF_SUPPORTED = /gemini-2\.5-flash/;
+const THINKING_HEADROOM = 2048;
+
+export function supportsThinkingOff(model) {
+  return THINKING_OFF_SUPPORTED.test(String(model || ''));
+}
+
 // OpenAI-style messages -> Gemini request body. A message may carry an
 // `images` array of data: URLs (site photos) — they become inline_data parts
 // so the multimodal model can "see" the job.
@@ -204,11 +215,29 @@ export function toGemini(messages, opts = {}) {
   if (opts.response_format && opts.response_format.type === 'json_object') gc.responseMimeType = 'application/json';
   if (typeof opts.temperature === 'number') gc.temperature = opts.temperature;
   if (opts.max_tokens) gc.maxOutputTokens = opts.max_tokens;
-  // Gemini 2.5 models "think", and thinking tokens are counted INSIDE
+
+  // Gemini models "think", and thinking tokens are counted INSIDE
   // maxOutputTokens — so a low max_tokens can be fully consumed by thinking and
   // truncate the visible answer mid-word. thinkingBudget:0 disables thinking
-  // (2.5-flash only) → faster replies and the whole budget goes to the answer.
-  if (opts.thinkingBudget != null) gc.thinkingConfig = { thinkingBudget: opts.thinkingBudget };
+  // and hands the whole budget to the answer.
+  //
+  // But only the 2.5 generation accepts 0. Gemini 3.x rejects it with
+  // 400 INVALID_ARGUMENT, and /ask/ and /api/scrape both send 0 unconditionally
+  // — so the moment the default model moved to 3.6-flash, those two endpoints
+  // would have started failing every request. Observed directly, not inferred.
+  //
+  // Where thinking cannot be switched off, the request is sent WITHOUT a
+  // thinkingConfig (valid) and the output budget is padded instead, because the
+  // caller passing 0 was really saying "I need the whole budget for the answer"
+  // and on these models thinking will quietly take a slice of it. A larger
+  // budget costs tokens; a truncated quote is worth nothing at all.
+  if (opts.thinkingBudget != null) {
+    if (opts.thinkingBudget > 0 || supportsThinkingOff(opts.model)) {
+      gc.thinkingConfig = { thinkingBudget: opts.thinkingBudget };
+    } else if (opts.max_tokens) {
+      gc.maxOutputTokens = opts.max_tokens + THINKING_HEADROOM;
+    }
+  }
   if (Object.keys(gc).length) body.generationConfig = gc;
   return body;
 }
@@ -238,7 +267,10 @@ function callOnce(name, key, opts) {
   return fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(toGemini(opts.messages, opts)),
+    // The RESOLVED model name has to travel into the body builder: whether
+    // thinking can be switched off is a property of the model actually being
+    // called, not of whatever the caller may or may not have asked for.
+    body: JSON.stringify(toGemini(opts.messages, { ...opts, model })),
   });
 }
 

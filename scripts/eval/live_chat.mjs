@@ -5,7 +5,7 @@
 // "did it use what it was told?". Run it on a few cases, not all 24.
 //
 //   node scripts/eval/live_chat.mjs 1 5 19
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { hydrate, searchMaterials, searchMaterialsMulti, extractItemQueries,
          categoryStats, renderMaterialsBlock, consumableQueries } from '../../functions/api/_materials.js';
 const ROOT = new URL('../../', import.meta.url);
@@ -42,6 +42,20 @@ for (const c of cases) {
   });
   const data = await res.json().catch(()=>({}));
   const txt = data?.choices?.[0]?.message?.content;
-  console.log(txt || `[${res.status}] ${JSON.stringify(data).slice(0,300)}`);
+  // Written to disk, not just printed: a 2,000-word Hebrew answer scrolls out of
+  // a terminal, and every one of these costs real AI quota — losing it to a pipe
+  // means paying twice for the same answer.
+  const outDir = new URL('../../data/field-research/live-answers/', ROOT);
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(new URL(`case-${c.num}.md`, outDir),
+    `# מקרה ${c.num} — ${c.title}
+
+## ההודעה
+${c.msg}
+
+## התשובה
+${txt || `[${res.status}] ${JSON.stringify(data)}`}
+`);
+  console.log(txt ? `saved case-${c.num}.md (${txt.length} chars)` : `[${res.status}] ${JSON.stringify(data).slice(0,200)}`);
   await new Promise(r=>setTimeout(r,6000));   // stay under the 12/min burst cap
 }
