@@ -8985,9 +8985,11 @@ function setChatMode(mode, projOverride) {
     // paints both rails from one rule, and the slide between stages carries the
     // sense of movement the old per-pill pulse used to.
     const input = document.getElementById('chat-user-input');
+    // Short enough to fit two lines on a phone: the long version wrapped to
+    // three and was cut mid-word inside the composer.
     if (input) input.placeholder = mode === 'plan'
-        ? 'תאר את העבודה (מה מתקינים, איפה, באילו תנאים)...'
-        : 'כתוב כאן הודעה למומחה התמחור...';
+        ? 'תאר את העבודה: מה, איפה, ובאילו תנאים'
+        : 'כתוב הודעה למומחה התמחור';
 
     // Characterization lives in the side panel: on a wide screen it cannot be
     // the stage and be hidden at the same time, so plan mode opens it. On a

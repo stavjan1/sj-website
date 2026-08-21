@@ -936,20 +936,34 @@ i[class^="fa-"], i[class*=" fa-"] {
 .chat-bubble-photos { display: flex; gap: var(--sp-1); flex-wrap: wrap; margin-block-end: var(--sp-1); }
 .chat-bubble-photo { width: 84px; height: 84px; object-fit: cover; border-radius: var(--r-sm); border: 1px solid var(--border); }
 
-/* Composer */
+/* Composer.
+   Same object as the box on the home screen, shrunk: you type the job into a
+   rounded card in the middle of the screen, you send, and the card is now the
+   one at the bottom of the conversation. */
 .chat-input-area {
     display: flex;
+    align-items: flex-end;
     gap: var(--sp-2);
-    padding: var(--sp-3) var(--sp-4);
+    margin: var(--sp-2) var(--sp-3) var(--sp-3);
+    padding: var(--sp-2);
     background: var(--surface);
-    border-block-start: 1px solid var(--border);
+    border: 1px solid var(--border-strong);
+    border-radius: 14px;
+    box-shadow: var(--shadow-1);
+    transition: border-color var(--t-fast);
 }
+.chat-input-area:focus-within { border-color: var(--accent); }
 .chat-input-area textarea {
     flex-grow: 1;
     resize: none;
     min-height: 56px;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: var(--sp-2);
     font: 400 var(--fs-md)/1.6 var(--font-ui);
 }
+.chat-input-area textarea:focus { outline: none; }
 .chat-input-area button, .chat-input-area .chat-attach-btn {
     flex-shrink: 0;
     width: 44px;
