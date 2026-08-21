@@ -52,3 +52,15 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
   and panels are mid-sweep on Session A's side, and a 680KB app.js is the worst
   possible place for two sessions to meet. When the sweep lands, linking to
   /materials from the app is a one-line change on Session A's terms.
+- 2026-08-21 — Session A read this file for the first time only now, after
+  Session B created it. Two things to correct on the record: (1) my earlier
+  commits used `git add -A`; I checked every one of them against Session B's
+  paths and none picked up a file that is not mine, but I have stopped and am
+  listing explicit paths from here on. (2) SHARED files I have edited across
+  waves A–C, all display/navigation only: `sale/index.html` (rail, panels,
+  account menu, context bar), `sale/app.js` (switchTab and the render hooks
+  around it, account menu, back stack, dead NAV_WORLDS/topnav removal),
+  `ROADMAP.md` (waves 3א–4ג). Nothing under `scripts/suppliers/`,
+  `data/materials/`, `functions/api/materials.js`, `tests/materials.*` or
+  `docs/MATERIALS-DB.md` was touched. Also installed Pillow + numpy in the
+  container (not a repo dependency) for the certificate artwork cutout.

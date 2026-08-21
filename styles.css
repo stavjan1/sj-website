@@ -433,9 +433,16 @@
 /* Slot for the two saluting figures, the way a seal opens a document. The
    artwork itself is still to come — the drop-in is two square images inside
    .sj-mil-salutes and one line in reserve.js. */
-.sj-mil-salutes { display: flex; justify-content: center; gap: var(--sp-4); margin-block-end: var(--sp-6); }
-.sj-mil-salutes img, .sj-mil-salute { width: 76px; height: 76px; flex: none; border-radius: 50%; }
-@media (max-width: 380px) { .sj-mil-salutes img, .sj-mil-salute { width: 64px; height: 64px; } }
+/* The two figures stand side by side at the head of the certificate, at full
+   height — not cropped into medallions, so it does not read as a copy of the
+   badge programmes SJ is not part of. */
+.sj-mil-salutes {
+  display: flex; align-items: flex-end; justify-content: center;
+  gap: var(--sp-6); margin-block-end: var(--sp-4);
+}
+.sj-mil-salutes img { height: 132px; width: auto; flex: none; }
+@media (max-width: 380px) { .sj-mil-salutes img { height: 104px; } }
+@media (max-height: 720px) { .sj-mil-salutes img { height: 108px; } }
 .sj-mil-eyebrow {
   color: #9DB35F; font-size: var(--fs-xs); font-weight: 600;
   letter-spacing: 0.12em; margin-block-end: var(--sp-3);

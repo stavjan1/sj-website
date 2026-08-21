@@ -90,6 +90,13 @@
     overlay.innerHTML =
       '<div class="sj-mil-cert" role="dialog" aria-modal="true" aria-labelledby="sj-mil-h">' +
         '<button type="button" class="sj-mil-close" aria-label="סגירה">' + ICON_X + '</button>' +
+        // The two saluting figures, if the artwork has been added. Each <img>
+        // removes the whole strip if it cannot load, so a missing file leaves
+        // the certificate exactly as it was rather than showing broken frames.
+        '<div class="sj-mil-salutes">' +
+          '<img src="/assets/salute-a.png" alt="" aria-hidden="true" onerror="this.closest(\'.sj-mil-salutes\').remove()">' +
+          '<img src="/assets/salute-b.png" alt="" aria-hidden="true" onerror="this.closest(\'.sj-mil-salutes\').remove()">' +
+        '</div>' +
         emblem('sj-mil-emblem') +
         '<div class="sj-mil-eyebrow">' + COPY.eyebrow + '</div>' +
         '<h2 id="sj-mil-h">' + COPY.title + '</h2>' +
