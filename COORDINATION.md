@@ -64,3 +64,8 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
   `data/materials/`, `functions/api/materials.js`, `tests/materials.*` or
   `docs/MATERIALS-DB.md` was touched. Also installed Pillow + numpy in the
   container (not a repo dependency) for the certificate artwork cutout.
+- 2026-08-21 — Session A bumped the shared asset version `?v=322 → ?v=323` in
+  every page that loads the shared CSS/JS, `materials.html` included. That page
+  is Session B's, and the edit is one mechanical line per file (nothing else in
+  it was touched) — without it that page would keep serving the previous
+  stylesheet from cache after today's changes to `styles.css` / `assets/*`.
