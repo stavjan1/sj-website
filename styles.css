@@ -433,16 +433,18 @@
 /* Slot for the two saluting figures, the way a seal opens a document. The
    artwork itself is still to come — the drop-in is two square images inside
    .sj-mil-salutes and one line in reserve.js. */
-/* The two figures stand side by side at the head of the certificate, at full
-   height — not cropped into medallions, so it does not read as a copy of the
-   badge programmes SJ is not part of. */
-.sj-mil-salutes {
-  display: flex; align-items: flex-end; justify-content: center;
-  gap: var(--sp-6); margin-block-end: var(--sp-4);
+/* The medal is the seal of this document. The two figures are a small mark at
+   its foot, beside the signature — both facing the same way, so they read as a
+   pair standing together rather than as two people looking at each other. */
+.sj-mil-foot {
+  display: flex; align-items: flex-end; gap: var(--sp-3);
+  margin-block-start: var(--sp-6); padding-block-start: var(--sp-4);
+  border-block-start: 1px solid rgb(157 179 95 / 0.2);
 }
-.sj-mil-salutes img { height: 132px; width: auto; flex: none; }
-@media (max-width: 380px) { .sj-mil-salutes img { height: 104px; } }
-@media (max-height: 720px) { .sj-mil-salutes img { height: 108px; } }
+.sj-mil-salutes { display: flex; align-items: flex-end; gap: 2px; flex: none; }
+.sj-mil-salutes img { height: 56px; width: auto; flex: none; }
+.sj-mil-salutes img:last-child { transform: scaleX(-1); }
+@media (max-width: 380px) { .sj-mil-salutes img { height: 46px; } }
 .sj-mil-eyebrow {
   color: #9DB35F; font-size: var(--fs-xs); font-weight: 600;
   letter-spacing: 0.12em; margin-block-end: var(--sp-3);
@@ -468,12 +470,34 @@
 .sj-mil-cert ul li svg { width: 15px; height: 15px; flex: none; color: #9DB35F; margin-block-start: 4px; }
 .sj-mil-cert .sj-mil-sign {
   color: rgb(198 204 176 / 0.75); font-size: var(--fs-xs);
-  margin-block-start: var(--sp-6); padding-block-start: var(--sp-4);
-  border-block-start: 1px solid rgb(157 179 95 / 0.2);
+  flex: 1; min-width: 0; text-align: start;
 }
 .sj-mil-cert .sj-mil-sign .who { color: var(--cert-ink); font-weight: 700; font-size: var(--fs-sm); }
 .sj-mil-cert .sj-mil-sign .role { display: block; margin-block-start: 2px; }
 .sj-mil-cert .sj-mil-actions { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-block-start: var(--sp-6); }
+
+/* On a screen with room, a certificate is a landscape document — not a tall
+   sheet standing in the middle of a monitor. Same content, two halves. */
+@media (min-width: 900px) {
+  .sj-mil-cert {
+    max-width: 860px;
+    display: grid;
+    grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+    column-gap: var(--sp-12);
+    align-items: start;
+    text-align: start;
+    padding: var(--sp-12);
+  }
+  .sj-mil-head { grid-column: 1; text-align: center; }
+  .sj-mil-text { grid-column: 2; }
+  .sj-mil-text .sj-mil-rule { display: none; }
+  .sj-mil-cert .sj-mil-body { font-size: var(--fs-md); }
+  .sj-mil-cert ul { margin-block-start: var(--sp-4); }
+  .sj-mil-foot { grid-column: 1 / -1; }
+  .sj-mil-cert .sj-mil-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .sj-mil-cert .sj-mil-actions .sj-mil-btn { flex: 0 1 220px; }
+  .sj-mil-salutes img { height: 66px; }
+}
 .sj-mil-btn {
   flex: 1 1 auto; min-width: 0; min-height: 42px; padding: 0 var(--sp-4);
   display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);

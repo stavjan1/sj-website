@@ -93,24 +93,35 @@
         // The two saluting figures, if the artwork has been added. Each <img>
         // removes the whole strip if it cannot load, so a missing file leaves
         // the certificate exactly as it was rather than showing broken frames.
-        '<div class="sj-mil-salutes">' +
-          '<img src="/assets/salute-a.png" alt="" aria-hidden="true" onerror="this.closest(\'.sj-mil-salutes\').remove()">' +
-          '<img src="/assets/salute-b.png" alt="" aria-hidden="true" onerror="this.closest(\'.sj-mil-salutes\').remove()">' +
+        // Two blocks rather than a flat stack: on a phone they read as one
+        // column, and on a wide screen they become the two halves of a
+        // landscape certificate instead of a tall A4 in the middle of a
+        // 27-inch monitor.
+        '<div class="sj-mil-head">' +
+          emblem('sj-mil-emblem') +
+          '<div class="sj-mil-eyebrow">' + COPY.eyebrow + '</div>' +
+          '<h2 id="sj-mil-h">' + COPY.title + '</h2>' +
         '</div>' +
-        // The medal stays on the tab that opens this — one seal per document is
-        // enough, and the two figures are the seal here.
-        '<div class="sj-mil-eyebrow">' + COPY.eyebrow + '</div>' +
-        '<h2 id="sj-mil-h">' + COPY.title + '</h2>' +
-        '<div class="sj-mil-rule"><span></span></div>' +
-        '<p class="sj-mil-body">' + COPY.body + '</p>' +
-        '<ul class="sj-mil-points">' +
-          COPY.points.map(function (p) {
-            return '<li>' + ICON_CHECK + '<span>' + p + '</span></li>';
-          }).join('') +
-        '</ul>' +
-        '<div class="sj-mil-sign">' +
-          '<div class="who">' + COPY.signName + '</div>' +
-          '<div class="role">' + COPY.signRole + '</div>' +
+        '<div class="sj-mil-text">' +
+          '<div class="sj-mil-rule"><span></span></div>' +
+          '<p class="sj-mil-body">' + COPY.body + '</p>' +
+          '<ul class="sj-mil-points">' +
+            COPY.points.map(function (p) {
+              return '<li>' + ICON_CHECK + '<span>' + p + '</span></li>';
+            }).join('') +
+          '</ul>' +
+        '</div>' +
+        '<div class="sj-mil-foot">' +
+          // Small, in the corner, both looking the same way — a mark at the foot
+          // of the document rather than a second seal competing with the medal.
+          '<div class="sj-mil-salutes">' +
+            '<img src="/assets/salute-a.png" alt="" aria-hidden="true" onerror="this.closest(\'.sj-mil-salutes\').remove()">' +
+            '<img src="/assets/salute-b.png" alt="" aria-hidden="true" onerror="this.closest(\'.sj-mil-salutes\').remove()">' +
+          '</div>' +
+          '<div class="sj-mil-sign">' +
+            '<div class="who">' + COPY.signName + '</div>' +
+            '<div class="role">' + COPY.signRole + '</div>' +
+          '</div>' +
         '</div>' +
         '<div class="sj-mil-actions">' +
           '<a class="sj-mil-btn call" href="' + CONFIG.tel + '">' + ICON_PHONE + CONFIG.phoneLabel + '</a>' +
