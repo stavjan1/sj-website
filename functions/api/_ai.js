@@ -390,7 +390,16 @@ async function normalize(name, upstream, stream, extraHeaders) {
   }
   const data = await upstream.json();
   const text = geminiText(data);
-  return new Response(JSON.stringify({ choices: [{ message: { role: 'assistant', content: text } }] }), {
+  // finish_reason travels with the answer, in the OpenAI field name the client
+  // already understands. Without it a truncated quote and a genuinely short one
+  // are indistinguishable — which is precisely the confusion that made a
+  // thinking-budget problem look like the model being terse. MAX_TOKENS here
+  // means the answer was cut off, not finished.
+  const finish = (data && data.candidates && data.candidates[0]
+    && data.candidates[0].finishReason) || null;
+  return new Response(JSON.stringify({
+    choices: [{ message: { role: 'assistant', content: text }, finish_reason: finish }],
+  }), {
     status: 200,
     headers: { ...JSON_HEADERS, ...headers },
   });
