@@ -46,3 +46,9 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
   * `.github/workflows/` — added `materials-refresh.yml` (new file only).
   Untouched by design: `sale/app.js`, `sale/index.html`, all CSS. The materials
   database reaches the bot entirely server-side, so no UI file had to move.
+- 2026-08-21 — Session B added a new public page, `materials.html` (a price
+  lookup over /api/materials), and one 5-line entry in `sitemap.xml`. The page
+  is deliberately standalone rather than a tab inside `/sale/`: the app's shell
+  and panels are mid-sweep on Session A's side, and a 680KB app.js is the worst
+  possible place for two sessions to meet. When the sweep lands, linking to
+  /materials from the app is a one-line change on Session A's terms.
