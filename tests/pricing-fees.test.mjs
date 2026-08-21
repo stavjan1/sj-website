@@ -60,3 +60,17 @@ test('the fee total is visible, not just counted', () => {
   assert.ok(/בלי תוספת רווח/.test(APP),
     'the UI does not say fees carry no markup, which is the whole point of the line');
 });
+
+test('applying to a quote turns each fee into its own visible line', () => {
+  // "תשלום בודק = שורה נפרדת" is Stav's rule, and a fee folded into one headline
+  // number breaks it just as thoroughly as a fee that was never counted. The
+  // total keeps the fee (the customer really does pay it) and the fee also
+  // becomes a work item, so it can be seen and defended.
+  const apply = APP.slice(APP.indexOf('function pricingApplyToQuote('),
+                          APP.indexOf('function pricingApplyToQuote(') + 1800);
+  assert.ok(/addWorkItemRow\(/.test(apply), 'fees never become quote line items');
+  assert.ok(/existing\.has\(f\.name\)/.test(apply),
+    'applying twice would duplicate the fee rows');
+  assert.ok(/ללא תוספת רווח/.test(apply),
+    'the fee line does not tell the customer it carries no margin');
+});

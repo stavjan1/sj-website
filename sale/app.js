@@ -6740,8 +6740,27 @@ function pricingApplyToQuote() {
     const base = document.getElementById('form-base-price');
     if (base) { base.value = price; if (typeof calculateTotal === 'function') calculateTotal(); }
     proj.laborPrice = Math.round((c.laborA + c.laborB) / 2);
+
+    // Stav's rule: the inspector, the utility fees and the permits are their own
+    // line, never folded into the price. They stay inside basePrice so the total
+    // the customer pays is right, AND each one becomes a visible work item, so
+    // the customer can see what he is paying and why it is not our margin.
+    // Titles are matched before adding, so applying twice does not duplicate.
+    const feeRows = (proj.fees || []).filter(f => f && f.name && Number(f.price) > 0);
+    if (feeRows.length && typeof addWorkItemRow === 'function') {
+        const container = document.getElementById('work-items-container');
+        const existing = new Set(Array.from(container ? container.children : [])
+            .map(row => (row.querySelector('.item-title-input') || {}).value || ''));
+        feeRows.forEach(f => {
+            if (existing.has(f.name)) return;
+            addWorkItemRow(f.name, f.note || 'תשלום לצד שלישי, מועבר כמו שהוא ללא תוספת רווח.', Math.round(Number(f.price) || 0));
+        });
+    }
+
     saveProjects();
-    showToast('המחיר הוחל על ההצעה, עבור ל"עורך ההצעה"');
+    showToast(feeRows.length
+        ? `המחיר הוחל, ו-${feeRows.length} שורות אגרות/בודק נוספו כסעיפים נפרדים`
+        : 'המחיר הוחל על ההצעה, עבור ל"עורך ההצעה"');
 }
 
 // Defaults editor (set once): markup, rate presets, multipliers.
