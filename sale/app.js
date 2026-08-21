@@ -2686,7 +2686,11 @@ function filterProjectsList() {
 
     let filtered = projectsList.slice();
 
-    if (q) filtered = filtered.filter(p => p.name.toLowerCase().includes(q));
+    // Search what is on the card, not only the stored name: a work the agent
+    // has not titled yet is called "פרויקט חדש", so searching for the words you
+    // actually typed found nothing.
+    if (q) filtered = filtered.filter(p =>
+        p.name.toLowerCase().includes(q) || draftPreview(p).toLowerCase().includes(q));
     if (statusFilter !== 'all') filtered = filtered.filter(p => (p.status || 'טיוטה') === statusFilter);
     if (activeCategoryFilter) filtered = filtered.filter(p => (p.category || '') === activeCategoryFilter);
     if (repeatFilterOn) filtered = filtered.filter(projectRepeats);
