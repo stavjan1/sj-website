@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=352">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=354">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,11 +26,11 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=352">
-    <link rel="stylesheet" href="../assets/ui.css?v=352">
-    <link rel="stylesheet" href="css/shell.css?v=352">
-    <link rel="stylesheet" href="css/panels.css?v=352">
-    <link rel="stylesheet" href="css/pdf.css?v=352">
+    <link rel="stylesheet" href="../assets/tokens.css?v=354">
+    <link rel="stylesheet" href="../assets/ui.css?v=354">
+    <link rel="stylesheet" href="css/shell.css?v=354">
+    <link rel="stylesheet" href="css/panels.css?v=354">
+    <link rel="stylesheet" href="css/pdf.css?v=354">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -107,6 +107,10 @@
                 <button class="nav-btn" id="tab-money" onclick="switchTab('money')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/><circle cx="17.5" cy="14.5" r="1.5"/></svg>
                     <span>כסף</span>
+                </button>
+                <button class="nav-btn" id="tab-pro" onclick="switchTab('pro')" title="PRO — תזרים מזומנים">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg>
+                    <span>PRO</span>
                 </button>
                 <button class="nav-btn" id="tab-catalog" onclick="switchTab('catalog')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M20.6 13.4 12 22l-9-9V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>
@@ -259,16 +263,23 @@
 
                 <div class="subtabs" role="tablist" aria-label="תצוגת כסף" id="money-subtabs">
                     <button type="button" class="subtab active" data-sub="docs" role="tab" aria-selected="true" onclick="setMoneyView('docs')">חשבוניות וקבלות</button>
-                    <button type="button" class="subtab" data-sub="flow" role="tab" aria-selected="false" id="money-tab-flow" hidden onclick="setMoneyView('flow')">תזרים</button>
                 </div>
                 <div id="money-view-docs">
                 <div id="acct-root"><!-- populated by renderAccounting() --></div>
             </div>
-                <div id="money-view-flow" hidden>
+            </section>
+
+            <!-- PRO — the cash-flow dashboard (תזרים מזומנים). Rendered by finance.js
+                 into #finance-root; pro/business/admin see their own numbers, free and
+                 guest accounts see what it is and how to get it. -->
+            <section id="panel-pro" class="content-panel">
+                <div class="section-header">
+                    <h2>PRO — תזרים מזומנים</h2>
+                    <p class="section-subtitle">הצד החי של העסק: יתרות, עקומת מזומן עבר וצפי, חיובים קרובים, והכנסות שנמשכות לבד מהמסמכים שהפקת.</p>
+                </div>
                 <div id="finance-root">
                     <div class="empty"><h3>טוען נתונים…</h3></div>
                 </div>
-            </div>
             </section>
 
             <!-- The way in is a question, not a dashboard. Everything that used
@@ -2160,8 +2171,6 @@
                 </div>
             </section>
 
-            <!-- Finance dashboard (תזרים מזומנים) — owner only. Rendered by finance.js -->
-            
 
         </main>
 
@@ -2419,17 +2428,17 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/listcards.js?v=352"></script>
+    <script src="/assets/listcards.js?v=354"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=352"></script>
-    <script src="app.js?v=352"></script>
+    <script src="coverage.js?v=354"></script>
+    <script src="app.js?v=354"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=352"></script>
+    <script src="finance.js?v=354"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=352" defer></script>
-    <script src="/track.js?v=352" defer></script>
+    <script src="../assistant.js?v=354" defer></script>
+    <script src="/track.js?v=354" defer></script>
 </body>
 </html>

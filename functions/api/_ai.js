@@ -147,6 +147,43 @@ function pickModel(cfg, model) {
 
 const MODEL_LIST_TTL = 6 * 60 * 60;      // seconds; a retirement is never sudden
 
+// ==========================================================================
+// Which 429 is this?
+//
+// Google returns 429 for two completely different situations and the status
+// code alone cannot tell them apart:
+//
+//   · per MINUTE  — ten requests in sixty seconds. Waiting eight seconds fixes
+//                   it. Falling through to Llama instead serves a worse answer
+//                   for no reason at all.
+//   · per DAY     — the free tier is spent. Nothing helps until midnight UTC,
+//                   and the fallback is exactly right.
+//
+// The ledger recorded both as "quota", the admin card said "נגמרה המכסה
+// היומית" for both, and the recommended fix for one is the opposite of the
+// other — so the panel has been giving the wrong advice about the wrong limit.
+// Google names the limit it enforced, in the response body, along with how long
+// to wait. It costs nothing to read it.
+// ==========================================================================
+function quotaInfo(bodyText) {
+  const out = { scope: 'unknown', retryMs: 0 };
+  try {
+    const details = (JSON.parse(bodyText).error || {}).details || [];
+    for (const d of details) {
+      const id = (d.violations || []).map((v) => v.quotaId || v.quotaMetric || '').join(' ');
+      if (/PerMinute|per_minute/i.test(id)) out.scope = 'minute';
+      else if (/PerDay|per_day/i.test(id)) out.scope = 'day';
+      const wait = /^(\d+(?:\.\d+)?)s$/.exec(String(d.retryDelay || ''));
+      if (wait) out.retryMs = Math.round(parseFloat(wait[1]) * 1000);
+    }
+  } catch { /* an unparseable body simply leaves us no wiser */ }
+  return out;
+}
+
+// The longest a customer should be made to wait rather than be handed a weaker
+// answer. Beyond this the fallback is genuinely the kinder outcome.
+const MAX_QUOTA_WAIT_MS = 12000;
+
 // What Google says it will serve for this key.
 export async function geminiServableModels(env, key) {
   const cacheKey = 'ai:gemini-models';
@@ -593,6 +630,11 @@ export async function generate(env, opts) {
     const modelForThis = PROVIDERS[name].models.includes(opts.model) ? opts.model : undefined;
     const modelUsed = pickModel(PROVIDERS[name], modelForThis);
 
+    // Which limit a 429 turned out to be. Declared here rather than assigned
+    // into thin air: this file is an ES module, so it runs in strict mode and
+    // an undeclared assignment is a ReferenceError on every single 429.
+    let quotaScope = null;
+
     let upstream;
     try {
       upstream = await callOnce(name, key, { ...opts, model: modelForThis });
@@ -625,6 +667,35 @@ export async function generate(env, opts) {
       }
     }
 
+    // Gemini only: a 429 that is a per-MINUTE limit is not a spent quota, it is
+    // a queue. The free tier allows ten requests a minute, and a burst — two
+    // people pricing at once, or a page that asks twice — trips it for a few
+    // seconds. Dropping to Llama over that hands the customer a visibly worse
+    // answer to save a wait he would never have noticed.
+    //
+    // A per-DAY 429 falls through immediately, unchanged: waiting for midnight
+    // is not a thing to do to somebody holding a phone.
+    //
+    // NOTE the order of what happens next, because the first version had it
+    // backwards. On a per-minute limit this block does NOT wait — it only reads
+    // which limit it was. The backup key is tried first, further down, because
+    // it is a different Google project with its own per-minute budget: it is
+    // free capacity available immediately. Waiting eight seconds on a key that
+    // is rate-limited, while an idle second key sits there, is the wrong way
+    // round — and the difference shows up exactly when several people arrive at
+    // once, which is precisely when this matters.
+    let quotaRetryMs = 0;
+    if (name === 'gemini' && upstream.status === 429) {
+      let bodyText = '';
+      try { bodyText = await upstream.text(); } catch (e) {}
+      const q = quotaInfo(bodyText);
+      quotaScope = q.scope;
+      quotaRetryMs = q.retryMs;
+      // Nothing is recorded here. The paths below already count this 429 once,
+      // and counting it twice would show the pool as twice as busy as it is —
+      // on the very card used to decide whether to pay for more.
+    }
+
     // Gemini only: a second personal key (env.GEMINI_API_KEY_2, e.g. a backup
     // Google account) is tried immediately on a quota/auth error, before
     // falling through to a weaker provider further down the chain. This is
@@ -634,8 +705,8 @@ export async function generate(env, opts) {
       // The first key just refused. THIS is the moment worth recording: from
       // the user's side the retry hides it completely.
       await recordAiUse(env, label, upstream.status === 429 ? 'quota' : 'fail', modelUsed,
-        { status: upstream.status, note: 'נופל למפתח הגיבוי' });
-      try { await upstream.text(); } catch (e) {} // drain the failed attempt
+        { status: upstream.status, scope: quotaScope, note: 'נופל למפתח הגיבוי' });
+      if (upstream.status !== 429) { try { await upstream.text(); } catch (e) {} } // already drained on 429
       try {
         const retryUpstream = await callOnce(name, env.GEMINI_API_KEY_2, { ...opts, model: modelForThis });
         if (!RETRIABLE.includes(retryUpstream.status)) {
@@ -648,9 +719,36 @@ export async function generate(env, opts) {
       } catch (e) { /* keep the original upstream response, fall through below */ }
     }
 
+
+    // Both Gemini keys are rate-limited for the minute, and this is the last
+    // moment before the customer gets Llama instead. NOW the wait is worth it:
+    // there is no spare capacity left to reach for, and the alternative is a
+    // visibly weaker answer. Bounded, and only for a per-minute limit — a spent
+    // daily quota does not clear by waiting.
+    //
+    // This is the case Stav asked about: three people arriving together from a
+    // WhatsApp group. Two of them are served by the two keys; the third waits a
+    // few seconds and is then served properly, instead of being the one who
+    // gets the bad answer and decides the product is bad.
+    if (name === 'gemini' && upstream.status === 429 && quotaScope === 'minute'
+        && quotaRetryMs && quotaRetryMs <= MAX_QUOTA_WAIT_MS && !opts._waited) {
+      await recordAiUse(env, label, 'quota', modelUsed,
+        { status: 429, scope: 'minute', note: `שני המפתחות תפוסים, ממתין ${Math.round(quotaRetryMs / 1000)} שניות` });
+      try { await upstream.text(); } catch (e) {}
+      await new Promise((r) => setTimeout(r, quotaRetryMs + 250));
+      try {
+        const afterWait = await callOnce(name, key, { ...opts, model: modelForThis, _waited: true });
+        if (!RETRIABLE.includes(afterWait.status)) {
+          await recordAiUse(env, label, 'ok', modelUsed, { note: 'עבר אחרי המתנה קצרה' });
+          return normalize(name, afterWait, !!opts.stream,
+            { 'X-AI-Provider': name, 'X-AI-Waited': String(quotaRetryMs) });
+        }
+        upstream = afterWait;
+      } catch (e) { /* keep the 429 and fall through to the chain */ }
+    }
     if (RETRIABLE.includes(upstream.status) && i < order.length - 1) {
       await recordAiUse(env, label, upstream.status === 429 ? 'quota' : 'fail', modelUsed,
-        { status: upstream.status, note: 'עובר לספק ' + order[i + 1] });
+        { status: upstream.status, scope: quotaScope, note: 'עובר לספק ' + order[i + 1] });
       try { await upstream.text(); } catch (e) {} // drain before next attempt
       continue;
     }
@@ -687,7 +785,7 @@ export async function generate(env, opts) {
     const headers = { 'X-AI-Provider': name };
     if (i > 0) headers['X-AI-Fallback-From'] = order[0];
     await recordAiUse(env, label, upstream.ok ? 'ok' : (upstream.status === 429 ? 'quota' : 'fail'), modelUsed,
-      upstream.ok ? null : { status: upstream.status });
+      upstream.ok ? null : { status: upstream.status, scope: quotaScope });
     return normalize(name, upstream, !!opts.stream, headers);
   }
 
