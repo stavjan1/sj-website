@@ -362,7 +362,6 @@ const PROVIDER_DEFAULT_VALUE = {
     grok: 'grok|grok-2-latest'
 };
 const WEIGHTED_DAILY_BUDGET_DEFAULT = 400;
-const MODEL_CIRCUMFERENCE = 138.2; // 2π×22
 function aiLabel(value) { return MODEL_LABELS[value] || value; }
 
 function _todayKey() {
@@ -403,18 +402,23 @@ function updateQuotaUI() {
     const allowance = (typeof tierLimit === 'function') ? tierLimit('aiDaily') : DAILY_AI_ALLOWANCE;
     const unlimited = allowance === -1;
     const pct = unlimited ? 0 : Math.min(100, Math.round((reqs / (allowance || 1)) * 100));
-    const offset = MODEL_CIRCUMFERENCE * (1 - pct / 100);
 
-    const arc = document.getElementById('quota-arc');
-    if (arc) {
-        arc.style.strokeDashoffset = offset;
-        arc.style.stroke = pct >= 100 ? 'var(--danger)' : pct >= 75 ? 'var(--warn-text)' : 'var(--color-accent)';
+    const fill = document.getElementById('quota-fill');
+    if (fill) {
+        fill.style.width = (unlimited ? 0 : pct) + '%';
+        fill.classList.toggle('hot', pct >= 100);
+        fill.classList.toggle('warm', pct >= 75 && pct < 100);
     }
-    // No percent, no engine name — just how many AI requests were used today.
+    // Said in words, not in a fraction to decode: how many of today's requests
+    // are gone, out of how many the plan gives per day.
     const pctEl = document.getElementById('quota-pct');
-    if (pctEl) pctEl.textContent = unlimited ? reqs : `${reqs}/${allowance}`;
+    if (pctEl) pctEl.textContent = unlimited ? `${reqs} בקשות` : `${reqs} מתוך ${allowance}`;
     const nameEl = document.getElementById('quota-model-name');
-    if (nameEl) nameEl.textContent = 'בקשות AI · היום';
+    if (nameEl) {
+        nameEl.textContent = unlimited ? 'ללא הגבלה יומית'
+            : reqs >= allowance ? 'המכסה להיום נגמרה, מתאפסת בחצות'
+            : `נשארו ${Math.max(0, allowance - reqs)} להיום, מתאפס בחצות`;
+    }
 }
 function changeGeminiModel(model) {
     selectedGeminiModel = model;
@@ -1073,9 +1077,11 @@ document.addEventListener('DOMContentLoaded', () => {
         navigator.serviceWorker.register('sw.js').catch(() => { /* non-fatal */ });
     }
 
-    // Estimate side panel: hidden by default (chat gets the full width);
-    // the "אומדן" toolbar button re-opens it and the choice is remembered.
-    toggleEstimatePanel(localStorage.getItem('sj_hide_estimate') !== '0');
+    // Estimate side panel: hidden at boot (the chat gets the full width), and
+    // NOT persisted — this call used to write '1' on every load, which quietly
+    // turned "he never chose" into "he chose to hide it" and kept the pricing
+    // stage from opening the card it needs.
+    toggleEstimatePanel(true, false);
 
     const activeUser = getActiveUser();
     authTrail('load', activeUser ? 'signed-in' : 'no-user → lock screen');
@@ -2000,10 +2006,29 @@ function setClientsView(view) {
     try { renderClientArchive(); } catch (e) {}
 }
 
+// ── What ships first ────────────────────────────────────────────────────────
+//
+// Stav, 22/08: the pricing chat goes to production before the money side does.
+// Invoices, receipts and cash flow are real and working, but they are his
+// alone until they are ready for customers, so everyone else sees a waiting
+// card instead of a half-finished ledger. One switch decides it everywhere.
+function moneyEnabled() { return isAdmin(); }
+
 function setMoneyView(view) {
     const docs = document.getElementById('money-view-docs');
     const flow = document.getElementById('money-view-flow');
     if (!docs || !flow) return;
+    const soon = document.getElementById('money-soon');
+    const subtabs = document.getElementById('money-subtabs');
+    if (!moneyEnabled()) {
+        if (soon) soon.hidden = false;
+        if (subtabs) subtabs.hidden = true;
+        docs.hidden = true;
+        flow.hidden = true;
+        return;
+    }
+    if (soon) soon.hidden = true;
+    if (subtabs) subtabs.hidden = false;
     const onFlow = view === 'flow';
     docs.hidden = onFlow;
     flow.hidden = !onFlow;
@@ -2991,8 +3016,8 @@ function renderProjectRail() {
         </button>
         <div class="rail-proj" title="${proj ? escapeHtml(proj.name) : ''}">${proj ? escapeHtml(proj.name) : ''}</div>
         <div class="rail-steps">${PROJECT_RAIL_STAGES.map(step).join('')}</div>
-        <div class="rail-divider"></div>
-        <div class="rail-steps rail-steps-soon">${PROJECT_RAIL_DOCS.map(docBtn).join('')}</div>`;
+        ${moneyEnabled() ? `<div class="rail-divider"></div>
+        <div class="rail-steps rail-steps-soon">${PROJECT_RAIL_DOCS.map(docBtn).join('')}</div>` : ''}`;
 }
 
 // Jump from a project straight into the accounting create form, prefilled.
@@ -9016,6 +9041,8 @@ function setSpecAnswer(fieldId, value, source) {
     saveProjects();
     renderSpecCard(proj);
     updatePlanActionBar(proj);
+    updateSpecStrip(proj);
+    updateSpecStrip(proj);
 }
 
 function skipSpecField(fieldId) {
@@ -9027,6 +9054,8 @@ function skipSpecField(fieldId) {
     saveProjects();
     renderSpecCard(proj);
     updatePlanActionBar(proj);
+    updateSpecStrip(proj);
+    updateSpecStrip(proj);
 }
 
 // clearSpecAnswer lived here. Its only caller was editSpecField, which used it
@@ -9069,6 +9098,8 @@ function setSpecJobType(type) {
     saveProjects();
     renderSpecCard(proj);
     updatePlanActionBar(proj);
+    updateSpecStrip(proj);
+    updateSpecStrip(proj);
 }
 
 // The written assumptions that ride along into the quote: the price of speed,
@@ -9495,6 +9526,7 @@ function toggleEstimatePanel(force, persist) {
     if (!panel) return;
     const hide = force !== undefined ? force : !panel.classList.contains('hide-estimate');
     panel.classList.toggle('hide-estimate', hide);
+    try { updateSpecStrip(); } catch (e) {}
     if (persist !== false) localStorage.setItem('sj_hide_estimate', hide ? '1' : '0');
     const btn = document.getElementById('btn-toggle-estimate');
     if (btn) btn.classList.toggle('active', !hide);
@@ -9521,19 +9553,29 @@ function setChatMode(mode, projOverride) {
         ? 'תאר את העבודה: מה, איפה, ובאילו תנאים'
         : 'כתוב הודעה למומחה התמחור';
 
-    // Characterization lives in the side panel: on a wide screen it cannot be
-    // the stage and be hidden at the same time, so plan mode opens it. On a
-    // phone the two panes swap rather than share, and the conversation is where
-    // you start, so the chat stays in front and the card is one tap away.
-    const wide = window.matchMedia('(min-width: 769px)').matches;
-    if (mode === 'plan') toggleEstimatePanel(!wide, false);
-    else toggleEstimatePanel(localStorage.getItem('sj_hide_estimate') !== '0', false);
+    // Where the card belongs, and when (Stav, 22/08: "שלחתי הודעה וזה ישר הקפיץ
+    // אותי למסך עמוס"). Describing a job is a conversation, so the chat gets the
+    // whole screen while it happens and the card waits behind one line under the
+    // messages. Pricing is the other half of his sentence — "עשיתי את התמחור
+    // ואני מבין שצריך את המסך בשמאל בשביל דיוק הסעיפים" — so there the card
+    // opens on its own, unless he closed it and meant it.
+    if (mode === 'plan') {
+        toggleEstimatePanel(true, false);
+    } else {
+        // Null means he never chose, and pricing's default is open: the line
+        // items are the reason the card exists. '1' means he closed it here on
+        // purpose, and that survives.
+        const hide = localStorage.getItem('sj_hide_estimate') === '1';
+        toggleEstimatePanel(hide, false);
+        if (!hide) _explainPricingPanelOnce();
+    }
 
     renderChatHistory(proj);
     renderStageRail(proj);
     renderSpecCard(proj);
     updatePlanActionBar(proj);
     updatePriceActionBar(proj);
+    updateSpecStrip(proj);
     updateStageHint(proj);
 }
 
@@ -9691,6 +9733,59 @@ function updatePriceActionBar(proj) {
         && (proj.chatHistory || []).some(m => m.role === 'user')
         && priced;
     bar.style.display = show ? 'flex' : 'none';
+}
+
+// The one line under the conversation that says the card exists, what is in it,
+// and that opening it is one tap. It only appears once the card has something.
+function updateSpecStrip(proj) {
+    const strip = document.getElementById('spec-strip');
+    if (!strip) return;
+    const project = proj || projectsList.find((p) => p.id === activeProjectId);
+    const panel = document.getElementById('panel-wizard');
+    const panelOpen = panel && !panel.classList.contains('hide-estimate');
+    if (!project || activeChatMode !== 'plan' || panelOpen) { strip.hidden = true; return; }
+
+    const cov = specCoverage(project);
+    if (!cov.answered) { strip.hidden = true; return; }
+    const txt = document.getElementById('spec-strip-text');
+    if (txt) {
+        const missing = (cov.missingCritical || []).length;
+        txt.textContent = missing
+            ? `אפיון העבודה: ${cov.answered} מתוך ${cov.total} שדות, חסרים ${missing} קריטיים`
+            : `אפיון העבודה: ${cov.answered} מתוך ${cov.total} שדות`;
+    }
+    strip.hidden = false;
+}
+
+function openSpecFromChat() {
+    toggleEstimatePanel(false, false);
+    updateSpecStrip();
+    const card = document.getElementById('spec-card');
+    if (card && window.matchMedia('(max-width: 860px)').matches) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+// Said once, the first time the pricing stage opens the card by itself, so the
+// panel arriving is an explanation rather than a surprise.
+function _explainPricingPanelOnce() {
+    try {
+        if (localStorage.getItem('sj_priced_panel_explained') === '1') return;
+        localStorage.setItem('sj_priced_panel_explained', '1');
+    } catch (e) { return; }
+    setTimeout(() => showToast('פתחתי את הצד: שם יושבים הסעיפים שמדייקים את המחיר'), 700);
+}
+
+// The two lists a job actually needs, asked for inside the conversation and
+// answered inside it: the reply carries the [[רשימות]] block, which renders as
+// the same designed cards the quick chat uses, and stays in the thread.
+function askListInChat(kind) {
+    const what = kind === 'tools'
+        ? 'תן רשימת כלים וציוד עבודה לביצוע העבודה הזו'
+        : 'תן רשימת חומרים מלאה לקנייה, כולל האביזרים הקטנים';
+    sendSuggestedChatPrompt(
+        `${what}. החזר אותה בבלוק [[רשימות]] בפורמט JSON, בלי הסבר מסביב.`,
+        true);
 }
 
 // The handoff bar appears only once the agent produced the actual product list

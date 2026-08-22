@@ -3703,3 +3703,43 @@ i[class^="fa-"], i[class*=" fa-"] {
 .bc-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     font: 500 var(--fs-sm) var(--font-ui); color: var(--text); }
 .bc-meta { flex: none; font-size: var(--fs-xs); color: var(--text-3); }
+
+/* ---- The daily AI meter: a line, and the day said out loud ---------------- */
+.quota-meter { display: grid; gap: 4px; min-width: 170px; max-width: 260px; }
+.qm-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
+.qm-label { font-size: var(--fs-xs); color: var(--text-3); font-weight: 600; }
+.qm-count { font: 700 var(--fs-sm) var(--font-ui); color: var(--text); }
+.qm-track { height: 6px; border-radius: var(--r-pill); background: var(--surface-2); overflow: hidden; }
+.qm-fill {
+    height: 100%; width: 0; border-radius: var(--r-pill);
+    background: var(--accent); transition: width .5s ease, background .3s ease;
+}
+.qm-fill.warm { background: var(--warn-text); }
+.qm-fill.hot { background: var(--danger); }
+.qm-note { font-size: var(--fs-xs); color: var(--text-3); }
+.quota-meter.charging .qm-fill { animation: qmPulse 1.2s ease-in-out infinite; }
+@keyframes qmPulse { 50% { opacity: .55; } }
+
+/* ---- Money, waiting its turn --------------------------------------------- */
+.money-soon {
+    max-width: 640px; padding: var(--sp-6);
+    border: 1px dashed var(--border); border-radius: var(--r-md);
+    background: var(--surface);
+}
+.money-soon h3 { margin: 0 0 var(--sp-2); font: 700 var(--fs-lg)/1.3 var(--font-display); color: var(--text); }
+.money-soon p { margin: 0; font-size: var(--fs-sm); line-height: 1.65; color: var(--text-2); }
+.money-soon .ms-fine { margin-block-start: var(--sp-3); font-size: var(--fs-xs); color: var(--text-3); }
+
+/* ---- The card, invited from inside the conversation ---------------------- */
+.spec-strip {
+    display: flex; align-items: center; gap: var(--sp-2);
+    margin: var(--sp-2) var(--sp-3) 0;
+    padding: var(--sp-2) var(--sp-3);
+    background: var(--accent-soft); border: 1px solid transparent;
+    border-radius: var(--r-pill); cursor: pointer; text-align: start;
+    font: 500 var(--fs-xs)/1.3 var(--font-ui); color: var(--accent);
+}
+.spec-strip:hover { border-color: var(--accent); }
+.spec-strip i { font-size: 12px; }
+.sst-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sst-go { flex: none; font-weight: 700; }

@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=333">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=334">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,11 +26,11 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=333">
-    <link rel="stylesheet" href="../assets/ui.css?v=333">
-    <link rel="stylesheet" href="css/shell.css?v=333">
-    <link rel="stylesheet" href="css/panels.css?v=333">
-    <link rel="stylesheet" href="css/pdf.css?v=333">
+    <link rel="stylesheet" href="../assets/tokens.css?v=334">
+    <link rel="stylesheet" href="../assets/ui.css?v=334">
+    <link rel="stylesheet" href="css/shell.css?v=334">
+    <link rel="stylesheet" href="css/panels.css?v=334">
+    <link rel="stylesheet" href="css/pdf.css?v=334">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -249,7 +249,15 @@
                     <h2><i class="fa-solid fa-shekel-sign" aria-hidden="true"></i> כסף</h2>
                     <p class="section-subtitle">חשבוניות וקבלות, ומה נכנס בפועל: במקום אחד.</p>
                 </div>
-                <div class="subtabs" role="tablist" aria-label="תצוגת כסף">
+                <!-- Money is not part of the first production cut: everyone except
+                     the account that owns the system sees this instead. -->
+                <div class="money-soon" id="money-soon" hidden>
+                    <h3>ניהול הכסף בדרך</h3>
+                    <p>חשבוניות, קבלות ומעקב תזרים ייפתחו כאן בקרוב, מחוברים ישירות להצעות המחיר שכבר יצאו מזרם, בלי להקליד שוב אף שורה.</p>
+                    <p class="ms-fine">עד אז אפשר להמשיך לעבוד רגיל: אפיון, תמחור והצעת מחיר עובדים במלואם.</p>
+                </div>
+
+                <div class="subtabs" role="tablist" aria-label="תצוגת כסף" id="money-subtabs">
                     <button type="button" class="subtab active" data-sub="docs" role="tab" aria-selected="true" onclick="setMoneyView('docs')">חשבוניות וקבלות</button>
                     <button type="button" class="subtab" data-sub="flow" role="tab" aria-selected="false" id="money-tab-flow" hidden onclick="setMoneyView('flow')">תזרים</button>
                 </div>
@@ -562,23 +570,16 @@
                                 <option value="grok|grok-2-latest">🤖 Grok 2</option>
                             </select>
                         </div>
-                        <div class="quota-ring-wrap">
-                            <div class="quota-ring" id="quota-ring">
-                                <svg width="56" height="56" viewBox="0 0 56 56">
-                                    <circle cx="28" cy="28" r="22" fill="none" stroke="var(--border-color)" stroke-width="5"/>
-                                    <circle cx="28" cy="28" r="22" fill="none" stroke="var(--color-accent)" stroke-width="5"
-                                        stroke-dasharray="138.2" stroke-dashoffset="138.2"
-                                        id="quota-arc" stroke-linecap="round"
-                                        style="transform:rotate(-90deg); transform-origin:28px 28px; transition:stroke-dashoffset 0.6s ease, stroke 0.4s;"/>
-                                </svg>
-                                <span class="quota-pct-text" id="quota-pct">0%</span>
+                        <!-- A line, not a dial: the question is "how much of today
+                             is left", and a bar answers it at a glance. -->
+                        <div class="quota-meter" id="quota-ring">
+                            <div class="qm-head">
+                                <span class="qm-label">בקשות AI היום</span>
+                                <span class="qm-count" id="quota-pct">0</span>
                             </div>
-                            <div class="quota-info-text">
-                                <span class="quota-load-label">צריכת מנוע AI</span>
-                                <span id="quota-model-name">DeepSeek V3 · היום</span>
-                            </div>
+                            <div class="qm-track"><div class="qm-fill" id="quota-fill"></div></div>
+                            <span class="qm-note" id="quota-model-name">מתאפס בחצות</span>
                         </div>
-                    </div>
                 </div>
                 
                 <div class="split-view">
@@ -624,6 +625,15 @@
                                 </div>
                             </div>
                             
+                            <!-- The characterization card, invited rather than imposed:
+                                 the conversation owns the screen until there is
+                                 something in the card worth opening. -->
+                            <button type="button" class="spec-strip" id="spec-strip" hidden onclick="openSpecFromChat()">
+                                <i class="fa-solid fa-clipboard-check" aria-hidden="true"></i>
+                                <span class="sst-text" id="spec-strip-text">אפיון העבודה</span>
+                                <span class="sst-go">פתיחה</span>
+                            </button>
+
                             <!-- Shown only once the checklist is satisfied AND the list exists -->
                             <div class="plan-action-bar" id="plan-action-bar" style="display:none;">
                                 <span class="pab-q">האפיון מלא · לעבור לתמחור?</span>
@@ -637,12 +647,21 @@
                                 </div>
                             </div>
 
-                            <!-- After pricing replies: clear "next step" forward -->
+                            <!-- After pricing replies: clear "next step" forward, plus
+                                 the two lists you actually walk into a shop with. They
+                                 come back as cards inside this conversation, not as a
+                                 separate screen. -->
                             <div class="plan-action-bar" id="price-action-bar" style="display:none;">
                                 <span class="pab-q">התמחור מוכן?</span>
                                 <div class="pab-btns">
                                     <button type="button" class="btn btn-success btn-small" onclick="goToDraft()">
                                         המשך להכנת טיוטה <i class="fa-solid fa-arrow-left"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-small" onclick="askListInChat('materials')">
+                                        <i class="fa-solid fa-cart-shopping"></i> רשימת חומרים
+                                    </button>
+                                    <button type="button" class="btn btn-secondary btn-small" onclick="askListInChat('tools')">
+                                        <i class="fa-solid fa-screwdriver-wrench"></i> רשימת כלים
                                     </button>
                                 </div>
                             </div>
@@ -2260,17 +2279,17 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/listcards.js?v=333"></script>
+    <script src="/assets/listcards.js?v=334"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=333"></script>
-    <script src="app.js?v=333"></script>
+    <script src="coverage.js?v=334"></script>
+    <script src="app.js?v=334"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=333"></script>
+    <script src="finance.js?v=334"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=333" defer></script>
-    <script src="/track.js?v=333" defer></script>
+    <script src="../assistant.js?v=334" defer></script>
+    <script src="/track.js?v=334" defer></script>
 </body>
 </html>
