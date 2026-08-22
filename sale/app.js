@@ -2235,7 +2235,8 @@ function moneyEnabled() { return isAdmin(); }
 
 function setMoneyView(view) {
     const docs = document.getElementById('money-view-docs');
-    // Cash flow moved out to its own PRO tab; כסף is documents only now.
+    const board = document.getElementById('money-view-board');
+    // Cash flow moved out to its own PRO tab; כסף is the board + documents.
     const flow = document.getElementById('money-view-flow');
     if (!docs) return;
     const soon = document.getElementById('money-soon');
@@ -2244,20 +2245,22 @@ function setMoneyView(view) {
         if (soon) soon.hidden = false;
         if (subtabs) subtabs.hidden = true;
         docs.hidden = true;
+        if (board) board.hidden = true;
         if (flow) flow.hidden = true;
         return;
     }
     if (soon) soon.hidden = true;
     if (subtabs) subtabs.hidden = false;
-    const onFlow = false; // flow lives in the PRO tab
-    docs.hidden = onFlow;
+    const onBoard = view !== 'docs';   // the board is where כסף opens
+    docs.hidden = onBoard;
+    if (board) board.hidden = !onBoard;
     if (flow) flow.hidden = true;
     document.querySelectorAll('#panel-money .subtab').forEach((b) => {
-        const on = b.dataset.sub === (onFlow ? 'flow' : 'docs');
+        const on = b.dataset.sub === (onBoard ? 'board' : 'docs');
         b.classList.toggle('active', on);
         b.setAttribute('aria-selected', String(on));
     });
-    try { onFlow ? (window.renderFinance && window.renderFinance()) : renderAccounting(); } catch (e) {}
+    try { onBoard ? renderStatistics() : renderAccounting(); } catch (e) {}
 }
 
 // How many clients are due, the number on the "שירות תקופתי" view.
@@ -2268,6 +2271,7 @@ function switchTab(tabId, opts) {
     if (tabId === 'archive') { tabId = 'clients'; subView = 'list'; }
     else if (tabId === 'checkups') { tabId = 'projects'; subView = 'maint'; }
     else if (tabId === 'accounting') { tabId = 'money'; subView = 'docs'; }
+    else if (tabId === 'statistics') { tabId = 'money'; subView = 'board'; }
     else if (tabId === 'finance') { tabId = 'pro'; }
 
     // Pipeline is a view of the work list; leaving it re-marks the toggle.
@@ -2364,7 +2368,7 @@ function switchTab(tabId, opts) {
         setProjectsTab(subView === 'maint' ? 'maint' : 'all');
     }
     if (tabId === 'money') {
-        setMoneyView(subView || 'docs');
+        setMoneyView(subView || 'board');
     }
     if (tabId === 'pro') {
         try { window.renderFinance && window.renderFinance(); } catch (e) {}
@@ -3269,6 +3273,7 @@ function openAccountingForProject(projectId, docType) {
     acctSection = 'create';
     acctVatBasis = 'exclude';
     switchTab('money');
+    setMoneyView('docs');   // switchTab opens on the board; this screen wants documents
     setTimeout(() => {
         const dt = document.getElementById('acct-doctype');
         if (dt && docType) dt.value = docType;
@@ -3680,17 +3685,24 @@ function renderStatistics() {
         const cards = items.length ? items.map(p => {
             const amt = projectAmount(p);
             let adv = '';
-            if (c.key === 'executed') adv = `<button class="pipe-adv" onclick="pipelineAdvance('${p.id}','awaiting',event)" title="חשבונית נשלחה: העבר לממתין לתשלום">חשבונית <i class="fa-solid fa-arrow-left"></i></button>`;
+            if (c.key === 'quote') adv = `<button class="pipe-adv" onclick="pipelineAdvance('${p.id}','executed',event)" title="העבודה בוצעה">בוצע <i class="fa-solid fa-arrow-left"></i></button>`;
+            else if (c.key === 'executed') adv = `<button class="pipe-adv" onclick="pipelineAdvance('${p.id}','awaiting',event)" title="חשבונית נשלחה: העבר לממתין לתשלום">חשבונית <i class="fa-solid fa-arrow-left"></i></button>`;
             else if (c.key === 'awaiting') adv = `<button class="pipe-adv" onclick="pipelineAdvance('${p.id}','paid',event)" title="התקבל תשלום: סמן שולם">שולם <i class="fa-solid fa-arrow-left"></i></button>`;
-            return `<div class="pipe-card" onclick="loadProject('${p.id}')" title="פתח את הפרויקט">
+            // Paid, and no receipt issued for it yet: the next thing you owe the
+            // customer is a receipt, so the card offers to produce one.
+            else if (c.key === 'paid' && !projectHasReceipt(p)) adv = `<button class="pipe-adv is-receipt" onclick="pipelineIssueReceipt('${p.id}',event)" title="הפק קבלה ללקוח"><i class="fa-solid fa-receipt"></i> צור קבלה</button>`;
+            const days = projectIdleDays(p);
+            return `<div class="pipe-card" draggable="true" data-pid="${p.id}" data-stage="${c.key}"
+                onclick="loadProject('${p.id}')" title="פתח את הפרויקט · אפשר לגרור לעמודה אחרת">
                 <div class="pipe-card-name">${escapeHtml(p.name)}</div>
                 <div class="pipe-card-foot">
                     <span class="pipe-card-amt">${amt ? nis(amt) : '—'}</span>
                     ${adv}
                 </div>
+                ${(c.key === 'awaiting' && days >= 7) ? `<div class="pipe-card-age">ממתין ${days} ימים</div>` : ''}
             </div>`;
         }).join('') : `<div class="pipe-empty">—</div>`;
-        return `<div class="pipe-col" style="--pipe-accent:${c.accent}">
+        return `<div class="pipe-col" data-stage="${c.key}" style="--pipe-accent:${c.accent}">
             <div class="pipe-col-head">
                 <span class="pipe-col-title"><i class="fa-solid ${c.icon}"></i> ${c.label}</span>
                 <span class="pipe-col-count">${items.length}</span>
@@ -3704,6 +3716,8 @@ function renderStatistics() {
     const totalValue = (projectsList || []).reduce((s, p) => s + projectAmount(p), 0);
     const paidValue = cols.paid.reduce((s, p) => s + projectAmount(p), 0);
     const openValue = totalValue - paidValue;
+    wirePipelineDnD(board);
+
     const head = document.getElementById('pipeline-summary');
     if (head) head.innerHTML = `
         <div class="pipe-stat"><span class="pipe-stat-num">${totalCount}</span><span class="pipe-stat-lbl">פרויקטים</span></div>
@@ -3712,16 +3726,68 @@ function renderStatistics() {
         <div class="pipe-stat"><span class="pipe-stat-num" style="color:var(--ok-text)">${nis(paidValue)}</span><span class="pipe-stat-lbl">שולם</span></div>`;
 }
 
+// One place decides what a column MEANS for a project, so a drag and a button
+// end in exactly the same state.
+const PIPE_STATE = {
+    planning: { status: 'טיוטה', awaiting: false, toast: 'הוחזר לאפיון' },
+    quote:    { status: 'נשלח',  awaiting: false, toast: 'סומן: הצעת מחיר נשלחה' },
+    executed: { status: 'הושלם', awaiting: false, toast: 'סומן כבוצע' },
+    awaiting: { status: 'הושלם', awaiting: true,  toast: 'הועבר לממתין לתשלום' },
+    paid:     { status: 'שולם',  awaiting: false, toast: 'סומן כשולם' },
+};
+
 function pipelineAdvance(projectId, to, e) {
     if (e) e.stopPropagation();
     const p = projectsList.find(x => x.id === projectId);
-    if (!p) return;
-    if (to === 'awaiting') { p.status = 'הושלם'; p.awaitingPayment = true; }
-    else if (to === 'paid') { p.status = 'שולם'; p.awaitingPayment = false; }
+    const target = PIPE_STATE[to];
+    if (!p || !target) return;
+    if (projectPipelineStage(p) === to) return;
+    p.status = target.status;
+    p.awaitingPayment = target.awaiting;
     p.statusChangedAt = Date.now();
     saveProjects();
     renderStatistics();
-    showToast(to === 'paid' ? 'סומן כשולם' : 'הועבר לממתין לתשלום');
+    filterProjectsList();
+    showToast(target.toast);
+    // Money that just arrived wants a receipt — offer it on the spot.
+    if (to === 'paid' && !projectHasReceipt(p)) {
+        setTimeout(() => showToast('אפשר להפיק קבלה ללקוח מהכרטיס בלוח'), 1200);
+    }
+}
+
+// A receipt already exists for this project?
+function projectHasReceipt(p) {
+    return (invoicesList || []).some(d => d.projectId === p.id && sbIsPaidType(d.docType) && d.status !== 'error');
+}
+
+// "צור קבלה": the document screen, prefilled from the project, on Receipt.
+function pipelineIssueReceipt(projectId, e) {
+    if (e) e.stopPropagation();
+    openAccountingForProject(projectId, 'Receipt');
+}
+
+// Drag and drop: pick a card up, drop it in the column where its money is.
+function wirePipelineDnD(board) {
+    if (!board) return;
+    let dragId = null;
+    board.querySelectorAll('.pipe-card').forEach(card => {
+        card.addEventListener('dragstart', (ev) => {
+            dragId = card.dataset.pid;
+            card.classList.add('is-dragging');
+            try { ev.dataTransfer.setData('text/plain', dragId); ev.dataTransfer.effectAllowed = 'move'; } catch (e) {}
+        });
+        card.addEventListener('dragend', () => { dragId = null; card.classList.remove('is-dragging'); board.querySelectorAll('.pipe-col').forEach(c => c.classList.remove('is-over')); });
+    });
+    board.querySelectorAll('.pipe-col').forEach(col => {
+        col.addEventListener('dragover', (ev) => { ev.preventDefault(); try { ev.dataTransfer.dropEffect = 'move'; } catch (e) {} col.classList.add('is-over'); });
+        col.addEventListener('dragleave', () => col.classList.remove('is-over'));
+        col.addEventListener('drop', (ev) => {
+            ev.preventDefault();
+            col.classList.remove('is-over');
+            const id = dragId || (ev.dataTransfer && ev.dataTransfer.getData('text/plain'));
+            if (id) pipelineAdvance(id, col.dataset.stage);
+        });
+    });
 }
 
 // ==========================================================================
