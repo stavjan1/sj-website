@@ -6568,8 +6568,17 @@ function aiVerdictHtml(ai) {
             'הבוט עונה מג\'מיני, המנוע החזק. לא נרשם היום אף כשל.');
     }
     const last = failures[0];                        // the ledger is newest-first
+    // A per-minute limit and a spent daily quota are both 429, and the useful
+    // reaction to each is the opposite of the other: one is a queue that clears
+    // in seconds, the other is over until midnight. Reporting both as "המכסה
+    // היומית נגמרה" is how this card recommended buying capacity that was never
+    // the problem. `scope` is the limit Google itself named in the response.
     const why = (last.outcome === 'quota' || last.status === 429)
-        ? 'המכסה היומית של ג\'מיני נגמרה'
+        ? (last.scope === 'minute'
+            ? 'נגמרו הבקשות לדקה של ג\'מיני, לא המכסה היומית'
+            : last.scope === 'day'
+                ? 'המכסה היומית של ג\'מיני נגמרה'
+                : 'ג\'מיני החזירה 429 בלי לפרט איזו מגבלה')
         : last.status === 404
             ? 'שם המודל שמוגדר אינו מוכר למפתח של גוגל'
             : (last.status === 401 || last.status === 403)

@@ -149,3 +149,31 @@ test('the system message still becomes systemInstruction', () => {
   assert.equal(b.contents.length, 1);
   assert.equal(b.contents[0].role, 'user');
 });
+
+test('a per-minute limit and a spent daily quota are told apart', () => {
+  // Both are 429, and the right reaction to each is the opposite of the other:
+  // a minute limit is a queue that clears in seconds, a daily quota is over
+  // until midnight. The ledger recorded both as "quota" and the panel said
+  // "המכסה היומית נגמרה" for both — so it recommended buying capacity to solve
+  // a problem that a nine-second wait solves for free.
+  const src = readFileSync(new URL('../functions/api/_ai.js', import.meta.url), 'utf8');
+  assert.match(src, /function quotaInfo\(/, 'the 429 body is never read');
+  assert.match(src, /PerMinute\|per_minute/, 'a per-minute limit is not recognised');
+  assert.match(src, /PerDay\|per_day/, 'a daily quota is not recognised');
+
+  // The wait is bounded: past a point, a weaker answer now beats a better one
+  // the customer already walked away from.
+  assert.match(src, /MAX_QUOTA_WAIT_MS/, 'an unbounded wait could hold a request open');
+
+  // quotaScope must be DECLARED. This file is an ES module and therefore strict
+  // mode, where assigning an undeclared name throws — on every single 429, in
+  // the exact path that exists to survive one.
+  assert.match(src, /let quotaScope = null;/, 'quotaScope is assigned without being declared');
+
+  // And the 429 is counted once, not once per handler that sees it.
+  const counted = (src.match(/scope: quotaScope/g) || []).length;
+  assert.ok(counted >= 3, 'the scope never reaches the records that count the failure');
+  const branch = src.slice(src.indexOf("upstream.status === 429) {"), src.indexOf('a second personal key'));
+  assert.ok(!/recordAiUse\(env, label, 'quota', modelUsed, \{ status: 429, scope/.test(branch),
+    'the quota branch records a failure the paths below will record again');
+});

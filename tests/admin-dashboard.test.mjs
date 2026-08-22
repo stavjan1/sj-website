@@ -159,11 +159,17 @@ test('the AI card leads with who is answering customers, in words', () => {
   assert.match(down, /שם המודל/, 'a 404 is not explained as a model-name problem');
   assert.match(down, /var\(--danger\)/, 'a live fallback is not styled as the problem it is');
 
-  // Quota reads differently from a broken model: one waits for tomorrow, the
-  // other needs a change. Saying "error" for both is what cost the diagnosis.
-  const quota = v({ events: [{ date: today, outcome: 'quota', note: 'עובר לספק cloudflare' }] });
-  assert.match(quota, /המכסה היומית/, 'exhausted quota is not named');
+  // Quota reads differently from a broken model: one waits, the other needs a
+  // change. And the two QUOTAS read differently from each other — a per-minute
+  // limit clears in seconds, a daily one is over until midnight — so the card
+  // must not call both "the daily quota", which is what it used to do.
+  const quota = v({ events: [{ date: today, outcome: 'quota', scope: 'day', note: 'עובר לספק cloudflare' }] });
+  assert.match(quota, /המכסה היומית/, 'exhausted daily quota is not named');
   assert.ok(!/שם המודל/.test(quota), 'quota is being reported as a model problem');
+
+  const minute = v({ events: [{ date: today, outcome: 'quota', scope: 'minute', note: 'עובר לספק cloudflare' }] });
+  assert.match(minute, /לדקה/, 'a per-minute limit is reported as a spent daily quota');
+  assert.ok(!/המכסה היומית של/.test(minute), 'a per-minute limit still claims the day is over');
 
   // Yesterday's trouble is not today's headline.
   assert.match(v({ events: [{ date: '2020-01-01', outcome: 'fail', status: 500 }] }), /המנוע החזק/,
