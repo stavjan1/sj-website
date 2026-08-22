@@ -85,17 +85,18 @@
      instead of hugging the header with a hole under it. The moment an answer
      arrives the log fills from the top like any chat. */
   main:has(> .wrap > .intro:only-child){justify-content:center}
-  .intro h1{font-size:1.35rem; color:var(--ink); margin-bottom:8px; font-weight:800}
+  .intro h1{font-size:1.2rem; color:var(--ink); margin-bottom:8px; font-weight:800}
   .intro p{font-size:.92rem; line-height:1.6; max-width:440px; margin:0 auto}
   .chips{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:14px}
   .chip{font-size:.82rem; color:var(--sub); background:var(--panel); border:1px solid var(--line);
     border-radius:999px; padding:7px 13px; cursor:pointer}
   .chip:hover{border-color:var(--accent); color:var(--ink)}
-  .msg{max-width:88%; padding:12px 15px; border-radius:14px; font-size:1rem; line-height:1.7; white-space:pre-wrap; word-break:break-word}
+  .msg{max-width:88%; padding:11px 14px; border-radius:14px; font-size:.92rem; line-height:1.65; white-space:pre-wrap; word-break:break-word}
   .msg.ai{background:var(--panel); border:1px solid var(--line); align-self:flex-start; border-bottom-right-radius:5px}
   .msg.me{background:var(--me); align-self:flex-end; border-bottom-left-radius:5px}
   .msg.ai b{color:var(--price)}
-  .price-line{display:block; font-size:1.15rem; font-weight:800; color:var(--price);
+  .price-note{display:block; font-size:.8rem; font-weight:500; color:var(--sub); margin-top:2px; line-height:1.5}
+  .price-line{display:block; font-size:1.05rem; font-weight:800; color:var(--price);
     background:var(--me); border:1px solid var(--accent);
     border-radius:10px; padding:8px 12px; margin-bottom:8px}
   .typing .dots::after{content:''; animation:dots 1.4s steps(4,end) infinite}
@@ -109,6 +110,7 @@
     border-radius:999px; padding:7px 14px; cursor:pointer; font-family:inherit}
   .q-opt:hover{border-color:var(--accent)}
   .q-opt.on{background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:700}
+  .q-hint{font-size:.72rem; color:var(--muted); margin:8px 0 2px}
   .q-free{font-size:.85rem; background:var(--bg); border:1px solid var(--line); color:var(--ink);
     border-radius:999px; padding:7px 14px; font-family:inherit; width:130px}
   .q-free:focus{outline:none; border-color:var(--accent)}
@@ -119,7 +121,7 @@
   /* Length→price slider (site-owned formula; AI only fills the numbers) */
   .calcbox{align-self:flex-start; max-width:88%; background:var(--panel); border:1px solid var(--accent);
     border-radius:14px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; width:340px}
-  .calc-price{font-size:1.5rem; font-weight:800; color:var(--price); text-align:center}
+  .calc-price{font-size:1.3rem; font-weight:800; color:var(--price); text-align:center}
   .calc-label{font-size:.82rem; color:var(--sub); display:flex; justify-content:space-between}
   .calc-label b{color:var(--ink)}
   .calcbox input[type=range]{width:100%; accent-color:var(--accent); cursor:pointer}
@@ -129,7 +131,7 @@
   .openbox{align-self:flex-start; max-width:88%; width:340px; background:var(--panel);
     border:1px solid var(--line); border-radius:14px; padding:13px 15px;
     display:flex; flex-direction:column; gap:4px}
-  .open-head{font-size:.83rem; font-weight:800; color:var(--ink); margin-bottom:4px}
+  .open-head{font-size:.8rem; font-weight:800; color:var(--ink); margin-bottom:4px}
   .open-sub{font-size:.7rem; font-weight:700; color:var(--muted); margin-top:6px}
   .open-list{margin:2px 0 0; padding-inline-start:16px; display:flex; flex-direction:column; gap:2px}
   .open-list li{font-size:.79rem; color:var(--sub); line-height:1.5}
@@ -246,22 +248,24 @@ const SYSTEM = `אתה "זרם", עוזר תמחור AI לחשמלאים ביש�
 ## שלב א': שאלות חכמות (כשחסרים פרטים שמשנים את המחיר)
 אם בתיאור חסרים 1–4 פרטים שמזיזים את המחיר משמעותית (אורך תוואי, סוג תוואי, נגישות, מצב לוח, גובה, חד/תלת פאזי...), אל תיתן מחיר סופי. חשוב בעצמך: מהם הגורמים שהכי משנים את המחיר בעבודה *הזאת*? החזר:
 0. **חובה לפני הכל**: אם המשתמש טעה מקצועית (כבל שגוי, הנחה שגויה, בחירה מסוכנת): תקן אותו במשפט ברור אחד ("שים לב: 6×4 הוא כבל פיקוד, לתלת-פאזי צריך 5×4"). ואם שאל שאלה טכנית (איזה כבל/חתך/ציוד), ענה עליה בשורה הראשונה. רק אחר כך השאלות.
-1. שורה אחת: "טווח גס: X–Y ₪. כדי לדייק, ענה על כמה שאלות:"
+1. שורה אחת: "הערכה ראשונית: X–Y ₪ לפני מע"מ." ואז שורה שנייה קצרה בלבד: "כמה שאלות יחדדו את זה:"
 2. ואז בלוק בפורמט המדויק הזה (JSON תקין, בלי טקסט נוסף בתוכו):
-[[שאלות]]{"questions":[{"q":"אורך הקו מהלוח","opts":["עד 10 מ'","10-30 מ'","30+ מ'"]},{"q":"תוואי הכבל","opts":["פיר/צנרת קיימת","תעלות עה\\"ט","חציבה/משתלבות חדשות"]}]}[[/שאלות]]
-עד 4 שאלות, עד 4 אפשרויות קצרות לכל אחת. רק שאלות שבאמת משנות את המחיר לעבודה הזו.
+[[שאלות]]{"questions":[{"q":"אורך הקו מהלוח","opts":["עד 10 מ'","10-30 מ'","30+ מ'"],"def":1},{"q":"תוואי הכבל","opts":["פיר/צנרת קיימת","תעלות עה\\"ט","חציבה/משתלבות חדשות"],"def":0}]}[[/שאלות]]
+**עד 3 שאלות**, עד 4 אפשרויות קצרות לכל אחת. רק שאלות שבאמת משנות את המחיר לעבודה הזו.
+לכל שאלה סמן "def": האינדקס של התשובה הסטנדרטית, זו שנכונה ברוב המקרים. היא תסומן מראש והמשתמש רק ישנה אם אצלו זה אחרת. אם אין תשובה סטנדרטית ברורה, אל תוסיף "def".
 לעולם אל תשאל שאלה שהתשובה לה כבר משתמעת מהתיאור (למשל: המשתמש כתב "כבל 5×4" ⇒ תלת-פאזי, אל תשאל על פאזות; עמדת טעינה ⇒ ברירת מחדל תלת-פאזי).
 
 ## שלב ב' · מחיר אחד
 כשיש לך את התשובות (או כשהתיאור מלא מההתחלה), תן **מספר אחד** (או טווח צר של עד ±10%):
 1. **מחיר מומלץ: X ₪** + מה כלול, שורה אחת.
-2. **אל תשכח**: 1–3 נקודות שמעלות מחיר (בודק בנפרד, חציבה, פחת ייעודי...).
-3. שורת נימוק אחת. אל תהיה הזול · תמחר לפי ערך, סיכון ומורכבות.
+2. אל תוסיף שורת נימוק ואל תסביר את עצמך: המספר וההנחות שמתחתיו הם ההסבר.
+   מה שמעלה מחיר (בודק, חציבה, הגעות חח"י) נכנס לבלוק "פתוח" בסוף ולא כפסקה נפרדת. פעמיים אותו דבר במילים שונות זה מה שמנפח את התשובה.
+3. אל תהיה הזול · תמחר לפי ערך, סיכון ומורכבות.
 4. אם המחיר תלוי-אורך (כבל/תוואי/צנרת): הוסף בסוף בלוק מחשבון בפורמט המדויק (JSON בלבד): [[מחשבון]]{"label":"אורך הקו (מ')","base":1800,"minM":5,"maxM":80,"defaultM":20,"tiers":[{"upToM":25,"perMeter":50},{"upToM":60,"perMeter":80},{"upToM":150,"perMeter":115}]}[[/מחשבון]]. המחיר למטר מדורג, קו ארוך יקר יותר למטר (זמן עבודה, חתך גדל). קבע maxM שמכסה את המקרה הריאלי (עד 150, לא רק את מה שהמשתמש אמר), ו-base כך שהמחיר ב-defaultM שווה בדיוק למחיר שנתת. אל תוסיף מחשבון לעבודות שאינן תלויות-אורך.
 5. **חובה בסוף שלב ב'**: בלוק "מה נשאר פתוח" בפורמט המדויק הזה (JSON תקין, בלי טקסט נוסף):
 [[פתוח]]{"assumptions":["המסלול גלוי ואין חציבה","בלוח יש מקום פנוי ל-2 מודולים"],"open":["מצב ההארקה במבנה","מי מספק את החומר","נגישות וחניה באתר"]}[[/פתוח]]
 assumptions = 2–4 ההנחות שהמחיר שנתת נשען עליהן בפועל. open = 3–6 דברים שלא נבדקו ושיכולים להזיז את המחיר. קצר, בלי מספרים, כל פריט עד 6 מילים. זה לא קישוט, זה מה שמבדיל הערכה מהירה מהצעת מחיר.
-קצר ולעניין. סיים תמיד בשורה: "רוצה לנהל את זה כהצעת מחיר מלאה ללקוח? היכנס לזרם."
+קצר ולעניין. אל תסיים בשורת שיווק ואל תזמין את המשתמש למערכת: זו תשובה מקצועית, לא פרסומת.
 
 ## רשימת ציוד וכלים (רק כשמתבקש במפורש)
 כשהמשתמש מבקש רשימת ציוד/חומרים/כלים: החזר משפט פתיחה קצר אחד, ואז בלוק בפורמט המדויק הזה (JSON תקין, בלי טקסט נוסף בתוכו):
@@ -284,7 +288,12 @@ function esc(s){ const d=document.createElement('div'); d.textContent=s; return 
 function md(s){
   let h = esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
   // Make the price line POP — the one thing every visitor came for.
-  h = h.replace(/^(.*?(?:מחיר מומלץ|מחיר משוער|טווח מחיר|טווח גס)[^\n]*)/, '<span class="price-line">$1</span>');
+  // Big type for the NUMBER, small for what comes after it. The old pattern
+  // took the entire first line, so "לפני מע\"מ, לא כולל העמדה עצמה ובודק" was
+  // printed at headline weight across four lines — most of what made this
+  // screen read as a shouty gimmick rather than an answer.
+  h = h.replace(/^([^\n]*?(?:מחיר מומלץ|מחיר משוער|טווח מחיר|טווח גס|הערכה ראשונית)[^\n]*?[\d,]+(?:\s*[–-]\s*[\d,]+)?\s*₪)([^\n]*)/,
+    '<span class="price-line">$1</span><span class="price-note">$2</span>');
   return h;
 }
 
@@ -348,7 +357,7 @@ function renderOpenItems(o){
       (open.length ? ' · ' + open.length + ' דברים עוד לא נבדקו' : '') + '</div>' +
     (assumptions.length ? '<div class="open-sub">הנחנו ש…</div><ul class="open-list">' + li(assumptions) + '</ul>' : '') +
     (open.length ? '<div class="open-sub">לא נבדק</div><ul class="open-list open-miss">' + li(open) + '</ul>' : '') +
-    '<a class="open-cta" href="/sale/">בוא נאפיין את זה כמו שצריך ←</a>';
+    '';
   wrap.appendChild(box);
 }
 
@@ -401,8 +410,15 @@ function renderQuestions(questions){
     const g = document.createElement('div'); g.className='qgroup';
     const lab = document.createElement('div'); lab.className='q-label'; lab.textContent = q.q;
     const opts = document.createElement('div'); opts.className='q-opts';
-    (q.opts||[]).slice(0,4).forEach(op=>{
+    // "def" is the index of the answer that is true in most jobs. Clamped
+    // against the options that actually exist — it arrives from a language
+    // model, and a def of 7 on a three-option question must pre-select nothing
+    // rather than throw inside a render.
+    const list = (q.opts||[]).slice(0,4);
+    const def = Number.isInteger(q.def) && q.def >= 0 && q.def < list.length ? q.def : -1;
+    list.forEach((op,oi)=>{
       const b = document.createElement('button'); b.className='q-opt'; b.textContent = op;
+      if (oi === def){ b.classList.add('on'); answers[qi] = op; }
       b.onclick = ()=>{
         opts.querySelectorAll('.q-opt').forEach(x=>x.classList.remove('on'));
         b.classList.add('on'); answers[qi] = op; free.value='';
@@ -419,8 +435,13 @@ function renderQuestions(questions){
     opts.appendChild(free);
     g.appendChild(lab); g.appendChild(opts); box.appendChild(g);
   });
-  const go = document.createElement('button'); go.className='q-go'; go.disabled = true;
+  const go = document.createElement('button'); go.className='q-go';
+  go.disabled = Object.keys(answers).length === 0;
   go.textContent = 'חשב מחיר מדויק ←';
+  const hint = document.createElement('div');
+  hint.className = 'q-hint';
+  hint.textContent = 'הסטנדרטי כבר מסומן. שנה רק מה ששונה אצלך.';
+  box.appendChild(hint);
   go.onclick = ()=>{
     const parts = questions.map((q,qi)=> answers[qi] ? (q.q + ': ' + answers[qi]) : null).filter(Boolean);
     box.classList.add('done');
@@ -485,9 +506,13 @@ function saveHandoff(reply){
 }
 function showCTA(){
   if (ctaShown) return; ctaShown = true;
-  const c = document.createElement('div'); c.className='cta-card';
-  c.innerHTML = '<p>אהבת? זו רק ההתחלה. במערכת המלאה נמשיך <b>בדיוק את העבודה הזו</b>: רשימת מוצרים, הצעת PDF ללקוח וחשבונית.</p><a href="/sale/">המשך את זה במערכת (חינם) ←</a>';
-  wrap.appendChild(c); feed.scrollTop = feed.scrollHeight;
+  // Deliberately does nothing now. This card used to say "אהבת? זו רק ההתחלה…"
+  // directly under a professional pricing answer, and an advertisement inside
+  // an answer cheapens the answer — which matters most in the one place this
+  // gets seen, a WhatsApp group of two hundred electricians. The logo at the
+  // top of the page is the whole pitch; a tradesman who got a good number will
+  // find it by himself.
+  return;
 }
 
 // When a send fails, the thing he typed must not be lost: one button puts it
@@ -760,6 +785,6 @@ setTimeout(maybeShowNoSave, 500);
 
 input.focus();
 </script>
-    <script src="/track.js?v=354" defer></script>
+    <script src="/track.js?v=355" defer></script>
 </body>
 </html>
