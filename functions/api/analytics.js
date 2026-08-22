@@ -9,8 +9,8 @@
 // Clarity is NOT handled here — functions/api/clarity.js already owns that
 // pipeline (admin-stored token, 6h cache, Actions puller for history).
 //
-//   POST /api/analytics  { s:'site'|'zerem', p:'/path', r:'referrer-host' }
-//   GET  /api/analytics?admin=1&days=30            → traffic for both sites
+//   POST /api/analytics  { s:'site'|'zerem'|'app', p:'/path', r:'referrer-host' }
+//   GET  /api/analytics?admin=1&days=30            → traffic for every property
 //
 // Owner/bot exclusion: the browser beacon refuses to fire for Stav's own
 // devices and for automation (see trackPageview in app.js / site js), and the
@@ -23,7 +23,10 @@ import { adminGate, rateLimit, dayKey, jsonResponse } from './_tiers.js';
 // Pages KV list() is paginated and slow, and this set changes about once a year.
 const AI_POOLS = ['gemini:primary', 'gemini:backup', 'gemini:paid', 'deepseek', 'grok', 'cloudflare', 'all'];
 
-const SITES = ['site', 'zerem'];
+// Three properties, because they answer three different questions: the office
+// site sells engineering, the זרם page sells the product, and the app itself is
+// people using it. Days before the split carry app traffic inside 'zerem'.
+const SITES = ['site', 'zerem', 'app'];
 const UNIQ_CAP = 4000;          // hashed ids kept per day — a counter, not an audience
 const PATH_CAP = 200;           // distinct paths tracked per day
 // Every counted hit costs one KV write, and this namespace also holds the
@@ -404,7 +407,50 @@ async function aiUsage(env, dates) {
     };
   }
 
-  return { pools: AI_POOLS, caps, totals: pools, series, today: todayPools, events: events.slice(-40).reverse() };
+  return {
+    pools: AI_POOLS, caps, totals: pools, series, today: todayPools,
+    pressure: await aiPressure(env, series, caps),
+    events: events.slice(-40).reverse(),
+  };
+}
+
+// How close to the ceiling this thing runs, which is the only AI number worth
+// looking at day to day. An average would hide exactly the days that matter, so
+// this counts the days that crossed each line instead, and keeps the all-time
+// record in KV so it survives past the window being viewed.
+//
+// The record is written only when it is actually beaten, which is rare — the
+// write budget is a real constraint here.
+const AI_PRESSURE_LINES = [50, 70, 90];
+
+async function aiPressure(env, series, caps) {
+  const dayPct = [];
+  for (const row of series) {
+    let used = 0, cap = 0;
+    for (const [label, rec] of Object.entries(row.pools || {})) {
+      const c = Number(caps[label]) > 0 ? Number(caps[label]) : 0;
+      if (!c) continue;                    // no ceiling declared → no percentage
+      used += rec.used || 0;
+      cap += c;
+    }
+    if (cap > 0) dayPct.push({ date: row.date, pct: Math.round((used / cap) * 100), used, cap });
+  }
+
+  const over = {};
+  for (const line of AI_PRESSURE_LINES) over[line] = dayPct.filter((d) => d.pct >= line).length;
+  const exhaustedDays = series.filter((row) =>
+    Object.values(row.pools || {}).some((r) => (r.quota || 0) > 0)).length;
+
+  const windowPeak = dayPct.reduce((best, d) => (!best || d.pct > best.pct ? d : best), null);
+
+  let record = safeParse(await env.SJ_DATA.get('stats:aiPeak'), null);
+  if (windowPeak && (!record || windowPeak.pct > record.pct)) {
+    record = { pct: windowPeak.pct, date: windowPeak.date, used: windowPeak.used, cap: windowPeak.cap };
+    try { await env.SJ_DATA.put('stats:aiPeak', JSON.stringify(record)); } catch { /* budget */ }
+  }
+
+  const todayPct = dayPct.length ? dayPct[dayPct.length - 1] : null;
+  return { days: dayPct, daysMeasured: dayPct.length, today: todayPct, windowPeak, record, over, exhaustedDays, lines: AI_PRESSURE_LINES };
 }
 
 // The weekly read, computed on view instead of by a scheduled job. A cron that

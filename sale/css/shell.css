@@ -127,10 +127,17 @@ body:not(.in-project) .proj-tab { display: none !important; }
   padding-block-start: var(--sp-3); border-block-start: 1px solid var(--border);
 }
 .sidebar-footer .nav-btn { width: 100%; min-height: 44px; }
+/* The admin door: same shape as a rail button, marked as its own thing. */
+.nav-admin { color: var(--accent); }
+.nav-admin svg { color: var(--accent); }
+.nav-admin.active, .nav-admin:hover { background: var(--accent-soft); }
 #sidebar-user-chip { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: var(--sp-1); }
 #user-chip-avatar {
   width: 30px; height: 30px; border-radius: var(--r-pill);
-  background: var(--surface-2); color: var(--text-2);
+  /* center/cover, like the menu's avatar: without it the Google photo was
+     painted at its own 96px size inside a 30px circle, so the rail showed a
+     zoomed corner of the face while the menu showed the picture. */
+  background: var(--surface-2) center/cover no-repeat; color: var(--text-2);
   display: flex; align-items: center; justify-content: center;
   font: 700 12px var(--font-ui); overflow: hidden;
 }

@@ -3614,3 +3614,60 @@ i[class^="fa-"], i[class*=" fa-"] {
     .maint-card { gap: var(--sp-2); }
     .maint-row-actions { flex-basis: 100%; }
 }
+
+/* The admin cards' "your hour lapsed" state: a reason and the button that
+   fixes it, instead of a red sentence with nothing to press. */
+.admin-auth {
+    display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    border: 1px solid var(--border); border-radius: var(--r-md);
+    background: var(--surface-2);
+}
+.admin-auth p { margin: 0; font-size: var(--fs-sm); color: var(--text-2); }
+
+/* ---- AI pressure: today, the record, and how often it climbs -------------- */
+.aipr { display: grid; gap: var(--sp-3); margin-block-end: var(--sp-4); }
+.aipr-now {
+    display: grid; gap: var(--sp-1);
+    padding: var(--sp-4); border-radius: var(--r-md);
+    background: var(--surface-2); border: 1px solid var(--border);
+}
+.aipr-now.warm { border-color: var(--warn-text); }
+.aipr-now.hot { border-color: var(--danger); }
+.aipr-k { font-size: var(--fs-xs); color: var(--text-3); font-weight: 600; }
+.aipr-v { font: 700 1.9rem/1 var(--font-display); color: var(--text); direction: ltr; unicode-bidi: isolate; }
+.aipr-s { font-size: var(--fs-xs); color: var(--text-3); }
+.aipr-now .aip-bar { margin-block-start: var(--sp-2); }
+.aipr-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--sp-3); }
+.aipr-card {
+    display: grid; gap: 2px; align-content: start;
+    padding: var(--sp-3); border-radius: var(--r-md);
+    background: var(--surface); border: 1px solid var(--border);
+}
+.aipr-card .aipr-v { font-size: 1.5rem; }
+.aipr-lines {
+    display: grid; gap: var(--sp-1); align-content: start;
+    padding: var(--sp-3); border-radius: var(--r-md);
+    background: var(--surface); border: 1px solid var(--border);
+}
+.aipr-line { display: flex; align-items: baseline; gap: var(--sp-2); }
+.aipr-line-k { font-size: var(--fs-xs); color: var(--text-2); min-width: 62px; }
+.aipr-line-v { font: 700 var(--fs-md) var(--font-ui); color: var(--text); }
+.aipr-line-s { font-size: var(--fs-xs); color: var(--text-3); }
+.aip-fill.warm { background: var(--warn-text); }
+
+/* The admin strip: four numbers, before any card. */
+.admin-overview {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: var(--sp-3); margin-block-end: var(--sp-4);
+}
+.aov-tile {
+    display: grid; gap: 2px; align-content: start;
+    padding: var(--sp-4); border-radius: var(--r-md);
+    background: var(--surface); border: 1px solid var(--border);
+}
+.aov-tile.warm { border-color: var(--warn-text); }
+.aov-tile.hot { border-color: var(--danger); }
+.aov-k { font-size: var(--fs-xs); color: var(--text-3); font-weight: 600; }
+.aov-v { font: 700 1.7rem/1.1 var(--font-display); color: var(--text); direction: ltr; unicode-bidi: isolate; text-align: start; }
+.aov-s { font-size: var(--fs-xs); color: var(--text-3); line-height: 1.5; }

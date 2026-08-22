@@ -40,8 +40,11 @@
 
   function site() {
     var p = location.pathname.toLowerCase();
-    // זרם is the app and its own landing page; everything else is the office site.
-    return (p.indexOf('/sale') === 0 || p.indexOf('/zerem') === 0 || p.indexOf('/ask') === 0) ? 'zerem' : 'site';
+    // Three properties, three questions. The app is people USING זרם; the זרם
+    // page is people deciding whether to; everything else is the office site.
+    if (p.indexOf('/sale') === 0 || p.indexOf('/ask') === 0 || p.indexOf('/checkups') === 0) return 'app';
+    if (p.indexOf('/zerem') === 0) return 'zerem';
+    return 'site';
   }
 
   function send() {

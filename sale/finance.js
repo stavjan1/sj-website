@@ -326,10 +326,13 @@
     window.renderAdminFunnel = async function renderAdminFunnel() {
         const body = document.getElementById('admin-funnel-body');
         if (!body) return;
-        const token = authToken();
-        if (!token) { body.innerHTML = '<p class="input-help">נדרשת התחברות.</p>'; return; }
         try {
-            const res = await fetch('/api/funnel', { headers: { Authorization: 'Bearer ' + token } });
+            // Through the app's admin fetch: it earns a live token first and
+            // retries once if the hour lapsed, instead of printing "נדרשת
+            // התחברות" at a signed-in admin.
+            const res = window.adminRes
+                ? await window.adminRes('/api/funnel')
+                : await fetch('/api/funnel', { headers: { Authorization: 'Bearer ' + authToken() } });
             const data = await res.json();
             if (!res.ok) throw new Error((data.error && data.error.message) || 'שגיאה');
             const f = data.funnel;
@@ -364,7 +367,9 @@
                     </table></div>
                 </details>`;
         } catch (e) {
-            body.innerHTML = '<p class="input-help">שגיאה בטעינת המשפך: ' + esc(e.message) + '</p>';
+            body.innerHTML = (e.code === 'NO_TOKEN' && window.adminAuthHtml)
+                ? window.adminAuthHtml('צריך חיבור חי לחשבון Google כדי לקרוא את המשפך.')
+                : '<p class="input-help">שגיאה בטעינת המשפך: ' + esc(e.message) + '</p>';
         }
     };
 

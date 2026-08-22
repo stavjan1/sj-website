@@ -19,10 +19,10 @@ async function adminTestMail(btn) {
     btn.disabled = true;
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> שולח…';
     try {
-        const res = await fetch('/api/admin-users', {
+        const res = await adminRes('/api/admin-users', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
-            body: JSON.stringify({ test: 'mail' }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ test: 'mail' })
         });
         const d = await res.json();
         if (d.ok) showToast('נשלח ✓ בדוק את תיבת הדואר של ' + ADMIN_EMAIL);
@@ -128,9 +128,9 @@ async function adminPublishSystemCatalog() {
     if (!confirm(`לפרסם ${priceCatalog.length} פריטים כמאגר המערכת לכל המשתמשים?\n(הפעולה מחליפה את מאגר המערכת הקיים)`)) return;
     if (status) { status.style.display = 'block'; status.style.color = ''; status.textContent = 'מפרסם…'; }
     try {
-        const res = await fetch('/api/catalog', {
+        const res = await adminRes('/api/catalog', {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ items: priceCatalog })
         });
         const data = await res.json().catch(() => ({}));
@@ -225,10 +225,10 @@ function _pmapStatus(msg) {
 }
 async function adminLoadPricingMap() {
     const ta = document.getElementById('admin-pricing-map');
-    if (!ta || !isAdmin() || !googleAccessToken) return;
+    if (!ta || !isAdmin()) return;
     _pmapStatus('טוען…');
     try {
-        const res = await fetch('/api/pricing-map', { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
+        const res = await adminRes('/api/pricing-map');
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
         ta.value = d.map || '';
@@ -237,13 +237,13 @@ async function adminLoadPricingMap() {
 }
 async function adminSavePricingMap() {
     const ta = document.getElementById('admin-pricing-map');
-    if (!ta || !isAdmin() || !googleAccessToken) return;
+    if (!ta || !isAdmin()) return;
     _pmapStatus('שומר…');
     try {
-        const res = await fetch('/api/pricing-map', {
+        const res = await adminRes('/api/pricing-map', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
-            body: JSON.stringify({ map: ta.value }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ map: ta.value })
         });
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
@@ -265,13 +265,13 @@ async function adminRevertPricingMap() {
 async function adminRefreshUserList() {
     const container = document.getElementById('admin-users-list');
     if (!container) return;
-    if (!isAdmin() || !googleAccessToken) {
+    if (!isAdmin()) {
         container.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">התחבר כמנהל כדי לראות משתמשים.</p>';
         return;
     }
     container.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">טוען…</p>';
     try {
-        const res = await fetch('/api/admin-users', { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
+        const res = await adminRes('/api/admin-users');
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
         const users = d.users || [];
@@ -316,7 +316,7 @@ async function adminToggleUser(btn) {
     if (body.dataset.loaded) return; // fetched once, cached
     body.innerHTML = '<p class="input-help" style="margin:6px 0;">טוען פרויקטים…</p>';
     try {
-        const res = await fetch('/api/admin-users?user=' + encodeURIComponent(email), { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
+        const res = await adminRes('/api/admin-users?user=' + encodeURIComponent(email));
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
         const projects = d.projects || [];
@@ -352,14 +352,14 @@ const MODEL_LABELS = {
     'gemini|gemini-2.5-flash': 'Gemini 2.5 Flash',
     'deepseek|deepseek-chat': 'DeepSeek V3',
     'deepseek|deepseek-reasoner': 'DeepSeek R1',
-    'grok|grok-2-latest': 'Grok 2',
+    'grok|grok-2-latest': 'Grok 2'
 };
 // Each provider's default "provider|model" value — used when an automatic
 // server-side fallback switches us to a different provider.
 const PROVIDER_DEFAULT_VALUE = {
     gemini: 'gemini|gemini-2.5-flash',
     deepseek: 'deepseek|deepseek-chat',
-    grok: 'grok|grok-2-latest',
+    grok: 'grok|grok-2-latest'
 };
 const WEIGHTED_DAILY_BUDGET_DEFAULT = 400;
 const MODEL_CIRCUMFERENCE = 138.2; // 2π×22
@@ -454,7 +454,7 @@ const TIER_FALLBACK = {
     free:     { aiDaily: 20,  projects: 3,  quotesPerMonth: 3,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, pdfCredit: true },
     pro:      { aiDaily: 150, projects: -1, quotesPerMonth: -1, catalogItems: 1000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  pdfCredit: false },
     business: { aiDaily: 300, projects: -1, quotesPerMonth: -1, catalogItems: 2000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  pdfCredit: false },
-    admin:    { aiDaily: -1,  projects: -1, quotesPerMonth: -1, catalogItems: 5000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  pdfCredit: false },
+    admin:    { aiDaily: -1,  projects: -1, quotesPerMonth: -1, catalogItems: 5000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  pdfCredit: false }
 };
 let userTier = { tier: 'guest', limits: TIER_FALLBACK.guest, usage: { aiToday: 0, quotesThisMonth: 0 } };
 let selectedModelClass = 'basic'; // 'basic' | 'advanced' — the only model vocabulary the browser knows
@@ -594,7 +594,7 @@ const UPGRADE_REASONS = {
     ai:       'נגמרו בקשות ה-AI להיום במסלול שלך',
     advanced: 'המודל המתקדם ⚡ זמין במסלול Pro',
     guestPdf: 'כדי להוריד PDF צריך להתחבר עם Google (חינם)',
-    pdfQuota: 'הגעת למכסת ההצעות החודשית של המסלול החינמי',
+    pdfQuota: 'הגעת למכסת ההצעות החודשית של המסלול החינמי'
 };
 
 function showUpgradeModal(reason) {
@@ -687,8 +687,8 @@ async function adminLookupTier() {
     const email = (document.getElementById('admin-tier-email') || {}).value || '';
     if (!email.trim()) { _adminTierStatus('הזן אימייל לבדיקה', false); return; }
     try {
-        const res = await fetch('/api/tier?email=' + encodeURIComponent(email.trim()), {
-            headers: { 'Authorization': 'Bearer ' + googleAccessToken }
+        const res = await adminRes('/api/tier?email=' + encodeURIComponent(email.trim()), {
+            
         });
         const data = await res.json();
         if (!res.ok) throw new Error((data.error && data.error.message) || res.status);
@@ -702,9 +702,9 @@ async function adminSetTier() {
     const tier = (document.getElementById('admin-tier-select') || {}).value || 'free';
     if (!email.trim()) { _adminTierStatus('הזן אימייל לשיוך', false); return; }
     try {
-        const res = await fetch('/api/tier', {
+        const res = await adminRes('/api/tier', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: email.trim(), tier })
         });
         const data = await res.json();
@@ -714,7 +714,7 @@ async function adminSetTier() {
 }
 async function adminLoadTierConfig() {
     try {
-        const res = await fetch('/api/tier?config=1', { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
+        const res = await adminRes('/api/tier?config=1');
         const data = await res.json();
         if (!res.ok) throw new Error((data.error && data.error.message) || res.status);
         const ta = document.getElementById('admin-tier-config');
@@ -728,9 +728,9 @@ async function adminSaveTierConfig() {
     let config;
     try { config = JSON.parse(ta.value); } catch (e) { _adminTierStatus('JSON לא תקין: ' + e.message, false); return; }
     try {
-        const res = await fetch('/api/tier', {
+        const res = await adminRes('/api/tier', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ config })
         });
         const data = await res.json();
@@ -1531,9 +1531,10 @@ function toggleAccountMenu(e) {
     if (!menu) return;
     const open = !menu.hasAttribute('hidden');
     if (open) { closeAccountMenu(); return; }
-    // Admin only sees the admin row.
+    // Admin has its own button in the rail now, above the chip: one door, not
+    // two. The menu row stays hidden.
     const adminItem = document.getElementById('am-admin-item');
-    if (adminItem) adminItem.hidden = !(typeof isAdmin === 'function' && isAdmin());
+    if (adminItem) adminItem.hidden = true;
     syncAccountMenuIdentity();
     menu.removeAttribute('hidden');
     if (chip) chip.setAttribute('aria-expanded', 'true');
@@ -1921,7 +1922,7 @@ function renderClientArchive() {
             date: qd.date || p.created || '',
             total: Number(qd.finalPrice) || 0,
             status: p.status || 'טיוטה',
-            shareLink: p.shareLink || '',
+            shareLink: p.shareLink || ''
         });
     });
 
@@ -3594,7 +3595,7 @@ async function acctSubmitDocument() {
         const res = await fetch('/api/invoice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
-            body: JSON.stringify({ docType, customer, items: items.map(it => ({ description: it.description, quantity: it.quantity, pricePerUnit: it.pricePerUnit })), vatType, quoteId: acctDraftProjectId || undefined, receiptDetails, incomeClassName }),
+            body: JSON.stringify({ docType, customer, items: items.map(it => ({ description: it.description, quantity: it.quantity, pricePerUnit: it.pricePerUnit })), vatType, quoteId: acctDraftProjectId || undefined, receiptDetails, incomeClassName })
         });
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || 'ההפקה נכשלה');
@@ -3607,7 +3608,7 @@ async function acctSubmitDocument() {
             apiMessageId: d.apiMessageId || null,
             docNumber: d.docNumber || '', pdfUrl: d.pdfUrl || '',
             projectId: acctDraftProjectId || '', createdAt: Date.now(),
-            paid: sbIsPaidType(docType),
+            paid: sbIsPaidType(docType)
         };
         invoicesList.unshift(doc);
         saveInvoices();
@@ -3745,7 +3746,7 @@ async function acctSaveProvider() {
         const res = await fetch('/api/billing', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
-            body: JSON.stringify({ provider: _acctProviderSel, credentials }),
+            body: JSON.stringify({ provider: _acctProviderSel, credentials })
         });
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
@@ -4138,7 +4139,7 @@ function maintSave() {
         repeats: _maintMonths === -1 ? 1 : _maintRepeats,
         // Only record an override when it differs from the global default.
         leadDays: chosen && chosen.join(',') !== maintDefaultLeads().join(',') ? chosen : null,
-        eventId: (proj.maintenance && proj.maintenance.eventId) || null,
+        eventId: (proj.maintenance && proj.maintenance.eventId) || null
     });
     saveProjects();
     filterProjectsList();
@@ -4378,7 +4379,7 @@ async function maintToGoogle(projectId) {
                 end: { dateTime: b.date + 'T10:00:00', timeZone: tz },
                 // One-time reminders are a single event, not a series.
                 ...(proj.maintenance && proj.maintenance.once ? {} : { recurrence: [maintRrule(months, maintRepeatsOf(proj))] }),
-                reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 0 }] },
+                reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 0 }] }
             });
             const r = await fetch(base, { method: 'POST', headers, body });
             if (r.status === 401 || r.status === 403) {
@@ -4590,7 +4591,7 @@ function getReminderItems() {
                 kind: 'followup', id: p.id, name: p.name || 'פרויקט',
                 why: (isPayment ? 'ממתין לתשלום' : 'ממתין לתשובה') + ' ' + days + ' ימים',
                 lateness: days,
-                phone: p.clientPhone || '', email: p.clientEmail || '',
+                phone: p.clientPhone || '', email: p.clientEmail || ''
             });
         });
     } catch (e) { /* projects not loaded yet */ }
@@ -4604,7 +4605,7 @@ function getReminderItems() {
                 why: n < 0 ? 'תחזוקה באיחור ' + Math.abs(n) + ' יום'
                     : n === 0 ? 'התחזוקה היום' : 'תחזוקה בעוד ' + n + ' יום',
                 lateness: -n,
-                phone: p.clientPhone || '', email: p.clientEmail || '',
+                phone: p.clientPhone || '', email: p.clientEmail || ''
             });
         });
     } catch (e) { /* projects not loaded yet */ }
@@ -4619,7 +4620,7 @@ function getReminderItems() {
                 // that hasn't come due yet goes negative, so it sorts below a
                 // quote that is genuinely sitting there waiting for an answer.
                 lateness: -n,
-                phone: c.phone || '', email: c.email || '',
+                phone: c.phone || '', email: c.email || ''
             });
         });
     } catch (e) { /* checkups not available */ }
@@ -4822,7 +4823,7 @@ async function followupRemindMe(projectId, e) {
         description: _followupDesc(proj),
         start: { dateTime: dt, timeZone: tz },
         end: { dateTime: _localDateTime(end), timeZone: tz },
-        reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 0 }] },
+        reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 0 }] }
     });
     const base = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
     const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
@@ -5223,7 +5224,7 @@ function defaultThemeByOS() { return 'auto'; }
 const THEME_META = {
     light: { cls: 'light-theme', icon: 'fa-sun',   label: 'LIGHT MODE', name: 'מצב בהיר' },
     mid:   { cls: 'mid-theme',   icon: 'fa-adjust', label: 'DIM MODE',   name: 'מצב אמצע' },
-    dark:  { cls: 'dark-theme',  icon: 'fa-moon',   label: 'DARK MODE',  name: 'מצב כהה' },
+    dark:  { cls: 'dark-theme',  icon: 'fa-moon',   label: 'DARK MODE',  name: 'מצב כהה' }
 };
 // 'mid' was retired in V3 (visually identical to dark); saved 'mid' prefs
 // still resolve through THEME_META, they just aren't offered anymore.
@@ -5494,7 +5495,7 @@ function recordQuoteStat() {
             profession: (appState.settings && appState.settings.profession) || 'general',
             jobType: classifyJobType(subject + ' ' + ((proj && (proj.scope || []).join(' ')) || '')),
             labor: Math.round(labor),
-            quoteId: (proj && proj.id) || (appState.currentQuote && appState.currentQuote.id) || '',
+            quoteId: (proj && proj.id) || (appState.currentQuote && appState.currentQuote.id) || ''
         };
         if (mode === 'named') {
             payload.named = (appState.settings.businessDetails && appState.settings.businessDetails.name) || '';
@@ -5502,7 +5503,7 @@ function recordQuoteStat() {
         fetch('/api/stats', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
+            body: JSON.stringify(payload)
         }).catch(() => {}); // fire-and-forget
     } catch (e) { /* stats must never affect the user's export */ }
 }
@@ -5539,7 +5540,7 @@ async function renderAdminStats() {
     const tableBox = document.getElementById('admin-stats-table');
     if (kpis) kpis.innerHTML = '<span class="input-help">טוען…</span>';
     try {
-        const res = await fetch('/api/stats?admin=1', { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
+        const res = await adminRes('/api/stats?admin=1');
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
         if (kpis) kpis.innerHTML = `
@@ -5568,10 +5569,10 @@ async function renderAdminStats() {
 }
 async function adminSetStatsLive(on) {
     try {
-        const res = await fetch('/api/stats', {
+        const res = await adminRes('/api/stats', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
-            body: JSON.stringify({ setLive: !!on }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ setLive: !!on })
         });
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
@@ -5585,9 +5586,13 @@ async function adminSetStatsLive(on) {
 // Two columns, always: the office site and זרם are different businesses with
 // different questions, and a single merged number answers neither.
 // ==========================================================================
+// Three properties, because the same number means three different things:
+// people looking for an engineer, people deciding whether זרם is for them, and
+// people actually working inside it.
 const TRAFFIC_SITES = [
     { key: 'site', label: 'אתר המשרד', icon: 'fa-globe' },
-    { key: 'zerem', label: 'זרם', icon: 'fa-bolt' },
+    { key: 'zerem', label: 'דף זרם', icon: 'fa-bolt' },
+    { key: 'app', label: 'המערכת', icon: 'fa-screwdriver-wrench' },
 ];
 
 // A dependency-free sparkline: an inline SVG polyline. A charting library for
@@ -5605,7 +5610,7 @@ function trafficSparkline(series, key) {
 
 function trafficColumn(site, d) {
     const list = (arr, empty) => arr.length
-        ? `<ul class="tlist">${arr.map(x => `<li><span class="tk">${escapeHtml(x.k)}</span><span class="tv">${x.v.toLocaleString('he-IL')}</span></li>`).join('')}</ul>`
+        ? `<ul class="tlist">${arr.map(x => `<li><span class="tk">${escapeHtml(x.k)}</span><span class="tv">${heNum(x.v)}</span></li>`).join('')}</ul>`
         : `<p class="input-help" style="margin:0;">${empty}</p>`;
     return `<div class="tcol">
         <h4 class="tcol-title"><i class="fa-solid ${site.icon}"></i> ${site.label}</h4>
@@ -5698,7 +5703,7 @@ function visitorsPanelHtml(summary, siteKey) {
     const empty = !s.year.visitors && !s.month.visitors;
     const body = empty
         ? `<div class="vempty">
-               <b>עוד לא נספרה אף כניסה ${escapeHtml(siteKey === 'zerem' ? 'לזרם' : 'לאתר')} השנה.</b>
+               <b>עוד לא נספרה אף כניסה ${escapeHtml(siteKey === 'zerem' ? 'לדף זרם' : siteKey === 'app' ? 'למערכת' : 'לאתר')} השנה.</b>
                <span>המונה עובד, פשוט עוד לא נכנס אף אחד. הכניסות שלך לא נספרות בכוונה, אז בדיקה עצמית לא תזיז אותו.</span>
            </div>`
         : `<div class="vsum-kpis">
@@ -5726,6 +5731,39 @@ function setTrafficSite(key) {
     if (box && _adminTrafficData) box.innerHTML = adminTrafficHtml(_adminTrafficData);
 }
 
+// The strip at the top of the admin panel: today, everywhere, in one row.
+// Everything under it is the detail behind one of these numbers.
+function renderAdminOverview(d) {
+    const box = document.getElementById('admin-overview');
+    if (!box) return;
+    const sum = d.summary || {};
+    const perSite = TRAFFIC_SITES.map((t) => ({
+        label: t.label,
+        n: ((sum[t.key] || {}).today || {}).visitors || 0,
+    }));
+    const visitorsToday = perSite.reduce((a, x) => a + x.n, 0);
+    const pr = (d.ai || {}).pressure || {};
+    const aiToday = pr.today ? pr.today.pct : null;
+    const rec = pr.record;
+    const over70 = (pr.over || {})[70] || 0;
+
+    const tile = (label, value, sub, tone) => `
+        <div class="aov-tile${tone ? ' ' + tone : ''}">
+            <span class="aov-k">${escapeHtml(label)}</span>
+            <b class="aov-v">${value}</b>
+            <span class="aov-s">${sub}</span>
+        </div>`;
+
+    box.innerHTML = `
+        ${tile('כניסות היום', heNum(visitorsToday),
+            perSite.map((x) => `${escapeHtml(x.label)} ${heNum(x.n)}`).join(' · '))}
+        ${tile('ניצול AI היום', aiToday === null ? '—' : aiToday + '%',
+            aiToday === null ? 'לא הוגדרה תקרה יומית' : `${heNum(pr.today.used)} מתוך ${heNum(pr.today.cap)} בקשות`,
+            aiToday >= 90 ? 'hot' : aiToday >= 70 ? 'warm' : '')}
+        ${tile('השיא שנמדד', rec ? rec.pct + '%' : '—', rec ? escapeHtml(formatHebrewDate(rec.date)) : 'עוד לא נמדד')}
+        ${tile('ימים מעל 70%', heNum(over70), `מתוך ${heNum(pr.daysMeasured || 0)} ימים שנמדדו`)}`;
+}
+
 function adminTrafficHtml(d) {
     const insights = (d.insights || []).length
         ? `<div class="tinsights"><h4 class="tcol-title"><i class="fa-solid fa-lightbulb"></i> מה השתנה השבוע</h4>
@@ -5745,15 +5783,15 @@ async function renderAdminTraffic() {
     const days = (document.getElementById('admin-traffic-days') || {}).value || '30';
     if (box) box.innerHTML = '<p class="input-help">טוען…</p>';
     try {
-        const res = await fetch(`/api/analytics?admin=1&summary=1&days=${encodeURIComponent(days)}`, {
-            headers: { 'Authorization': 'Bearer ' + googleAccessToken },
-        });
+        const res = await adminRes(`/api/analytics?admin=1&summary=1&days=${encodeURIComponent(days)}`);
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
         _adminTrafficData = d;
         if (box) box.innerHTML = adminTrafficHtml(d);
+        renderAdminOverview(d);
     } catch (e) {
-        if (box) box.innerHTML = `<p class="input-help" style="color:var(--danger);">שגיאה: ${escapeHtml(e.message)}</p>`;
+        if (box) box.innerHTML = e.code === 'NO_TOKEN' ? adminAuthHtml()
+            : `<p class="input-help" style="color:var(--danger);">שגיאה: ${escapeHtml(e.message)}</p>`;
     }
     if (clarityBox) renderAdminClarity();
     renderAdminAi();
@@ -5774,7 +5812,7 @@ const AI_POOL_LABELS = {
     deepseek: 'DeepSeek',
     grok: 'Grok',
     cloudflare: 'Workers AI (חינם)',
-    all: 'כשל מלא · כל הספקים',
+    all: 'כשל מלא · כל הספקים'
 };
 
 let _adminAiData = null;
@@ -5786,15 +5824,14 @@ async function renderAdminAi() {
     box.innerHTML = '<p class="input-help">טוען…</p>';
     try {
         const days = (document.getElementById('admin-traffic-days') || {}).value || '30';
-        const res = await fetch(`/api/analytics?admin=1&days=${encodeURIComponent(days)}`, {
-            headers: { Authorization: 'Bearer ' + googleAccessToken },
-        });
+        const res = await adminRes(`/api/analytics?admin=1&days=${encodeURIComponent(days)}`);
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
         _adminAiData = d.ai || null;
         box.innerHTML = _adminAiData ? aiPanelHtml(_adminAiData) : '<p class="input-help">אין נתונים עדיין.</p>';
     } catch (e) {
-        box.innerHTML = `<p class="input-help" style="color:var(--danger);">שגיאה: ${escapeHtml(e.message)}</p>`;
+        if (box) box.innerHTML = e.code === 'NO_TOKEN' ? adminAuthHtml()
+            : `<p class="input-help" style="color:var(--danger);">שגיאה: ${escapeHtml(e.message)}</p>`;
     }
 }
 
@@ -5850,12 +5887,57 @@ function aiPanelHtml(ai) {
              }).join('')}</ul></div>`
         : '<p class="input-help" style="margin:0;">אין אירועי מכסה או כשל בטווח, כל הבקשות נענו על המפתח הראשון. ✓</p>';
 
-    return `<div class="aip-list">${rows}</div>
+    return `${aiPressureHtml(ai.pressure)}
+        <div class="aip-list">${rows}</div>
         <button class="btn btn-accent btn-small" onclick="saveAiCaps()" style="align-self:flex-start;">
             <i class="fa-solid fa-floppy-disk"></i> שמור תקרות
         </button>
         ${models}
         ${events}`;
+}
+
+// How hard the AI is being pushed, in the three numbers that actually decide
+// whether the day is fine: where it stands right now, the worst it has ever
+// been, and how often it climbs. An average is the one number that would hide
+// all three, so it is counted days over a line instead.
+function aiPressureHtml(pr) {
+    if (!pr) return '';
+    if (!pr.daysMeasured) {
+        return `<div class="aipr aipr-empty">
+            <p class="input-help" style="margin:0;">אין עדיין אחוזים להראות: קבע תקרה יומית לפחות למפתח אחד למטה, ומהיום הבא תראה כאן כמה מהמכסה נוצלה.</p>
+        </div>`;
+    }
+    const today = pr.today || { pct: 0, used: 0, cap: 0 };
+    const rec = pr.record;
+    const tone = today.pct >= 90 ? ' hot' : today.pct >= 70 ? ' warm' : '';
+    const overRows = (pr.lines || []).map((line) => `
+        <div class="aipr-line">
+            <span class="aipr-line-k">מעל ${line}%</span>
+            <span class="aipr-line-v">${(pr.over || {})[line] || 0}</span>
+            <span class="aipr-line-s">מתוך ${pr.daysMeasured} ימים</span>
+        </div>`).join('');
+
+    return `<div class="aipr">
+        <div class="aipr-now${tone}">
+            <span class="aipr-k">היום</span>
+            <b class="aipr-v">${today.pct}%</b>
+            <span class="aipr-s">${heNum(today.used)} מתוך ${heNum(today.cap)} בקשות</span>
+            <div class="aip-bar"><div class="aip-fill${tone}" style="width:${Math.min(100, today.pct)}%"></div></div>
+        </div>
+        <div class="aipr-cards">
+            <div class="aipr-card">
+                <span class="aipr-k">השיא</span>
+                <b class="aipr-v">${rec ? rec.pct + '%' : '—'}</b>
+                <span class="aipr-s">${rec ? escapeHtml(formatHebrewDate(rec.date)) : 'עוד לא נמדד'}</span>
+            </div>
+            <div class="aipr-card">
+                <span class="aipr-k">ימים שנגמרה בהם המכסה</span>
+                <b class="aipr-v">${pr.exhaustedDays || 0}</b>
+                <span class="aipr-s">בטווח שנבחר</span>
+            </div>
+            <div class="aipr-lines">${overRows}</div>
+        </div>
+    </div>`;
 }
 
 async function saveAiCaps() {
@@ -5865,10 +5947,10 @@ async function saveAiCaps() {
         if (Number.isFinite(n) && n > 0) caps[inp.dataset.pool] = n;
     });
     try {
-        const res = await fetch('/api/analytics?caps=1', {
+        const res = await adminRes('/api/analytics?caps=1', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + googleAccessToken },
-            body: JSON.stringify({ caps }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ caps })
         });
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
@@ -5894,13 +5976,14 @@ async function renderAdminModels() {
     if (!box) return;
     box.innerHTML = '<p class="input-help">טוען…</p>';
     try {
-        const res = await fetch('/api/model-eval', { headers: { Authorization: 'Bearer ' + googleAccessToken } });
+        const res = await adminRes('/api/model-eval');
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
         _modelsData = d;
         box.innerHTML = modelsPanelHtml(d);
     } catch (e) {
-        box.innerHTML = `<p class="input-help" style="color:var(--danger);">שגיאה: ${escapeHtml(e.message)}</p>`;
+        if (box) box.innerHTML = e.code === 'NO_TOKEN' ? adminAuthHtml()
+            : `<p class="input-help" style="color:var(--danger);">שגיאה: ${escapeHtml(e.message)}</p>`;
     }
 }
 
@@ -5940,10 +6023,10 @@ async function runModelTraps(which) {
     const model = sel.value;
     box.innerHTML = `<p class="input-help">מריץ ${_modelsData ? _modelsData.trapCount : 5} מלכודות על ${escapeHtml(model)}… זה לוקח כמה שניות.</p>`;
     try {
-        const res = await fetch('/api/model-eval', {
+        const res = await adminRes('/api/model-eval', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + googleAccessToken },
-            body: JSON.stringify({ model }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model })
         });
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
@@ -5963,7 +6046,8 @@ async function runModelTraps(which) {
             </div>${rows}
             <p class="input-help">המלכודות מסננות כשלים שכבר ראינו, הן לא תעודת איכות. עבר = שווה מבט אנושי, לא "מאושר".</p>`;
     } catch (e) {
-        box.innerHTML = `<p class="input-help" style="color:var(--danger);">שגיאה: ${escapeHtml(e.message)}</p>`;
+        if (box) box.innerHTML = e.code === 'NO_TOKEN' ? adminAuthHtml()
+            : `<p class="input-help" style="color:var(--danger);">שגיאה: ${escapeHtml(e.message)}</p>`;
     }
 }
 
@@ -5971,10 +6055,10 @@ async function saveModelChoice() {
     const basic = (document.getElementById('mdl-basic') || {}).value;
     const advanced = (document.getElementById('mdl-advanced') || {}).value;
     try {
-        const res = await fetch('/api/model-eval', {
+        const res = await adminRes('/api/model-eval', {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + googleAccessToken },
-            body: JSON.stringify({ basic, advanced }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ basic, advanced })
         });
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
@@ -5985,10 +6069,10 @@ async function saveModelChoice() {
 
 async function resetModelChoice() {
     try {
-        const res = await fetch('/api/model-eval', {
+        const res = await adminRes('/api/model-eval', {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + googleAccessToken },
-            body: JSON.stringify({}),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
         });
         if (!res.ok) throw new Error(res.status);
         showToast('חזרנו לברירת המחדל של הקוד');
@@ -6013,7 +6097,7 @@ function reduceClarity(payload) {
         } else if (/popular\s*pages/i.test(name)) {
             out.pages = info.slice(0, 12).map(r => ({
                 url: r.Url || r.URL || r.url || r.PageTitle || '—',
-                views: parseInt(r.visitsCount || r.totalSessionCount || '0', 10) || 0,
+                views: parseInt(r.visitsCount || r.totalSessionCount || '0', 10) || 0
             }));
         } else {
             // Friction metrics name their count field differently per metric: // sum whatever numeric field the row actually carries.
@@ -6051,7 +6135,7 @@ const CLARITY_HINTS = {
     'חזרה מהירה': 'נכנסו לדף וחזרו מיד, הדף לא ענה על מה שחיפשו.',
     'גלילה מוגזמת': 'גללו הרבה מדי כדי למצוא, התוכן שהם חיפשו נמצא נמוך מדי.',
     'שגיאות סקריפט': 'שגיאת קוד בדפדפן של המבקר, שווה בדיקה.',
-    'קליקים על שגיאה': 'לחצו על משהו שהחזיר שגיאה.',
+    'קליקים על שגיאה': 'לחצו על משהו שהחזיר שגיאה.'
 };
 
 async function renderAdminClarity() {
@@ -6064,7 +6148,7 @@ async function renderAdminClarity() {
             <span class="input-help" style="font-weight:400;">(3 ימים אחרונים, מקור Clarity)</span></h4>
         ${inner}${dash}</div>`;
     try {
-        const res = await fetch('/api/clarity', { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
+        const res = await adminRes('/api/clarity');
         const d = await res.json();
 
         if (!d.ok) {
@@ -6119,7 +6203,7 @@ function clarityMetricLabel(name) {
         'QuickbackClick': 'חזרה מהירה', 'Quickback Click': 'חזרה מהירה',
         'ScriptErrorCount': 'שגיאות סקריפט', 'Script Error Count': 'שגיאות סקריפט',
         'ErrorClickCount': 'קליקים על שגיאה', 'Error Click Count': 'קליקים על שגיאה',
-        'ScrollDepth': 'עומק גלילה', 'EngagementTime': 'זמן שהייה',
+        'ScrollDepth': 'עומק גלילה', 'EngagementTime': 'זמן שהייה'
     };
     return map[name] || name;
 }
@@ -6365,18 +6449,18 @@ const PDF_TEMPLATES = {
     classic: {
         label: 'קלאסית',
         font: "'David Libre', serif", size: '12', lh: '1.4',
-        primary: '#1e3a8a', secondary: '#3b82f6', watermark: true,
+        primary: '#1e3a8a', secondary: '#3b82f6', watermark: true
     },
     modern: {
         label: 'מודרנית',
         font: "'Heebo', sans-serif", size: '12', lh: '1.5',
-        primary: '#0e7490', secondary: '#22d3ee', watermark: false,
+        primary: '#0e7490', secondary: '#22d3ee', watermark: false
     },
     minimal: {
         label: 'מינימלית',
         font: "'Rubik', sans-serif", size: '11', lh: '1.45',
-        primary: '#111827', secondary: '#6b7280', watermark: false,
-    },
+        primary: '#111827', secondary: '#6b7280', watermark: false
+    }
 };
 
 function applyPdfTemplate(key, silent) {
@@ -6927,7 +7011,7 @@ function savePricingDefaults() {
         complexityMult: num('pd-cx', 1.3),
         urgencyUrgent: num('pd-urgent', 1.5),
         urgencyRush: num('pd-rush', 2),
-        riskPct: num('pd-risk', 10),
+        riskPct: num('pd-risk', 10)
     };
     persistSettings();
     _pricingDefaultsOpen = false;
@@ -8597,7 +8681,7 @@ const GENERIC_CHECKLIST = {
         'אין הארקה תקינה במבנה',
         'עבודה במבנה מאוכלס בשעות פעילות',
         'לוח או תשתית שלא בוצעו על ידי בעל מקצוע מוסמך',
-    ],
+    ]
 };
 
 // COVERAGE_CHECKLISTS lives in coverage.js (loaded before this file) and holds
@@ -8635,7 +8719,7 @@ function specCoverage(proj) {
         criticalAnswered: critical.length - missingCritical.length,
         missingCritical,
         assumptions: list.fields.filter(f => answers[f.id] && answers[f.id].skipped),
-        ready: missingCritical.length === 0,
+        ready: missingCritical.length === 0
     };
 }
 
@@ -8810,7 +8894,7 @@ function setSpecChip(fieldId, chipIndex) {
 const JOB_TYPE_LABELS = {
     panel: 'לוח חשמל', points: 'נקודות חשמל', charger: 'עמדת טעינה',
     infra: 'תשתית', lighting: 'תאורה', solar: 'סולארי', earthing: 'הארקות',
-    inspection: 'בדיקה ודוח', fault: 'תקלה', generic: 'כללי',
+    inspection: 'בדיקה ודוח', fault: 'תקלה', generic: 'כללי'
 };
 
 // A full checklist rendered flat runs to ~4,700px on a phone: nobody fills
@@ -10239,7 +10323,7 @@ function toggleChatDictation() {
             'service-not-allowed': 'הדפדפן חסם את המיקרופון, אשר גישה והפעל שוב',
             'no-speech': 'לא נשמע דיבור',
             'audio-capture': 'לא נמצא מיקרופון',
-            'network': 'זיהוי הדיבור דורש חיבור לאינטרנט',
+            'network': 'זיהוי הדיבור דורש חיבור לאינטרנט'
         }[event.error];
         // 'aborted' is what a deliberate stop looks like — never an error to show.
         if (event.error !== 'aborted' && why) showToast(why, 'error');
@@ -10842,7 +10926,7 @@ async function checkPdfExportAllowed() {
         const res = await fetch('/api/pdf', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
-            body: JSON.stringify({ quoteId: String(quoteId) }),
+            body: JSON.stringify({ quoteId: String(quoteId) })
         });
         if (!res.ok) return { allow: true }; // fail-open on server error
         return await res.json();
@@ -11246,6 +11330,146 @@ function _tokenIsFresh(t) {
 }
 function _haveFreshIdToken() { return _tokenIsFresh(); }
 
+// ── Getting a live token, on demand ─────────────────────────────────────────
+//
+// Every admin card fetched with `Bearer ' + googleAccessToken` and no check
+// that the token was still alive. A Google ID token lives one hour, so opening
+// the admin screen any later than that answered 401 on every card, and the
+// screen has read "שגיאה: ההתחברות פגה" ever since it was built. The gate
+// itself was never the problem: the app just never asked Google for a new
+// token at the moment it needed one.
+//
+// ensureGoogleToken() is that ask. It resolves with a live token, refreshing
+// silently first (no window, no click) and falling back to the visible consent
+// flow only when explicitly allowed to.
+let _tokenWaiters = [];
+
+function _resolveTokenWaiters(tok) {
+    const waiting = _tokenWaiters;
+    _tokenWaiters = [];
+    waiting.forEach((fn) => { try { fn(tok); } catch (e) {} });
+}
+
+// Called by both token callbacks (ID token and access token) so anything
+// waiting on a refresh wakes up the moment one lands.
+function _announceToken(tok) {
+    if (tok) _resolveTokenWaiters(tok);
+}
+
+function ensureGoogleToken(opts) {
+    const interactive = !!(opts && opts.interactive);
+    if (isGuestUser()) return Promise.resolve(null);
+    if (_tokenIsFresh()) {
+        if (!googleAccessToken) googleAccessToken = getSessionOrLocalStorageItem(getStorageKey('sj_drive_access_token'));
+        return Promise.resolve(googleAccessToken);
+    }
+    // The held token is dead: drop it before asking for a new one, or the
+    // refresh paths below see "we already have one" and bail.
+    if (googleAccessToken || getSessionOrLocalStorageItem(getStorageKey('sj_drive_access_token'))) {
+        authTrail('token-expired', 'ensureGoogleToken');
+        forgetExpiredGoogleToken();
+    }
+    return new Promise((resolve) => {
+        let done = false;
+        const finish = (tok) => { if (done) return; done = true; resolve(tok || null); };
+        _tokenWaiters.push(finish);
+        try {
+            if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+                mintGoogleAccessToken();                       // silent: prompt:'none'
+            }
+            if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+                silentIdTokenAuth();                           // silent One Tap
+            }
+        } catch (e) { authTrail('ensure-token-throw', String(e && e.message)); }
+        setTimeout(() => {
+            if (done) return;
+            if (_tokenIsFresh()) { finish(googleAccessToken); return; }
+            if (!interactive) { finish(null); return; }
+            // Nothing silent worked: ask out loud, once, from the click the
+            // caller already has.
+            try { connectGoogleDrive(); } catch (e) {}
+            finish(null);
+        }, 3500);
+    });
+}
+
+// Response-shaped sibling of adminFetch, for the call sites that read the
+// response themselves. Same contract: a live token before the call, and one
+// silent refresh + retry if the hour lapsed mid-session.
+async function adminRes(url, opts) {
+    opts = opts || {};
+    let token = await ensureGoogleToken();
+    if (!token) { const e = new Error('NO_TOKEN'); e.code = 'NO_TOKEN'; throw e; }
+    const call = (tok) => fetch(url, {
+        ...opts,
+        headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + tok }
+    });
+    let res = await call(token);
+    if (res.status === 401) {
+        authTrail('admin-401', url);
+        forgetExpiredGoogleToken();
+        token = await ensureGoogleToken();
+        if (!token) { const e = new Error('NO_TOKEN'); e.code = 'NO_TOKEN'; throw e; }
+        res = await call(token);
+    }
+    return res;
+}
+
+// One fetch for everything behind the admin gate: it makes sure the token is
+// alive BEFORE the call, and treats a 401 as "the hour passed", refreshing once
+// and retrying instead of printing an error at the user.
+async function adminFetch(url, opts) {
+    opts = opts || {};
+    let token = await ensureGoogleToken();
+    if (!token) { const e = new Error('NO_TOKEN'); e.code = 'NO_TOKEN'; throw e; }
+    const call = (tok) => fetch(url, {
+        ...opts,
+        headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + tok }
+    });
+    let res = await call(token);
+    if (res.status === 401) {
+        authTrail('admin-401', url);
+        forgetExpiredGoogleToken();
+        token = await ensureGoogleToken();
+        if (!token) { const e = new Error('NO_TOKEN'); e.code = 'NO_TOKEN'; throw e; }
+        res = await call(token);
+    }
+    let data = null;
+    try { data = await res.json(); } catch (e) { data = null; }
+    if (!res.ok) {
+        const err = new Error((data && data.error && data.error.message) || ('שגיאה ' + res.status));
+        err.code = res.status === 401 ? 'NO_TOKEN' : res.status === 403 ? 'FORBIDDEN' : 'HTTP';
+        throw err;
+    }
+    return data;
+}
+
+// finance.js renders the funnel card and needs the same live-token fetch.
+window.adminRes = adminRes;
+window.ensureGoogleToken = ensureGoogleToken;
+window.adminAuthHtml = (msg) => adminAuthHtml(msg);
+
+// What an admin card shows instead of a red sentence when the token is gone:
+// a reason and a button that fixes it.
+function adminAuthHtml(msg) {
+    return `
+        <div class="admin-auth">
+            <p>${escapeHtml(msg || 'צריך חיבור חי לחשבון Google כדי לקרוא את הנתונים.')}</p>
+            <button type="button" class="btn btn-accent btn-small" onclick="adminReconnect(this)">
+                <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i> התחבר מחדש
+            </button>
+        </div>`;
+}
+
+async function adminReconnect(btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'מתחבר…'; }
+    await ensureGoogleToken({ interactive: true });
+    setTimeout(() => {
+        try { renderAdminTraffic(); } catch (e) {}
+        try { renderAdminUsers && renderAdminUsers(); } catch (e) {}
+    }, 600);
+}
+
 function checkGoogleSession() {
     if (isGuestUser()) return;
     const savedToken = getSessionOrLocalStorageItem(getStorageKey('sj_drive_access_token'));
@@ -11303,11 +11527,12 @@ function silentIdTokenAuth() {
                     googleAccessToken = resp.credential; // ID token (JWT) as the bearer
                     localStorage.setItem(getStorageKey('sj_drive_access_token'), googleAccessToken);
                     _rememberTokenExpiry(_jwtExpiryMs(googleAccessToken));
+                    _announceToken(googleAccessToken);
                     updateDriveStatus(true);
                     refreshTierInfo();
                     cloudLoadAndMerge(true); // pull + union-merge + push → devices converge
                 }
-            },
+            }
         });
         _idPromptPending = true;
         google.accounts.id.prompt(); // auto-selects silently for a single returning account
@@ -11437,11 +11662,12 @@ function mintGoogleAccessToken() {
                     googleAccessToken = resp.access_token;
                     localStorage.setItem(getStorageKey('sj_drive_access_token'), googleAccessToken);
                     _rememberTokenExpiry(Date.now() + (parseInt(resp.expires_in, 10) || 3600) * 1000);
+                    _announceToken(googleAccessToken);
                     updateDriveStatus(true);
                     refreshTierInfo();
                     cloudLoadAndMerge(true); // pull + union-merge + push → converges every device
                 }
-            },
+            }
         });
         // prompt:'none' → mint SILENTLY for a returning, consented user and, if
         // that's not possible, fail quietly with NO account-picker window (the
@@ -11522,6 +11748,8 @@ function connectGoogleDrive() {
                 }
                 googleAccessToken = response.access_token;
                 localStorage.setItem(getStorageKey('sj_drive_access_token'), googleAccessToken);
+                _rememberTokenExpiry(Date.now() + (parseInt(response.expires_in, 10) || 3600) * 1000);
+                _announceToken(googleAccessToken);
                 refreshTierInfo();
 
                 // Clear old cache
@@ -11541,7 +11769,7 @@ function connectGoogleDrive() {
                 } catch (folderErr) {
                     showToast('שגיאה ביצירת נתיב התיקיות בדרייב: ' + folderErr.message, 'error');
                 }
-            },
+            }
         });
         
         googleTokenClient.requestAccessToken({ prompt: '' });
@@ -12332,6 +12560,8 @@ function updateUserProfileUI() {
     if (chipName) chipName.textContent = shownName;
     const chipRole = document.getElementById('user-chip-role');
     if (chipRole) chipRole.textContent = isGuest ? 'מצב התנסות' : professionName;
+    const adminRail = document.getElementById('tab-admin-rail');
+    if (adminRail) adminRail.hidden = !(typeof isAdmin === 'function' && isAdmin());
     const chipAvatar = document.getElementById('user-chip-avatar');
     if (chipAvatar) {
         const pic = isGuest ? null : localStorage.getItem('gsi_picture');
@@ -13087,7 +13317,7 @@ function ckSaveClient(ev) {
         last: document.getElementById('ck-f-last').value || null,
         next: document.getElementById('ck-f-next').value || null,
         notes: document.getElementById('ck-f-notes').value.trim(),
-        updatedAt: Date.now(),
+        updatedAt: Date.now()
     };
     if (!rec.name) return;
     if (ckEditingId) {
@@ -13127,7 +13357,7 @@ function ckRemoveClient(id) {
     if (eventId && confirm('למחוק גם את התזכורת מיומן Google?')) {
         ckEnsureCalToken().then((token) =>
             fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events/' + eventId, {
-                method: 'DELETE', headers: { Authorization: 'Bearer ' + token },
+                method: 'DELETE', headers: { Authorization: 'Bearer ' + token }
             })
         ).then(() => showToast('התזכורת נמחקה מהיומן')).catch(() => showToast('מחיקת האירוע מהיומן נכשלה', 'error'));
     }
@@ -13154,7 +13384,7 @@ async function ckCloudSave() {
         await fetch('/api/checkups', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + googleAccessToken },
-            body: JSON.stringify({ data: { clients: ckClients } }),
+            body: JSON.stringify({ data: { clients: ckClients } })
         });
     } catch { /* offline — local copy is intact, next change retries */ }
 }
@@ -13201,12 +13431,12 @@ function ckEnsureCalToken() {
                 if (resp && resp.access_token) {
                     localStorage.setItem(CK_CAL_TOKEN_KEY, JSON.stringify({
                         token: resp.access_token,
-                        exp: Date.now() + (parseInt(resp.expires_in, 10) || 3600) * 1000,
+                        exp: Date.now() + (parseInt(resp.expires_in, 10) || 3600) * 1000
                     }));
                     resolve(resp.access_token);
                 } else reject(new Error('no-token'));
             },
-            error_callback: () => reject(new Error('denied')),
+            error_callback: () => reject(new Error('denied'))
         });
         tc.requestAccessToken({ prompt: '' });
     });
@@ -13240,8 +13470,8 @@ function ckEventBody(c) {
                 { method: 'email', minutes: 28 * 1440 },
                 { method: 'email', minutes: 7 * 1440 },
                 { method: 'popup', minutes: 1440 },
-            ],
-        },
+            ]
+        }
     };
 }
 
@@ -13356,7 +13586,7 @@ function ckRunImport() {
             id: 'c' + Date.now() + Math.random().toString(36).slice(2, 7),
             name, phone: phone || '', email: email || '', site: site || '', type: 'בדיקה תקופתית',
             months, last: ckParseDate(lastRaw), next: null, notes: '', eventId: null,
-            updatedAt: Date.now(),
+            updatedAt: Date.now()
         });
         added++;
     }
@@ -13489,10 +13719,10 @@ async function adminSaveClarityToken() {
     if (!googleAccessToken) { showToast('התחבר עם Google קודם', 'error'); return; }
     status.textContent = 'שומר…';
     try {
-        const res = await fetch('/api/clarity', {
+        const res = await adminRes('/api/clarity', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + googleAccessToken },
-            body: JSON.stringify({ token }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token })
         });
         const d = await res.json();
         if (!res.ok || !d.ok) throw new Error((d.error && d.error.message) || res.status);
