@@ -223,6 +223,12 @@ function _pmapStatus(msg) {
     const el = document.getElementById('admin-pricing-map-status');
     if (el) el.textContent = msg;
 }
+// The same line, for a failure that has a button in it: an expired Google
+// hour is fixed by clicking, not by reading.
+function _pmapStatusHtml(html) {
+    const el = document.getElementById('admin-pricing-map-status');
+    if (el) el.innerHTML = html;
+}
 async function adminLoadPricingMap() {
     const ta = document.getElementById('admin-pricing-map');
     if (!ta || !isAdmin()) return;
@@ -233,7 +239,7 @@ async function adminLoadPricingMap() {
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
         ta.value = d.map || '';
         _pmapStatus(d.isCustom ? 'מפה מותאמת (KV) פעילה.' : 'ברירת המחדל מהקוד פעילה.');
-    } catch (e) { _pmapStatus('שגיאה בטעינה: ' + e.message); }
+    } catch (e) { _pmapStatusHtml(adminErrorHtml(e)); }
 }
 async function adminSavePricingMap() {
     const ta = document.getElementById('admin-pricing-map');
@@ -249,7 +255,7 @@ async function adminSavePricingMap() {
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
         _pmapStatus(d.isCustom ? 'נשמר · המפה המותאמת פעילה מעכשיו בכל צ\'אט.' : 'נשמר.');
         showToast('מפת התמחור עודכנה');
-    } catch (e) { _pmapStatus('שגיאה בשמירה: ' + e.message); }
+    } catch (e) { _pmapStatusHtml(adminErrorHtml(e)); }
 }
 async function adminRevertPricingMap() {
     if (!confirm('לחזור לברירת המחדל מהקוד? המפה המותאמת תימחק.')) return;
@@ -301,7 +307,7 @@ async function adminRefreshUserList() {
             </div>`;
         }).join('');
     } catch (e) {
-        container.innerHTML = `<p class="input-help" style="color:var(--danger);">שגיאה: ${e.message}</p>`;
+        container.innerHTML = adminErrorHtml(e);
     }
 }
 
@@ -329,7 +335,7 @@ async function adminToggleUser(btn) {
             : '<p class="input-help" style="margin:6px 0;">אין פרויקטים.</p>');
         body.dataset.loaded = '1';
     } catch (e) {
-        body.innerHTML = `<p class="input-help" style="color:var(--danger);">שגיאה: ${e.message}</p>`;
+        body.innerHTML = adminErrorHtml(e);
     }
 }
 
@@ -2302,10 +2308,10 @@ function switchTab(tabId, opts) {
         refreshBenchmarkBar(); // "עבודה כזו תומחרה ב-X" (only if admin went live)
     }
     if (tabId === 'admin') {
-        try { renderAdminTraffic(); } catch (e) {}
-        try { renderAdminStats(); } catch (e) {}
-        try { adminLoadPricingMap(); } catch (e) {}
-        try { window.renderAdminFunnel && window.renderAdminFunnel(); } catch (e) {}
+        // One list, one place. The panel used to open four of its cards here and
+        // leave the users list to be refreshed by something else, so a failure
+        // there had no owner.
+        renderAdminAll({ fromGesture: true });
     }
     if (tabId === 'reports') {
         initReportsPanel();
@@ -6004,6 +6010,36 @@ async function refreshBenchmarkBar() {
     } catch (e) { /* offline / not live, stay hidden */ }
 }
 
+// ---- Admin: the permission strip nobody should ever have to read -----------
+//
+// Google's token lives one hour. When it lapses every card below fails at
+// once, and the panel reads as "the whole dashboard is broken" — for a state
+// that is completely routine.
+//
+// So this shows NOTHING while things work. No green tick, no expiry time, no
+// vocabulary about tokens: the hour is Google's problem, not the electrician's,
+// and a dashboard that reports on its own plumbing is a dashboard about
+// plumbing. It appears only when the panel could not heal itself, and then it
+// is one sentence and one button.
+function renderAdminAuthStatus() {
+    const card = document.getElementById('admin-auth-card');
+    const box = document.getElementById('admin-auth-status');
+    if (!box) return;
+    const show = (html) => {
+        box.innerHTML = html;
+        if (card) card.hidden = !html;
+    };
+    const user = getActiveUser() || '';
+
+    if (user && !isAdmin()) {
+        show(`<p class="input-help" style="color:var(--danger);margin:0;">
+            מחובר כ-<b dir="ltr">${escapeHtml(user)}</b>. הפאנל נפתח רק עם ${escapeHtml(ADMIN_EMAIL)}.</p>`);
+        return;
+    }
+    if (_tokenIsFresh()) { show(''); return; }
+    show(adminAuthHtml('צריך אישור מגוגל כדי למשוך את הנתונים.'));
+}
+
 // ---- Admin: aggregate stats dashboard (no PII) ----
 async function renderAdminStats() {
     if (!isAdmin()) return;
@@ -6035,7 +6071,8 @@ async function renderAdminStats() {
             ? `<table class="admin-stats-tbl"><thead><tr><th>סוג עבודה</th><th>מקצוע</th><th>דגימות</th><th>טווח (עבודה)</th><th>חציון</th><th>עם שם</th></tr></thead><tbody>${rows}</tbody></table>`
             : '<p class="input-help">עוד לא נאספו נתונים. כל הורדת PDF תתחיל למלא את הטבלה.</p>';
     } catch (e) {
-        if (kpis) kpis.innerHTML = `<span class="input-help" style="color:var(--danger);">שגיאה: ${e.message}</span>`;
+        if (kpis) kpis.innerHTML = adminErrorHtml(e);
+        if (tableBox) tableBox.innerHTML = '';
     }
 }
 async function adminSetStatsLive(on) {
@@ -6261,8 +6298,7 @@ async function renderAdminTraffic() {
         if (box) box.innerHTML = adminTrafficHtml(d);
         renderAdminOverview(d);
     } catch (e) {
-        if (box) box.innerHTML = e.code === 'NO_TOKEN' ? adminAuthHtml()
-            : `<p class="input-help" style="color:var(--danger);">שגיאה: ${escapeHtml(e.message)}</p>`;
+        if (box) box.innerHTML = adminErrorHtml(e);
     }
     if (clarityBox) renderAdminClarity();
     renderAdminAi();
@@ -6301,8 +6337,7 @@ async function renderAdminAi() {
         _adminAiData = d.ai || null;
         box.innerHTML = _adminAiData ? aiPanelHtml(_adminAiData) : '<p class="input-help">אין נתונים עדיין.</p>';
     } catch (e) {
-        if (box) box.innerHTML = e.code === 'NO_TOKEN' ? adminAuthHtml()
-            : `<p class="input-help" style="color:var(--danger);">שגיאה: ${escapeHtml(e.message)}</p>`;
+        if (box) box.innerHTML = adminErrorHtml(e);
     }
 }
 
@@ -6453,8 +6488,7 @@ async function renderAdminModels() {
         _modelsData = d;
         box.innerHTML = modelsPanelHtml(d);
     } catch (e) {
-        if (box) box.innerHTML = e.code === 'NO_TOKEN' ? adminAuthHtml()
-            : `<p class="input-help" style="color:var(--danger);">שגיאה: ${escapeHtml(e.message)}</p>`;
+        if (box) box.innerHTML = adminErrorHtml(e);
     }
 }
 
@@ -6517,8 +6551,7 @@ async function runModelTraps(which) {
             </div>${rows}
             <p class="input-help">המלכודות מסננות כשלים שכבר ראינו, הן לא תעודת איכות. עבר = שווה מבט אנושי, לא "מאושר".</p>`;
     } catch (e) {
-        if (box) box.innerHTML = e.code === 'NO_TOKEN' ? adminAuthHtml()
-            : `<p class="input-help" style="color:var(--danger);">שגיאה: ${escapeHtml(e.message)}</p>`;
+        if (box) box.innerHTML = adminErrorHtml(e);
     }
 }
 
@@ -6662,7 +6695,7 @@ async function renderAdminClarity() {
             ${frictionRows}
             ${pages}`);
     } catch (e) {
-        box.innerHTML = `<p class="input-help" style="color:var(--danger);">שגיאה במפת החום: ${escapeHtml(e.message)}</p>`;
+        box.innerHTML = adminErrorHtml(e);
     }
 }
 
@@ -13106,25 +13139,49 @@ function _resolveTokenWaiters(tok) {
 // Called by both token callbacks (ID token and access token) so anything
 // waiting on a refresh wakes up the moment one lands.
 function _announceToken(tok) {
-    if (tok) _resolveTokenWaiters(tok);
+    if (!tok) return;
+    _clearTokenRefusal();
+    _resolveTokenWaiters(tok);
 }
 
-function ensureGoogleToken(opts) {
-    const interactive = !!(opts && opts.interactive);
+// One refresh at a time, and one answer for everybody who asked.
+//
+// The admin panel opens eight cards at once and every one of them called this.
+// Without these two variables that meant eight silent-mint requests and eight
+// One Tap prompts racing each other and — when the answer was "no token" —
+// eight separate 3.5-second waits, so the screen sat on "טוען…" long enough to
+// look hung before it admitted anything was wrong.
+let _tokenRefreshInFlight = null;
+let _tokenRefusedUntil = 0;
+
+function ensureGoogleToken() {
     if (isGuestUser()) return Promise.resolve(null);
     if (_tokenIsFresh()) {
         if (!googleAccessToken) googleAccessToken = getSessionOrLocalStorageItem(getStorageKey('sj_drive_access_token'));
         return Promise.resolve(googleAccessToken);
     }
+    // Google refused a silent refresh moments ago. Asking again in the same
+    // breath cannot succeed; it only delays the card that is waiting.
+    if (Date.now() < _tokenRefusedUntil) return Promise.resolve(null);
+    if (_tokenRefreshInFlight) return _tokenRefreshInFlight;
+
     // The held token is dead: drop it before asking for a new one, or the
     // refresh paths below see "we already have one" and bail.
     if (googleAccessToken || getSessionOrLocalStorageItem(getStorageKey('sj_drive_access_token'))) {
         authTrail('token-expired', 'ensureGoogleToken');
         forgetExpiredGoogleToken();
     }
-    return new Promise((resolve) => {
+    _tokenRefreshInFlight = new Promise((resolve) => {
         let done = false;
-        const finish = (tok) => { if (done) return; done = true; resolve(tok || null); };
+        const finish = (tok) => {
+            if (done) return;
+            done = true;
+            _tokenRefreshInFlight = null;
+            // Remember a refusal briefly; a success needs no remembering, the
+            // token itself is the memory.
+            if (!tok) _tokenRefusedUntil = Date.now() + 20000;
+            resolve(tok || null);
+        };
         _tokenWaiters.push(finish);
         try {
             if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
@@ -13137,13 +13194,23 @@ function ensureGoogleToken(opts) {
         setTimeout(() => {
             if (done) return;
             if (_tokenIsFresh()) { finish(googleAccessToken); return; }
-            if (!interactive) { finish(null); return; }
-            // Nothing silent worked: ask out loud, once, from the click the
-            // caller already has.
-            try { connectGoogleDrive(); } catch (e) {}
+            // Nothing visible is attempted from here, deliberately. Anything
+            // Google shows out loud is a popup, and a popup opened 3.5 seconds
+            // after the click that started this is blocked by every browser —
+            // which is exactly why "התחבר מחדש" appeared to do nothing at all.
+            // The out-loud path lives in adminSignInNow(), on the click itself.
+            authTrail('silent-refresh-failed', 'ensureGoogleToken');
             finish(null);
         }, 3500);
     });
+    return _tokenRefreshInFlight;
+}
+
+// Clearing the "Google just said no" memory. Called the moment a token lands,
+// so the cards that gave up 5 seconds ago can be re-rendered immediately.
+function _clearTokenRefusal() {
+    _tokenRefusedUntil = 0;
+    _tokenRefreshInFlight = null;
 }
 
 // Response-shaped sibling of adminFetch, for the call sites that read the
@@ -13201,6 +13268,95 @@ async function adminFetch(url, opts) {
 window.adminRes = adminRes;
 window.ensureGoogleToken = ensureGoogleToken;
 window.adminAuthHtml = (msg) => adminAuthHtml(msg);
+window.adminErrorHtml = (e) => adminErrorHtml(e);
+
+// ── Getting back in ─────────────────────────────────────────────────────────
+//
+// Identity only. The Drive scopes belong to the Drive button; asking for them
+// here would put a heavier consent screen in front of a man who only wants to
+// read his own dashboard, and Google is entitled to refuse a silent refresh of
+// a scope set the user never approved.
+const ADMIN_SIGNIN_SCOPE = 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile';
+
+function googleClientId() {
+    return localStorage.getItem('sj_global_google_client_id')
+        || (appState && appState.settings && appState.settings.googleClientId)
+        || '';
+}
+
+// The one path that is allowed to show Google's window, and the only one that
+// can: `requestAccessToken()` must be reached from the click itself, with no
+// await and no timer in between, or the browser treats the popup as unrequested
+// and blocks it. Everything here is therefore synchronous up to that call.
+function adminSignInNow(btn) {
+    const say = (msg, bad) => {
+        if (!btn) return;
+        const host = btn.closest('.admin-auth');
+        let line = host && host.querySelector('.admin-auth-say');
+        if (!line && host) {
+            line = document.createElement('p');
+            line.className = 'admin-auth-say input-help';
+            host.appendChild(line);
+        }
+        if (line) {
+            line.textContent = msg;
+            line.style.color = bad ? 'var(--danger)' : '';
+        }
+    };
+    const clientId = googleClientId();
+    if (!clientId) {
+        authTrail('signin-no-client-id');
+        say('חסר Google Client ID בהגדרות. פתח הגדרות ← חיבור לגוגל.', true);
+        return;
+    }
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+        authTrail('signin-no-gis');
+        say('ספריית ההתחברות של גוגל לא נטענה. רענן את הדף ונסה שוב.', true);
+        return;
+    }
+    if (btn) { btn.disabled = true; }
+    say('נפתח חלון של גוגל…');
+    try {
+        const tc = google.accounts.oauth2.initTokenClient({
+            client_id: clientId,
+            scope: ADMIN_SIGNIN_SCOPE,
+            callback: (resp) => {
+                if (btn) btn.disabled = false;
+                if (!resp || !resp.access_token) {
+                    authTrail('signin-no-token', resp && resp.error);
+                    say('גוגל לא החזיר אישור: ' + ((resp && resp.error) || 'לא ידוע'), true);
+                    return;
+                }
+                googleAccessToken = resp.access_token;
+                localStorage.setItem(getStorageKey('sj_drive_access_token'), googleAccessToken);
+                _rememberTokenExpiry(Date.now() + (parseInt(resp.expires_in, 10) || 3600) * 1000);
+                authTrail('signin-ok');
+                _announceToken(googleAccessToken);
+                updateDriveStatus(true);
+                refreshTierInfo();
+                renderAdminAll();
+            },
+            // Without this a blocked or dismissed popup is silence, and silence
+            // is what made this button look broken.
+            error_callback: (err) => {
+                if (btn) btn.disabled = false;
+                const type = (err && err.type) || 'unknown';
+                authTrail('signin-error', type);
+                say(type === 'popup_failed_to_open'
+                    ? 'הדפדפן חסם את חלון גוגל. אשר חלונות קופצים לאתר הזה ונסה שוב.'
+                    : type === 'popup_closed'
+                        ? 'החלון נסגר לפני שהתחברת.'
+                        : 'ההתחברות נכשלה: ' + type, true);
+            }
+        });
+        authTrail('signin-request');
+        tc.requestAccessToken();          // visible on purpose — this IS the ask
+    } catch (e) {
+        if (btn) btn.disabled = false;
+        authTrail('signin-throw', String(e && e.message));
+        say('ההתחברות נכשלה: ' + (e && e.message ? e.message : e), true);
+    }
+}
 
 // What an admin card shows instead of a red sentence when the token is gone:
 // a reason and a button that fixes it.
@@ -13208,19 +13364,54 @@ function adminAuthHtml(msg) {
     return `
         <div class="admin-auth">
             <p>${escapeHtml(msg || 'צריך חיבור חי לחשבון Google כדי לקרוא את הנתונים.')}</p>
-            <button type="button" class="btn btn-accent btn-small" onclick="adminReconnect(this)">
+            <button type="button" class="btn btn-accent btn-small" onclick="adminSignInNow(this)">
                 <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i> התחבר מחדש
             </button>
         </div>`;
 }
 
-async function adminReconnect(btn) {
-    if (btn) { btn.disabled = true; btn.textContent = 'מתחבר…'; }
-    await ensureGoogleToken({ interactive: true });
-    setTimeout(() => {
-        try { renderAdminTraffic(); } catch (e) {}
-        try { renderAdminUsers && renderAdminUsers(); } catch (e) {}
-    }, 600);
+// Every admin card decides the same way what a failure looks like. They used to
+// each decide for themselves, so one expired hour read as a reconnect button on
+// one card, the bare word "NO_TOKEN" on the next, and a spinner that never
+// stopped on a third.
+//
+// A missing permission is deliberately NOT an error here: it is grey, quiet and
+// wordless about tokens. Eight cards each shouting the same red sentence with
+// its own button is how a routine hour looked like a system failure. The strip
+// at the top owns the one button.
+function adminErrorHtml(e) {
+    const code = e && e.code;
+    if (code === 'NO_TOKEN') {
+        return '<p class="input-help" style="margin:0;opacity:0.65;">ממתין לאישור מגוגל…</p>';
+    }
+    if (code === 'FORBIDDEN') {
+        return `<p class="input-help" style="color:var(--danger);">הפאנל נפתח רק עם ${escapeHtml(ADMIN_EMAIL)}.</p>`;
+    }
+    return `<p class="input-help" style="color:var(--danger);">שגיאה: ${escapeHtml((e && e.message) || 'לא ידוע')}</p>`;
+}
+
+// One token arriving has to reach every card, including the ones that gave up
+// before it landed. The old version refreshed two of them, and one of those two
+// was a function that does not exist.
+//
+// `fromGesture` is the whole trick behind "it just works": opening the admin
+// panel is itself a click, so if the permission is already dead we can ask
+// Google right there — inside the gesture, where a popup is still allowed.
+// Anywhere else (a timer, an await, a re-render) the browser blocks it, which
+// is why every previous attempt to recover automatically failed in silence.
+function renderAdminAll(opts) {
+    if (opts && opts.fromGesture && isAdmin() && !_tokenIsFresh()) {
+        try { adminSignInNow(null); } catch (e) {}
+    }
+    const jobs = [
+        () => renderAdminAuthStatus(),
+        () => renderAdminTraffic(),          // pulls clarity + AI + models with it
+        () => renderAdminStats(),
+        () => adminLoadPricingMap(),
+        () => adminRefreshUserList(),
+        () => window.renderAdminFunnel && window.renderAdminFunnel(),
+    ];
+    for (const job of jobs) { try { job(); } catch (e) {} }
 }
 
 function checkGoogleSession() {

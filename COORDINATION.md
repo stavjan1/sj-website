@@ -123,3 +123,17 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
   `new Date().toISOString().slice(0,10)` for "today". Between midnight and 03:00
   Israel time that is yesterday. It feeds the AI request counter, so the impact
   is small, but it is the same bug.
+- 2026-08-22 — Session B repaired the admin dashboard, which was dead on every
+  card (Stav's screenshots: "שגיאה: NO_TOKEN" on three, a permanent "טוען…" on
+  four). Root cause was one thing: the Google hour lapses, and the button meant
+  to fix it reached Google's popup from a 3.5-second timer, which browsers
+  block. SHARED files touched, both behaviour-only:
+  * `sale/app.js` — `ensureGoogleToken` (shared in-flight refresh, no popup from
+    a timer), new `adminSignInNow` / `adminErrorHtml` / `renderAdminAll` /
+    `renderAdminAuthStatus`, and every card's catch routed through the shared
+    one. No layout code, no CSS, nothing reordered.
+  * `sale/index.html` — ONE new element, `#admin-auth-card`, `hidden` by
+    default, plus the routine `?v=338 → 339` bump across all pages (the
+    site.test.mjs guard requires them to agree).
+  Session A's CSS files were not touched: `.admin-auth` already existed in
+  `sale/css/panels.css` and is reused as-is.

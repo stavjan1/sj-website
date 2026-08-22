@@ -15,17 +15,23 @@
 //   add a "Workers AI" binding named `AI` in Pages → Settings → Functions → Bindings.
 //   It is used as the last-resort fallback so the AI works even with no external keys.
 
+import { MODEL_CLASS } from './_tiers.js';
+
 export const PROVIDERS = {
   gemini: {
     label: 'Gemini',
     kind: 'gemini',
     keyEnv: ['GEMINI_API_KEY'],
-    // gemini-2.0-flash was deprecated by Google on 2026-06-01 — requesting it
-    // can surface as a misleading "429 limit: 0" free-tier quota error instead
-    // of a clear "model retired" message. gemini-2.5-flash is the current
-    // free-tier-capable default (2.0-flash kept in the list for compatibility
-    // if a caller explicitly asks for it).
-    defaultModel: 'gemini-2.5-flash',
+    // The fallback for a caller who names no model, and it had quietly become
+    // gemini-2.5-flash — the exact model Google stopped serving on 2026-08-21.
+    // So a request that specified nothing was aimed at a dead name, 404ed, and
+    // slid down the chain to Llama. Nothing above this line said so, because
+    // the constant was written when 2.5-flash was current.
+    //
+    // The real protection is not this string, which will go stale again; it is
+    // healGeminiModel() below, which asks Google what it will serve instead of
+    // trusting a name compiled in months ago.
+    defaultModel: 'gemini-3.5-flash',
     // gemini-2.5-pro = the "מודל מתקדם ⚡" class (pro+ plans, mapped in chat.js).
     // The 3.x ids are listed so a candidate can be TESTED (see /api/model-eval)
     // and switched to from the admin panel. Listing is not selecting: what
@@ -118,6 +124,116 @@ export function buildOrder(requested, env) {
 
 function pickModel(cfg, model) {
   return cfg.models.includes(model) ? model : cfg.defaultModel;
+}
+
+// ==========================================================================
+// A model name Google will not serve, healed without a deploy.
+//
+// Three outages now have had the same shape. gemini-2.0-flash was retired in
+// June 2026; gemini-2.5-flash began answering "no longer available to new
+// users" in August; and a name can also be perfectly real yet absent from a
+// particular key's tier, which from here looks identical. Every time, the bot
+// went on answering — from the weakest provider in the chain — because 404 is
+// retriable and Llama sits at the end of that chain. Nothing was ever "down".
+// It was quietly much worse, which is far harder to notice than an error.
+//
+// Editing a constant fixes it until the next time. Asking Google does not:
+// which models this key may actually call is a question with an answer, and
+// the answer is one HTTP call away.
+//
+// Deliberately not a cron or a warm-up. It runs only after a call has already
+// failed with 404, so a healthy system never pays for it.
+// ==========================================================================
+
+const MODEL_LIST_TTL = 6 * 60 * 60;      // seconds; a retirement is never sudden
+
+// What Google says it will serve for this key.
+export async function geminiServableModels(env, key) {
+  const cacheKey = 'ai:gemini-models';
+  if (env && env.SJ_DATA) {
+    try {
+      const raw = await env.SJ_DATA.get(cacheKey);
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (Array.isArray(list) && list.length) return list;
+      }
+    } catch { /* a cold cache is not an error */ }
+  }
+  let list = [];
+  try {
+    const res = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=' + encodeURIComponent(key));
+    if (!res.ok) return [];
+    const data = await res.json();
+    list = (data.models || [])
+      // Only models that can answer a chat turn. The same list carries
+      // embedding, TTS and image endpoints, and asking one of those for a
+      // quote would fail in a new and more confusing way.
+      .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map((m) => String(m.name || '').replace(/^models\//, ''))
+      .filter((n) => n.startsWith('gemini-'))
+      .filter((n) => !/embedding|aqa|tts|live|image|vision/i.test(n));
+  } catch { return []; }
+  if (env && env.SJ_DATA && list.length) {
+    try { await env.SJ_DATA.put(cacheKey, JSON.stringify(list), { expirationTtl: MODEL_LIST_TTL }); } catch {}
+  }
+  return list;
+}
+
+// Rank a candidate against the model we wanted. Higher is better.
+//
+// The bias towards Flash is deliberate: everything routed through here is a
+// chat turn on the free pool, Pro carries a far smaller daily allowance, and
+// silently promoting a broken Flash call to Pro would burn the advanced pool
+// that paying work depends on. Preview ids rank below stable ones — a preview
+// can change or vanish underneath us, and this choice gets cached for hours.
+export function modelScore(id, wanted) {
+  const gen = (s) => { const m = /gemini-(\d+(?:\.\d+)?)/.exec(s || ''); return m ? parseFloat(m[1]) : 0; };
+  const wantLite = /lite/i.test(wanted || '');
+  let score = gen(id) * 10;
+  if (/flash/i.test(id)) score += 40;
+  if (/lite/i.test(id) && !wantLite) score -= 15;   // cheaper, weaker at Hebrew pricing prose
+  if (/pro/i.test(id)) score -= 25;                 // as above: a different, scarcer pool
+  if (/preview|exp|experimental/i.test(id)) score -= 30;
+  return score;
+}
+
+// Write the repair into the same setting a human would have edited, so the
+// next request costs nothing extra and the admin panel shows what happened.
+//
+// Overwriting an explicit admin choice is not something to do lightly. It is
+// right here for one narrow reason: the choice being overwritten is a model
+// Google refuses to serve, so honouring it means serving nobody. Only the
+// class that named the dead model is touched, and the ledger records the swap.
+async function persistHealedModel(env, dead, healed) {
+  if (!env || !env.SJ_DATA) return;
+  try {
+    const raw = await env.SJ_DATA.get('config:models');
+    const cfg = raw ? JSON.parse(raw) : {};
+    let changed = false;
+    for (const cls of ['basic', 'advanced']) {
+      // The dead name came either from KV or, when KV is silent for that class,
+      // from the shipped constant. Both are repaired; neither is guessed at.
+      const current = (cfg[cls] && cfg[cls].model) || (MODEL_CLASS[cls] && MODEL_CLASS[cls].model);
+      if (current !== dead) continue;
+      cfg[cls] = { provider: (cfg[cls] && cfg[cls].provider) || 'gemini', model: healed };
+      changed = true;
+    }
+    if (!changed) return;   // some other caller's model — not ours to rewrite
+    await env.SJ_DATA.put('config:models', JSON.stringify(cfg));
+  } catch { /* the answer already went out; bookkeeping must not undo it */ }
+}
+
+// The substitute for a model Google just refused, or null when there is nothing
+// better to say than the original error.
+async function healGeminiModel(env, key, wanted) {
+  const models = await geminiServableModels(env, key);
+  if (!models.length) return null;
+  if (models.includes(wanted)) return null;   // the 404 was about something else
+  const best = models
+    .map((id) => ({ id, s: modelScore(id, wanted) }))
+    .sort((a, b) => b.s - a.s)[0];
+  return best && best.id !== wanted ? best.id : null;
 }
 
 // ==========================================================================
@@ -255,7 +371,10 @@ export function toGemini(messages, opts = {}) {
 
 function callOnce(name, key, opts) {
   const cfg = PROVIDERS[name];
-  const model = pickModel(cfg, opts.model);
+  // _resolvedModel is a name the healer got from Google itself. It is used
+  // verbatim: running it through pickModel would reject it for not being in
+  // the hardcoded list and hand back the very default that just 404ed.
+  const model = opts._resolvedModel || pickModel(cfg, opts.model);
   if (cfg.kind === 'openai') {
     const payload = {
       model,
@@ -481,6 +600,29 @@ export async function generate(env, opts) {
       await recordAiUse(env, label, 'fail', modelUsed, { reason: 'network' });
       if (i < order.length - 1) continue;
       return errorResponse('שגיאת רשת מול שירות ה-AI: ' + e.message, 502);
+    }
+
+    // Gemini only: 404 does not mean "Google is busy", it means "not this
+    // model name, not for this key". Falling through to the next provider on
+    // that is how a retired model turned into months of the pricing bot
+    // answering from Llama while every dashboard read green.
+    if (name === 'gemini' && upstream.status === 404) {
+      const healed = await healGeminiModel(env, key, modelUsed);
+      if (healed) {
+        await recordAiUse(env, label, 'fail', modelUsed,
+          { status: 404, note: 'המודל אינו זמין למפתח, עובר ל-' + healed });
+        try { await upstream.text(); } catch (e) {}
+        try {
+          const onHealed = await callOnce(name, key, { ...opts, _resolvedModel: healed });
+          if (!RETRIABLE.includes(onHealed.status)) {
+            await recordAiUse(env, label, 'ok', healed, { note: 'המודל תוקן אוטומטית' });
+            await persistHealedModel(env, modelUsed, healed);
+            return normalize(name, onHealed, !!opts.stream,
+              { 'X-AI-Provider': name, 'X-AI-Model': healed, 'X-AI-Model-Healed-From': modelUsed });
+          }
+          upstream = onHealed;
+        } catch (e) { /* keep the 404 and carry on down the chain */ }
+      }
     }
 
     // Gemini only: a second personal key (env.GEMINI_API_KEY_2, e.g. a backup
