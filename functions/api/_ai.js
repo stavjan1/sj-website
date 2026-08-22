@@ -675,31 +675,25 @@ export async function generate(env, opts) {
     //
     // A per-DAY 429 falls through immediately, unchanged: waiting for midnight
     // is not a thing to do to somebody holding a phone.
+    //
+    // NOTE the order of what happens next, because the first version had it
+    // backwards. On a per-minute limit this block does NOT wait — it only reads
+    // which limit it was. The backup key is tried first, further down, because
+    // it is a different Google project with its own per-minute budget: it is
+    // free capacity available immediately. Waiting eight seconds on a key that
+    // is rate-limited, while an idle second key sits there, is the wrong way
+    // round — and the difference shows up exactly when several people arrive at
+    // once, which is precisely when this matters.
+    let quotaRetryMs = 0;
     if (name === 'gemini' && upstream.status === 429) {
       let bodyText = '';
       try { bodyText = await upstream.text(); } catch (e) {}
       const q = quotaInfo(bodyText);
-      // Recorded either way, and now with WHICH limit — the ledger used to say
-      // "quota" for both, so the panel advised buying capacity that was never
-      // the problem.
-      if (q.scope === 'minute' && q.retryMs && q.retryMs <= MAX_QUOTA_WAIT_MS && !opts._waited) {
-        await recordAiUse(env, label, 'quota', modelUsed,
-          { status: 429, scope: 'minute', note: `מגבלת דקה, ממתין ${Math.round(q.retryMs / 1000)} שניות` });
-        await new Promise((r) => setTimeout(r, q.retryMs + 250));
-        try {
-          const afterWait = await callOnce(name, key, { ...opts, model: modelForThis, _waited: true });
-          if (!RETRIABLE.includes(afterWait.status)) {
-            await recordAiUse(env, label, 'ok', modelUsed, { note: 'עבר אחרי המתנה קצרה' });
-            return normalize(name, afterWait, !!opts.stream, { 'X-AI-Provider': name, 'X-AI-Waited': String(q.retryMs) });
-          }
-          upstream = afterWait;
-        } catch (e) { /* fall through to the chain below */ }
-      }
-      // Nothing is recorded on the way out of here. The paths below already
-      // count this 429 once, and counting it twice would show the pool as
-      // twice as busy as it is — on the very card used to decide whether to
-      // buy more capacity. What they gain is `quotaScope`: WHICH limit it was.
       quotaScope = q.scope;
+      quotaRetryMs = q.retryMs;
+      // Nothing is recorded here. The paths below already count this 429 once,
+      // and counting it twice would show the pool as twice as busy as it is —
+      // on the very card used to decide whether to pay for more.
     }
 
     // Gemini only: a second personal key (env.GEMINI_API_KEY_2, e.g. a backup
@@ -725,6 +719,33 @@ export async function generate(env, opts) {
       } catch (e) { /* keep the original upstream response, fall through below */ }
     }
 
+
+    // Both Gemini keys are rate-limited for the minute, and this is the last
+    // moment before the customer gets Llama instead. NOW the wait is worth it:
+    // there is no spare capacity left to reach for, and the alternative is a
+    // visibly weaker answer. Bounded, and only for a per-minute limit — a spent
+    // daily quota does not clear by waiting.
+    //
+    // This is the case Stav asked about: three people arriving together from a
+    // WhatsApp group. Two of them are served by the two keys; the third waits a
+    // few seconds and is then served properly, instead of being the one who
+    // gets the bad answer and decides the product is bad.
+    if (name === 'gemini' && upstream.status === 429 && quotaScope === 'minute'
+        && quotaRetryMs && quotaRetryMs <= MAX_QUOTA_WAIT_MS && !opts._waited) {
+      await recordAiUse(env, label, 'quota', modelUsed,
+        { status: 429, scope: 'minute', note: `שני המפתחות תפוסים, ממתין ${Math.round(quotaRetryMs / 1000)} שניות` });
+      try { await upstream.text(); } catch (e) {}
+      await new Promise((r) => setTimeout(r, quotaRetryMs + 250));
+      try {
+        const afterWait = await callOnce(name, key, { ...opts, model: modelForThis, _waited: true });
+        if (!RETRIABLE.includes(afterWait.status)) {
+          await recordAiUse(env, label, 'ok', modelUsed, { note: 'עבר אחרי המתנה קצרה' });
+          return normalize(name, afterWait, !!opts.stream,
+            { 'X-AI-Provider': name, 'X-AI-Waited': String(quotaRetryMs) });
+        }
+        upstream = afterWait;
+      } catch (e) { /* keep the 429 and fall through to the chain */ }
+    }
     if (RETRIABLE.includes(upstream.status) && i < order.length - 1) {
       await recordAiUse(env, label, upstream.status === 429 ? 'quota' : 'fail', modelUsed,
         { status: upstream.status, scope: quotaScope, note: 'עובר לספק ' + order[i + 1] });

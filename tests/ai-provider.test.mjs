@@ -177,3 +177,22 @@ test('a per-minute limit and a spent daily quota are told apart', () => {
   assert.ok(!/recordAiUse\(env, label, 'quota', modelUsed, \{ status: 429, scope/.test(branch),
     'the quota branch records a failure the paths below will record again');
 });
+
+test('the spare key is reached for before anyone is made to wait', () => {
+  // Stav's launch question: three people arrive together from a WhatsApp group.
+  // The free tier allows ten requests a minute PER PROJECT, and the backup key
+  // is a different project — so it is free capacity available immediately.
+  // Waiting eight seconds on a rate-limited key while an idle second key sits
+  // there is the wrong way round, and the first version did exactly that.
+  const src = readFileSync(new URL('../functions/api/_ai.js', import.meta.url), 'utf8');
+  const backupAt = src.indexOf('env.GEMINI_API_KEY_2 && env.GEMINI_API_KEY_2 !== key');
+  const waitAt = src.indexOf('quotaScope === \'minute\'');
+  assert.ok(backupAt > -1 && waitAt > -1, 'the backup-key or wait path is gone');
+  assert.ok(backupAt < waitAt,
+    'the request waits on a busy key before trying the idle spare one');
+
+  // And the wait must not fire on a daily quota, which no amount of waiting
+  // clears.
+  const block = src.slice(waitAt - 400, waitAt + 200);
+  assert.ok(!/scope === 'day'/.test(block), 'a spent daily quota would be waited on');
+});
