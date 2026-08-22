@@ -110,8 +110,12 @@ test('the four chips are exactly the four verdicts the server accepts', () => {
 test('sending feedback can never surface an error to the user', () => {
   // It is telemetry. A widget that can interrupt the man reading his quote
   // costs more than the data it returns.
-  const src = APP.slice(APP.indexOf('function postPriceFeedback('),
-                        APP.indexOf('function postPriceFeedback(') + 900);
+  // To the end of the function, not a fixed character count: a window that
+  // stops early passes or fails on how many comment lines happen to precede
+  // the line it is actually about.
+  const from = APP.indexOf('function postPriceFeedback(');
+  const rest = APP.slice(from);
+  const src = rest.slice(0, rest.search(/\r?\n\}\r?\n/));
   assert.match(src, /\.catch\(\(\) => \{\}\)/, 'a failed post is not swallowed');
   assert.match(src, /try \{/, 'a throw would escape into the render path');
 });

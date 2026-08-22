@@ -16,7 +16,7 @@
 //   POST /api/feedback   { verdict, price, jobType?, quoteId?, note? }
 //   GET  /api/feedback   (admin) → recent verdicts + rates per job type
 
-import { adminGate, rateLimit } from './_tiers.js';
+import { adminGate, rateLimit, verifyGoogleEmail, bearerToken } from './_tiers.js';
 
 const VERDICTS = {
   way_off:  { he: 'ממש לא',              alert: true,  weight: -2 },
@@ -48,11 +48,25 @@ async function submit({ request, env }) {
   const verdict = String(body.verdict || '');
   if (!VERDICTS[verdict]) return json({ error: { message: 'ערך משוב לא מוכר.' } }, 400);
 
+  // Who said it, when we already know — verified from the token the browser was
+  // already sending, never taken from the request body. A client-supplied
+  // "this is who I am" would let anyone file a complaint under someone else's
+  // name, in a store that decides whether a price gets re-examined.
+  //
+  // A guest stays a guest. This is not a place to start identifying people who
+  // have not signed in: the verdict is just as usable without a name on it.
+  let by = '';
+  try {
+    const token = bearerToken(request);
+    if (token) by = (await verifyGoogleEmail(token)) || '';
+  } catch { /* an unverifiable token is simply an anonymous verdict */ }
+
   const entry = {
     verdict,
     price: Number(body.price) || 0,
     jobType: String(body.jobType || '').slice(0, 40),
     quoteId: String(body.quoteId || '').slice(0, 60),
+    by,
     // Free text is the most valuable field and the least structured. Clamped
     // hard: it is displayed back in an admin screen, so it must stay data.
     note: String(body.note || '').slice(0, 500),
@@ -86,6 +100,7 @@ async function alertAdmin(env, entry) {
     '🔴 משוב תמחור: "ממש לא"',
     entry.jobType ? `סוג עבודה: ${entry.jobType}` : null,
     entry.price ? `המחיר שניתן: ${entry.price} ₪` : null,
+    entry.by ? `מי: ${entry.by}` : null,
     entry.note ? `הערה: ${entry.note}` : null,
     entry.quoteId ? `הצעה: ${entry.quoteId}` : null,
   ].filter(Boolean).join('\n');
