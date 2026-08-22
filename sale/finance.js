@@ -367,8 +367,13 @@
                     </table></div>
                 </details>`;
         } catch (e) {
-            body.innerHTML = (e.code === 'NO_TOKEN' && window.adminAuthHtml)
-                ? window.adminAuthHtml('צריך חיבור חי לחשבון Google כדי לקרוא את המשפך.')
+            // The same failure, wearing the same face as every other card on
+            // the panel. This one used to grow its own "התחבר מחדש", so one
+            // routine expired hour put two buttons on the screen doing the same
+            // job — and recovering from here would have refreshed the funnel
+            // alone, leaving the other six cards exactly as empty as before.
+            body.innerHTML = window.adminErrorHtml
+                ? window.adminErrorHtml(e)
                 : '<p class="input-help">שגיאה בטעינת המשפך: ' + esc(e.message) + '</p>';
         }
     };

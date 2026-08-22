@@ -188,3 +188,20 @@ test('nothing re-exports a global function as a wrapper around itself', () => {
     assert.deepEqual(bad, [], `self-referential re-export: ${bad.join(', ')}`);
   }
 });
+
+test('exactly one button offers to reconnect', () => {
+  // The funnel card built its own. Two buttons doing the same job is confusing
+  // on its own, and the funnel's would have refreshed the funnel alone —
+  // leaving the other six cards as empty as they were before the click.
+  const FIN = readFileSync(join(ROOT, 'sale', 'finance.js'), 'utf8');
+  assert.ok(!/adminAuthHtml\(/.test(FIN), 'the funnel still renders its own sign-in panel');
+  assert.ok(/window\.adminErrorHtml/.test(FIN), 'the funnel does not use the shared failure');
+
+  // In app.js the button lives inside adminAuthHtml, and adminAuthHtml is
+  // reached from exactly one place: the strip at the top of the panel. Two in
+  // the code — its own declaration, and the strip's two calls collapse to the
+  // same site — so anything beyond that is a card growing a button again.
+  const code = APP.split(/\r?\n/).filter((l) => !l.trimStart().startsWith('//')).join('\n');
+  const sites = (code.match(/adminAuthHtml\(/g) || []).length;
+  assert.ok(sites <= 3, `adminAuthHtml appears at ${sites} sites; a card is rendering its own button`);
+});
