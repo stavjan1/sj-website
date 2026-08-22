@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=340">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=341">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,11 +26,11 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=340">
-    <link rel="stylesheet" href="../assets/ui.css?v=340">
-    <link rel="stylesheet" href="css/shell.css?v=340">
-    <link rel="stylesheet" href="css/panels.css?v=340">
-    <link rel="stylesheet" href="css/pdf.css?v=340">
+    <link rel="stylesheet" href="../assets/tokens.css?v=341">
+    <link rel="stylesheet" href="../assets/ui.css?v=341">
+    <link rel="stylesheet" href="css/shell.css?v=341">
+    <link rel="stylesheet" href="css/panels.css?v=341">
+    <link rel="stylesheet" href="css/pdf.css?v=341">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -945,6 +945,18 @@
                              the first place anyone finds out. -->
                         <div id="page-overflow-warning" class="page-overflow-warning" style="display:none;"></div>
 
+                        <!-- The document is the editor: this opens its fields for
+                             typing, on the same sheet that becomes the PDF. -->
+                        <div class="sheet-edit-bar">
+                            <button type="button" class="btn btn-secondary btn-small" id="btn-sheet-edit" onclick="toggleSheetEdit()">
+                                <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i> <span>עריכה על המסמך</span>
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-small" id="sheet-pick-client" onclick="openClientPicker()" hidden>
+                                <i class="fa-solid fa-user" aria-hidden="true"></i> בחירת לקוח
+                            </button>
+                            <span class="sheet-edit-note">לוחצים על כל טקסט במסמך וכותבים. הכל נשמר לפרויקט.</span>
+                        </div>
+
                         <!-- The actual sheet container -->
                         <div class="sheet-scroller">
                             <div id="quote-pdf-sheet" class="a4-sheet">
@@ -1002,6 +1014,9 @@
                                         <div id="pdf-work-items" class="pdf-items-list">
                                             <!-- Dynamically filled by script -->
                                         </div>
+                                        <button type="button" class="sheet-add-row" id="sheet-add-row" onclick="sheetAddRow()" hidden>
+                                            <span aria-hidden="true">+</span> הוספת שורה להצעה
+                                        </button>
                                         
                                         <!-- Summary Notes -->
                                         <div class="pdf-summary-box">
@@ -2312,17 +2327,17 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/listcards.js?v=340"></script>
+    <script src="/assets/listcards.js?v=341"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=340"></script>
-    <script src="app.js?v=340"></script>
+    <script src="coverage.js?v=341"></script>
+    <script src="app.js?v=341"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=340"></script>
+    <script src="finance.js?v=341"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=340" defer></script>
-    <script src="/track.js?v=340" defer></script>
+    <script src="../assistant.js?v=341" defer></script>
+    <script src="/track.js?v=341" defer></script>
 </body>
 </html>

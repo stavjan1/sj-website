@@ -3969,3 +3969,28 @@ i[class^="fa-"], i[class*=" fa-"] {
 .pt-lab-sum em { font-style: normal; font-size: var(--fs-xs); color: var(--text-3); }
 .pt-lab-sum b { margin-inline-start: auto; font-size: var(--fs-md); color: var(--text); direction: ltr; unicode-bidi: isolate; }
 .ptf-time { display: block; font-style: normal; font-size: var(--fs-xs); color: var(--text-3); }
+
+/* ---- Editing on the document ---------------------------------------------
+   The A4 sheet is the editor: the fields are the document's own text, marked
+   only while editing is on so the PDF never shows a hint of it. */
+.sheet-edit-bar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); margin-block-end: var(--sp-2); }
+.sheet-edit-note { font-size: var(--fs-xs); color: var(--text-3); }
+#btn-sheet-edit.active { border-color: var(--accent); color: var(--accent); }
+.sheet-editing .sheet-field {
+    outline: 1px dashed rgba(59, 130, 246, .55);
+    outline-offset: 2px; border-radius: 3px; min-width: 40px; min-height: 1em;
+    cursor: text;
+}
+.sheet-editing .sheet-field:focus { outline: 2px solid #3b82f6; background: rgba(59, 130, 246, .06); }
+.sheet-editing .sheet-field:empty::before { content: 'לחץ וכתוב'; color: #94a3b8; }
+.sheet-row-del {
+    margin-inline-start: 6px; width: 20px; height: 20px; line-height: 1;
+    background: none; border: 1px solid rgba(148, 163, 184, .5); border-radius: 4px;
+    color: #ef4444; cursor: pointer; font-size: 11px;
+}
+.sheet-add-row {
+    display: block; width: 100%; margin-block-start: 8px; padding: 8px;
+    background: none; border: 1px dashed rgba(148, 163, 184, .7); border-radius: 6px;
+    color: #475569; cursor: pointer; font: 600 12px var(--font-ui);
+}
+.sheet-add-row:hover { border-color: #3b82f6; color: #3b82f6; }

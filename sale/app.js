@@ -8055,7 +8055,7 @@ function updateRowIndices() {
     });
 }
 
-function getWorkItemsFromForm() {
+function getWorkItemsFromForm(includeEmpty) {
     const items = [];
     const container = document.getElementById('work-items-container');
     
@@ -8065,7 +8065,7 @@ function getWorkItemsFromForm() {
         const priceInput = row.querySelector('.item-price-input');
         const price = priceInput ? (parseFloat(priceInput.value) || 0) : 0;
         
-        if (title || desc) {
+        if (title || desc || includeEmpty) {
             items.push({ title, description: desc, price });
         }
     });
@@ -8128,6 +8128,194 @@ function formatPriceString(val) {
     return val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+// ── Editing on the document itself ──────────────────────────────────────────
+//
+// Stav: "אני מדמיין מסך כמו שההצעה תצא, אבל עם תיבות טקסט, ופלוס למטה להוסיף
+// שורה". So the sheet IS the editor: the same A4 that becomes the PDF, with
+// its fields open for typing. The form underneath stays the source of truth,
+// so nothing here invents a second copy of the quote — a field edited on the
+// page writes into the form and the page re-renders from it.
+let _sheetEditing = false;
+
+function sheetEditable() { return _sheetEditing; }
+
+function toggleSheetEdit(on) {
+    _sheetEditing = on === undefined ? !_sheetEditing : !!on;
+    const sheet = document.getElementById('quote-pdf-sheet');
+    if (sheet) sheet.classList.toggle('sheet-editing', _sheetEditing);
+    const btn = document.getElementById('btn-sheet-edit');
+    if (btn) {
+        btn.classList.toggle('active', _sheetEditing);
+        const label = btn.querySelector('span');
+        if (label) label.textContent = _sheetEditing ? 'סיום עריכה על המסמך' : 'עריכה על המסמך';
+    }
+    // Re-render: an empty description has no line on a finished document, and
+    // needs one the moment you are allowed to type into it.
+    try { updatePreviewFromForm(); } catch (e) { applySheetEditing(); }
+    try { localStorage.setItem('sj_sheet_edit', _sheetEditing ? '1' : '0'); } catch (e) {}
+}
+
+// Wire the editable spots after every re-render of the sheet.
+function applySheetEditing() {
+    const sheet = document.getElementById('quote-pdf-sheet');
+    if (!sheet) return;
+    const on = _sheetEditing;
+
+    const bind = (el, onSave, opts) => {
+        if (!el) return;
+        el.contentEditable = on ? 'true' : 'false';
+        el.classList.toggle('sheet-field', on);
+        if (on && !el.dataset.sheetBound) {
+            el.dataset.sheetBound = '1';
+            el.setAttribute('role', 'textbox');
+            el.addEventListener('blur', () => onSave(el.textContent.trim()));
+            el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !(opts && opts.multiline)) { e.preventDefault(); el.blur(); }
+                if (e.key === 'Escape') { el.blur(); }
+            });
+        }
+    };
+    const setForm = (id, value, after) => {
+        const input = document.getElementById(id);
+        if (!input) return;
+        input.value = value;
+        if (after) after();
+        updatePreviewFromForm();
+        syncCurrentQuoteToProject();
+    };
+
+    bind(sheet.querySelector('#pdf-subject'), (v) => setForm('form-quote-subject', v));
+    bind(sheet.querySelector('#pdf-client-name'), (v) => setForm('form-client-name', v));
+    bind(sheet.querySelector('#pdf-client-sub'), (v) => setForm('form-client-sub', v), { multiline: true });
+    bind(sheet.querySelector('#pdf-summary'), (v) => setForm('form-summary', v), { multiline: true });
+
+    // Rows: the title, the detail and the price are the three things anyone
+    // actually edits on a quote.
+    const rows = sheet.querySelectorAll('[data-item-index]');
+    rows.forEach((row) => {
+        const i = Number(row.dataset.itemIndex);
+        bind(row.querySelector('[data-item-field="title"]'), (v) => sheetSetItem(i, 'title', v));
+        bind(row.querySelector('[data-item-field="description"]'), (v) => sheetSetItem(i, 'description', v), { multiline: true });
+        bind(row.querySelector('[data-item-field="price"]'), (v) => sheetSetItem(i, 'price', v));
+    });
+
+    const adder = document.getElementById('sheet-add-row');
+    if (adder) adder.hidden = !on;
+    const picker = document.getElementById('sheet-pick-client');
+    if (picker) picker.hidden = !on;
+}
+
+// A field on the page writes into its row in the form, which is what the PDF
+// and every total already read.
+function sheetSetItem(index, field, value) {
+    const container = document.getElementById('work-items-container');
+    const row = container && container.children[index];
+    if (!row) return;
+    if (field === 'title') row.querySelector('.item-title-input').value = value;
+    if (field === 'description') row.querySelector('.item-desc-input').value = value;
+    if (field === 'price') {
+        const input = row.querySelector('.item-price-input');
+        if (input) { input.value = String(value).replace(/[^\d.]/g, ''); calculateItemizedTotal(); }
+    }
+    updatePreviewFromForm();
+    syncCurrentQuoteToProject();
+}
+
+function sheetAddRow() {
+    addWorkItemRow('', '', 0);
+    if (appState.currentQuote.showItemizedPrices) calculateItemizedTotal();
+    updatePreviewFromForm();
+    syncCurrentQuoteToProject();
+    // Put the cursor in the new row's title, on the document.
+    setTimeout(() => {
+        const rows = document.querySelectorAll('#quote-pdf-sheet [data-item-index]');
+        const last = rows[rows.length - 1];
+        const title = last && last.querySelector('[data-item-field="title"]');
+        if (title) { title.focus(); document.getSelection().selectAllChildren(title); }
+    }, 60);
+}
+
+function sheetDeleteRow(index) {
+    const container = document.getElementById('work-items-container');
+    const row = container && container.children[index];
+    if (!row) return;
+    row.remove();
+    if (appState.currentQuote.showItemizedPrices) calculateItemizedTotal();
+    updatePreviewFromForm();
+    syncCurrentQuoteToProject();
+}
+
+// ── Choosing the customer, from the customers he has ────────────────────────
+function openClientPicker() {
+    const old = document.getElementById('client-picker');
+    if (old) old.remove();
+    const dlg = document.createElement('dialog');
+    dlg.id = 'client-picker';
+    dlg.className = 'ck-dialog';
+    const rows = (clientsList || []).slice().sort((a, b) => a.name.localeCompare(b.name, 'he'));
+    dlg.innerHTML = `
+        <h3>בחירת לקוח</h3>
+        <div class="search-bar">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="text" id="cl-pick-q" placeholder="חיפוש לקוח…" oninput="renderClientPicker()">
+        </div>
+        <div class="cp-list" id="cl-pick-list"></div>
+        <div class="ck-dialog-actions">
+            <button type="button" class="btn btn-accent" onclick="pickNewClient()">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i> הוספת לקוח חדש
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('client-picker').close()">ביטול</button>
+        </div>`;
+    document.body.appendChild(dlg);
+    renderClientPicker();
+    dlg.showModal();
+}
+
+function renderClientPicker() {
+    const box = document.getElementById('cl-pick-list');
+    if (!box) return;
+    const q = ((document.getElementById('cl-pick-q') || {}).value || '').trim().toLowerCase();
+    const rows = (clientsList || []).filter((c) => !q || String(c.name || '').toLowerCase().includes(q)
+        || String(c.phone || '').includes(q));
+    if (!rows.length) {
+        box.innerHTML = `<p class="input-help">${(clientsList || []).length ? 'לא נמצא לקוח תואם.' : 'עוד אין לקוחות שמורים. אפשר להוסיף אחד עכשיו.'}</p>`;
+        return;
+    }
+    box.innerHTML = rows.map((c) => `
+        <button type="button" class="cp-row" onclick="pickClient('${escapeHtml(c.id)}')">
+            <span class="cp-name">${escapeHtml(c.name)}</span>
+            <span class="cp-price">${escapeHtml([c.phone, c.city].filter(Boolean).join(' · '))}</span>
+        </button>`).join('');
+}
+
+function pickClient(id) {
+    const client = (clientsList || []).find((c) => c.id === id);
+    const dlg = document.getElementById('client-picker');
+    if (dlg) { dlg.close(); dlg.remove(); }
+    if (!client) return;
+    const proj = projectsList.find((p) => p.id === activeProjectId);
+    if (proj) { proj.clientId = client.id; saveProjects(); }
+    const name = document.getElementById('form-client-name');
+    const sub = document.getElementById('form-client-sub');
+    if (name) name.value = client.name || '';
+    if (sub) sub.value = [client.address, client.city, client.phone].filter(Boolean).join(' · ');
+    updatePreviewFromForm();
+    syncCurrentQuoteToProject();
+    try { filterProjectsList(); } catch (e) {}
+    showToast(`ההצעה על שם ${client.name}`);
+}
+
+function pickNewClient() {
+    const name = (window.prompt('שם הלקוח:') || '').trim();
+    if (!name) return;
+    const phone = (window.prompt('טלפון (אפשר להשאיר ריק):') || '').trim();
+    const address = (window.prompt('כתובת (אפשר להשאיר ריק):') || '').trim();
+    const client = { id: 'cli' + Date.now(), name, phone, email: '', address, city: '', dealerNumber: '', tags: [] };
+    clientsList.unshift(client);
+    saveClients();
+    pickClient(client.id);
+}
+
 function updatePreviewFromForm() {
     const biz = appState.settings.businessDetails;
     try { applyQuoteLayout(); } catch (e) {} // manual block design (order/align/size/dir)
@@ -8173,7 +8361,9 @@ function updatePreviewFromForm() {
         `;
     }
     
-    const itemsList = getWorkItemsFromForm();
+    // A finished document hides an empty row; an editor must show it, or a row
+    // you just added has nowhere to be typed.
+    const itemsList = sheetEditable() ? getWorkItemsFromForm(true) : getWorkItemsFromForm();
     const pdfItemsContainer = document.getElementById('pdf-work-items');
     pdfItemsContainer.innerHTML = '';
     
@@ -8197,13 +8387,20 @@ function updatePreviewFromForm() {
         
         itemsList.forEach((item, idx) => {
             const tr = document.createElement('tr');
+            tr.dataset.itemIndex = idx;
+            // While editing, an empty description still needs somewhere to
+            // click, so the line exists (empty) instead of vanishing.
+            const showDesc = item.description || sheetEditable();
             tr.innerHTML = `
                 <td style="font-family: 'Outfit', sans-serif; font-weight: 700; text-align: center;">${idx + 1}</td>
                 <td>
-                    <div style="font-weight: 700; color: var(--pdf-primary); text-decoration: underline; margin-bottom: 4px;">${escapeHtml(item.title) || 'סעיף ללא כותרת'}</div>
-                    ${item.description ? `<div style="white-space: pre-line; line-height: 1.5; color: var(--pdf-text-main); font-size: 0.9rem;">${escapeHtml(item.description)}</div>` : ''}
+                    <div data-item-field="title" style="font-weight: 700; color: var(--pdf-primary); text-decoration: underline; margin-bottom: 4px;">${escapeHtml(item.title) || 'סעיף ללא כותרת'}</div>
+                    ${showDesc ? `<div data-item-field="description" style="white-space: pre-line; line-height: 1.5; color: var(--pdf-text-main); font-size: 0.9rem;">${escapeHtml(item.description)}</div>` : ''}
                 </td>
-                <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight: 700; text-align: left; color: var(--pdf-primary);">${formatPriceString(item.price || 0)} ₪</td>
+                <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight: 700; text-align: left; color: var(--pdf-primary);">
+                    <span data-item-field="price">${formatPriceString(item.price || 0)}</span> ₪
+                    ${sheetEditable() ? `<button type="button" class="sheet-row-del" onclick="sheetDeleteRow(${idx})" title="מחיקת שורה" aria-label="מחיקת שורה">✕</button>` : ''}
+                </td>
             `;
             tbody.appendChild(tr);
         });
@@ -8212,9 +8409,13 @@ function updatePreviewFromForm() {
         itemsList.forEach((item, idx) => {
             const itemEl = document.createElement('div');
             itemEl.className = 'pdf-work-item';
+            itemEl.dataset.itemIndex = idx;
+            const showDesc = item.description || sheetEditable();
             itemEl.innerHTML = `
-                <div class="pdf-item-title">${idx + 1}. ${escapeHtml(item.title) || 'סעיף ללא כותרת'}</div>
-                ${item.description ? `<div class="pdf-item-desc">${escapeHtml(item.description)}</div>` : ''}
+                <div class="pdf-item-title">${idx + 1}. <span data-item-field="title">${escapeHtml(item.title) || 'סעיף ללא כותרת'}</span>
+                    ${sheetEditable() ? `<button type="button" class="sheet-row-del" onclick="sheetDeleteRow(${idx})" title="מחיקת שורה" aria-label="מחיקת שורה">✕</button>` : ''}
+                </div>
+                ${showDesc ? `<div class="pdf-item-desc" data-item-field="description">${escapeHtml(item.description)}</div>` : ''}
             `;
             pdfItemsContainer.appendChild(itemEl);
         });
@@ -8222,6 +8423,9 @@ function updatePreviewFromForm() {
     
     syncCurrentQuoteToProject();
     renderPageGuides();
+
+    // Whatever was just re-rendered has to be typeable again.
+    try { applySheetEditing(); } catch (e) {}
 }
 
 // ── Where the paper actually ends ────────────────────────────────────────────
@@ -11580,6 +11784,10 @@ function renderPricingTable() {
                 <span class="ptf-sum">סה"כ לפני מע"מ <b>${heNum(Math.round(t.total))} ₪</b></span>
             </div>
             <div class="ptf-actions">
+                <div class="pt-modes ptf-build" role="group" aria-label="איך תיראה ההצעה">
+                    <button type="button" class="pt-mode${quoteBuildMode(proj) === 'komplet' ? ' on' : ''}" onclick="setQuoteBuildMode('komplet')" title="סעיף אחד, בלי לחשוף עלויות">קומפלט</button>
+                    <button type="button" class="pt-mode${quoteBuildMode(proj) === 'detailed' ? ' on' : ''}" onclick="setQuoteBuildMode('detailed')" title="סעיף לכל שורה">מפורט</button>
+                </div>
                 <button type="button" class="btn btn-secondary btn-small" onclick="switchTab('wizard')">
                     <i class="fa-solid fa-comments" aria-hidden="true"></i> חזרה לשיחה
                 </button>
@@ -11741,6 +11949,43 @@ function ptAddLabor() {
     _ptSave(proj);
 }
 
+// ── One line, or the whole list ─────────────────────────────────────────────
+//
+// Stav: "לא שולחים ללקוח הצעה עם עלות חומרים. רושמים בדרך כלל סעיף קומפלט".
+// He is right, and it is a choice, not a rule: some jobs are sold as one line
+// ("התקנת עמדת טעינה 22kW, קומפלט"), some are sold itemised. The table holds
+// the truth either way; this decides how much of it the customer sees.
+function quoteBuildMode(proj) {
+    const m = (proj && proj.quoteBuild) || (getPricingRules().quoteBuild || 'komplet');
+    return m === 'detailed' ? 'detailed' : 'komplet';
+}
+function setQuoteBuildMode(mode) {
+    const proj = _ptProj(); if (!proj) return;
+    proj.quoteBuild = mode === 'detailed' ? 'detailed' : 'komplet';
+    touchProject(proj);
+    saveProjects();
+    renderPricingTable();
+}
+
+// The one-line version: the job in a sentence, at the price the table came to.
+// The wording is his, and it is remembered per job type so the next charger
+// installation opens with the sentence he wrote last time.
+function kompletTitle(proj) {
+    return String((proj.quoteData && proj.quoteData.kompletTitle) || proj.name || 'ביצוע העבודה').trim();
+}
+function kompletText(proj) {
+    const stored = (proj.quoteData && proj.quoteData.kompletText);
+    if (stored !== undefined && stored !== null) return String(stored);
+    const remembered = (appState.settings.kompletByJob || {})[(proj.spec && proj.spec.jobType) || 'generic'];
+    return remembered || '';
+}
+function rememberKomplet(proj, text) {
+    const job = (proj.spec && proj.spec.jobType) || 'generic';
+    appState.settings.kompletByJob = appState.settings.kompletByJob || {};
+    appState.settings.kompletByJob[job] = text;
+    persistSettings();
+}
+
 // ── The quote, built from the table ─────────────────────────────────────────
 //
 // Until now the quote was written by an agent reading the conversation, which
@@ -11754,6 +11999,18 @@ function ptAddLabor() {
 // what a customer must not see.
 function quoteItemsFromTable(proj) {
     const items = [];
+
+    // Sold as one line: the customer reads what he is buying and what it costs,
+    // and the breakdown stays in the table where it belongs.
+    if (quoteBuildMode(proj) === 'komplet') {
+        const t = pricingTotals(proj);
+        if (t.total <= 0) return [];
+        return [{
+            title: kompletTitle(proj),
+            description: kompletText(proj),
+            price: Math.round(t.total),
+        }];
+    }
 
     const lab = laborSummary(proj);
     const rows = laborItems(proj).filter((x) => (x.name || '').trim() || Number(x.qty) > 0 || Number(x.price) > 0);
@@ -11824,6 +12081,11 @@ function ptToQuote() {
         p.materialsCost = totals.materials;
     } catch (e) { /* the engine is optional */ }
 
+    if (quoteBuildMode(proj) === 'komplet') {
+        proj.quoteData.kompletTitle = items[0].title;
+        proj.quoteData.kompletText = items[0].description;
+        if (items[0].description) rememberKomplet(proj, items[0].description);
+    }
     touchProject(proj);
     saveProjects();
     appState.currentQuote = { id: proj.id, ...proj.quoteData };

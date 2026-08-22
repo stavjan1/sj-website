@@ -15,7 +15,7 @@ function load(catalog = [], book = {}, rules = {}) {
     const pbEnd = app.indexOf('const MATERIAL_UNITS =');
     const ptStart = app.indexOf('const MATERIAL_UNITS =');
     const ptEnd = app.indexOf('function openPricingTable');
-    const qStart = app.indexOf('function quoteItemsFromTable(proj)');
+    const qStart = app.indexOf('function quoteBuildMode(proj)');
     const qEnd = app.indexOf('function ptToQuote()');
     assert.ok(pbStart > -1 && ptStart > -1, 'the pricing helpers moved or were renamed');
     const ctx = vm.createContext({
@@ -106,7 +106,7 @@ test('an item the catalog does not have can be put into it', () => {
 
 test('the quote is built from the rows, in the order a customer reads them', () => {
     const { quoteItemsFromTable } = load();
-    const items = quoteItemsFromTable(proj());
+    const items = quoteItemsFromTable({ ...proj(), quoteBuild: 'detailed' });
     const titles = items.map((x) => x.title);
 
     // Labour first: that is the work being bought.
@@ -132,7 +132,8 @@ test('an empty section carries no filler text to a customer', () => {
 
 test('nothing is built from an empty table', () => {
     const { quoteItemsFromTable } = load();
-    assert.equal(quoteItemsFromTable({ materials: [], laborItems: [], extras: {} }).length, 0);
+    assert.equal(quoteItemsFromTable({ materials: [], laborItems: [], extras: {}, quoteBuild: 'detailed' }).length, 0);
+    assert.equal(quoteItemsFromTable({ materials: [], laborItems: [], extras: {} }).length, 0, 'komplet has nothing to sell either');
 });
 
 // ── Pricing by time ─────────────────────────────────────────────────────────
@@ -183,7 +184,7 @@ test('an extra can be time too, and a legacy boolean still means "on"', () => {
 
 test('sold by the day, the customer sees days, not a per-line breakdown', () => {
     const { quoteItemsFromTable } = load();
-    const items = quoteItemsFromTable(dayProject());
+    const items = quoteItemsFromTable({ ...dayProject(), quoteBuild: 'detailed' });
     assert.equal(items.length, 1, 'the labour is one line when it is sold by the day');
     assert.match(items[0].title, /2 ימי עבודה/);
     assert.equal(items[0].price, 4000);
@@ -195,4 +196,29 @@ test('a material carries its unit, and defaults to a piece', () => {
     assert.equal(matUnit({}), MATERIAL_UNITS[0]);
     assert.equal(matUnit({ unit: 'מטר' }), 'מטר');
     assert.ok(MATERIAL_UNITS.includes('קומפלט'), 'קומפלט is how half his lines are sold');
+});
+
+test('a quote can be one line, and that line is his sentence', () => {
+    // "לא שולחים ללקוח הצעה עם עלות חומרים, רושמים סעיף קומפלט."
+    assert.match(app, /function quoteBuildMode/, 'the komplet/detailed choice is gone');
+    assert.match(app, /if \(quoteBuildMode\(proj\) === 'komplet'\)/, 'the builder stopped honouring the choice');
+    assert.match(app, /function rememberKomplet/, 'the wording is no longer remembered per job type');
+});
+
+test('the document itself is editable, and writes back through the form', () => {
+    assert.match(app, /function applySheetEditing/, 'on-document editing is gone');
+    assert.match(app, /function sheetSetItem/, 'a field on the page no longer writes into the row');
+    assert.match(app, /function sheetAddRow/, 'the "+" that adds a row is gone');
+    assert.match(app, /getWorkItemsFromForm\(true\)/, 'an empty row would have nowhere to be typed');
+    assert.match(app, /function openClientPicker/, 'the client picker is gone');
+    assert.match(app, /function pickNewClient/, 'adding a client from the picker is gone');
+});
+
+test('komplet sells the whole table as one line', () => {
+    const { quoteItemsFromTable, pricingTotals } = load();
+    const withName = { ...dayProject(), name: 'התקנת עמדת טעינה 22kW', quoteData: {} };
+    const items = quoteItemsFromTable(withName);
+    assert.equal(items.length, 1, 'one line is the whole point');
+    assert.equal(items[0].title, 'התקנת עמדת טעינה 22kW');
+    assert.equal(items[0].price, Math.round(pricingTotals(withName).total));
 });
