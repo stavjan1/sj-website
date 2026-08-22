@@ -12,7 +12,7 @@
 // Legacy {provider, model} bodies are still accepted but the model name is
 // honored only for the admin — everyone else gets their class mapping.
 
-import { generate } from './_ai.js';
+import { generate, recordAiUse } from './_ai.js';
 import { noteAnonVisit } from './_anon.js';
 import { getPricingMap } from './_pricing_map.js';
 import { getKitBlock } from './_electrical_kit.js';
@@ -24,7 +24,24 @@ import {
   verifyGoogleEmail, bearerToken, dayKey, rateLimit,
 } from './_tiers.js';
 
+// The endpoint every visitor actually hits, and until now it had no error
+// boundary at all: anything that threw here escaped the Function, and
+// Cloudflare answered with sixteen bytes of its own English —
+//     error code: 502
+// which told a stranger with a real pricing question that the product is
+// broken, and told us nothing whatsoever about why. A handler that cannot
+// say what went wrong is a handler that cannot be fixed from the outside.
 export async function onRequestPost(context) {
+  try {
+    return await handleChat(context);
+  } catch (e) {
+    const detail = (e && e.message) ? String(e.message).slice(0, 300) : String(e);
+    try { await recordAiUse(context.env, 'all', 'fail', null, { note: 'chat: ' + detail }); } catch (err) {}
+    return json({ error: { code: 'CHAT_CRASH', message: 'שגיאה זמנית בצד השרת. נסו שוב עוד רגע.', detail } }, 500);
+  }
+}
+
+async function handleChat(context) {
   const { request, env } = context;
 
   let body;
