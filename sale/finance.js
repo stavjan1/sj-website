@@ -39,8 +39,17 @@
     let saveTimer = null;
 
     // ── data ───────────────────────────────────────────────────────────────
+    async function liveToken() {
+        // ensureGoogleToken() refreshes an expired token on demand; without it
+        // an hour-old session shows "נדרשת התחברות" while the avatar still smiles.
+        if (typeof ensureGoogleToken === 'function') {
+            try { const t = await ensureGoogleToken(); if (t) return t; } catch (e) { /* fall through */ }
+        }
+        return authToken();
+    }
+
     async function loadFinance(retried) {
-        const token = authToken();
+        const token = await liveToken();
         if (!token) throw new Error('נדרשת התחברות');
         const res = await fetch('/api/finance', { headers: { Authorization: 'Bearer ' + token } });
         if (res.status === 401 && !retried) {
@@ -58,7 +67,7 @@
     }
 
     async function saveNow(useKeepalive) {
-        const token = authToken();
+        const token = useKeepalive ? authToken() : await liveToken();
         if (!token || !fin) return;
         try {
             const res = await fetch('/api/finance', {
@@ -113,11 +122,14 @@
             (fin.recurring || []).forEach(r => {
                 if (Number(r.dayOfMonth) === d.getDate()) fbal += (Number(r.amount) || 0);
             });
-            // Open documents have no due date — book them as expected income
-            // two weeks out (a single honest bump, not per-day guesswork).
-            if (i === 14) {
-                fbal += invoiceIncome.filter(inv => !inv.paid).reduce((s, inv) => s + inv.amount, 0);
-            }
+            // Open documents land on the day their payment terms say (שוטף+N,
+            // computed server-side from the document); anything already overdue
+            // is expected any day now, so it is booked on day one.
+            invoiceIncome.forEach(inv => {
+                if (inv.paid) return;
+                const due = inv.dueDate || '';
+                if (due === iso || (i === 1 && due && due < todayISO())) fbal += inv.amount;
+            });
             future.push({ date: iso, bal: fbal });
         }
         return { past, future };
@@ -199,7 +211,7 @@
             <div class="card"><div class="fin-kpi-label">מזומן זמין עכשיו</div><div class="fin-kpi num">${fmtILS(cash)}</div>
                 <div class="fin-kpi-sub">${(fin.accounts || []).length ? (fin.accounts || []).map(a => `${esc(a.name)}: ${fmtILS(a.balance)}`).join(' · ') : 'עדיין לא הוגדרו חשבונות'}</div></div>
             <div class="card"><div class="fin-kpi-label">ממתין לתשלום (הצעות/חשבוניות)</div><div class="fin-kpi num status-ok">${fmtILS(openSum)}</div>
-                <div class="fin-kpi-sub">${openInvoices.length} מסמכים פתוחים מהמערכת</div></div>
+                <div class="fin-kpi-sub">${openInvoices.length} מסמכים פתוחים${(() => { const n = openInvoices.map(i => i.dueDate).filter(Boolean).sort()[0]; return n ? ' · הקרוב צפוי ב-' + new Date(n).toLocaleDateString('he-IL') : ''; })()}</div></div>
             <div class="card"><div class="fin-kpi-label">הוצאות קבועות בחודש</div><div class="fin-kpi num status-danger">${fmtILS(Math.abs(monthlyRecurring))}</div>
                 <div class="fin-kpi-sub">${(fin.recurring || []).length} חיובים קבועים</div></div>
         </div>
