@@ -13,6 +13,7 @@
 // honored only for the admin — everyone else gets their class mapping.
 
 import { generate } from './_ai.js';
+import { noteAnonVisit } from './_anon.js';
 import { getPricingMap } from './_pricing_map.js';
 import { getKitBlock } from './_electrical_kit.js';
 import { getMaterialsBlock, getTaxonomyBlock, renderQuoteChecklist } from './_materials.js';
@@ -74,6 +75,14 @@ export async function onRequestPost(context) {
       // Best-effort increment (KV is eventually consistent — good enough here).
       context.waitUntil(env.SJ_DATA.put(key, String(used + 1), { expirationTtl: 60 * 60 * 26 }));
     }
+  }
+
+  // Count the visitor who never signs in. After the quota gate, so a refused
+  // request is not counted as a visit, and off the critical path so it can
+  // never delay an answer.
+  if (!email) {
+    const anon = request.headers.get('X-Zerem-Anon');
+    if (anon) context.waitUntil(noteAnonVisit(env, anon));
   }
 
   // ---- Model-class mapping (real model names never come from the browser) ----

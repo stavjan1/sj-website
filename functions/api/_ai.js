@@ -610,6 +610,17 @@ async function normalize(name, upstream, stream, extraHeaders) {
   });
 }
 
+// Read an error body WITHOUT spending it. `upstream` can still be handed to
+// normalize() further down — on a deployment with a single provider there is
+// nowhere to fall to — and normalize() reads the body again. A Response whose
+// body was already read throws there, the throw escapes the Pages Function, and
+// the customer gets a naked Cloudflare 502 instead of "the daily quota is
+// spent". That is exactly what took /ask/ down. Read a clone; the original
+// stays intact for whoever returns it.
+async function peekBody(res) {
+  try { return await res.clone().text(); } catch (e) { return ''; }
+}
+
 function errorResponse(message, status) {
   return new Response(JSON.stringify({ error: { message } }), { status, headers: JSON_HEADERS });
 }
@@ -631,7 +642,21 @@ const SYSTEM_GUARD = `
 6. סגנון: עברית פשוטה ומשפטים קצרים. אל תשתמש במקף ארוך (—); במקומו פסיק, נקודתיים או נקודה.
 `;
 
+// Public entry. The wrapper exists for one reason: nothing inside the provider
+// chain may reach the customer as a naked Cloudflare 502. An uncaught throw in
+// a Pages Function is served by the edge as sixteen bytes of English, with no
+// hint of what happened and no way for the page to say anything useful — which
+// is how a spent daily quota looked like a dead product.
 export async function generate(env, opts) {
+  try {
+    return await runProviders(env, opts);
+  } catch (e) {
+    try { await recordAiUse(env, 'all', 'fail', null, { note: 'חריגה לא צפויה: ' + (e && e.message ? e.message : e) }); } catch (err) {}
+    return errorResponse('מנוע ה-AI נכשל באופן לא צפוי. נסו שוב עוד רגע.', 502);
+  }
+}
+
+async function runProviders(env, opts) {
   // Immutable guard: appended server-side on EVERY call (see above).
   opts = { ...opts, messages: [...(opts.messages || []), { role: 'system', content: SYSTEM_GUARD }] };
   // Gemini already said "no more today", in Google's own words. Skipping it
@@ -701,7 +726,6 @@ export async function generate(env, opts) {
       if (healed) {
         await recordAiUse(env, label, 'fail', modelUsed,
           { status: 404, note: 'המודל אינו זמין למפתח, עובר ל-' + healed });
-        try { await upstream.text(); } catch (e) {}
         try {
           const onHealed = await callOnce(name, key, { ...opts, _resolvedModel: healed });
           if (!RETRIABLE.includes(onHealed.status)) {
@@ -734,8 +758,7 @@ export async function generate(env, opts) {
     // once, which is precisely when this matters.
     let quotaRetryMs = 0;
     if (name === 'gemini' && upstream.status === 429) {
-      let bodyText = '';
-      try { bodyText = await upstream.text(); } catch (e) {}
+      const bodyText = await peekBody(upstream);
       const q = quotaInfo(bodyText);
       quotaScope = q.scope;
       quotaRetryMs = q.retryMs;
@@ -756,7 +779,6 @@ export async function generate(env, opts) {
       // the user's side the retry hides it completely.
       await recordAiUse(env, label, upstream.status === 429 ? 'quota' : 'fail', modelUsed,
         { status: upstream.status, scope: quotaScope, note: 'נופל למפתח הגיבוי' });
-      if (upstream.status !== 429) { try { await upstream.text(); } catch (e) {} } // already drained on 429
       try {
         const retryUpstream = await callOnce(name, env.GEMINI_API_KEY_2, { ...opts, model: modelForThis });
         if (!RETRIABLE.includes(retryUpstream.status)) {
@@ -784,7 +806,6 @@ export async function generate(env, opts) {
         && quotaRetryMs && quotaRetryMs <= MAX_QUOTA_WAIT_MS && !opts._waited) {
       await recordAiUse(env, label, 'quota', modelUsed,
         { status: 429, scope: 'minute', note: `שני המפתחות תפוסים, ממתין ${Math.round(quotaRetryMs / 1000)} שניות` });
-      try { await upstream.text(); } catch (e) {}
       await new Promise((r) => setTimeout(r, quotaRetryMs + 250));
       try {
         const afterWait = await callOnce(name, key, { ...opts, model: modelForThis, _waited: true });
@@ -820,7 +841,6 @@ export async function generate(env, opts) {
     if (TRANSIENT.includes(upstream.status) && !opts._retried) {
       await recordAiUse(env, label, 'fail', modelUsed,
         { status: upstream.status, note: 'ניסיון שני מול אותו ספק' });
-      try { await upstream.text(); } catch (e) {}
       await new Promise((r) => setTimeout(r, 700));
       try {
         const again = await callOnce(name, key, { ...opts, model: modelForThis, _retried: true });
@@ -836,6 +856,15 @@ export async function generate(env, opts) {
     if (i > 0) headers['X-AI-Fallback-From'] = order[0];
     await recordAiUse(env, label, upstream.ok ? 'ok' : (upstream.status === 429 ? 'quota' : 'fail'), modelUsed,
       upstream.ok ? null : { status: upstream.status, scope: quotaScope });
+    // Nowhere left to fall to and the pool is spent: say that in Hebrew. What
+    // arrives here otherwise is Google's own English error object, rendered in
+    // the chat as a wall of English at the exact moment a stranger is deciding
+    // whether this product works.
+    if (upstream.status === 429) {
+      return errorResponse(quotaScope === 'minute'
+        ? 'מנוע ה-AI עמוס כרגע (יותר מדי בקשות באותו רגע). נסו שוב בעוד כמה שניות.'
+        : 'מכסת ה-AI היומית של השרת נגמרה. היא מתאפסת בחצות — נסו שוב מאוחר יותר.', 429);
+    }
     return normalize(name, upstream, !!opts.stream, headers);
   }
 

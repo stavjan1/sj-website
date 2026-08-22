@@ -8,6 +8,7 @@
 // retention is visible ("do people throw it away after one message?").
 
 import { adminGate, jsonResponse, monthKey } from './_tiers.js';
+import { listAnonVisitors } from './_anon.js';
 
 export async function onRequestGet(context) {
     const { request, env } = context;
@@ -55,6 +56,24 @@ export async function onRequestGet(context) {
         });
     }
 
+    // The people who never signed in — the bulk of a launch day, and until now
+    // completely absent from this screen. Kept as their own rows rather than
+    // merged into the totals: "one signed-up user" and "forty strangers who
+    // asked one question each" are different facts, and averaging them would
+    // hide both.
+    const anon = await listAnonVisitors(env, 200);
+    const anonUsers = anon.visitors.map((v) => ({
+        email: v.label,          // "אנונימי 3" — a rank, not an identity
+        anon: true,
+        firstSeen: v.firstSeen,
+        lastUpdated: v.lastSeen,
+        projects: 0,
+        projectsPlanned: 0,
+        chatMsgs: v.msgs || 0,
+        quotes: 0,
+        catalogItems: 0,
+    }));
+
     // PDF exporters this month (server-metered, verified emails).
     const mo = monthKey(new Date());
     const pdfList = await env.SJ_DATA.list({ prefix: 'pdfmo:', limit: 500 });
@@ -69,8 +88,15 @@ export async function onRequestGet(context) {
         activeLast7d: users.filter(u => u.lastUpdated && (Date.now() - u.lastUpdated) < 7 * 864e5).length,
         oneMessageOnly: users.filter(u => u.chatMsgs > 0 && u.chatMsgs <= 2).length, // real typed messages only
         capped: list.list_complete === false || list.keys.length >= 40,
+        anonVisitors: anonUsers.length,
+        anonMsgs: anonUsers.reduce((s, u) => s + u.chatMsgs, 0),
+        anonCapped: anon.capped,
     };
 
     users.sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
-    return jsonResponse({ funnel, users: users.slice(0, 100) });
+    // Signed-up users first, then the anonymous ones in their own stable order.
+    // Sorting the two groups together by activity would move "אנונימי 3" up and
+    // down the table on every refresh — the exact instability the numbering
+    // exists to prevent, reintroduced at the last step.
+    return jsonResponse({ funnel, users: users.slice(0, 100).concat(anonUsers) });
 }
