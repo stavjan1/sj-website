@@ -723,6 +723,9 @@ i[class^="fa-"], i[class*=" fa-"] {
 }
 
 /* Stage rail (1 אפיון → 2 תמחור → 3 הצעה) */
+/* `hidden` has to win over the display rules below, or a hidden stepper keeps
+   drawing itself. */
+.chat-mode-toggle[hidden] { display: none !important; }
 .chat-mode-toggle {
     display: flex;
     align-items: center;
@@ -3378,6 +3381,7 @@ i[class^="fa-"], i[class*=" fa-"] {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: var(--sp-3);
     max-width: 720px; margin-inline: auto;
+    width: 100%;
     /* No height of its own: the panel centres it. */
     min-height: 0;
     text-align: center;
@@ -3455,6 +3459,11 @@ i[class^="fa-"], i[class*=" fa-"] {
 .home-hi.has-ctx-btns { position: static; }
 .home-main .ctx-bell { position: absolute; inset-block-start: 0; inset-inline-end: 0; margin: 0; }
 .home-main .ctx-back { position: absolute; inset-block-start: 0; inset-inline-start: 0; margin: 0; }
+
+/* A desk has room: the column spreads with the screen instead of staying a
+   narrow strip in the middle of it. */
+@media (min-width: 1100px) { .home-main { max-width: 860px; } }
+@media (min-width: 1500px) { .home-main { max-width: 980px; } }
 
 @media (max-width: 860px) {
     .home-main { min-height: 0; padding-block-start: var(--sp-4); gap: var(--sp-2); }
@@ -4036,4 +4045,24 @@ i[class^="fa-"], i[class*=" fa-"] {
     padding: 2px var(--sp-2); border-radius: var(--r-pill);
     background: color-mix(in srgb, var(--ok-text, #16a34a) 14%, transparent);
     color: var(--ok-text, #16a34a); font-size: var(--fs-xs); font-weight: 600;
+}
+
+/* ---- The two things a job ends with, and the tools behind a fold ---------- */
+.pt-outputs { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-block: var(--sp-4) var(--sp-3); }
+.pt-helpers {
+    margin-block-start: var(--sp-4); border: 1px dashed var(--border); border-radius: var(--r-md);
+    background: color-mix(in srgb, var(--surface-2) 55%, transparent); min-width: 0;
+}
+.pt-helpers > summary {
+    display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-4); cursor: pointer; list-style: none;
+    font: 600 var(--fs-sm)/1.3 var(--font-ui); color: var(--text-2);
+}
+.pt-helpers > summary::-webkit-details-marker { display: none; }
+.pt-helpers[open] .ss-caret { transform: rotate(180deg); }
+.pt-helpers-body { padding: 0 var(--sp-4) var(--sp-4); display: grid; gap: var(--sp-3); }
+.list-text {
+    max-height: 50vh; overflow: auto; white-space: pre-wrap; margin: var(--sp-3) 0;
+    padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-sm);
+    background: var(--surface-2); font: 400 var(--fs-sm)/1.7 var(--font-ui); color: var(--text);
 }

@@ -156,7 +156,11 @@ body:not(.in-project) .proj-tab { display: none !important; }
   background: var(--surface); border-block-end: 1px solid var(--border);
   font-size: var(--fs-sm);
 }
-body.in-project #project-banner { display: flex; }
+/* Only on the project's own screens: coming back to the home screen with a
+   project still open used to leave its title bar sitting on top of the
+   greeting. `in-project-stage` is set by the rail and means exactly "you are
+   inside one of the project's screens". */
+body.in-project.in-project-stage #project-banner { display: flex; }
 #active-project-name { font-weight: 700; }
 #active-project-status { color: var(--text-3); }
 #banner-sync-indicator { margin-inline-start: auto; color: var(--text-3); font-size: var(--fs-xs); }

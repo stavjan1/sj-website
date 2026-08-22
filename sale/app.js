@@ -3209,11 +3209,15 @@ function updateActiveProjectBanner(proj) {
 // back button to the projects list. Replaces the horizontal step sub-tabs on
 // desktop; the mobile bottom bar keeps its own proj-tab buttons. Invoice/receipt
 // are reserved (shown as "בקרוב") for the accounting flow.
+// Three steps, because there are three things: describe the job, price it,
+// send it. Stav, 22/08: "צריך שיהיה רק 2 דברים, צ'אט אפיון ומסך תמחור" — and
+// the quote is what those two produce, so it is the third and last.
+// דוח בדיקה is a different product and left the rail; it is reached from the
+// quote screen, where someone actually thinks of it.
 const PROJECT_RAIL_STAGES = [
-    { tab: 'wizard',  label: 'אפיון ותמחור', icon: 'fa-compass-drafting' },
-    { tab: 'pricing', label: 'טבלת תמחור',   icon: 'fa-table-list' },
-    { tab: 'create',  label: 'הצעת מחיר',    icon: 'fa-file-invoice-dollar' },
-    { tab: 'reports', label: 'דוח בדיקה',    icon: 'fa-clipboard-check' },
+    { tab: 'wizard',  label: 'אפיון',       icon: 'fa-comments' },
+    { tab: 'pricing', label: 'תמחור',       icon: 'fa-table-list' },
+    { tab: 'create',  label: 'הצעת מחיר',   icon: 'fa-file-invoice-dollar' },
 ];
 // Accounting documents reachable straight from a project: enabled once the
 // project has a priced quote (else locked with a tooltip explaining why).
@@ -3248,9 +3252,7 @@ function renderProjectRail() {
             <i class="fa-solid fa-arrow-right"></i><span>הפרויקטים</span>
         </button>
         <div class="rail-proj" title="${proj ? escapeHtml(proj.name) : ''}">${proj ? escapeHtml(proj.name) : ''}</div>
-        <div class="rail-steps">${PROJECT_RAIL_STAGES.map(step).join('')}</div>
-        ${moneyEnabled() ? `<div class="rail-divider"></div>
-        <div class="rail-steps rail-steps-soon">${PROJECT_RAIL_DOCS.map(docBtn).join('')}</div>` : ''}`;
+        <div class="rail-steps">${PROJECT_RAIL_STAGES.map(step).join('')}</div>`;
 }
 
 // Jump from a project straight into the accounting create form, prefilled.
@@ -12116,6 +12118,9 @@ function toggleQuoteExtra(key, on) {
     touchProject(proj);
     saveProjects();
     renderMaterialsChecklist(proj.materials);
+    // The table draws the row's total from this state, so it has to repaint:
+    // without it the tick landed and the line still said "—".
+    try { renderPricingTable(); } catch (e) {}
     try { calculateWizardTotal(); } catch (e) {}
 }
 function setExtraPrice(key, value) {
@@ -12752,6 +12757,75 @@ function ptToQuote() {
         renderPricingEngine();
     } catch (e) { /* the editor fills itself on the next paint anyway */ }
     showToast(`ההצעה נבנתה מהטבלה: ${items.length} סעיפים, ${heNum(Math.round(totals.total))} ₪ לפני מע"מ`);
+}
+
+// ── What the job needs, on paper ────────────────────────────────────────────
+//
+// The two lists a job actually ends with. The shopping list is read straight
+// off the table (so it is priced with his prices, not the agent's), and the
+// toolbox comes from the agent, who knows the trade.
+function shoppingListText(proj) {
+    const rows = (proj.materials || []).filter((m) => m && m.checked && String(m.name || '').trim());
+    if (!rows.length) return '';
+    const lines = rows.map((m) => {
+        const qty = matQty(m);
+        const unit = matUnit(m);
+        const total = Math.round(matLineTotal(m));
+        return `• ${m.name}${qty > 1 || unit !== MATERIAL_UNITS[0] ? ` — ${heNum(qty)} ${unit}` : ''}${total ? ` (${heNum(total)} ₪)` : ''}`;
+    });
+    const sum = rows.reduce((a, m) => a + matLineTotal(m), 0);
+    return `רשימת חומרים · ${proj.name || 'עבודה'}\n${lines.join('\n')}\nסה"כ חומרים: ${heNum(Math.round(sum))} ₪`;
+}
+
+function openShoppingList() {
+    const proj = _ptProj();
+    if (!proj) return;
+    const text = shoppingListText(proj);
+    if (!text) { showToast('אין חומרים מסומנים בטבלה', 'error'); return; }
+    openListDialog('רשימת חומרים לקנייה', text);
+}
+
+// The toolbox list: ask the agent once, keep the answer on the project, and
+// show it here as a checklist you tick while loading the van.
+function requestToolsList() {
+    const proj = _ptProj();
+    if (!proj) return;
+    if ((proj.tools || []).length) {
+        const text = 'ארגז כלים · ' + (proj.name || 'עבודה') + '\n'
+            + proj.tools.map((t) => '• ' + (t.name || t)).join('\n');
+        openListDialog('רשימת כלי עבודה', text);
+        return;
+    }
+    showToast('מבקש מהסוכן רשימת כלים…');
+    switchTab('wizard');
+    setChatMode('price');
+    askListInChat('tools');
+}
+
+function openListDialog(title, text) {
+    const old = document.getElementById('list-dialog');
+    if (old) old.remove();
+    const dlg = document.createElement('dialog');
+    dlg.id = 'list-dialog';
+    dlg.className = 'ck-dialog';
+    dlg.innerHTML = `
+        <h3>${escapeHtml(title)}</h3>
+        <pre class="list-text" id="list-text">${escapeHtml(text)}</pre>
+        <div class="ck-dialog-actions">
+            <button type="button" class="btn btn-accent" onclick="copyListText()"><i class="fa-solid fa-copy" aria-hidden="true"></i> העתקה</button>
+            <a class="btn btn-secondary" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(text)}"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i> וואטסאפ</a>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('list-dialog').close()">סגירה</button>
+        </div>`;
+    document.body.appendChild(dlg);
+    dlg.showModal();
+}
+
+function copyListText() {
+    const el = document.getElementById('list-text');
+    if (!el) return;
+    navigator.clipboard.writeText(el.textContent)
+        .then(() => showToast('הרשימה הועתקה'))
+        .catch(() => showToast('ההעתקה נכשלה', 'error'));
 }
 
 // ---- add from the catalog ----
