@@ -69,24 +69,15 @@ test('a question whose premise fails is never asked', () => {
   }
 });
 
-test('the aluminium question only appears where aluminium exists', () => {
-  // Stav: "אין אלומיניום בפחות מ-63 אמפר אחי, לא קיים אף אחד שמשתמש בזה."
-  // Asking a 3×25 house is a question with exactly one possible answer.
-  const at = COVERAGE.indexOf('"id": "feed_conductor"');
-  assert.ok(at > 0, 'feed_conductor is gone');
-  const field = COVERAGE.slice(at, at + 1200);
-  assert.ok(/"showWhen"/.test(field), 'feed_conductor is still asked unconditionally');
-  assert.ok(/3×63/.test(field), 'the threshold is not 3×63');
-
-  // The condition has to name a real chip of a real field, or it never fires.
-  const cond = field.match(/"showWhen":\s*\{\s*"field":\s*"(\w+)",\s*"in":\s*\[([^\]]+)\]/);
-  assert.ok(cond, 'showWhen is malformed');
-  const [, srcField, values] = cond;
-  const srcAt = COVERAGE.indexOf(`"id": "${srcField}"`);
-  assert.ok(srcAt > 0, `showWhen points at a field that does not exist: ${srcField}`);
-  const srcChips = COVERAGE.slice(srcAt, srcAt + 1500);
-  for (const v of values.split(',').map((s) => s.trim().replace(/^"|"$/g, ''))) {
-    assert.ok(srcChips.includes(v), `showWhen expects a chip "${v}" that ${srcField} does not offer`);
+test('the questions Stav ruled irrelevant stay gone', () => {
+  // His call, and he is the licensed electrician: the supply conductor feeding
+  // the panel does not change a charger quote, and a building's year is not a
+  // usable proxy for its wiring or its earthing method. I argued for keeping
+  // the first one behind a 3×63A condition; he overruled it, and a checklist
+  // that asks questions the tradesman knows are pointless is a checklist he
+  // stops reading.
+  for (const gone of ['feed_conductor', 'existing_conductors']) {
+    assert.ok(!COVERAGE.includes(`"id": "${gone}"`), `${gone} came back`);
   }
 });
 

@@ -1831,12 +1831,32 @@ function _atzmautShift(date) {
     return 0;
 }
 
+// Add whole CALENDAR days, not 24-hour blocks.
+//
+// Israel moves the clock twice a year, so one day in March is 23 hours long and
+// one in October is 25. Stepping with `+ i * 86400000` walks off the midnight it
+// started from and can land on the wrong civil date for the rest of the loop —
+// in a function whose entire job is to name a date, that is the bug that
+// matters. setDate() is defined in local calendar terms and steps over the
+// shift correctly.
+function _addDays(date, n) {
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    d.setDate(d.getDate() + n);
+    return d;
+}
+
+// Whole calendar days between two local midnights. Rounding absorbs the 23- and
+// 25-hour days rather than being defeated by them.
+function _daysBetween(a, b) {
+    return Math.round((b - a) / 86400000);
+}
+
 // Every holiday inside the next `days` days, nearest first.
 function upcomingHolidays(days = 30, from = new Date()) {
     const out = [];
     const start = new Date(from.getFullYear(), from.getMonth(), from.getDate());
     for (let i = 0; i <= days; i++) {
-        const d = new Date(start.getTime() + i * 86400000);
+        const d = _addDays(start, i);
         const h = hebrewParts(new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 12)));
         if (!h) break;
         for (const holiday of HOLIDAYS) {
@@ -1844,10 +1864,9 @@ function upcomingHolidays(days = 30, from = new Date()) {
             if (holiday.key === 'purim' && h.leapAdar && !h.isAdarII) continue;
             let when = d;
             if (holiday.key === 'atzmaut') {
-                const shift = _atzmautShift(d);
-                when = new Date(d.getTime() + shift * 86400000);
+                when = _addDays(d, _atzmautShift(d));
             }
-            const daysAway = Math.round((when - start) / 86400000);
+            const daysAway = _daysBetween(start, when);
             if (daysAway < 0) continue;
             // NOT toISOString(): `when` is LOCAL midnight, and toISOString
             // converts to UTC — which in Asia/Jerusalem (UTC+2/+3) lands on the
@@ -1880,17 +1899,27 @@ function _broadcastMarkDone(campaign, id) {
     try { localStorage.setItem(_broadcastDoneKey(campaign), JSON.stringify([...set])); } catch (e) {}
 }
 
+// How the countdown reads, in Stav's words. "בעוד 9 ימים" is a number to
+// decode; "השבוע" is something you act on. The greeting itself takes over on
+// the day, because by then the reminder has done its job and what is left to
+// say is the wish.
+function holidayHeadline(h) {
+    if (h.daysAway === 0) return `${h.greet}!`;
+    if (h.daysAway === 1) return `מחר ${h.name}`;
+    if (h.daysAway <= 7) return `השבוע ${h.name}`;
+    return `בעוד שבועיים ${h.name}`;
+}
+
 function renderHolidayBar() {
     const box = document.getElementById('holiday-bar');
     if (!box) return;
     const next = upcomingHolidays(HOLIDAY_LEAD_DAYS)[0];
     if (!next) { box.innerHTML = ''; box.hidden = true; return; }
     box.hidden = false;
-    const when = next.daysAway === 0 ? 'היום' : next.daysAway === 1 ? 'מחר' : `בעוד ${next.daysAway} ימים`;
     box.innerHTML = `
         <div class="hol-bar">
             <div class="hol-text">
-                <b>${escapeHtml(next.name)} ${escapeHtml(when)}</b>
+                <b>${escapeHtml(holidayHeadline(next))}</b>
                 <span>רגע טוב לשלוח ברכה קצרה ללקוחות. הם זוכרים את מי ששלח.</span>
             </div>
             <button type="button" class="btn btn-accent btn-small" onclick="openBroadcast('${escapeHtml(next.key)}')">
