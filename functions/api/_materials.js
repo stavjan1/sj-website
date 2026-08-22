@@ -637,7 +637,11 @@ export function renderMaterialsBlock(db, hits, stats, forgotten = []) {
   lines.push('• "מטר" = המחיר הוא למטר אחד. "יחידה" = לפריט. אם יחידת המידה נראית לא הגיונית לפריט, אמור זאת במקום לנחש.');
   lines.push('• **מחיר למטר אינו אומר שאפשר לקנות מטר.** חלק מהפריטים (צינור שרשורי, מריכף, כבלים) נמכרים רק בגליל/חבילה שלמה, לרוב 50 או 100 מ\'. אם הכמות שהעבודה צריכה קטנה מאריזה, תמחר את האריזה השלמה ואמור זאת במפורש; אל תכפיל מטרים במחיר-למטר ותציג את זה כעלות הקנייה.');
   lines.push('• פריט שאינו ברשימה, אמוד כרגיל וציין במפורש שזו הערכה ולא מחירון.');
-  lines.push('• כשאתה לוקח מחיר מהרשימה, **צטט גם את המק"ט**. המק"ט הוא מה שמזמינים איתו; מחיר בלעדיו מאלץ לחפש את הפריט שוב ידנית מול הספק.');
+  // No SKUs in the quote for now: Stav has not agreed the catalog with ארכה
+  // yet, and a part number in a customer's hands is a commitment to a specific
+  // supplier line. Goes back in when he says so — the SKUs are still in the
+  // data above, only the instruction to repeat them is gone.
+  lines.push('• אל תצטט מק"טים בהצעה. די בשם הפריט ובמחיר.');
 
   if (hits.length) {
     lines.push('');

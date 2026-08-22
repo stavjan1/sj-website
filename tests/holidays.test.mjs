@@ -59,3 +59,41 @@ test('nothing in the past is offered', () => {
         assert.ok(h.daysAway >= 0, `${h.name} came back with a negative distance`);
     }
 });
+
+test('the clock change does not shift a date', () => {
+    // Israel moves the clock on the last Friday of March and the last Sunday of
+    // October, so one day is 23 hours and one is 25. Walking the calendar with
+    // `+ i * 86400000` drifts off midnight across those days and can name the
+    // wrong civil date for the rest of the loop — in a function whose only job
+    // is to name a date.
+    const { upcomingHolidays } = load();
+
+    // Pesach 5787 is 22.4.2027, and counting to it from before the March change
+    // crosses the short day.
+    const before = upcomingHolidays(90, on('2027-03-01')).find((h) => h.name === 'פסח');
+    assert.ok(before, 'no Pesach found across the spring clock change');
+    assert.equal(before.iso, '2027-04-22');
+
+    // And the count of days has to match the calendar, not the elapsed hours.
+    const days = Math.round(
+        (new Date('2027-04-22T00:00:00') - new Date('2027-03-01T00:00:00')) / 86400000);
+    assert.equal(before.daysAway, days, 'daysAway drifted over the clock change');
+
+    // Crossing the autumn change in the other direction.
+    const autumn = upcomingHolidays(80, on('2026-10-01')).find((h) => h.name === 'חנוכה');
+    assert.ok(autumn, 'no Hanukkah found across the autumn clock change');
+    assert.equal(autumn.iso, '2026-12-05');
+});
+
+test('the countdown reads the way it is spoken', () => {
+    // "בעוד 9 ימים" is a number to decode. "השבוע" is something you act on.
+    const src = app.slice(app.indexOf('function holidayHeadline('), app.indexOf('function renderHolidayBar('));
+    const ctx = vm.createContext({});
+    vm.runInContext(src + ';globalThis.h = holidayHeadline;', ctx);
+    const h = ctx.h;
+    const shavuot = { name: 'שבועות', greet: 'חג שבועות שמח' };
+    assert.equal(h({ ...shavuot, daysAway: 14 }), 'בעוד שבועיים שבועות');
+    assert.equal(h({ ...shavuot, daysAway: 5 }), 'השבוע שבועות');
+    assert.equal(h({ ...shavuot, daysAway: 1 }), 'מחר שבועות');
+    assert.equal(h({ ...shavuot, daysAway: 0 }), 'חג שבועות שמח!');
+});
