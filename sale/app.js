@@ -11080,31 +11080,138 @@ function showTypingIndicator(show) {
     }
 }
 
+// ── The price book: the AI suggests, you decide, and it remembers ───────────
+//
+// Stav, 22/08: "יהיה שם 'מחיר מוצע' שזה קבוע 600, וליד 'מחיר שלי' שנגיד רשם 800
+// פעם אחת אז תמיד לכל ההצעות זה יהיה 800". That is the whole idea: the agent's
+// number is a suggestion, the price you type once is yours from then on, and
+// after a month of use the quotes are priced by you, not by a model.
+function _pbKey(name) {
+    return String(name || '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 80);
+}
+function priceBook() {
+    if (!appState.settings.priceBook || typeof appState.settings.priceBook !== 'object') {
+        appState.settings.priceBook = {};
+    }
+    return appState.settings.priceBook;
+}
+function priceBookGet(name) {
+    const rec = priceBook()[_pbKey(name)];
+    return rec && Number(rec.price) > 0 ? Number(rec.price) : null;
+}
+function priceBookSet(name, price) {
+    const n = Number(price);
+    if (!_pbKey(name)) return;
+    if (!(n > 0)) delete priceBook()[_pbKey(name)];
+    else priceBook()[_pbKey(name)] = { price: n, at: Date.now() };
+    persistSettings();
+}
+
+// Lines that are not materials and not labour, and that a customer either wants
+// or does not: each one a toggle, with the market's number as the suggestion
+// and yours remembered beside it.
+const QUOTE_EXTRAS = [
+    { key: 'inspector', label: 'בדיקת חשמלאי בודק', suggested: 600 },
+    { key: 'delivery',  label: 'הובלה ואספקה',      suggested: 150 },
+    { key: 'waste',     label: 'פינוי פסולת',        suggested: 250 },
+    { key: 'travel',    label: 'נסיעות',             suggested: 120 },
+];
+
+function projectExtras(proj) {
+    if (!proj.extras || typeof proj.extras !== 'object') proj.extras = {};
+    return proj.extras;
+}
+function extraPrice(x) {
+    const mine = priceBookGet(x.label);
+    return mine === null ? x.suggested : mine;
+}
+function toggleQuoteExtra(key, on) {
+    const proj = projectsList.find((p) => p.id === activeProjectId);
+    if (!proj) return;
+    projectExtras(proj)[key] = !!on;
+    touchProject(proj);
+    saveProjects();
+    renderMaterialsChecklist(proj.materials);
+    try { calculateWizardTotal(); } catch (e) {}
+}
+function setExtraPrice(key, value) {
+    const x = QUOTE_EXTRAS.find((e) => e.key === key);
+    if (!x) return;
+    priceBookSet(x.label, value);
+    const proj = projectsList.find((p) => p.id === activeProjectId);
+    if (proj) renderMaterialsChecklist(proj.materials);
+    try { calculateWizardTotal(); } catch (e) {}
+}
+
+// A material's price: the agent's number is the suggestion, and yours, once
+// typed, is what the quote uses and what the next quote starts from.
+function setMaterialPrice(idx, value) {
+    const proj = projectsList.find((p) => p.id === activeProjectId);
+    if (!proj || !proj.materials || !proj.materials[idx]) return;
+    const mat = proj.materials[idx];
+    const n = Number(value);
+    if (mat.suggested === undefined) mat.suggested = Number(mat.price) || 0;
+    mat.price = n > 0 ? n : 0;
+    priceBookSet(mat.name, mat.price);
+    touchProject(proj);
+    saveProjects();
+    renderMaterialsChecklist(proj.materials);
+    try { calculateWizardTotal(); } catch (e) {}
+}
+
 function renderMaterialsChecklist(materials) {
     const container = document.getElementById('wizard-materials-list');
     if (!container) return;
-    
-    container.innerHTML = '';
-    
+    const proj = projectsList.find((p) => p.id === activeProjectId);
+
+    const extrasHtml = proj ? `
+        <div class="extras-block">
+            <div class="extras-head">תוספות להצעה</div>
+            ${QUOTE_EXTRAS.map((x) => {
+                const on = !!projectExtras(proj)[x.key];
+                const mine = priceBookGet(x.label);
+                return `
+                <div class="extra-row${on ? ' is-on' : ''}">
+                    <label class="extra-name">
+                        <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleQuoteExtra('${x.key}', this.checked)">
+                        <span>${escapeHtml(x.label)}</span>
+                    </label>
+                    <span class="extra-sugg">מוצע ${heNum(x.suggested)} ₪</span>
+                    <label class="extra-mine">
+                        <span>המחיר שלי</span>
+                        <input type="number" min="0" step="10" value="${mine !== null ? mine : ''}"
+                               placeholder="${x.suggested}" onchange="setExtraPrice('${x.key}', this.value)">
+                    </label>
+                </div>`;
+            }).join('')}
+            <p class="extras-note">מחיר שתכתוב כאן נשמר, ויחזור לבד בכל הצעה הבאה.</p>
+        </div>` : '';
+
     if (!materials || materials.length === 0) {
-        container.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:20px;">אין חומרים באומדן. התחל שיחה עם ה-AI כדי לפרק עבודה לחומרים.</div>`;
+        container.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:20px;">אין חומרים באומדן. התחל שיחה עם ה-AI כדי לפרק עבודה לחומרים.</div>' + extrasHtml;
         return;
     }
-    
-    materials.forEach((mat, idx) => {
-        const row = document.createElement('div');
-        row.className = 'material-check-row';
-        row.innerHTML = `
+
+    container.innerHTML = materials.map((mat, idx) => {
+        const suggested = mat.suggested !== undefined ? Number(mat.suggested) : Number(mat.price) || 0;
+        const mine = Number(mat.price) || 0;
+        const changed = suggested > 0 && Math.round(mine) !== Math.round(suggested);
+        return `
+        <div class="material-check-row">
             <input type="checkbox" id="mat-chk-${idx}" ${mat.checked ? 'checked' : ''} onchange="toggleMaterialChecked(${idx}, this.checked)">
             <div class="material-check-text">
                 <span class="material-item-name">${escapeHtml(mat.name)}</span>
-                <span class="material-item-details">(${escapeHtml(mat.details)}) - <b style="color:var(--color-success)">${Number(mat.price) || 0} ₪</b></span>
+                <span class="material-item-details">${mat.details ? escapeHtml(mat.details) : ''}</span>
             </div>
-        `;
-        container.appendChild(row);
-    });
+            <span class="mat-sugg${changed ? ' is-old' : ''}">מוצע ${heNum(suggested)} ₪</span>
+            <label class="mat-mine">
+                <span>שלי</span>
+                <input type="number" min="0" step="1" value="${mine || ''}" placeholder="${suggested || 0}"
+                       onchange="setMaterialPrice(${idx}, this.value)">
+            </label>
+        </div>`;
+    }).join('') + extrasHtml;
 }
-
 function toggleMaterialChecked(idx, checked) {
     if (!activeProjectId) return;
     const proj = projectsList.find(p => p.id === activeProjectId);
@@ -11122,6 +11229,29 @@ function calculateWizardTotal() {
         proj.laborPrice = parseFloat(document.getElementById('wizard-labor-price').value) || 0;
         saveProjects();
     }
+    renderEstimateTotal();
+}
+
+// The three numbers the quote is made of, live, so a price you type is a price
+// you see land: materials that are ticked, the labour, and the extras you
+// switched on. Separate lines because they behave differently in the quote.
+function renderEstimateTotal() {
+    const box = document.getElementById('est-total');
+    if (!box) return;
+    const proj = projectsList.find((p) => p.id === activeProjectId);
+    if (!proj) { box.hidden = true; return; }
+    const mats = (proj.materials || []).filter((m) => m && m.checked)
+        .reduce((sum, m) => sum + (Number(m.price) || 0), 0);
+    const labor = Number(proj.laborPrice) || 0;
+    const extras = QUOTE_EXTRAS.filter((x) => projectExtras(proj)[x.key]);
+    const extrasSum = extras.reduce((sum, x) => sum + extraPrice(x), 0);
+    if (!mats && !labor && !extrasSum) { box.hidden = true; return; }
+    box.hidden = false;
+    box.innerHTML = `
+        <div class="et-row"><span>חומרים מסומנים</span><b>${heNum(mats)} ₪</b></div>
+        <div class="et-row"><span>עבודה</span><b>${heNum(labor)} ₪</b></div>
+        ${extras.length ? `<div class="et-row"><span>תוספות (${extras.map((x) => escapeHtml(x.label)).join(', ')})</span><b>${heNum(extrasSum)} ₪</b></div>` : ''}
+        <div class="et-row et-sum"><span>סה"כ לפני מע"מ</span><b>${heNum(mats + labor + extrasSum)} ₪</b></div>`;
 }
 
 // ==========================================================================
@@ -11159,7 +11289,13 @@ async function exportChatToQuote() {
     const checkedMats = (proj.materials || []).filter(m => m.checked);
     const checkedMatsText = checkedMats.map(m => `• ${m.name} (${m.details}) - ${m.price} ₪`).join('\n');
     const materialsCost = checkedMats.reduce((sum, m) => sum + m.price, 0);
-    const estimatedCost = (proj.laborPrice || 0) + materialsCost;
+    // Extras are switched on per project and priced from the price book. They
+    // travel to the writer as their own lines, because a customer reads them
+    // that way: the inspector is not part of the installation price.
+    const extrasOn = QUOTE_EXTRAS.filter((x) => projectExtras(proj)[x.key]);
+    const extrasText = extrasOn.map((x) => `• ${x.label}: ${extraPrice(x)} ₪ (שורה נפרדת)`).join('\n');
+    const extrasCost = extrasOn.reduce((sum, x) => sum + extraPrice(x), 0);
+    const estimatedCost = (proj.laborPrice || 0) + materialsCost + extrasCost;
     
     const phrasingDb = appState.settings.phrasingDb || '';
 
@@ -11194,6 +11330,7 @@ ${conversationText}
 מחיר עבודה מוערך: ${proj.laborPrice || 0} ש"ח
 חומרים שנבחרו:
 ${checkedMatsText}
+${extrasText ? `תוספות שסתיו סימן (כל אחת סעיף נפרד בהצעה, אין לגלגל אותן לתוך מחיר ההתקנה):\n${extrasText}` : ''}
 """
 
 משימתך היא להפיק קובץ JSON מובנה המפרט את סעיפי הצעת המחיר הסופיים. 

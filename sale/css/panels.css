@@ -3784,3 +3784,62 @@ i[class^="fa-"], i[class*=" fa-"] {
 .ctx-back.in-title svg { width: 16px; height: 16px; }
 .ctx-bar.is-empty { display: none; }
 .bc-groupbtn { margin-inline-start: auto; }
+
+/* ---- Suggested price vs. my price, and the extras that are a yes/no --------
+   The estimate column is narrow, so each line is a small grid rather than a
+   flex row that wraps into itself: tick, name, and the two prices side by side
+   in a fixed lane. */
+.helper-materials-checklist .material-check-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center; gap: 2px var(--sp-2);
+    padding-block: var(--sp-2);
+}
+.helper-materials-checklist .material-check-text { grid-column: 2; min-width: 0; }
+.helper-materials-checklist .material-item-name { display: block; overflow-wrap: anywhere; }
+.helper-materials-checklist .material-item-details { display: block; font-size: var(--fs-xs); color: var(--text-3); }
+.mat-sugg { grid-column: 2; font-size: var(--fs-xs); color: var(--text-3); }
+.mat-sugg.is-old { text-decoration: line-through; opacity: .7; }
+.mat-mine {
+    grid-column: 3; grid-row: 1 / span 2; align-self: center;
+    display: inline-flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.mat-mine span { font-size: var(--fs-xs); color: var(--text-3); }
+/* By id, because the panel-wide "every input is full width" rule carries six
+   :not() clauses and outweighs any reasonable stack of classes. That rule is
+   what stretched a price box across the whole column. */
+#wizard-materials-list .mat-mine input,
+#wizard-materials-list .extra-mine input {
+    width: 92px; min-height: 32px; padding: 0 var(--sp-2);
+    text-align: center; font: 600 var(--fs-sm) var(--font-ui);
+}
+.extras-block {
+    margin-block-start: var(--sp-4); padding-block-start: var(--sp-3);
+    border-block-start: 1px dashed var(--border);
+}
+.extras-head { font: 700 var(--fs-sm) var(--font-ui); color: var(--text-2); margin-block-end: var(--sp-2); }
+.extra-row {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center; gap: 2px var(--sp-2);
+    padding: var(--sp-2); border-radius: var(--r-sm); border: 1px solid transparent;
+}
+.extra-row.is-on { background: var(--accent-soft); border-color: var(--accent-soft); }
+.extra-name { grid-column: 1; min-width: 0; display: flex; align-items: center; gap: var(--sp-2); cursor: pointer;
+    font: 500 var(--fs-sm) var(--font-ui); color: var(--text); }
+.extra-name input { flex: none; width: 16px; height: 16px; accent-color: var(--accent); }
+.extra-sugg { grid-column: 1; font-size: var(--fs-xs); color: var(--text-3); padding-inline-start: 24px; }
+.extra-mine {
+    grid-column: 2; grid-row: 1 / span 2; align-self: center;
+    display: inline-flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.extra-mine span { font-size: var(--fs-xs); color: var(--text-3); }
+.extras-note { margin: var(--sp-2) 0 0; font-size: var(--fs-xs); color: var(--text-3); }
+
+.est-total {
+    margin-block-start: var(--sp-4); padding: var(--sp-3) var(--sp-4);
+    border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2);
+    display: grid; gap: var(--sp-1);
+}
+.et-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); font-size: var(--fs-sm); color: var(--text-2); }
+.et-row b { font-weight: 700; color: var(--text); direction: ltr; unicode-bidi: isolate; }
+.et-sum { margin-block-start: var(--sp-2); padding-block-start: var(--sp-2); border-block-start: 1px solid var(--border); font-weight: 700; color: var(--text); }
