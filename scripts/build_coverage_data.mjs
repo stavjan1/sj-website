@@ -44,6 +44,12 @@ export function extract(source) {
       impacts: (spec.fields || [])
         .filter((f) => f && f.pricingImpact)
         .map((f) => ({ id: f.id, impact: f.pricingImpact, critical: !!f.critical })),
+      // Conditional follow-ups: an answer that forks the job rather than just
+      // describing it. The server needs these so the pricing agent knows the
+      // fork was put to the customer and which way it went.
+      followUps: (spec.fields || [])
+        .filter((f) => f && f.followUp)
+        .map((f) => ({ id: f.id, ...f.followUp })),
       exclusions: (spec.exclusions || []).map(String),
       redFlags: (spec.redFlags || []).map((r) => (typeof r === 'string' ? r : (r && (r.text || r.label || r.flag)) || '')).filter(Boolean),
     };

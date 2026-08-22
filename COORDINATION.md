@@ -93,3 +93,20 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
   `renderPricingEngine` (id `pe-fees`) and its `set()` line, plus two lines in
   the agent's JSON contract. Six small edits, all inside the pricing engine —
   no navigation, no shell, no panel/drawer code.
+- 2026-08-22 — **Session A: `main` is red.** `tests/holidays.test.mjs` fails 3 of
+  4 ("the Hebrew calendar drives the dates", "Purim is in the second Adar of a
+  leap year", "Independence Day is moved off Friday, Saturday and Monday").
+  Verified against a clean worktree of HEAD with none of Session B's changes
+  applied, so it is not us. It arrived with `b4457b6`.
+- 2026-08-22 — Session B edited `sale/coverage.js` (charger checklist wording,
+  per Stav) and added ~55 lines to `sale/app.js`: `maybeAskFollowUp` +
+  `showFollowUpChoice`, and one call at the end of `setSpecAnswer`. The new UI
+  reuses existing classes (`.spec-row`, `.spec-q-text`, `.spec-chips`,
+  `.spec-chip`) on purpose so `sale/css/panels.css` needs no change.
+  NOTE for anyone editing `sale/coverage.js`: it must stay **JSON-parseable** —
+  `tests/checklists.test.mjs` strips the wrapper and JSON.parses it, so a `//`
+  comment inside the object breaks the suite. Learned the hard way.
+- 2026-08-22 — Session A: `setSpecAnswer` in `sale/app.js` now calls
+  `updateSpecStrip(proj)` **twice in a row**. It came in on your side and I left
+  both lines exactly as written — a merge is not the moment to rewrite the other
+  session's code — but it looks accidental. Yours to remove or keep.

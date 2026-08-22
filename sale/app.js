@@ -9043,6 +9043,68 @@ function setSpecAnswer(fieldId, value, source) {
     updatePlanActionBar(proj);
     updateSpecStrip(proj);
     updateSpecStrip(proj);
+    maybeAskFollowUp(proj, fieldId, value);
+}
+
+// Some answers do not describe the job, they FORK it. A 3×25 supply with a
+// charger going onto it is the example: the three ways out — enlarge the
+// supply, add load management, or fit the charger and accept the trips — are
+// thousands of shekels apart, and the customer has to choose. Asking at the
+// moment the answer arrives, while he is still in the conversation, is worth
+// far more than discovering it in the quote.
+//
+// Declared as data on the field itself (coverage.js → followUp), so adding
+// another fork is a checklist edit and not a code change.
+function maybeAskFollowUp(proj, fieldId, value) {
+    const field = (getChecklist(proj).fields || []).find(f => f.id === fieldId);
+    const fu = field && field.followUp;
+    if (!fu || !Array.isArray(fu.when) || !fu.when.includes(value)) return;
+    // Asked once. Re-answering the same way should not re-open a decision the
+    // customer already made.
+    const spec = ensureSpec(proj);
+    spec.followUps = spec.followUps || {};
+    if (spec.followUps[fieldId]) return;
+    showFollowUpChoice(proj, fieldId, fu);
+}
+
+// Built entirely from classes the spec card already defines — .spec-row,
+// .spec-q-text, .spec-chips, .spec-chip. Adding .spec-followup styling would
+// mean editing sale/css/panels.css, which belongs to the display work running
+// in parallel; reusing the existing vocabulary avoids that and makes the
+// follow-up look like the rest of the card rather than bolted on.
+function showFollowUpChoice(proj, fieldId, fu) {
+    const host = document.getElementById('spec-card') || document.body;
+    const box = document.createElement('div');
+    box.className = 'spec-row expanded';
+    box.setAttribute('role', 'group');
+    const title = document.createElement('div');
+    title.className = 'spec-q-text';
+    title.textContent = fu.prompt;
+    box.appendChild(title);
+    const chips = document.createElement('div');
+    chips.className = 'spec-chips';
+    box.appendChild(chips);
+    fu.options.forEach(opt => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'spec-chip';
+        b.textContent = opt;
+        b.addEventListener('click', () => {
+            const spec = ensureSpec(proj);
+            spec.followUps = spec.followUps || {};
+            spec.followUps[fieldId] = opt;
+            // Also recorded as a normal answer so it travels into the pricing
+            // handoff with everything else, instead of living only in the UI.
+            spec.answers[fieldId + '_followup'] = { value: opt, source: 'user', skipped: false };
+            touchProject(proj);
+            saveProjects();
+            box.remove();
+            renderSpecCard(proj);
+            showToast('נרשם: ' + opt);
+        });
+        chips.appendChild(b);
+    });
+    host.prepend(box);
 }
 
 function skipSpecField(fieldId) {

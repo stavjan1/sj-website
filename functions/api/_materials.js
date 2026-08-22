@@ -501,7 +501,9 @@ const JOB_CONSUMABLES = [
   {
     when: /עמדת טעינה|טעינה לרכב|רכב חשמלי|wallbox|charger/i,
     // מרירון for a charger, per Stav — not מריכף, which is a different conduit.
-    items: ['צינור גמיש לבן PG 21', 'צינור מרירון', 'מפסק פקט',
+    // And the PG conduit is "לכיפופים", the trade's word for it; "לפניות" is
+    // what the model kept writing and is not what an electrician says.
+    items: ['צינור גמיש לבן PG 21 לכיפופים', 'צינור מרירון', 'מפסק פקט',
             'ממסר פחת 4x40 30mA', 'נעל כבל', 'שרוול מתכווץ', 'מהדק כבל',
             'שילוט מעגלים',
             // The model picks the cross-section itself, and it does that AFTER
