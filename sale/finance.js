@@ -23,6 +23,13 @@
         return localStorage.getItem(key) || sessionStorage.getItem(key) || null;
     }
 
+    // PRO gate: the owner always; paying plans on their own numbers.
+    function hasProAccess() {
+        if (typeof isAdmin === 'function' && isAdmin()) return true;
+        const tier = (typeof userTier !== 'undefined' && userTier && userTier.tier) || '';
+        return tier === 'pro' || tier === 'business';
+    }
+
     const fmtILS = (n) => (typeof nisFmt === 'function') ? nisFmt(n) : '₪' + Math.round(Number(n) || 0).toLocaleString('he-IL');
     const todayISO = () => new Date().toISOString().slice(0, 10);
     const esc = (s) => (typeof escapeHtml === 'function' ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s));
@@ -147,8 +154,19 @@
     window.renderFinance = async function renderFinance() {
         const root = document.getElementById('finance-root');
         if (!root) return;
-        if (typeof isAdmin === 'function' && !isAdmin()) {
-            root.innerHTML = '<div class="empty"><h3>אזור פרטי</h3><p>הדשבורד הפיננסי זמין לבעל המערכת בלבד.</p></div>';
+        if (!hasProAccess()) {
+            root.innerHTML = `<div class="card fin-locked">
+                <h3>תזרים מזומנים — תכונת PRO</h3>
+                <p>יתרות החשבונות, עקומת מזומן של 60 יום אחורה ו-30 קדימה, חיובים קבועים שמופיעים לבד, והכנסות שנמשכות ישירות מהמסמכים שהפקת כאן — בלי להקליד שוב.</p>
+                <ul>
+                    <li>מזומן זמין עכשיו, במבט אחד</li>
+                    <li>מה ייכנס ומה ייצא — לפני שזה קורה</li>
+                    <li>ייבוא תנועות מהבנק ב-CSV, וחיבור בנקאות פתוחה בהמשך</li>
+                </ul>
+                <div class="fin-locked-actions">
+                    <button class="btn btn-primary" onclick="typeof showUpgradeModal === 'function' ? showUpgradeModal('general') : null">שדרוג ל-PRO</button>
+                </div>
+            </div>`;
             return;
         }
         if (!fin) {

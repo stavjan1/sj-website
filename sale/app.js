@@ -53,10 +53,6 @@ function signupMailNote(d) {
 function showAdminTabIfNeeded() {
     const adminTab = document.getElementById('tab-admin');
     if (adminTab) adminTab.style.display = isAdmin() ? 'flex' : 'none';
-    // The cash view is owner-only, and it is a sub-view of כסף now rather than
-    // a menu entry of its own.
-    const flowTab = document.getElementById('money-tab-flow');
-    if (flowTab) flowTab.hidden = !isAdmin();
     // Signing in as the owner excludes this device from the traffic counters
     // from here on — otherwise Stav's own visits are the traffic.
     if (isAdmin()) { try { localStorage.setItem('sj_notrack', '1'); } catch (e) {} }
@@ -2231,22 +2227,23 @@ function moneyEnabled() { return isAdmin(); }
 
 function setMoneyView(view) {
     const docs = document.getElementById('money-view-docs');
+    // Cash flow moved out to its own PRO tab; כסף is documents only now.
     const flow = document.getElementById('money-view-flow');
-    if (!docs || !flow) return;
+    if (!docs) return;
     const soon = document.getElementById('money-soon');
     const subtabs = document.getElementById('money-subtabs');
     if (!moneyEnabled()) {
         if (soon) soon.hidden = false;
         if (subtabs) subtabs.hidden = true;
         docs.hidden = true;
-        flow.hidden = true;
+        if (flow) flow.hidden = true;
         return;
     }
     if (soon) soon.hidden = true;
     if (subtabs) subtabs.hidden = false;
-    const onFlow = view === 'flow';
+    const onFlow = false; // flow lives in the PRO tab
     docs.hidden = onFlow;
-    flow.hidden = !onFlow;
+    if (flow) flow.hidden = true;
     document.querySelectorAll('#panel-money .subtab').forEach((b) => {
         const on = b.dataset.sub === (onFlow ? 'flow' : 'docs');
         b.classList.toggle('active', on);
@@ -2263,7 +2260,7 @@ function switchTab(tabId, opts) {
     if (tabId === 'archive') { tabId = 'clients'; subView = 'list'; }
     else if (tabId === 'checkups') { tabId = 'projects'; subView = 'maint'; }
     else if (tabId === 'accounting') { tabId = 'money'; subView = 'docs'; }
-    else if (tabId === 'finance') { tabId = 'money'; subView = 'flow'; }
+    else if (tabId === 'finance') { tabId = 'pro'; }
 
     // Pipeline is a view of the work list; leaving it re-marks the toggle.
     if (tabId === 'projects' || tabId === 'statistics') setTimeout(() => {
@@ -2360,6 +2357,9 @@ function switchTab(tabId, opts) {
     }
     if (tabId === 'money') {
         setMoneyView(subView || 'docs');
+    }
+    if (tabId === 'pro') {
+        try { window.renderFinance && window.renderFinance(); } catch (e) {}
     }
     if (tabId === 'wizard') {
         try { renderPricingEngine(); } catch (e) {}

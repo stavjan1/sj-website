@@ -6,7 +6,7 @@
 //   PUT  /api/finance {data}      — save the finance record (manual entries,
 //                                   accounts, recurring charges, settings)
 //
-// Admin-only (adminGate). Data model, all additive:
+// PRO-gated (proGate). Data model, all additive:
 //   finance:admin = {
 //     accounts:  [{ id, name, kind:'bank'|'card'|'cash', balance:Number, asOf:'YYYY-MM-DD' }],
 //     entries:   [{ id, date:'YYYY-MM-DD', amount:Number (+income/-expense),
@@ -18,9 +18,19 @@
 // Bank passwords/credentials never touch this system. When Financy (open
 // banking, read-only) is registered, its keys will live in env vars — not KV.
 
-import { adminGate, jsonResponse, ADMIN_EMAIL } from './_tiers.js';
+import { verifyGoogleEmail, bearerToken, getTierForEmail, jsonResponse, ADMIN_EMAIL } from './_tiers.js';
 
-const KEY = 'finance:admin';
+// PRO feature: every paying account (pro/business) plus the owner gets its OWN
+// record; the owner's key stays 'finance:admin' so nothing he entered moves.
+const PRO_TIERS = ['pro', 'business', 'admin'];
+function keyFor(email) { return email === ADMIN_EMAIL ? 'finance:admin' : `finance:${email}`; }
+async function proGate(env, request) {
+    const email = await verifyGoogleEmail(bearerToken(request));
+    if (!email) return { ok: false, response: jsonResponse({ error: { message: 'נדרשת התחברות.', code: 'auth-expired' } }, 401) };
+    const tier = await getTierForEmail(env, email);
+    if (!PRO_TIERS.includes(tier)) return { ok: false, response: jsonResponse({ error: { message: 'תזרים מזומנים הוא תכונת PRO.', code: 'pro-required' } }, 403) };
+    return { ok: true, email, tier };
+}
 const MAX_BYTES = 2 * 1024 * 1024;
 
 function emptyRecord() {
@@ -29,9 +39,10 @@ function emptyRecord() {
 
 export async function onRequestGet(context) {
     const { request, env } = context;
-    const gate = await adminGate(request);
-    if (!gate.ok) return gate.response; // carries the proper Hebrew 401/403 body
     if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) לא מוגדר.' } }, 501);
+    const gate = await proGate(env, request);
+    if (!gate.ok) return gate.response;
+    const KEY = keyFor(gate.email);
 
     let record;
     try { record = JSON.parse(await env.SJ_DATA.get(KEY) || 'null') || emptyRecord(); }
@@ -40,7 +51,7 @@ export async function onRequestGet(context) {
     // Income side for free: the owner's own ZEREM invoices live in the user blob.
     let invoiceIncome = [];
     try {
-        const blob = JSON.parse(await env.SJ_DATA.get(`user:${ADMIN_EMAIL}`) || 'null');
+        const blob = JSON.parse(await env.SJ_DATA.get(`user:${gate.email}`) || 'null');
         const invoices = blob && Array.isArray(blob.invoices) ? blob.invoices : [];
         for (const inv of invoices) {
             // Per-invoice guard: one malformed createdAt must not drop ALL income.
@@ -69,9 +80,10 @@ export async function onRequestPost(context) { return savePut(context); }
 
 async function savePut(context) {
     const { request, env } = context;
-    const gate = await adminGate(request);
-    if (!gate.ok) return gate.response; // carries the proper Hebrew 401/403 body
     if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) לא מוגדר.' } }, 501);
+    const gate = await proGate(env, request);
+    if (!gate.ok) return gate.response;
+    const KEY = keyFor(gate.email);
 
     let body;
     try { body = await request.json(); } catch { return jsonResponse({ error: { message: 'JSON שגוי.' } }, 400); }
