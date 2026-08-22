@@ -46,8 +46,14 @@ const APP = read('sale/app.js');
 function literalBlock(fnName) {
   const at = APP.indexOf(`function ${fnName}(`);
   if (at === -1) return '';
-  // Take the backtick-delimited template literals inside the function body.
-  const body = APP.slice(at, at + 12000);
+  // The backtick-delimited template literals inside the function body — the
+  // WHOLE function, not a fixed window. A 12,000-char window silently cut
+  // getProfessionSystemInstruction (13,970 chars) right before the JSON output
+  // contract at offset 13,066, so every harness run measured a prompt that
+  // never asked the model for structured output, and the absent JSON read as a
+  // production bug rather than a measurement bug.
+  const next = APP.indexOf('\nfunction ', at + 10);
+  const body = APP.slice(at, next === -1 ? APP.length : next);
   const parts = body.match(/`[^`]*`/g) || [];
   return parts.join('\n');
 }

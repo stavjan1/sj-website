@@ -47,10 +47,29 @@ test('a model that cannot stop thinking gets extra room to answer', () => {
   assert.ok(padded.generationConfig.maxOutputTokens > 1200,
     'no headroom added for unavoidable thinking');
 
+  // A model that can switch thinking off gets exactly what was asked for.
   const plain = toGemini([{ role: 'user', content: 'x' }],
-    { max_tokens: 1200, model: 'gemini-3.6-flash' });
+    { max_tokens: 1200, model: 'gemini-2.5-flash' });
   assert.equal(plain.generationConfig.maxOutputTokens, 1200,
-    'headroom leaked into calls that never asked to disable thinking');
+    'headroom leaked into a model that does not need it');
+});
+
+test('a caller who says nothing about thinking still gets room to answer', () => {
+  // This is the common case and it was the one starving: the app sends
+  // max_tokens and no thinkingBudget, thinking takes its share of that same
+  // budget, and a real pricing answer stopped mid-word at item 5 of the bill of
+  // quantities. Headroom applies whenever thinking cannot be switched off, not
+  // only when the caller explicitly asked for it off.
+  const b = toGemini([{ role: 'user', content: 'x' }],
+    { max_tokens: 3000, model: 'gemini-3.6-flash' });
+  assert.ok(b.generationConfig.maxOutputTokens > 3000,
+    'no headroom for a caller who never mentioned thinking');
+  assert.equal(b.generationConfig.thinkingConfig, undefined);
+
+  // A model that CAN disable thinking does not need padding.
+  const old = toGemini([{ role: 'user', content: 'x' }],
+    { max_tokens: 3000, model: 'gemini-2.5-flash' });
+  assert.equal(old.generationConfig.maxOutputTokens, 3000);
 });
 
 test('a positive thinking budget is passed through untouched', () => {

@@ -12,7 +12,16 @@ const ROOT = new URL('../../', import.meta.url);
 const read = (p) => readFileSync(new URL(p, ROOT), 'utf8');
 const db = hydrate(JSON.parse(read('data/materials/index.json')));
 const APP = read('sale/app.js');
-function literalBlock(fn){const at=APP.indexOf(`function ${fn}(`);if(at<0)return'';return (APP.slice(at,at+12000).match(/`[^`]*`/g)||[]).join('\n');}
+// The WHOLE function, not a fixed window. A 12,000-char window cut
+// getProfessionSystemInstruction — 13,970 chars — right before the JSON output
+// contract at offset 13,066, so every run tested a prompt that never asked for
+// structured output, and the absent JSON read as a production bug.
+function literalBlock(fn) {
+  const at = APP.indexOf(`function ${fn}(`);
+  if (at < 0) return '';
+  const next = APP.indexOf('\nfunction ', at + 10);
+  return ((next === -1 ? APP.slice(at) : APP.slice(at, next)).match(/`[^`]*`/g) || []).join('\n');
+}
 function sternBlock(){const r=JSON.parse(read('sale/stern-pricing.json').replace(/^\uFEFF/,''));const items=Array.isArray(r)?r:r.items;
   return items.filter(i=>i&&i.description&&Number(i.price)>0).map(i=>`• ${i.description} — ${i.price} ₪`).join('\n');}
 const CLIENT=[literalBlock('getProfessionSystemInstruction'),sternBlock(),
@@ -41,7 +50,9 @@ for (const c of cases) {
       max_tokens: 3000, stream:false }),
   });
   const data = await res.json().catch(()=>({}));
-  const txt = data?.choices?.[0]?.message?.content;
+  const choice = data?.choices?.[0];
+  const txt = choice?.message?.content;
+  const finish = choice?.finish_reason;
   // Written to disk, not just printed: a 2,000-word Hebrew answer scrolls out of
   // a terminal, and every one of these costs real AI quota — losing it to a pipe
   // means paying twice for the same answer.
@@ -58,12 +69,18 @@ for (const c of cases) {
   writeFileSync(dest,
     `# מקרה ${c.num} — ${c.title}
 
+finish_reason: ${finish || 'n/a'}
+
 ## ההודעה
 ${c.msg}
 
 ## התשובה
 ${txt || `[${res.status}] ${JSON.stringify(data)}`}
 `);
-  console.log(txt ? `saved case-${c.num}.md (${txt.length} chars)` : `[${res.status}] ${JSON.stringify(data).slice(0,200)}`);
+  // finish_reason is the difference between "the model was brief" and "the
+  // quote was cut off mid-item", and only one of those is a bug.
+  console.log(txt
+    ? `saved case-${c.num}.md (${txt.length} chars, finish=${finish})${finish === 'MAX_TOKENS' ? '  ⚠ TRUNCATED' : ''}`
+    : `[${res.status}] ${JSON.stringify(data).slice(0,200)}`);
   await new Promise(r=>setTimeout(r,6000));   // stay under the 12/min burst cap
 }
