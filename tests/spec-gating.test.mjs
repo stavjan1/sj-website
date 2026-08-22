@@ -109,3 +109,18 @@ test('first person means the electrician everywhere', () => {
       `chip is written in the customer's voice: ${c}`);
   }
 });
+
+test('every distance question asks for the route, not the crow flight', () => {
+  // infra/route_length_m already carried the lesson in its own why-line: a
+  // remembered or straight-line measurement runs 20-40% short. Cable is priced
+  // per metre, so that gap is money, and four other checklists were still
+  // asking the naive version.
+  const questions = (COVERAGE.match(/"question": "([^"]*)"/g) || [])
+    .map((q) => q.slice('"question": "'.length, -1))
+    .filter((q) => /כמה מטר|מרחק/.test(q));
+  assert.ok(questions.length >= 4, `only ${questions.length} distance questions found`);
+  for (const q of questions) {
+    assert.ok(/בפועל|לא בקו ישר/.test(q),
+      `distance question does not ask for the real route: ${q}`);
+  }
+});
