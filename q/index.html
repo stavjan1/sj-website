@@ -43,6 +43,23 @@
             font-variant-numeric: tabular-nums;
         }
         .qs-vat { color: #79716B; font-size: 0.82rem; margin-bottom: 18px; }
+        .qs-terms { display: grid; gap: 4px; margin: 14px 0; padding: 10px 14px;
+            border: 1px solid #E7E5E4; border-radius: 8px; background: #FAFAF9; font-size: 0.88rem; }
+        .qs-term { display: flex; gap: 8px; align-items: baseline; }
+        .qs-term .k { flex: none; min-width: 92px; font-weight: 700; color: #1e3a8a; }
+        .qs-excl { margin: 10px 0; padding: 10px 14px; border: 1px dashed #ef4444; border-radius: 8px;
+            color: #b91c1c; font-size: 0.86rem; line-height: 1.6; }
+        .qs-approve { margin: 18px 0; padding: 14px; border: 1px solid #16a34a; border-radius: 10px;
+            background: rgba(22, 163, 74, .05); }
+        .qs-approve-t { font-weight: 700; margin-bottom: 8px; }
+        .qs-approve-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .qs-approve-row input { flex: 1 1 180px; min-height: 44px; padding: 0 12px; border: 1px solid #d6d3d1;
+            border-radius: 8px; font: inherit; }
+        .qs-btn.approve { background: #16a34a; color: #fff; border: none; cursor: pointer; padding: 0 20px; border-radius: 8px; font-weight: 700; }
+        .qs-btn.approve:disabled { opacity: .6; cursor: default; }
+        .qs-approve-note { margin-top: 8px; font-size: 0.78rem; color: #78716c; }
+        .qs-approved { margin: 18px 0; padding: 12px 14px; border-radius: 10px; background: rgba(22,163,74,.09);
+            color: #15803d; font-weight: 700; }
         .qs-summary { background: #FAFAF9; border: 1px solid #E7E5E4; border-radius: 8px; padding: 12px 16px; font-size: 0.9rem; white-space: pre-wrap; margin-bottom: 16px; }
         .qs-signed {
             display: flex; align-items: center; gap: 12px;
@@ -95,6 +112,67 @@
             }
         }
 
+        function token() { return new URLSearchParams(location.search).get('t') || ''; }
+
+        // The terms, in the same order they appear on the PDF.
+        function termsHtml(q) {
+            const rows = [];
+            if (q.validityDays) rows.push(['תוקף ההצעה', q.validityDays + ' ימים מתאריך ההצעה']);
+            if (q.paymentTerms) rows.push(['תנאי תשלום', q.paymentTerms]);
+            if (q.startWithinDays || q.durationDays) {
+                const start = q.startWithinDays ? 'תחילת עבודה תוך ' + q.startWithinDays + ' ימים מאישור ההצעה' : '';
+                const dur = q.durationDays ? (start ? ', ' : '') + 'משך העבודה כ־' + q.durationDays + ' ימי עבודה' : '';
+                rows.push(['מועד ביצוע', start + dur]);
+            }
+            if (q.warranty) rows.push(['אחריות', q.warranty]);
+            if (!rows.length) return '';
+            return '<div class="qs-terms">' + rows.map(function (r) {
+                return '<div class="qs-term"><span class="k">' + esc(r[0]) + '</span><span class="v">' + esc(r[1]) + '</span></div>';
+            }).join('') + '</div>';
+        }
+
+        // Approval, in one press, by the person holding the link. No account,
+        // no app: this is the whole point of sending a link instead of a file.
+        function approveHtml(q) {
+            if (q.approved && q.approved.at) {
+                const when = new Date(q.approved.at).toLocaleDateString('he-IL');
+                return '<div class="qs-approved">✓ ההצעה אושרה' + (q.approved.name ? ' על ידי ' + esc(q.approved.name) : '') +
+                    ' בתאריך ' + esc(when) + '</div>';
+            }
+            return '<div class="qs-approve">' +
+                '<div class="qs-approve-t">מאשרים את ההצעה?</div>' +
+                '<div class="qs-approve-row">' +
+                '<input id="qs-name" type="text" placeholder="השם שלך" maxlength="80">' +
+                '<button type="button" class="qs-btn approve" onclick="approveQuote()">אישור ההצעה</button>' +
+                '</div>' +
+                '<div class="qs-approve-note">האישור נשלח לבעל המקצוע. אין בו התחייבות לתשלום מקוון.</div>' +
+                '</div>';
+        }
+
+        async function approveQuote() {
+            const btn = document.querySelector('.qs-btn.approve');
+            const name = (document.getElementById('qs-name') || {}).value || '';
+            if (btn) { btn.disabled = true; btn.textContent = 'שולח…'; }
+            try {
+                const res = await fetch('/api/quote-share?t=' + encodeURIComponent(token()), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name.trim() }),
+                });
+                const d = await res.json();
+                if (!res.ok || !d.ok) throw new Error((d.error && d.error.message) || 'שגיאה');
+                const box = document.querySelector('.qs-approve');
+                if (box) {
+                    const when = new Date(d.approved.at).toLocaleDateString('he-IL');
+                    box.outerHTML = '<div class="qs-approved">✓ ההצעה אושרה' +
+                        (d.approved.name ? ' על ידי ' + esc(d.approved.name) : '') + ' בתאריך ' + esc(when) + '</div>';
+                }
+            } catch (e) {
+                if (btn) { btn.disabled = false; btn.textContent = 'אישור ההצעה'; }
+                alert('האישור לא נשלח: ' + e.message);
+            }
+        }
+
         function render(q, sheet) {
             const biz = q.business || {};
             document.title = 'הצעת מחיר ' + (q.quoteNumber || '') + (biz.name ? ', ' + biz.name : '');
@@ -127,7 +205,10 @@
                 ${items}
                 <div class="qs-total"><span>סה"כ לתשלום:</span><span>${fmt(q.finalPrice)} ₪</span></div>
                 <div class="qs-vat">${esc(q.vatLabel || '')}</div>
+                ${termsHtml(q)}
                 ${q.summary ? `<div class="qs-summary"><strong>פירוט תנאים נוספים:</strong>\n${esc(q.summary)}</div>` : ''}
+                ${q.exclusions ? `<div class="qs-excl"><strong>מה לא כלול:</strong> ${esc(q.exclusions)}</div>` : ''}
+                ${approveHtml(q)}
                 ${q.signature && safeImg(q.signature.img) ? `
                     <div class="qs-signed">
                         <img src="${esc(safeImg(q.signature.img))}" alt="חתימה">
@@ -143,6 +224,6 @@
 
         load();
     </script>
-    <script src="/track.js?v=341" defer></script>
+    <script src="/track.js?v=342" defer></script>
 </body>
 </html>

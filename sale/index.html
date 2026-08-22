@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=341">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=342">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,11 +26,11 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=341">
-    <link rel="stylesheet" href="../assets/ui.css?v=341">
-    <link rel="stylesheet" href="css/shell.css?v=341">
-    <link rel="stylesheet" href="css/panels.css?v=341">
-    <link rel="stylesheet" href="css/pdf.css?v=341">
+    <link rel="stylesheet" href="../assets/tokens.css?v=342">
+    <link rel="stylesheet" href="../assets/ui.css?v=342">
+    <link rel="stylesheet" href="css/shell.css?v=342">
+    <link rel="stylesheet" href="css/panels.css?v=342">
+    <link rel="stylesheet" href="css/pdf.css?v=342">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -1018,16 +1018,21 @@
                                             <span aria-hidden="true">+</span> הוספת שורה להצעה
                                         </button>
                                         
+                                        <!-- The terms that decide arguments later: how long the
+                                             price holds, how it is paid, when the work starts and
+                                             how long it takes, and what the warranty covers. Filled
+                                             from the user's defaults and editable on the document. -->
+                                        <div class="pdf-terms-box" id="pdf-terms-box"></div>
+
                                         <!-- Summary Notes -->
                                         <div class="pdf-summary-box">
                                             <div class="summary-title">פירוט תנאים נוספים:</div>
                                             <div class="summary-text" id="pdf-summary"></div>
                                         </div>
                                         
-                                        <!-- Exclusions warning -->
-                                        <div class="pdf-warning-box">
-                                            המחיר לא כולל איתור או תיקון תקלות במידה וימצאו ממצאים חריגים !
-                                        </div>
+                                        <!-- What the price does NOT include. The most valuable
+                                             paragraph in the document, legally. -->
+                                        <div class="pdf-warning-box" id="pdf-exclusions"></div>
                                     </div>
                                     
                                     <!-- Client & Contractor Signature Row -->
@@ -1736,6 +1741,13 @@
                     <p class="section-subtitle">הפרטים שמוטבעים בכל הצעה, ממלאים פעם אחת. עיצוב ההצעה עצמה נמצא במסך "הצעת מחיר", ליד ההצעה.</p>
                 </div>
                 <div class="settings-grid settings-stack">
+                    <!-- Set once, printed on every quote, editable per job on the
+                         document itself. -->
+                    <div class="section-card">
+                        <div class="card-header"><h3><i class="fa-solid fa-file-signature"></i> תנאי ברירת מחדל להצעות</h3></div>
+                        <div class="card-body" id="quote-defaults-body"></div>
+                    </div>
+
                     <div class="section-card">
                         <div class="card-header"><h3><i class="fa-solid fa-building"></i> פרטי החברה</h3></div>
                         <div class="card-body">
@@ -2327,17 +2339,17 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/listcards.js?v=341"></script>
+    <script src="/assets/listcards.js?v=342"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=341"></script>
-    <script src="app.js?v=341"></script>
+    <script src="coverage.js?v=342"></script>
+    <script src="app.js?v=342"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=341"></script>
+    <script src="finance.js?v=342"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=341" defer></script>
-    <script src="/track.js?v=341" defer></script>
+    <script src="../assistant.js?v=342" defer></script>
+    <script src="/track.js?v=342" defer></script>
 </body>
 </html>

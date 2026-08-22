@@ -2320,6 +2320,9 @@ function switchTab(tabId, opts) {
     if (tabId === 'catalog') {
         renderPriceCatalog();
     }
+    if (tabId === 'business') {
+        try { renderQuoteDefaults(); } catch (e) {}
+    }
     if (tabId === 'statistics') {
         renderStatistics();
     }
@@ -3116,6 +3119,8 @@ function loadProject(id, navigate = true) {
         switchTab('wizard');
         showToast(`פרויקט "${proj.name}" נטען בהצלחה`);
     }
+    // A quote sent by link may have been approved since he last looked.
+    try { checkQuoteApproval(proj); } catch (e) {}
 }
 
 function deleteProject(id, event) {
@@ -5417,6 +5422,7 @@ function renderProjectsList(list) {
                 <div class="project-title">${escapeHtml(cardTitle)}</div>
                 <div class="project-meta">
                     <span><i class="fa-solid fa-calendar"></i> ${formatHebrewDate(p.created)}</span>
+                    ${p.approvedAt ? `<span class="approved-badge" title="${escapeHtml('אושרה בקישור' + (p.approvedBy ? ' על ידי ' + p.approvedBy : ''))}"><i class="fa-solid fa-circle-check"></i> אושרה על ידי הלקוח</span>` : ''}
                     ${maintBadgeHtml(p)}
                     <label class="proj-cat-chip ${p.category ? 'has-cat' : ''}" onclick="event.stopPropagation()">
                         <i class="fa-solid fa-tag"></i>
@@ -5541,7 +5547,18 @@ function syncCurrentQuoteToProject() {
             finalPrice: appState.currentQuote.finalPrice,
             summary: document.getElementById('form-summary').value,
             showItemizedPrices: appState.currentQuote.showItemizedPrices || false,
-            signature: appState.currentQuote.signature || null
+            signature: appState.currentQuote.signature || null,
+            // The terms travel with the quote. They are rebuilt from the live
+            // quote rather than from a form field, because they are edited on
+            // the document itself.
+            validityDays: appState.currentQuote.validityDays,
+            paymentTerms: appState.currentQuote.paymentTerms,
+            startWithinDays: appState.currentQuote.startWithinDays,
+            durationDays: appState.currentQuote.durationDays,
+            warranty: appState.currentQuote.warranty,
+            exclusions: appState.currentQuote.exclusions,
+            kompletTitle: appState.currentQuote.kompletTitle,
+            kompletText: appState.currentQuote.kompletText
         };
         saveProjects();
     }
@@ -8128,6 +8145,170 @@ function formatPriceString(val) {
     return val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
+// Did the customer press the button? The link the app created is the same one
+// the customer holds, so asking is a single public GET. Called when a project
+// opens: an approval that arrived while he was driving shows up by itself.
+async function checkQuoteApproval(proj) {
+    if (!proj || !proj.shareToken || proj.approvedAt) return;
+    try {
+        const res = await fetch('/api/quote-share?t=' + encodeURIComponent(proj.shareToken));
+        const body = await res.json().catch(() => ({}));
+        const approved = body && body.data && body.data.approved;
+        if (!approved || !approved.at) return;
+        proj.approvedAt = approved.at;
+        proj.approvedBy = approved.name || '';
+        // The status vocabulary stays as it is (draft / sent / done / paid) —
+        // approval is a fact about the quote, shown as its own mark, not a
+        // fifth status that every filter and board would have to learn.
+        saveProjects();
+        filterProjectsList();
+        showToast(`הלקוח אישר את ההצעה${approved.name ? ': ' + approved.name : ''}`);
+    } catch (e) { /* offline, or the link was deleted */ }
+}
+
+// ── The terms that decide arguments later ───────────────────────────────────
+//
+// Six lines Stav approved, in the order they matter: how long the price holds,
+// how it is paid, when the work starts and how long it takes, what the warranty
+// covers, and what the price does NOT include. Each has a default he sets once,
+// each can be edited on the document for a specific job, and the exclusions
+// paragraph is the most valuable one in the file.
+const QUOTE_TERM_DEFAULTS = {
+    validityDays: 14,
+    paymentTerms: '50% מקדמה עם אישור ההצעה, 50% בסיום העבודה ומסירה.',
+    startWithinDays: 7,
+    warranty: 'שנה על העבודה. על הציוד חלה אחריות היצרן.',
+    exclusions: 'המחיר אינו כולל איתור או תיקון תקלות קיימות שיתגלו במהלך העבודה, עבודות בנייה וגמר, ואגרות או בדיקות של חברת החשמל.',
+};
+
+const PAYMENT_PRESETS = [
+    '50% מקדמה עם אישור ההצעה, 50% בסיום העבודה ומסירה.',
+    'תשלום מלא בסיום העבודה.',
+    'שוטף + 30 מיום החשבונית.',
+    '30% מקדמה, 40% באמצע העבודה, 30% במסירה.',
+];
+
+function quoteDefaults() {
+    const d = (appState.settings && appState.settings.quoteDefaults) || {};
+    return { ...QUOTE_TERM_DEFAULTS, ...d };
+}
+function setQuoteDefault(field, value) {
+    appState.settings.quoteDefaults = { ...quoteDefaults(), [field]: value };
+    persistSettings();
+}
+
+// A quote's terms: its own if it has them, the defaults if it does not.
+function quoteTerms(q) {
+    const d = quoteDefaults();
+    const v = q || appState.currentQuote || {};
+    return {
+        validityDays: v.validityDays === undefined || v.validityDays === '' ? d.validityDays : v.validityDays,
+        paymentTerms: v.paymentTerms === undefined ? d.paymentTerms : v.paymentTerms,
+        startWithinDays: v.startWithinDays === undefined || v.startWithinDays === '' ? d.startWithinDays : v.startWithinDays,
+        durationDays: v.durationDays || 0,
+        warranty: v.warranty === undefined ? d.warranty : v.warranty,
+        exclusions: v.exclusions === undefined ? d.exclusions : v.exclusions,
+    };
+}
+
+function setQuoteTerm(field, value) {
+    appState.currentQuote[field] = value;
+    syncCurrentQuoteToProject();
+    renderQuoteTerms();
+    try { applySheetEditing(); } catch (e) {}
+}
+
+function _daysWord(n) {
+    const x = Number(n) || 0;
+    if (x === 1) return 'יום עבודה אחד';
+    if (x === 1.5) return 'יום וחצי';
+    return `${heNum(x)} ימי עבודה`;
+}
+
+function renderQuoteDefaults() {
+    const box = document.getElementById('quote-defaults-body');
+    if (!box) return;
+    const d = quoteDefaults();
+    box.innerHTML = `
+        <p class="input-help" style="margin-block-start:0;">אלה הברירות מחדל. בכל הצעה אפשר לשנות אותן על המסמך עצמו, בלי לגעת כאן.</p>
+        <div class="form-grid-2">
+            <div class="form-group">
+                <label for="qd-validity">תוקף ההצעה (ימים)</label>
+                <input type="number" id="qd-validity" min="1" max="365" value="${d.validityDays}" onchange="setQuoteDefault('validityDays', parseInt(this.value, 10) || 14)">
+            </div>
+            <div class="form-group">
+                <label for="qd-start">תחילת עבודה תוך (ימים מאישור)</label>
+                <input type="number" id="qd-start" min="0" max="180" value="${d.startWithinDays}" onchange="setQuoteDefault('startWithinDays', parseInt(this.value, 10) || 0)">
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="qd-pay">תנאי תשלום</label>
+            <div class="qd-presets">
+                ${PAYMENT_PRESETS.map((t, i) => `<button type="button" class="chip" onclick="pickPaymentPreset(${i})">${escapeHtml(t.length > 34 ? t.slice(0, 34) + '…' : t)}</button>`).join('')}
+            </div>
+            <textarea id="qd-pay" rows="2" onchange="setQuoteDefault('paymentTerms', this.value)">${escapeHtml(d.paymentTerms)}</textarea>
+        </div>
+        <div class="form-group">
+            <label for="qd-warranty">אחריות</label>
+            <textarea id="qd-warranty" rows="2" onchange="setQuoteDefault('warranty', this.value)">${escapeHtml(d.warranty)}</textarea>
+        </div>
+        <div class="form-group">
+            <label for="qd-excl">מה לא כלול</label>
+            <textarea id="qd-excl" rows="3" onchange="setQuoteDefault('exclusions', this.value)">${escapeHtml(d.exclusions)}</textarea>
+            <p class="input-help">הפסקה הכי חשובה במסמך מבחינה משפטית. מה שלא כתוב כאן, הלקוח מניח שכלול.</p>
+        </div>`;
+}
+
+function pickPaymentPreset(i) {
+    const text = PAYMENT_PRESETS[i];
+    if (!text) return;
+    setQuoteDefault('paymentTerms', text);
+    const ta = document.getElementById('qd-pay');
+    if (ta) ta.value = text;
+    showToast('תנאי התשלום עודכנו');
+}
+
+function renderQuoteTerms() {
+    const box = document.getElementById('pdf-terms-box');
+    const warn = document.getElementById('pdf-exclusions');
+    if (!box) return;
+    const t = quoteTerms();
+
+    const line = (label, field, text) => `
+        <div class="pdf-term-row">
+            <span class="pdf-term-k">${escapeHtml(label)}</span>
+            <span class="pdf-term-v" data-term-field="${field}">${escapeHtml(text)}</span>
+        </div>`;
+
+    const duration = t.durationDays ? `, משך העבודה כ־${_daysWord(t.durationDays)}` : '';
+    box.innerHTML = `
+        ${line('תוקף ההצעה', 'validityDays', `${heNum(t.validityDays)} ימים מתאריך ההצעה`)}
+        ${line('תנאי תשלום', 'paymentTerms', t.paymentTerms)}
+        ${line('מועד ביצוע', 'startWithinDays', `תחילת עבודה תוך ${heNum(t.startWithinDays)} ימים מאישור ההצעה${duration}`)}
+        ${line('אחריות', 'warranty', t.warranty)}`;
+
+    if (warn) {
+        warn.innerHTML = `<span data-term-field="exclusions">${escapeHtml(t.exclusions)}</span>`;
+    }
+}
+
+// The document's term lines are editable like everything else on it. A number
+// typed into "14 ימים" is read back out of the sentence, so he never has to
+// know which part of the line is the field.
+function bindTermFields(bind) {
+    document.querySelectorAll('[data-term-field]').forEach((el) => {
+        const field = el.dataset.termField;
+        bind(el, (text) => {
+            if (field === 'validityDays' || field === 'startWithinDays') {
+                const n = parseInt(String(text).replace(/[^\d]/g, ''), 10);
+                setQuoteTerm(field, Number.isFinite(n) ? n : quoteDefaults()[field]);
+            } else {
+                setQuoteTerm(field, text);
+            }
+        }, { multiline: field === 'exclusions' || field === 'paymentTerms' || field === 'warranty' });
+    });
+}
+
 // ── Editing on the document itself ──────────────────────────────────────────
 //
 // Stav: "אני מדמיין מסך כמו שההצעה תצא, אבל עם תיבות טקסט, ופלוס למטה להוסיף
@@ -8188,6 +8369,7 @@ function applySheetEditing() {
     bind(sheet.querySelector('#pdf-client-name'), (v) => setForm('form-client-name', v));
     bind(sheet.querySelector('#pdf-client-sub'), (v) => setForm('form-client-sub', v), { multiline: true });
     bind(sheet.querySelector('#pdf-summary'), (v) => setForm('form-summary', v), { multiline: true });
+    bindTermFields(bind);
 
     // Rows: the title, the detail and the price are the three things anyone
     // actually edits on a quote.
@@ -8424,6 +8606,8 @@ function updatePreviewFromForm() {
     syncCurrentQuoteToProject();
     renderPageGuides();
 
+    // The terms live on the same sheet and follow the same data.
+    try { renderQuoteTerms(); } catch (e) {}
     // Whatever was just re-rendered has to be typeable again.
     try { applySheetEditing(); } catch (e) {}
 }
@@ -9220,6 +9404,7 @@ async function shareQuoteLink() {
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (!proj) return;
     const q = proj.quoteData || {};
+    const t = quoteTerms(q);
     const biz = appState.settings.businessDetails || {};
     const logoImg = document.querySelector('#pdf-logo-container img');
     const logo = (logoImg && logoImg.src && logoImg.src.startsWith('data:') && logoImg.src.length < 80000) ? logoImg.src : '';
@@ -9228,6 +9413,11 @@ async function shareQuoteLink() {
         date: q.date, subject: q.subject, items: q.items || [],
         finalPrice: q.finalPrice, showItemizedPrices: q.showItemizedPrices,
         summary: q.summary, signature: q.signature || null,
+        // The terms travel with the link, so the customer decides with the
+        // whole picture in front of him and not just a number.
+        validityDays: t.validityDays, paymentTerms: t.paymentTerms,
+        startWithinDays: t.startWithinDays, durationDays: t.durationDays,
+        warranty: t.warranty, exclusions: t.exclusions,
         vatLabel: (document.getElementById('pdf-vat-label') || {}).textContent || '',
         business: { name: biz.name, owner: biz.owner, phone: biz.phone, email: biz.email },
         logo
@@ -9243,6 +9433,7 @@ async function shareQuoteLink() {
         if (!res.ok || !data.token) throw new Error((data.error && data.error.message) || 'יצירת הקישור נכשלה');
         const link = `${location.origin}/q/?t=${data.token}`;
         proj.shareLink = link; // kept on the project, the archive seed
+        proj.shareToken = data.token;   // so the app can ask later whether it was approved
         saveProjects();
         try {
             await navigator.clipboard.writeText(link);
@@ -12072,6 +12263,10 @@ function ptToQuote() {
     const totals = pricingTotals(proj);
     proj.quoteData = proj.quoteData || {};
     proj.quoteData.items = items;
+    // The table knows how long the job takes, so the document says it without
+    // being asked: the hours in the labour block become working days.
+    const days = totals.lab && totals.lab.hours ? hoursToDays(totals.lab.hours) : 0;
+    if (days) proj.quoteData.durationDays = days;
     proj.quoteData.basePrice = Math.round(totals.total);
     if (!String(proj.quoteData.subject || '').trim()) proj.quoteData.subject = proj.name;
 

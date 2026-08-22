@@ -756,3 +756,18 @@
 @media print {
     .page-guide, .page-overflow-warning { display: none !important; }
 }
+
+/* The terms block on the sheet: four short lines a customer reads once and a
+   court reads later. Quiet, but present. */
+.pdf-terms-box {
+    margin-block-start: 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--pdf-line, #e2e8f0);
+    border-radius: 6px;
+    background: rgba(148, 163, 184, .06);
+    display: grid;
+    gap: 4px;
+}
+.pdf-term-row { display: flex; gap: 8px; align-items: baseline; font-size: 0.82rem; line-height: 1.5; }
+.pdf-term-k { flex: none; min-width: 88px; font-weight: 700; color: var(--pdf-primary, #1e3a8a); }
+.pdf-term-v { color: var(--pdf-text-main, #334155); }

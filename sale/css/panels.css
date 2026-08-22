@@ -3994,3 +3994,10 @@ i[class^="fa-"], i[class*=" fa-"] {
     color: #475569; cursor: pointer; font: 600 12px var(--font-ui);
 }
 .sheet-add-row:hover { border-color: #3b82f6; color: #3b82f6; }
+.qd-presets { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-block-end: var(--sp-2); }
+.approved-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px var(--sp-2); border-radius: var(--r-pill);
+    background: color-mix(in srgb, var(--ok-text, #16a34a) 14%, transparent);
+    color: var(--ok-text, #16a34a); font-size: var(--fs-xs); font-weight: 600;
+}
