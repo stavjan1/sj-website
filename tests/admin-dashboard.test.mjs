@@ -169,3 +169,22 @@ test('the AI card leads with who is answering customers, in words', () => {
   assert.match(v({ events: [{ date: '2020-01-01', outcome: 'fail', status: 500 }] }), /המנוע החזק/,
     'an old failure is reported as the current state');
 });
+
+test('nothing re-exports a global function as a wrapper around itself', () => {
+  // `window.adminAuthHtml = (msg) => adminAuthHtml(msg);` looks like exposing a
+  // function and is the opposite: this file is a classic script, so the
+  // declaration is already on window, and the assignment replaces it with a
+  // body that calls itself. adminAuthHtml() was a stack overflow — thrown
+  // inside the catch block of every card that handled an expired hour, so the
+  // card never wrote anything and kept its "טוען…" forever.
+  //
+  // Found by running the deployed page. Reading the source had not caught it in
+  // however long the line had been there.
+  for (const src of [APP, readFileSync(join(ROOT, 'sale', 'finance.js'), 'utf8')]) {
+    // Code only: the comment above quotes the broken line deliberately, and a
+    // test that fails on its own explanation is a test nobody keeps.
+    const code = src.split(/\r?\n/).filter((l) => !l.trimStart().startsWith('//')).join('\n');
+    const bad = code.match(/window\.([A-Za-z_$][\w$]*)\s*=\s*\([^)]*\)\s*=>\s*\1\s*\(/g) || [];
+    assert.deepEqual(bad, [], `self-referential re-export: ${bad.join(', ')}`);
+  }
+});

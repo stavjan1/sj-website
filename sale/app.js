@@ -13316,8 +13316,23 @@ async function adminFetch(url, opts) {
 // finance.js renders the funnel card and needs the same live-token fetch.
 window.adminRes = adminRes;
 window.ensureGoogleToken = ensureGoogleToken;
-window.adminAuthHtml = (msg) => adminAuthHtml(msg);
-window.adminErrorHtml = (e) => adminErrorHtml(e);
+
+// adminAuthHtml and adminErrorHtml are deliberately NOT re-exported here.
+//
+// This file is a classic script, so a top-level `function foo()` is already a
+// property of window. Writing
+//     window.adminAuthHtml = (msg) => adminAuthHtml(msg);
+// therefore does not "expose" it — it REPLACES the declaration with a function
+// whose body calls itself. adminAuthHtml() was infinite recursion, and it had
+// been for as long as the line existed.
+//
+// That is the second half of the broken dashboard, and the uglier half: the
+// four cards that did handle an expired hour called adminAuthHtml() inside
+// their catch, blew the stack there, and so never wrote anything to the page.
+// The card kept the "טוען…" it had set before the fetch, forever. Caught by
+// running the deployed page, not by reading it.
+//
+// finance.js reads window.adminAuthHtml and finds the real declaration.
 
 // ── Getting back in ─────────────────────────────────────────────────────────
 //
