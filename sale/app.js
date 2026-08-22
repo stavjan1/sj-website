@@ -1814,6 +1814,13 @@ function hebrewParts(date) {
     } catch (e) { return null; }
 }
 
+// A calendar date as the CIVIL day it is, not as UTC. Everything here works in
+// local midnights, and toISOString() would shift them backwards over the
+// Israeli offset.
+function _localIso(dt) {
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+}
+
 // יום העצמאות moves so it never touches Shabbat: 5 Iyar on Friday or Saturday
 // is marked earlier in the week, and on Monday it is pushed to Tuesday.
 function _atzmautShift(date) {
@@ -1842,7 +1849,11 @@ function upcomingHolidays(days = 30, from = new Date()) {
             }
             const daysAway = Math.round((when - start) / 86400000);
             if (daysAway < 0) continue;
-            out.push({ ...holiday, date: when, iso: when.toISOString().slice(0, 10), daysAway });
+            // NOT toISOString(): `when` is LOCAL midnight, and toISOString
+            // converts to UTC — which in Asia/Jerusalem (UTC+2/+3) lands on the
+            // previous day and reported every holiday one day early. The Hebrew
+            // lookup above was always right; only the formatting was wrong.
+            out.push({ ...holiday, date: when, iso: _localIso(when), daysAway });
         }
     }
     return out.sort((a, b) => a.daysAway - b.daysAway);
@@ -9165,23 +9176,40 @@ function ensureSpec(proj) {
     return proj.spec;
 }
 
+// Some questions only matter given another answer. Declared on the field as
+// `showWhen: {field, in:[...]}` so the condition is checklist data, not code.
+//
+// The one that prompted this: nobody supplies aluminium below 3×63A, so asking
+// "copper or aluminium?" on a 3×25 house is a question with one possible answer
+// — pure friction, and the kind that teaches you to click through the card
+// without reading it.
+function specFieldApplies(field, answers) {
+    const cond = field && field.showWhen;
+    if (!cond || !cond.field) return true;
+    const a = answers[cond.field];
+    if (!a || a.skipped || !a.value) return false;   // premise unknown → do not ask
+    return Array.isArray(cond.in) ? cond.in.includes(a.value) : true;
+}
+
 // Coverage state drives both the card's progress and the pricing gate.
 function specCoverage(proj) {
     const list = getChecklist(proj);
     const answers = (proj && proj.spec && proj.spec.answers) || {};
+    // A question that does not apply is not a question you are missing.
+    const fields = list.fields.filter(f => specFieldApplies(f, answers));
     const isSet = (f) => {
         const a = answers[f.id];
         return !!a && (a.skipped || (a.value !== '' && a.value != null));
     };
-    const critical = list.fields.filter(f => f.critical);
+    const critical = fields.filter(f => f.critical);
     const missingCritical = critical.filter(f => !isSet(f));
     return {
-        total: list.fields.length,
-        answered: list.fields.filter(isSet).length,
+        total: fields.length,
+        answered: fields.filter(isSet).length,
         criticalTotal: critical.length,
         criticalAnswered: critical.length - missingCritical.length,
         missingCritical,
-        assumptions: list.fields.filter(f => answers[f.id] && answers[f.id].skipped),
+        assumptions: fields.filter(f => needsAssumption(f, answers)),
         ready: missingCritical.length === 0
     };
 }
@@ -9326,10 +9354,39 @@ function setSpecJobType(type) {
 
 // The written assumptions that ride along into the quote: the price of speed,
 // made visible instead of hidden.
+// "לא ידוע" is not an answer, it is a skip with extra steps.
+//
+// Twenty-one chips across the checklists let you say you do not know — "לא ידוע
+// · לפי תמונת הלוח", "עוד לא סוכם", "אין הארקה או לא ידוע". Picking one stored a
+// non-empty value, so specCoverage counted the critical field as satisfied AND
+// specAssumptions passed over it, because it only ever looked at `skipped`. The
+// quote then went out carrying no caveat at all on a fact nobody had
+// established — which is exactly what this coverage model exists to prevent.
+// coverage.js's own header promises the gate stays shut "until it is answered or
+// knowingly skipped", and an unknown is neither.
+//
+// Pricing still proceeds — those chips exist so work is not blocked. What
+// changes is that the assumption is printed, so the customer sees what was
+// assumed on his behalf.
+const UNKNOWN_ANSWER = /לא ידוע|^עוד לא סוכם|לא נבדק|לא בטוח/;
+
+function isUnknownAnswer(a) {
+    return !!a && !a.skipped && typeof a.value === 'string' && UNKNOWN_ANSWER.test(a.value);
+}
+
+// A field whose answer does not establish the fact: skipped outright, or
+// answered "I don't know". Both have to print their assumption.
+function needsAssumption(field, answers) {
+    const a = answers[field.id];
+    return !!a && (a.skipped || isUnknownAnswer(a));
+}
+
 function specAssumptions(proj) {
     const list = getChecklist(proj);
     const answers = (proj && proj.spec && proj.spec.answers) || {};
-    return list.fields.filter(f => answers[f.id] && answers[f.id].skipped).map(f => f.assumption);
+    return list.fields
+        .filter(f => specFieldApplies(f, answers) && needsAssumption(f, answers))
+        .map(f => f.assumption);
 }
 
 function specExclusions(proj) {
@@ -9510,10 +9567,15 @@ function renderSpecCard(proj) {
         `<button type="button" class="spec-type-chip ${project.spec.jobType === t ? 'active' : ''}" onclick="setSpecJobType('${t}')">${JOB_TYPE_LABELS[t]}</button>`
     ).join('');
 
+    // Questions whose premise does not hold are not shown at all — not even
+    // under "show everything". Asking a 3×25 house whether its supply is
+    // aluminium is a question with one possible answer.
+    const applicable = list.fields.filter(f => specFieldApplies(f, answers));
+
     // Optional questions stay out of the way until the criticals are done.
     const isDeferred = (f) => !f.critical && !answers[f.id];
-    const deferredCount = list.fields.filter(isDeferred).length;
-    const visibleFields = specShowAll ? list.fields : list.fields.filter(f => !isDeferred(f));
+    const deferredCount = applicable.filter(isDeferred).length;
+    const visibleFields = specShowAll ? applicable : applicable.filter(f => !isDeferred(f));
 
     // Nothing open, or the open one just got answered → move to the next gap.
     // Unless it was opened on purpose to be changed, in which case moving on is
@@ -9631,7 +9693,7 @@ function openFieldWorkOrder() {
     const row = (label, value, muted) =>
         `<tr><th>${escapeHtml(label)}</th><td${muted ? ' class="muted"' : ''}>${escapeHtml(value)}</td></tr>`;
 
-    const specRows = list.fields.map(f => {
+    const specRows = list.fields.filter(f => specFieldApplies(f, answers)).map(f => {
         const a = answers[f.id];
         if (!a) return row(f.question, 'לא נבדק', true);
         if (a.skipped) return row(f.question, 'לבדוק בשטח', true);
@@ -10074,9 +10136,13 @@ function getPlanningSystemInstruction() {
     const proj = projectsList.find(p => p.id === activeProjectId);
     const list = getChecklist(proj);
     const answers = (proj && proj.spec && proj.spec.answers) || {};
-    const known = list.fields.filter(f => answers[f.id] && !answers[f.id].skipped && answers[f.id].value)
+    // Only questions whose premise holds. Without this the planning agent is
+    // handed "still open: is the supply copper or aluminium?" for a 3×25 house
+    // and dutifully asks the customer a question with one possible answer.
+    const applicable = list.fields.filter(f => specFieldApplies(f, answers));
+    const known = applicable.filter(f => answers[f.id] && !answers[f.id].skipped && answers[f.id].value)
         .map(f => `• ${f.question} ${answers[f.id].value}`).join('\n');
-    const open = list.fields.filter(f => !answers[f.id])
+    const open = applicable.filter(f => !answers[f.id])
         .map(f => `• [${f.id}] ${f.question}${f.chips ? ', אפשרויות: ' + f.chips.join(' / ') : ''}${f.critical ? ' (חובה)' : ''}`).join('\n');
 
     return `אתה מאפיין עבודות מומחה עבור ${professionAiRole(profession)} בישראל. תפקידך הוא אפיון בלבד, לעולם אל תציין מחירים או עלויות (זה השלב הבא).

@@ -110,3 +110,16 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
   `updateSpecStrip(proj)` **twice in a row**. It came in on your side and I left
   both lines exactly as written — a merge is not the moment to rewrite the other
   session's code — but it looks accidental. Yours to remove or keep.
+- 2026-08-22 — Session B FIXED the red `tests/holidays.test.mjs` (Session A's
+  feature). `upcomingHolidays` built its `iso` with `when.toISOString()`, but
+  `when` is a LOCAL midnight — in Asia/Jerusalem that converts back a day, so
+  every holiday came out one day early (Rosh Hashana 11.9 instead of 12.9). The
+  Hebrew lookup was always correct; only the formatting was wrong. Added
+  `_localIso()` and used it at that one call site. Verified against ICU
+  directly: 2026-09-12 really is 1 Tishri 5787. All 4 tests pass.
+  I crossed into your file because main was red and the fix is two lines your
+  own tests already specified — say the word if you'd rather own it.
+  Related, NOT fixed (yours to judge): `sale/app.js:368` has the same pattern,
+  `new Date().toISOString().slice(0,10)` for "today". Between midnight and 03:00
+  Israel time that is yesterday. It feeds the AI request counter, so the impact
+  is small, but it is the same bug.
