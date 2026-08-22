@@ -81,6 +81,11 @@ const FALLBACK_SEQUENCE = ['gemini', 'deepseek', 'grok', 'cloudflare'];
 // right trade: a working answer from the next provider beats a raw error.
 const RETRIABLE = [404, 429, 401, 402, 403, 500, 502, 503];
 
+// The subset that is worth asking the SAME provider about again: a server that
+// hiccuped, not a server that said no. Quota, auth and missing-model failures
+// will answer identically the second time and only cost the caller the wait.
+const TRANSIENT = [500, 502, 503];
+
 const SSE_HEADERS = {
   'Content-Type': 'text/event-stream; charset=utf-8',
   'Cache-Control': 'no-cache',
@@ -506,6 +511,35 @@ export async function generate(env, opts) {
         { status: upstream.status, note: 'עובר לספק ' + order[i + 1] });
       try { await upstream.text(); } catch (e) {} // drain before next attempt
       continue;
+    }
+
+    // Nowhere left to fall to, and the failure looks transient. Try the same
+    // provider once more.
+    //
+    // The fallback chain only contains providers whose key is configured, so on
+    // a deployment with just GEMINI_API_KEY the chain is one link long and a
+    // passing 502 from Google reaches the customer as a dead bot. That is the
+    // shape of the 502s seen in testing — roughly one call in three during one
+    // run. Binding Workers AI would give the chain a second link and is the
+    // better fix, but it needs someone in the Cloudflare dashboard; this needs
+    // nobody, and a transient 502 does not usually repeat.
+    //
+    // Only genuine server hiccups: a 429 means the pool is spent and a second
+    // ask changes nothing, a 401/403/404 will fail identically, and retrying
+    // either would just spend the customer's time before the same error.
+    if (TRANSIENT.includes(upstream.status) && !opts._retried) {
+      await recordAiUse(env, label, 'fail', modelUsed,
+        { status: upstream.status, note: 'ניסיון שני מול אותו ספק' });
+      try { await upstream.text(); } catch (e) {}
+      await new Promise((r) => setTimeout(r, 700));
+      try {
+        const again = await callOnce(name, key, { ...opts, model: modelForThis, _retried: true });
+        if (!RETRIABLE.includes(again.status)) {
+          await recordAiUse(env, label, 'ok', modelUsed, { note: 'הצליח בניסיון השני' });
+          return normalize(name, again, !!opts.stream, { 'X-AI-Provider': name, 'X-AI-Retried': '1' });
+        }
+        upstream = again;
+      } catch (e) { /* keep the first response and report it below */ }
     }
 
     const headers = { 'X-AI-Provider': name };
