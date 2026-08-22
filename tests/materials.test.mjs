@@ -309,6 +309,63 @@ test('a charger job is reminded about מרירון, not מריכף', () => {
   assert.ok(!qs.some((q) => /מריכף/.test(q)), 'מריכף should not be a charger default');
 });
 
+// The real handoff: the approved characterisation CARD, then the product list.
+// The card is 14 question bullets and the list is 9 items, and the card used to
+// win — see the test below for why.
+const REAL_HANDOFF = `האפיון הושלם ואושר. תמחר את העבודה במלואה, עבודה + חומרים.
+
+כרטיס אפיון מאושר
+• מה בדיוק עושים? התקנת עמדת טעינה חדשה
+• סוג הנכס? בית פרטי דו-משפחתי
+• גודל החיבור הראשי הקיים? 3x25 אמפר
+• מרחק הלוח מהחניה? כ-25 מטר
+• סוג הקיר בנקודות המעבר? בטון מזוין
+• מי סוגר אחרי העבודה: טיח, צבע, ניקיון? סגירה גסה בלבד
+
+רשימת המוצרים שגובשה:
+• כבל N2XY 5x6 ממ"ר — כ-30 מטר כולל רזרבה
+• צינור מרירון 25 להגנה בתוואי החיצוני
+• צינור גמיש לבן PG 21 לפניות ליד הלוח והעמדה
+• ממסר פחת Type A-EV 4x40 30mA
+• מפסק פקט מוגן מים IP65 ליד העמדה`;
+
+test('the characterisation card does not get mistaken for the product list', () => {
+  // The handoff opens "תמחר את העבודה במלואה, עבודה + חומרים". A bare "חומרים"
+  // marker matched THAT, so everything after it — including the card's question
+  // bullets — was searched as products. The questions ate the budget and four
+  // of the six real items were never looked up at all.
+  const qs = extractItemQueries(REAL_HANDOFF);
+  assert.ok(qs.length <= 12, `${qs.length} queries — the card is leaking in`);
+  const joined = qs.join(' | ');
+  assert.ok(!/סוג הנכס|מי סוגר|סוג הקיר/.test(joined),
+    `card questions became product queries: ${joined}`);
+});
+
+test('every line of a real handoff BOM gets priced', () => {
+  const hits = searchMaterialsMulti(db, extractItemQueries(REAL_HANDOFF), 3, 45);
+  const must = [
+    ['כבל 5x6',   /5X6|5x6/],
+    ['מרירון',    /מרירון/],
+    ['PG 21',     /PG\s?21|EL-022/],
+    ['ממסר פחת',  /^ממסר פחת/],
+    ['פקט',       /פקט/],
+  ];
+  const missing = must.filter(([, rx]) => !hits.some((h) => rx.test(h.name))).map(([n]) => n);
+  assert.equal(missing.length, 0, `handoff items never looked up: ${missing.join(', ')}`);
+});
+
+test('the word that names the product beats the words that describe it', () => {
+  // "מפסק פקט מוגן מים IP65" returned a water-resistant HEATER: three
+  // description words outvoted the one word naming the part, and IP65 is a
+  // digit token a heater and a switch genuinely share. Rarity fixes it —
+  // "פקט" is in ~30 products, "מוגן" and "מים" in hundreds.
+  const hits = searchMaterials(db, 'מפסק פקט מוגן מים IP65 ליד העמדה', 6);
+  assert.ok(hits.some((h) => /פקט/.test(h.name)),
+    `no פקט in: ${hits.map((h) => h.name).join(' | ')}`);
+  assert.ok(!/תנור|חימום/.test(hits[0].name),
+    `top hit is a heater: ${hits[0].name}`);
+});
+
 test('a misspelling still finds the product', () => {
   // Hebrew typos are mostly homophone swaps (ח/כ, ט/ת, א/ע/ה) plus dropped
   // letters. Both classes are repaired against the catalog's own vocabulary.
