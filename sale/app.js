@@ -1641,6 +1641,13 @@ function placeBackButton() {
         // its start, the bell at its end. The bar they used to live in is then
         // an empty row, so it goes away entirely.
         h2.classList.add('has-ctx-btns');
+        // The title usually sits inside a wrapper div beside the subtitle, and a
+        // flex item is only as wide as its text: the bell's margin-auto then
+        // pushed it to the end of the WORDS instead of the end of the row, which
+        // is the "row that doesn't sit right" Stav kept seeing. Marked here
+        // rather than matched with :has() so the rule is deterministic.
+        const wrap = h2.parentElement;
+        if (wrap && wrap.classList.contains('section-header') === false) wrap.classList.add('ctx-title-wrap');
         if (btn.parentElement !== h2) h2.insertBefore(btn, h2.firstChild);
         if (bell && bell.parentElement !== h2) h2.appendChild(bell);
         btn.classList.add('in-title');
@@ -1649,6 +1656,7 @@ function placeBackButton() {
         // No visible heading on this screen (the chat on a phone): the strip
         // comes back, because the two controls still need somewhere to be.
         document.querySelectorAll('.section-header h2.has-ctx-btns').forEach((el) => el.classList.remove('has-ctx-btns'));
+        document.querySelectorAll('.ctx-title-wrap').forEach((el) => el.classList.remove('ctx-title-wrap'));
         if (btn.parentElement !== bar) bar.insertBefore(btn, bar.firstChild);
         if (bell && bell.parentElement !== bar) bar.appendChild(bell);
         btn.classList.remove('in-title');
@@ -9845,6 +9853,79 @@ function ensureSpec(proj) {
     return proj.spec;
 }
 
+// ── Every question starts on the standard answer ─────────────────────────────
+// Stav, 22/08: "תעשה שכל אחד יהיה מוגדר כבר להכי סטנדרטי." A blank checklist
+// asks fourteen questions before it will let anyone price anything, and the
+// answer to most of them is the same on most jobs. So the card opens already
+// filled with the common case (COVERAGE_DEFAULTS in coverage.js) and the work
+// becomes correcting what is different about THIS job — which is what the chat
+// is for, and which is a far smaller job than answering everything.
+//
+// Three rules keep that from becoming a lie:
+//   · a default never overwrites an answer from the user, the agent or a skip;
+//   · it is tagged "סטנדרט" in the card until someone confirms or changes it;
+//   · a critical one still standing prints as an assumption in the quote.
+function specDefaults(proj) {
+    const type = (proj && proj.spec && proj.spec.jobType) || 'generic';
+    const all = (typeof COVERAGE_DEFAULTS !== 'undefined' && COVERAGE_DEFAULTS) || {};
+    return all[type] || all.generic || {};
+}
+
+function applyStandardDefaults(proj) {
+    if (!proj) return 0;
+    const spec = ensureSpec(proj);
+    const defs = specDefaults(proj);
+    const fields = getChecklist(proj).fields || [];
+    let filled = 0;
+    // In checklist order, and re-testing showWhen as we go: a question whose
+    // premise is itself a default only becomes askable once that default is in.
+    fields.forEach((f) => {
+        if (!specFieldApplies(f, spec.answers)) return;
+        const a = spec.answers[f.id];
+        if (a && (a.skipped || (a.value !== '' && a.value != null))) return;
+        const val = defs[f.id];
+        if (val != null && val !== '') {
+            spec.answers[f.id] = { value: String(val), source: 'std', skipped: false };
+            filled++;
+            return;
+        }
+        // "אפשר לצרף תמונות של הלוח?" has no standard answer — but it is
+        // critical, and leaving it empty keeps the pricing gate shut on every
+        // new job, which is the friction all of this exists to remove. So the
+        // standard for those is the honest one: not checked yet. It counts as
+        // answered, it prints its authored assumption in the quote, and the card
+        // still shows the question waiting for a real answer.
+        if (f.critical) {
+            spec.answers[f.id] = { value: '', source: 'std', skipped: true };
+            filled++;
+        }
+    });
+    spec.stdFor = spec.jobType || 'generic';
+    return filled;
+}
+
+// Answers nobody has looked at yet. Drives the card's recommendation line and
+// the "confirm everything" button.
+function pendingStdFields(proj) {
+    const answers = (proj && proj.spec && proj.spec.answers) || {};
+    return (getChecklist(proj).fields || [])
+        .filter(f => specFieldApplies(f, answers) && answers[f.id] && answers[f.id].source === 'std');
+}
+
+// "עברתי על הכל, זה נכון" — turns the remaining defaults into real answers, so
+// the tags clear and the quote stops printing them as assumptions.
+function confirmStandardDefaults() {
+    const proj = projectsList.find(p => p.id === activeProjectId);
+    if (!proj) return;
+    const pending = pendingStdFields(proj);
+    pending.forEach(f => { proj.spec.answers[f.id].source = 'user'; });
+    touchProject(proj);
+    saveProjects();
+    renderSpecCard(proj);
+    updateSpecStrip(proj);
+    showToast(pending.length ? `${pending.length} שדות אושרו` : 'הכל כבר מאושר');
+}
+
 // Some questions only matter given another answer. Declared on the field as
 // `showWhen: {field, in:[...]}` so the condition is checklist data, not code.
 //
@@ -10006,7 +10087,10 @@ function setSpecJobType(type) {
     // disappears with no warning and no way back. So ask first · and only when
     // there is actually something to lose, since the agent sets the type on
     // almost every new job.
-    const answered = Object.keys(spec.answers || {}).length;
+    // Defaults are not work the user did, so switching type must not warn that
+    // "13 answers will be deleted" on a card he has never touched.
+    const answered = Object.keys(spec.answers || {})
+        .filter(id => (spec.answers[id] || {}).source !== 'std').length;
     if (answered) {
         const label = (allChecklists()[type] || GENERIC_CHECKLIST).label || type;
         if (!confirm(`מעבר ל"${label}" יחליף את רשימת השאלות, ו-${answered} התשובות שכבר מילאת יימחקו.\n\nאי אפשר לשחזר אותן אחר כך. להחליף?`)) {
@@ -10018,6 +10102,7 @@ function setSpecJobType(type) {
     spec.jobType = type;
     spec.answers = {};
     specEditingField = null;
+    applyStandardDefaults(proj);   // the new checklist opens on its own standard
     saveProjects();
     renderSpecCard(proj);
     updatePlanActionBar(proj);
@@ -10051,7 +10136,12 @@ function isUnknownAnswer(a) {
 // answered "I don't know". Both have to print their assumption.
 function needsAssumption(field, answers) {
     const a = answers[field.id];
-    return !!a && (a.skipped || isUnknownAnswer(a));
+    if (!a) return false;
+    // A default nobody confirmed is exactly what an assumption paragraph is
+    // for. Only the criticals print, or a quote would open with fourteen of
+    // them and the customer would read none.
+    if (a.source === 'std') return !!field.critical;
+    return a.skipped || isUnknownAnswer(a);
 }
 
 function specAssumptions(proj) {
@@ -10291,6 +10381,12 @@ function renderSpecCard(proj) {
     if (!project) { host.style.display = 'none'; return; }
 
     ensureSpec(project);
+    // Seeded here rather than at project creation so projects made before the
+    // standards existed also open filled in, and so a checklist swapped by the
+    // agent is seeded whichever path swapped it. Once per project per type.
+    if (project.spec.stdFor !== (project.spec.jobType || 'generic')) {
+        if (applyStandardDefaults(project)) saveProjects();
+    }
     const list = getChecklist(project);
     const answers = project.spec.answers;
     const cov = specCoverage(project);
@@ -10330,18 +10426,20 @@ function renderSpecCard(proj) {
         const done = !!a && !a.skipped && a.value !== '' && a.value != null;
         const skipped = !!a && a.skipped;
         const fromAi = done && a.source === 'ai';
+        const fromStd = (done || skipped) && a.source === 'std';
         const isOpen = specOpenField === f.id;
 
         // Answered → one line, the answer doing the talking, tap to change it.
         // Unless this is the one being changed right now, which needs its
         // control back — otherwise "tap to change it" changes nothing.
         if ((done || skipped) && !(isOpen && specEditingField === f.id)) {
-            return `<button type="button" class="spec-row answered ${done ? 'done' : 'skipped'}" data-field="${f.id}"
+            return `<button type="button" class="spec-row answered ${done ? 'done' : 'skipped'}${fromStd ? ' std' : ''}" data-field="${f.id}"
                     onclick="editSpecField('${f.id}')">
                 <i class="fa-solid ${done ? 'fa-circle-check' : 'fa-circle-half-stroke'} spec-dot" aria-hidden="true"></i>
                 <span class="spec-row-q">${escapeHtml(f.question)}</span>
                 <span class="spec-row-v">${skipped ? 'נבדוק בשטח' : escapeHtml(a.value)}</span>
                 ${fromAi ? '<span class="spec-ai-tag">הצעה</span>' : ''}
+                ${fromStd ? '<span class="spec-std-tag">סטנדרט</span>' : ''}
             </button>`;
         }
 
@@ -10400,6 +10498,7 @@ function renderSpecCard(proj) {
             </div>`;
     }).join('');
 
+    const stdLeft = pendingStdFields(project).length;
     const pct = cov.total ? Math.round((cov.answered / cov.total) * 100) : 0;
     const gateReady = cov.ready;
     const assumptionsNote = cov.assumptions.length
@@ -10413,6 +10512,12 @@ function renderSpecCard(proj) {
         <div class="spec-types" role="group" aria-label="סוג העבודה">${typeChips}</div>
         <div class="spec-bar" role="progressbar" aria-label="התקדמות האפיון"
             aria-valuenow="${cov.answered}" aria-valuemin="0" aria-valuemax="${cov.total}"><span style="width:${pct}%"></span></div>
+        ${stdLeft ? `<div class="spec-reco">
+            <p><b>${stdLeft} שדות ממולאים בברירת מחדל סטנדרטית</b>, כדי שאפשר יהיה לתמחר מיד.
+            ההמלצה: לעבור עליהם ולוודא, שדה אחד שלא מתאים לעבודה הזאת מזיז את המחיר.
+            מה שיישאר מסומן "סטנדרט" ייכתב בהצעה כהנחה.</p>
+            <button type="button" class="spec-reco-ok" onclick="confirmStandardDefaults()">עברתי, הכל נכון</button>
+        </div>` : ''}
         <div class="spec-rows">${rows}</div>
         ${deferredCount ? `<button type="button" class="spec-more" aria-expanded="${specShowAll}" onclick="toggleSpecShowAll()">
             ${specShowAll ? 'הסתר שדות לא-חובה' : `עוד ${deferredCount} שדות שמדייקים את המחיר`}
@@ -10426,6 +10531,8 @@ function renderSpecCard(proj) {
             <button type="button" class="spec-force" onclick="priceThisProject(true)">דלג ותמחר עכשיו, הכל יירשם כהנחות</button>`}
             ${cov.answered ? '<button type="button" class="spec-order" onclick="openFieldWorkOrder()"><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i> פקודת עבודה לשטח</button>' : ''}
         </div>`;
+
+    try { updateSpecToggleCount(project); } catch (e) {}
 }
 
 // The same characterization, printed for the person doing the work: what the
@@ -10563,6 +10670,7 @@ function toggleEstimatePanel(force, persist) {
     if (persist !== false) localStorage.setItem('sj_hide_estimate', hide ? '1' : '0');
     const btn = document.getElementById('btn-toggle-estimate');
     if (btn) btn.classList.toggle('active', !hide);
+    try { updateSpecToggleCount(); } catch (e) {}
 }
 
 // Switch the chat between the planning and pricing conversations.
@@ -10592,16 +10700,11 @@ function setChatMode(mode, projOverride) {
     // messages. Pricing is the other half of his sentence — "עשיתי את התמחור
     // ואני מבין שצריך את המסך בשמאל בשביל דיוק הסעיפים" — so there the card
     // opens on its own, unless he closed it and meant it.
-    if (mode === 'plan') {
-        toggleEstimatePanel(true, false);
-    } else {
-        // Null means he never chose, and pricing's default is open: the line
-        // items are the reason the card exists. '1' means he closed it here on
-        // purpose, and that survives.
-        const hide = localStorage.getItem('sj_hide_estimate') === '1';
-        toggleEstimatePanel(hide, false);
-        if (!hide) _explainPricingPanelOnce();
-    }
+    // Both conversations now sit beside the same one card. The estimate and the
+    // materials moved to the pricing screen with its table, so what is left
+    // here is the characterization — a place to be precise, not the way in.
+    // Folded unless he opened it himself, in which case that survives.
+    toggleEstimatePanel(localStorage.getItem('sj_hide_estimate') !== '0', false);
 
     renderChatHistory(proj);
     renderStageRail(proj);
@@ -10783,11 +10886,25 @@ function updateSpecStrip(proj) {
     const txt = document.getElementById('spec-strip-text');
     if (txt) {
         const missing = (cov.missingCritical || []).length;
+        const std = pendingStdFields(project).length;
         txt.textContent = missing
             ? `אפיון העבודה: ${cov.answered} מתוך ${cov.total} שדות, חסרים ${missing} קריטיים`
-            : `אפיון העבודה: ${cov.answered} מתוך ${cov.total} שדות`;
+            : std
+                ? `אפיון העבודה מוכן · ${std} שדות עדיין בברירת המחדל הסטנדרטית`
+                : `אפיון העבודה: ${cov.answered} מתוך ${cov.total} שדות`;
     }
     strip.hidden = false;
+}
+
+// The count on the toolbar button, so "כרטיס האפיון" says how much of it is
+// still standing on a standard nobody looked at.
+function updateSpecToggleCount(proj) {
+    const el = document.getElementById('spec-toggle-count');
+    if (!el) return;
+    const project = proj || projectsList.find(p => p.id === activeProjectId);
+    const n = project ? pendingStdFields(project).length : 0;
+    el.textContent = n ? ' · ' + n : '';
+    el.classList.toggle('has', !!n);
 }
 
 function openSpecFromChat() {
@@ -10797,16 +10914,6 @@ function openSpecFromChat() {
     if (card && window.matchMedia('(max-width: 860px)').matches) {
         card.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-}
-
-// Said once, the first time the pricing stage opens the card by itself, so the
-// panel arriving is an explanation rather than a surprise.
-function _explainPricingPanelOnce() {
-    try {
-        if (localStorage.getItem('sj_priced_panel_explained') === '1') return;
-        localStorage.setItem('sj_priced_panel_explained', '1');
-    } catch (e) { return; }
-    setTimeout(() => showToast('פתחתי את הצד: שם יושבים הסעיפים שמדייקים את המחיר'), 700);
 }
 
 // The two lists a job actually needs, asked for inside the conversation and
@@ -10942,6 +11049,7 @@ function applySpecPrefill(proj, responseText) {
         && !Object.keys(spec.answers).some(id => spec.answers[id].source === 'user')) {
         spec.jobType = parsed.jobType;
         spec.answers = {};
+        applyStandardDefaults(proj);
     }
     // Only ever names a project the user left blank, and only once.
     if (proj.autoName && typeof parsed.title === 'string') {

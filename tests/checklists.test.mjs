@@ -21,8 +21,14 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
 
 function loadChecklists() {
+    // coverage.js now declares two objects (the checklists and their standard
+    // defaults), so "everything between the first { and the last }" is no
+    // longer the checklists — it is both, with a stray `};\nconst … = {` in
+    // the middle. Cut the one that is being asked for.
     const src = read('sale/coverage.js');
-    return JSON.parse(src.slice(src.indexOf('{'), src.lastIndexOf('}') + 1));
+    const start = src.indexOf('{', src.indexOf('const COVERAGE_CHECKLISTS'));
+    const end = src.indexOf('\n};', start);
+    return JSON.parse(src.slice(start, end + 2));
 }
 
 const LISTS = loadChecklists();

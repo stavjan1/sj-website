@@ -15,9 +15,14 @@ import { createContext, runInContext } from 'node:vm';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const APP = readFileSync(join(ROOT, 'sale', 'app.js'), 'utf8');
-const CHECKLISTS = JSON.parse(
-  readFileSync(join(ROOT, 'sale', 'coverage.js'), 'utf8')
-    .replace(/^[\s\S]*?=\s*/, '').replace(/;\s*$/, ''));
+const COVERAGE_SRC = readFileSync(join(ROOT, 'sale', 'coverage.js'), 'utf8');
+// Cut the checklists object specifically: the file also declares the standard
+// defaults after it, so "from the first = to the last ;" now spans both.
+const cut = (name) => {
+  const start = COVERAGE_SRC.indexOf('{', COVERAGE_SRC.indexOf('const ' + name));
+  return JSON.parse(COVERAGE_SRC.slice(start, COVERAGE_SRC.indexOf('\n};', start) + 2));
+};
+const CHECKLISTS = cut('COVERAGE_CHECKLISTS');
 
 const multiFields = () => Object.entries(CHECKLISTS).flatMap(([job, v]) =>
   (v.fields || []).filter((f) => f.multi).map((f) => [job, f]));

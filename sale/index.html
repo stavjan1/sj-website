@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=354">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=355">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,11 +26,11 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=354">
-    <link rel="stylesheet" href="../assets/ui.css?v=354">
-    <link rel="stylesheet" href="css/shell.css?v=354">
-    <link rel="stylesheet" href="css/panels.css?v=354">
-    <link rel="stylesheet" href="css/pdf.css?v=354">
+    <link rel="stylesheet" href="../assets/tokens.css?v=355">
+    <link rel="stylesheet" href="../assets/ui.css?v=355">
+    <link rel="stylesheet" href="css/shell.css?v=355">
+    <link rel="stylesheet" href="css/panels.css?v=355">
+    <link rel="stylesheet" href="css/pdf.css?v=355">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -89,15 +89,15 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5z"/></svg>
                     <span>אפיון</span>
                 </button>
-                <button class="nav-btn mobile-core proj-tab" id="tab-create" onclick="switchTab('create')">
+                <button class="nav-btn mobile-core proj-tab" id="tab-pricing" onclick="switchTab('pricing')">
                     <b class="step-num">2</b>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M9 10v10"/></svg>
+                    <span>תמחור</span>
+                </button>
+                <button class="nav-btn mobile-core proj-tab" id="tab-create" onclick="switchTab('create')">
+                    <b class="step-num">3</b>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
                     <span>הצעה</span>
-                </button>
-                <button class="nav-btn proj-tab" id="tab-reports" onclick="switchTab('reports')">
-                    <b class="step-num">3</b>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 13l2 2 4-4"/></svg>
-                    <span>דוחות</span>
                 </button>
                 <div class="nav-proj-divider proj-tab"></div>
                 <button class="nav-btn" id="tab-clients" onclick="switchTab('clients')">
@@ -627,8 +627,8 @@
                                 <button type="button" class="btn btn-secondary btn-small" id="btn-regenerate" onclick="regenerateLastAnswer()" title="נסח מחדש את התשובה האחרונה">
                                     <i class="fa-solid fa-rotate"></i> נסה שוב
                                 </button>
-                                <button type="button" class="btn btn-secondary btn-small" id="btn-toggle-estimate" onclick="toggleEstimatePanel()" title="הצג/הסתר את כרטיס האפיון, האומדן ורשימת החומרים">
-                                    <i class="fa-solid fa-clipboard-check"></i> אפיון ואומדן
+                                <button type="button" class="btn btn-secondary btn-small" id="btn-toggle-estimate" onclick="toggleEstimatePanel()" title="פתיחה או קיפול של כרטיס האפיון">
+                                    <i class="fa-solid fa-clipboard-check"></i> כרטיס האפיון<span class="tge-count" id="spec-toggle-count"></span>
                                 </button>
                             </div>
                             <div class="chat-messages" id="chat-messages-log">
@@ -645,7 +645,7 @@
                             <button type="button" class="spec-strip" id="spec-strip" hidden onclick="openSpecFromChat()">
                                 <i class="fa-solid fa-clipboard-check" aria-hidden="true"></i>
                                 <span class="sst-text" id="spec-strip-text">אפיון העבודה</span>
-                                <span class="sst-go">פתיחה</span>
+                                <span class="sst-go">לדיוקים</span>
                             </button>
 
                             <!-- Shown only once the checklist is satisfied AND the list exists -->
@@ -711,8 +711,14 @@
                     <!-- Left Side: Estimate Summary Dashboard -->
                     <div class="preview-side" style="background-color: var(--bg-card);">
                         <div class="card-header">
+                            <!-- Stav, 22/08: the card folds away and the chat takes the screen.
+                                 It is where you go to be precise, not where you start. -->
+                            <button type="button" class="side-fold" id="spec-fold" onclick="toggleEstimatePanel(true)"
+                                title="קיפול כרטיס האפיון" aria-label="קיפול כרטיס האפיון">
+                                <i class="fa-solid fa-angles-left" aria-hidden="true"></i>
+                            </button>
                             <h3><i class="fa-solid fa-clipboard-check text-accent"></i> אפיון העבודה</h3>
-                            <p class="card-subtitle">מה שידוע על העבודה. השיחה ממלאת אותו, וכשהוא מלא אפשר לעבור לתמחור.</p>
+                            <p class="card-subtitle">הכל מתחיל בברירת מחדל סטנדרטית. השיחה מדייקת אותו, וכאן אפשר לתקן ידנית.</p>
                         </div>
                         <div class="card-body" style="overflow-y:auto; flex-grow:1; display:flex; flex-direction:column; gap:16px;">
 
@@ -2428,17 +2434,17 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/listcards.js?v=354"></script>
+    <script src="/assets/listcards.js?v=355"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=354"></script>
-    <script src="app.js?v=354"></script>
+    <script src="coverage.js?v=355"></script>
+    <script src="app.js?v=355"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=354"></script>
+    <script src="finance.js?v=355"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=354" defer></script>
-    <script src="/track.js?v=354" defer></script>
+    <script src="../assistant.js?v=355" defer></script>
+    <script src="/track.js?v=355" defer></script>
 </body>
 </html>

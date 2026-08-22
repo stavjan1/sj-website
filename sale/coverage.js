@@ -2228,3 +2228,160 @@ const COVERAGE_CHECKLISTS = {
         ]
     }
 };
+
+/* ── ברירות המחדל הסטנדרטיות ─────────────────────────────────────────────────
+   Stav, 22/08: "תעשה שכל אחד יהיה מוגדר כבר להכי סטנדרטי."
+
+   Every chips/number question in every checklist starts on the answer that is
+   true for most jobs — a 3×25 supply, foundation earthing, a ground-floor flat
+   with parking — so a new project is priceable the moment it opens instead of
+   after fourteen taps. The chat overrides them as it learns the real job; a tap
+   overrides them by hand; and anything still standing on a default is tagged
+   "סטנדרט" in the card, with the criticals among them printed as assumptions in
+   the customer's quote. A default nobody looked at is therefore visible in two
+   places rather than hidden in one.
+
+   Values are the chip TEXT, not its index: a chip reordered in the list above
+   must not silently change what a project assumes. A test asserts every value
+   here is still one of its field's chips.                                     */
+const COVERAGE_DEFAULTS = {
+    "panel": {
+        "job_scope": "החלפת לוח קיים על אותו חיבור",
+        "main_size": "3×25A",
+        "mount": "תחת הטיח (שקוע)",
+        "panel_size_fit": "עד 24 מקום · נכנס לפתח הקיים",
+        "earthing": "הארקת יסוד או פס השוואת פוטנציאלים תקין",
+        "modern_loads": "לא · צרכנים רגילים בלבד",
+        "equipment_supply": "בעל המקצוע מספק את הכל",
+        "existing_feed": "נחושת בחתך מתאים ובאורך מספיק",
+        "meter_seal": "המונה צמוד ללוח, הראשי אחרי המונה",
+        "property_type": "דירה בבניין משותף",
+        "circuit_marking": "סימון חלקי או ישן ולא אמין",
+        "site_logistics": "קומת קרקע או מעלית זמינה, חניה צמודה"
+    },
+    "points": {
+        "point_kind": "שקעים רגילים 16A",
+        "work_scope_type": "הוספת נקודות חדשות",
+        "points_count": "4 נקודות",
+        "points_layout": "חדר אחד, מסלול מסביב לחדר",
+        "existing_conduit": "אין צנרת · חציבה חדשה",
+        "wall_type": "בלוק / איטונג",
+        "panel_and_supply": "תלת-פאזי 3×25",
+        "work_window": "אין מגבלה · יום עבודה רצוף",
+        "hidden_infrastructure": "לא · קירות ורצפה רגילים",
+        "access_obstructions": "מיקום הנקודות פנוי לחלוטין"
+    },
+    "charger": {
+        "charger_power": "11kW תלת-פאזי (3×16A)",
+        "connection_size": "3×25 תלת-פאזי",
+        "earthing_system": "הארקת יסוד + פס הארקה נפרד בלוח",
+        "panel_state": "לוח מודרני עם פחת ו-8 מודולים פנויים",
+        "meter_source": "מונה הדירה/הבית",
+        "route_type": "יש צנרת ריקה או חוט משיכה עד החניה",
+        "distance_m": "15 מטר",
+        "private_meter": "לא",
+        "parking_context": "חניה פרטית צמודה לבית",
+        "site_access": "גישה חופשית וחניה צמודה לאזור העבודה",
+        "mounting": "קיר בטון"
+    },
+    "infra": {
+        "route_length_m": "15 מטר",
+        "route_method": "תעלה חיצונית או צינור גלוי על הקיר",
+        "route_surface": "גבס או בלוקים",
+        "cable_type": "כבל הזנה חד-פאזי (3 גידים)",
+        "end_structure": "מחסן, פרגולה או מבנה צמוד",
+        "materials_supply": "אני מספק הכל · חומר ועבודה",
+        "earthing_rcd": "לוח מודרני עם פחת ומאמ\"תים",
+        "power_shutdown": "אפשר להפסיק בכל שעה ביום העבודה",
+        "underground_infra": "אין חפירה בעבודה הזו",
+        "route_ownership_permits": "הלקוח בעל הנכס ומאשר את המסלול",
+        "clearing_and_restoration": "המסלול פנוי, נדרשת סתימה וכיסוי בלבד",
+        "site_logistics": "גישה ברכב עד המסלול, יש חשמל ומים"
+    },
+    "earthing": {
+        "scope_requested": "אלקטרודות + שוחת ביקורת",
+        "existing_system": "TN-C-S · הפרדת אפס והארקה בלוח (הנפוץ בישראל)",
+        "foundation_earthing_docs": "יש הארקת יסוד בלי תיעוד",
+        "open_ground_area": "כן, אדמה פתוחה ליד הלוח",
+        "distance_to_electrode": "10 מטר",
+        "route_type": "גלוי על הקיר או בתעלה קיימת",
+        "soil_type": "חמרה או אדמה חקלאית",
+        "water_pipes": "פלסטית (PEX/פוליאתילן)",
+        "bonding_points": "2 נקודות",
+        "circuits_without_ground": "0 מעגלים",
+        "manhole_access": "אין שוחה - צריך להתקין חדשה",
+        "resistance_report": "כן, דוח חתום לרשות/בודק",
+        "lightning_protection": "לא קיים",
+        "site_access": "באזור שלי, חניה נוחה"
+    },
+    "lighting": {
+        "fixtures_count": "6 גופים",
+        "fixture_type": "שקועים בגבס",
+        "existing_points": "כן – החלפה 1:1 בנקודות קיימות",
+        "ceiling_type": "גבס",
+        "work_height": "עד 3 מ' – סולם רגיל",
+        "fixtures_supply": "הלקוח מספק הכל",
+        "dimming_control": "לא – מפסק רגיל",
+        "outdoor_ip": "הכל בפנים",
+        "emergency_lighting": "לא נדרש",
+        "old_fixtures_removal": "פירוק – הלקוח מפנה",
+        "panel_feed": "יש מעגל קיים ומספיק",
+        "cable_route_meters": "0 מטר",
+        "site_condition": "דירה מאוכלסת עם ריהוט",
+        "site_access": "באזור שלי, חניה נוחה"
+    },
+    "solar": {
+        "roof_type": "בטון – גג שטוח",
+        "system_size_kw": "10 kWp",
+        "existing_connection": "תלת-פאזי 3x25A",
+        "roof_access": "גישה חופשית ברכב + סולם/מדרגות",
+        "route_meters": "15 מטר",
+        "meter_scheme": "מונה נטו · קיזוז מול הצריכה שלך",
+        "roof_orientation_tilt": "גג שטוח – נדרשת קונסטרוקציה",
+        "shading": "אין הצללה",
+        "panel_space": "יש 4 מקומות פנויים ומעלה",
+        "earthing": "הארקת יסוד תקינה + פס השוואת פוטנציאלים",
+        "roof_condition": "גג חדש / תקין ואטום",
+        "licensing": "המבצע מטפל בהכול",
+        "monitoring": "יש WiFi יציב באזור האינוורטר",
+        "site_access": "באזור שלי, חניה נוחה"
+    },
+    "inspection": {
+        "report_purpose": "מכירה / העברת בעלות",
+        "inspection_scope": "דוח ליקויים בלבד",
+        "property_type": "דירה",
+        "panels_count": "1 לוחות",
+        "power_shutdown": "ניתוק קצר בלבד, עד שעה",
+        "circuits_range": "עד 12 מעגלים",
+        "connection_type": "תלת-פאזי 3x25 עד 3x40",
+        "documentation": "אין שום תיעוד",
+        "circuit_mapping": "סימון חלקי או שגוי",
+        "report_format": "דוח מפורט עם תמונות וחתימה",
+        "measurements_scope": "סט הבדיקות המלא (רציפות הארקה, בידוד, פחת, עכבת לולאת תקלה)",
+        "access_conditions": "גישה חופשית לכל הלוחות",
+        "urgency": "תוך שבוע",
+        "site_access": "באזור שלי, חניה נוחה"
+    },
+    "fault": {
+        "symptom_type": "הפחת קופץ",
+        "fault_scope": "מעגל אחד · חדר/אזור",
+        "fault_frequency": "חוזרת כל יום/כמה ימים",
+        "repair_scope": "איתור + תיקון קטן במקום",
+        "access_suspect": "צנרת קיימת · אפשר למשוך חוט",
+        "trigger_appliance": "לא · קופץ בלי קשר למכשיר",
+        "already_tried": "העלינו/הורדנו מפסקים בלוח",
+        "panel_age": "לוח בן 10-25 שנה",
+        "property_type": "דירה בבניין",
+        "recent_works": "לא, שום דבר",
+        "moisture_signs": "אין רטיבות",
+        "power_shutdown": "ניתוק קצר בלבד (מקרר/מקפיא)",
+        "availability_window": "כל היום"
+    },
+    "generic": {
+        "site_type": "דירה",
+        "access": "נוחה",
+        "who_supplies": "אני מספק הכל",
+        "schedule": "שעות עבודה רגילות",
+        "finish_work": "סגירה גסה בלבד"
+    }
+};

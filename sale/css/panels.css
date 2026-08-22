@@ -3791,6 +3791,9 @@ i[class^="fa-"], i[class*=" fa-"] {
     font: 500 var(--fs-xs)/1.3 var(--font-ui); color: var(--accent);
 }
 .spec-strip:hover { border-color: var(--accent); }
+/* `hidden` is an attribute, `display:flex` is a rule, and the rule was winning:
+   the invitation stayed on screen with the card already open beside it. */
+.spec-strip[hidden] { display: none !important; }
 .spec-strip i { font-size: 12px; }
 .sst-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sst-go { flex: none; font-weight: 700; }
@@ -4073,3 +4076,100 @@ i[class^="fa-"], i[class*=" fa-"] {
 .fin-locked p { color: var(--text-2); }
 .fin-locked ul { margin: var(--sp-3) 0 var(--sp-4); padding-inline-start: var(--sp-4); color: var(--text-2); display: grid; gap: var(--sp-1); }
 .fin-locked-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+
+/* ============================================================================
+   Wave: two screens, continued (Stav 22/08 evening)
+   ---------------------------------------------------------------------------
+   1. the title row reaches both ends of the screen
+   2. the characterization card folds away, and says what is still standard
+   ============================================================================ */
+
+/* 1 · The row at the top. The title lives in a wrapper beside its subtitle, and
+   a shrink-to-fit flex item ends where its words end: the bell was landing in
+   the middle of the row rather than at its far edge. */
+.section-header > .ctx-title-wrap { flex: 1 1 auto; min-width: 0; }
+.section-header h2.has-ctx-btns { width: 100%; }
+
+/* The project bar above it, same story: everything crowded at the start and
+   700px of nothing after it. The client now anchors the far end, so the row is
+   held at both edges, and its inline padding lines up with the panel below
+   instead of sitting eight pixels off. */
+#project-banner { padding-inline: var(--sp-6); min-height: 44px; }
+#project-banner .banner-client { margin-inline-start: auto; }
+#project-banner #banner-sync-indicator { margin-inline-start: var(--sp-3); }
+
+/* 2 · Folding the card away. It is where you go to be precise; the conversation
+   is where you start. */
+.preview-side .card-header { position: relative; padding-inline-start: 46px; }
+.side-fold {
+    position: absolute; inset-block-start: var(--sp-3); inset-inline-start: var(--sp-3);
+    width: 30px; height: 30px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-sm);
+    color: var(--text-3); cursor: pointer;
+}
+.side-fold:hover { color: var(--text); border-color: var(--accent); }
+.side-fold svg, .side-fold i { font-size: 13px; }
+
+/* The way back in, on the toolbar button, carrying how much of the card is
+   still standing on a default nobody has looked at. */
+.tge-count { font-variant-numeric: tabular-nums; }
+.tge-count.has { color: var(--accent); font-weight: 700; }
+
+/* Standard answers: filled in, but not confirmed by anyone. Tagged rather than
+   silently green, and the recommendation says plainly what to do about them. */
+.spec-std-tag {
+    flex: none; padding: 1px 7px; border-radius: var(--r-pill);
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text-3); font-size: 10px; font-weight: 600;
+}
+.spec-row.answered.std .spec-dot { color: var(--text-3); }
+.spec-reco {
+    display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2);
+    margin-block-end: var(--sp-3); padding: var(--sp-3);
+    background: var(--accent-soft); border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+}
+.spec-reco p { margin: 0; color: var(--text-2); font-size: var(--fs-xs); line-height: 1.6; }
+.spec-reco b { color: var(--text); }
+.spec-reco-ok {
+    flex: none; min-height: 32px; padding: 0 var(--sp-3);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-pill);
+    color: var(--text); font: 600 var(--fs-xs) var(--font-ui); cursor: pointer;
+}
+.spec-reco-ok:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Phone: while a project is open the bar IS the project — home, the list, and
+   its three steps. The other destinations are a tap away through them, and a
+   nine-icon bar at 390px is a row of unreadable slivers. */
+@media (max-width: 768px) {
+    body.in-project #tab-clients,
+    body.in-project #tab-money,
+    body.in-project #tab-pro,
+    body.in-project #tab-catalog { display: none; }
+    /* The toolbar carries the model pills and the daily meter now, and on a
+       phone they need their own line rather than a horizontal scroll. */
+    .chat-toolbar { flex-wrap: wrap; }
+    .chat-toolbar .model-quota-bar { flex: 1 1 100%; }
+}
+
+/* Phone: the conversation is the screen, so everything around it gets thin.
+   The toolbar was 126px and the invitation to price another 146, which left
+   113px of actual chat. */
+@media (max-width: 768px) {
+    .quota-meter { min-width: 0; max-width: none; gap: 3px; }
+    .quota-meter .qm-note { display: none; }
+    .quota-meter .qm-label { font-size: 10px; }
+    .quota-meter .qm-count { font-size: var(--fs-xs); }
+    /* Rephrasing the answer rather than repeating the question: the toolbar has
+       one number on it and it is obvious which. */
+    .chat-toolbar #btn-regenerate { display: none; }
+    .chat-toolbar .model-quota-bar { gap: var(--sp-2); }
+    .plan-action-bar { flex-wrap: nowrap; }
+    .plan-action-bar .pab-q { font-size: var(--fs-xs); }
+    .plan-action-bar .pab-btns { flex-wrap: nowrap; }
+    .plan-action-bar .pab-btns .btn { white-space: nowrap; }
+    /* "עוד לא · יש מה להוסיף" is the same as carrying on typing, and on a phone
+       it costs a whole line to say so. */
+    .plan-action-bar .pab-btns .btn-secondary { display: none; }
+}

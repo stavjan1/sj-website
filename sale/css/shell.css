@@ -234,3 +234,12 @@ body:not(.in-project-stage) .project-rail { display: none !important; }
 @media (min-width: 769px) {
   .nav-more-btn { display: flex; } /* "more" now exists on desktop too */
 }
+
+/* The three project steps had two homes at once: the floating rail and this
+   sidebar, one above לקוחות/כסף/PRO. Stav, 22/08: "עדין נפתחים ה3 תמחור וזה
+   בלשונית צד… תבטל את ההופעה של הדבר הזה." So wherever the rail exists, the
+   sidebar keeps out of it; narrower than that the rail is gone and these are
+   the only way between the stages, so there they stay. */
+@media (min-width: 861px) {
+  .proj-tab { display: none !important; }
+}
