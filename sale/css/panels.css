@@ -3474,7 +3474,7 @@ i[class^="fa-"], i[class*=" fa-"] {
        automatic minimum is the widest child's min-content, so one long draft
        sentence in here stretched every project card past the screen edge. */
     min-width: 0;
-    margin-block-start: var(--sp-5);
+    margin-block-start: var(--sp-4);
     border: 1px dashed var(--border);
     border-radius: var(--r-md);
     background: color-mix(in srgb, var(--surface-2) 55%, transparent);
@@ -3522,4 +3522,95 @@ i[class^="fa-"], i[class*=" fa-"] {
 
 @media (max-width: 560px) {
     .ss-note { display: none; }
+}
+
+#projects-view-maint { max-width: 1000px; min-width: 0; }
+
+/* ============================================================================
+   Periodic service, as a view of the works list.
+   The screen explains itself first: this is the tab you land on rarely, and
+   the whole point of it is a promise about the future.
+   ============================================================================ */
+.maint-welcome {
+    border: 1px solid var(--border);
+    border-inline-start: 3px solid var(--accent);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    padding: var(--sp-4) var(--sp-6);
+    margin-block-end: var(--sp-4);
+}
+.maint-welcome h3 {
+    margin: 0 0 var(--sp-2);
+    font: 700 var(--fs-lg)/1.25 var(--font-display);
+    color: var(--text);
+}
+.maint-welcome p { margin: 0; font-size: var(--fs-sm); line-height: 1.65; color: var(--text-2); }
+.maint-welcome .mw-fine { margin-block-start: var(--sp-2); font-size: var(--fs-xs); color: var(--text-3); }
+
+.maint-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-block-end: var(--sp-4); }
+
+.maint-list { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
+.maint-card {
+    display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+    min-width: 0;
+}
+.maint-card.is-due { border-color: var(--warn-text); }
+.maint-open {
+    flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+    background: none; border: none; cursor: pointer; text-align: start; padding: 0;
+}
+.mc-name { font: 600 var(--fs-sm) var(--font-ui); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-client { font-size: var(--fs-xs); color: var(--text-3); }
+.maint-when { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; flex: none; }
+.mc-date { font: 600 var(--fs-sm) var(--font-ui); color: var(--text-2); }
+.mc-rel { font-size: var(--fs-xs); color: var(--text-3); }
+.maint-card.is-due .mc-rel { color: var(--warn-text); font-weight: 600; }
+.maint-row-actions { display: flex; gap: var(--sp-2); flex: none; }
+
+.maint-empty {
+    border: 1px dashed var(--border); border-radius: var(--r-md);
+    padding: var(--sp-6); text-align: center; color: var(--text-2);
+}
+.maint-empty p { margin: 0; font-size: var(--fs-sm); }
+.maint-empty .me-sub { margin-block-start: var(--sp-2); font-size: var(--fs-xs); color: var(--text-3); }
+
+/* The installations list that predates all this. Folded, and honest about
+   what it is. */
+.ck-legacy {
+    margin-block-start: var(--sp-6);
+    border: 1px dashed var(--border); border-radius: var(--r-md);
+    background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+    min-width: 0;
+}
+.ck-legacy > summary {
+    display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-4); cursor: pointer; list-style: none;
+    font: 600 var(--fs-sm)/1.3 var(--font-ui); color: var(--text-2);
+}
+.ck-legacy > summary::-webkit-details-marker { display: none; }
+.ck-legacy[open] .ss-caret { transform: rotate(180deg); }
+.ck-legacy-note { font: 400 var(--fs-xs)/1.3 var(--font-ui); color: var(--text-3); }
+.ck-legacy #ck-legacy-body { padding: 0 var(--sp-3) var(--sp-4); }
+
+/* Picker: which existing work comes back */
+.mp-list { display: flex; flex-direction: column; gap: 2px; max-height: 50vh; overflow-y: auto; margin-block: var(--sp-3); }
+.mp-row {
+    display: flex; align-items: baseline; gap: var(--sp-3); min-width: 0;
+    background: none; border: 1px solid transparent; border-radius: var(--r-sm);
+    padding: var(--sp-2) var(--sp-3); cursor: pointer; text-align: start;
+}
+.mp-row:hover { background: var(--surface-2); border-color: var(--border); }
+.mp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font: 500 var(--fs-sm) var(--font-ui); color: var(--text); }
+.mp-meta { flex: none; font-size: var(--fs-xs); color: var(--text-3); }
+
+/* Client list filters: the same chips as the subtabs, one row above the list */
+.client-filters { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-block-end: var(--sp-3); }
+
+@media (max-width: 560px) {
+    .ck-legacy-note { display: none; }
+    .maint-card { gap: var(--sp-2); }
+    .maint-row-actions { flex-basis: 100%; }
 }

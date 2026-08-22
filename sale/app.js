@@ -1604,19 +1604,157 @@ function updateBackButton() {
 // panel now, and the old tab names still work so every deep link, reminder
 // and toast that says switchTab('checkups') lands where it always did.
 // ==========================================================================
-function setClientsView(view) {
-    const list = document.getElementById('clients-view-list');
-    const chk = document.getElementById('clients-view-checkups');
-    if (!list || !chk) return;
-    const onChk = view === 'checkups';
-    list.hidden = onChk;
-    chk.hidden = !onChk;
-    document.querySelectorAll('#panel-clients .subtab').forEach((b) => {
-        const on = b.dataset.sub === (onChk ? 'checkups' : 'list');
+// ── Two views of the work list ──────────────────────────────────────────────
+//
+// Periodic service used to be a tab under "לקוחות", which put it one subject
+// away from the thing it is actually about: a project that comes back. It is a
+// view of the works list now, next to "כל העבודות" (Stav, 22/08).
+let projectsTab = 'all';
+
+function setProjectsTab(view) {
+    const all = document.getElementById('projects-view-all');
+    const maint = document.getElementById('projects-view-maint');
+    if (!all || !maint) return;
+    projectsTab = view === 'maint' ? 'maint' : 'all';
+    const onMaint = projectsTab === 'maint';
+    all.hidden = onMaint;
+    maint.hidden = !onMaint;
+    document.querySelectorAll('#panel-projects .subtabs .subtab').forEach((b) => {
+        const on = b.dataset.pv === projectsTab;
         b.classList.toggle('active', on);
         b.setAttribute('aria-selected', String(on));
     });
-    try { onChk ? renderCheckups() : renderClientArchive(); } catch (e) {}
+    try {
+        if (onMaint) { renderMaintenanceProjects(); try { renderCheckups(); } catch (e) {} }
+        else filterProjectsList();
+    } catch (e) {}
+}
+
+// The badge counts what needs a hand: a maintenance visit inside its lead time,
+// plus whatever the old installations list says is due.
+function updateMaintCount() {
+    const el = document.getElementById('projects-maint-count');
+    if (!el) return;
+    let n = (projectsList || []).filter((p) => projectRepeats(p) && maintIsDue(p)).length;
+    try { n += (typeof ckDueSoonClients === 'function' ? ckDueSoonClients() : []).length; } catch (e) {}
+    el.textContent = n > 99 ? '99+' : String(n);
+    el.hidden = !n;
+}
+
+function maintIsDue(p) {
+    const next = p && p.maintenance && p.maintenance.next;
+    if (!next) return false;
+    const days = Math.round((Date.parse(next) - Date.now()) / 86400000);
+    const leads = maintLeadsFor(p);
+    const window_ = leads.length ? Math.max.apply(null, leads) : 30;
+    return days <= window_;
+}
+
+function renderMaintenanceProjects() {
+    const box = document.getElementById('maint-list');
+    if (!box) return;
+    const list = (projectsList || []).filter(projectRepeats)
+        .sort((a, b) => String(a.maintenance.next).localeCompare(String(b.maintenance.next)));
+    updateMaintCount();
+
+    if (!list.length) {
+        box.innerHTML = `
+            <div class="maint-empty">
+                <p>אין כאן עדיין עבודה אחת.</p>
+                <p class="me-sub">כל עבודה יכולה להפוך לכזו: פותחים אותה, לוחצים "תזכיר לי לחזור", ובוחרים כל כמה זמן.</p>
+            </div>`;
+        return;
+    }
+
+    box.innerHTML = list.map((p) => {
+        const m = p.maintenance || {};
+        const days = Math.round((Date.parse(m.next) - Date.now()) / 86400000);
+        const when = days < 0 ? `עבר לפני ${Math.abs(days)} ימים`
+            : days === 0 ? 'היום'
+            : days === 1 ? 'מחר'
+            : `בעוד ${days} ימים`;
+        const client = (p.quoteData && p.quoteData.clientName) || (projectClient(p) || {}).name || '';
+        return `
+            <div class="maint-card${maintIsDue(p) ? ' is-due' : ''}">
+                <button type="button" class="maint-open" onclick="loadProject('${p.id}')">
+                    <span class="mc-name">${escapeHtml(p.name)}</span>
+                    ${client ? `<span class="mc-client">${escapeHtml(client)}</span>` : ''}
+                </button>
+                <div class="maint-when">
+                    <span class="mc-date">${escapeHtml(formatHebrewDate(m.next))}</span>
+                    <span class="mc-rel">${escapeHtml(when)}</span>
+                </div>
+                <div class="maint-row-actions">
+                    <button type="button" class="btn btn-secondary btn-small" onclick="openMaintenanceDialog('${p.id}')">
+                        כל ${escapeHtml(String(m.months || 12))} חודשים
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-small" onclick="maintStop('${p.id}')" title="הפסקת המעקב">
+                        הסר
+                    </button>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+// New work that is a maintenance job from the start: open a project, and ask
+// the interval question as soon as it exists.
+function startMaintenanceProject() {
+    createNewProject({});
+    if (activeProjectId) setTimeout(() => openMaintenanceDialog(activeProjectId), 300);
+}
+
+// "Pull an existing project in": the same dialog, reached from here instead of
+// from the card, because this is the screen you are on when you think of it.
+function openMaintPicker() {
+    const free = (projectsList || []).filter((p) => !projectRepeats(p));
+    if (!free.length) { showToast('כל העבודות כבר במעקב תחזוקה'); return; }
+    const old = document.getElementById('maint-picker');
+    if (old) old.remove();
+    const dlg = document.createElement('dialog');
+    dlg.id = 'maint-picker';
+    dlg.className = 'ck-dialog';
+    dlg.innerHTML = `
+        <h3>איזו עבודה חוזרת?</h3>
+        <p class="input-help">בוחרים עבודה, ואז קובעים כל כמה זמן לחזור אליה.</p>
+        <div class="mp-list">
+            ${free.map((p) => `
+                <button type="button" class="mp-row" onclick="maintPick('${p.id}')">
+                    <span class="mp-name">${escapeHtml((p.autoName && p.name === 'פרויקט חדש') ? draftPreview(p) : p.name)}</span>
+                    <span class="mp-meta">${escapeHtml(formatHebrewDate(p.created))}</span>
+                </button>`).join('')}
+        </div>
+        <div class="ck-dialog-actions">
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('maint-picker').close()">ביטול</button>
+        </div>`;
+    document.body.appendChild(dlg);
+    dlg.showModal();
+}
+
+function maintPick(projectId) {
+    const dlg = document.getElementById('maint-picker');
+    if (dlg) { dlg.close(); dlg.remove(); }
+    openMaintenanceDialog(projectId);
+}
+
+// ── The clients list, filtered ───────────────────────────────────────────────
+// Not a screen per filter: one list, three ways to look at it.
+let clientFilter = 'all';
+
+function setClientFilter(f) {
+    clientFilter = ['maint', 'repeat'].includes(f) ? f : 'all';
+    document.querySelectorAll('#client-filters .subtab').forEach((b) => {
+        const on = b.dataset.cf === clientFilter;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', String(on));
+    });
+    try { renderClientArchive(); } catch (e) {}
+}
+
+// Old callers said setClientsView('checkups'); periodic service lives in the
+// works list now, so send them there instead of leaving a dead button.
+function setClientsView(view) {
+    if (view === 'checkups') { switchTab('projects'); setProjectsTab('maint'); return; }
+    try { renderClientArchive(); } catch (e) {}
 }
 
 function setMoneyView(view) {
@@ -1635,20 +1773,12 @@ function setMoneyView(view) {
 }
 
 // How many clients are due, the number on the "שירות תקופתי" view.
-function updateClientsDueCount() {
-    const el = document.getElementById('clients-due-count');
-    if (!el) return;
-    let n = 0;
-    try { n = (typeof ckDueSoonClients === 'function' ? ckDueSoonClients() : []).length; } catch (e) { n = 0; }
-    el.textContent = n > 99 ? '99+' : String(n);
-    el.hidden = !n;
-}
 
 function switchTab(tabId, opts) {
     // Old names, new homes. Every existing caller keeps working.
     let subView = null;
     if (tabId === 'archive') { tabId = 'clients'; subView = 'list'; }
-    else if (tabId === 'checkups') { tabId = 'clients'; subView = 'checkups'; }
+    else if (tabId === 'checkups') { tabId = 'projects'; subView = 'maint'; }
     else if (tabId === 'accounting') { tabId = 'money'; subView = 'docs'; }
     else if (tabId === 'finance') { tabId = 'money'; subView = 'flow'; }
 
@@ -1736,8 +1866,10 @@ function switchTab(tabId, opts) {
         renderHome();
     }
     if (tabId === 'clients') {
-        setClientsView(subView || 'list');
-        updateClientsDueCount();
+        setClientFilter(clientFilter);
+    }
+    if (tabId === 'projects') {
+        setProjectsTab(subView === 'maint' ? 'maint' : 'all');
     }
     if (tabId === 'money') {
         setMoneyView(subView || 'docs');
@@ -1756,6 +1888,13 @@ function switchTab(tabId, opts) {
 function _clientKey(name) {
     return String(name || '').trim().toLowerCase().replace(/\s+/g, ' ') || '—';
 }
+function _setCfCount(id, n) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = n > 99 ? '99+' : String(n);
+    el.hidden = !n;
+}
+
 function renderClientArchive() {
     const box = document.getElementById('archive-list');
     if (!box) return;
@@ -1788,11 +1927,24 @@ function renderClientArchive() {
 
     let list = Object.values(groups);
     if (q) list = list.filter(g => g.client.toLowerCase().includes(q) || (g.contact || '').toLowerCase().includes(q));
+
+    // Two ways of asking "who is worth a phone call": someone with a job that
+    // comes back, and someone who has already come back more than once.
+    const byId = new Map((projectsList || []).map((p) => [p.id, p]));
+    const underMaint = (g) => g.quotes.some((x) => projectRepeats(byId.get(x.projectId)));
+    const isRepeat = (g) => g.quotes.length > 1;
+    _setCfCount('cf-count-maint', list.filter(underMaint).length);
+    _setCfCount('cf-count-repeat', list.filter(isRepeat).length);
+    if (clientFilter === 'maint') list = list.filter(underMaint);
+    else if (clientFilter === 'repeat') list = list.filter(isRepeat);
     // Most recent client first (by their newest quote date).
     list.sort((a, b) => (b.quotes[0]?.date || '').localeCompare(a.quotes[0]?.date || ''));
 
     if (list.length === 0) {
-        box.innerHTML = `<div class="archive-empty">${q ? 'לא נמצא לקוח בשם הזה.' : 'עדיין אין לקוחות בארכיון. כל פרויקט שתיצור יופיע כאן, מקובץ לפי לקוח.'}</div>`;
+        const noneMsg = clientFilter === 'maint' ? 'אף לקוח לא נמצא תחת תחזוקה. אפשר לסמן עבודה כחוזרת בלשונית "שירות תקופתי".'
+            : clientFilter === 'repeat' ? 'עדיין אין לקוח שחזר יותר מפעם אחת.'
+            : 'עדיין אין לקוחות.';
+        box.innerHTML = `<div class="archive-empty">${q ? 'לא נמצא לקוח בשם הזה.' : escapeHtml(noneMsg)}</div>`;
         return;
     }
 
@@ -2704,6 +2856,7 @@ function filterProjectsList() {
     renderProjectsList(filtered);
     updateMetricsDashboard();
     renderFollowupReminders();
+    try { updateMaintCount(); } catch (e) {}
 }
 
 // ── Linking a project to a real client ───────────────────────────────────────
@@ -3991,6 +4144,21 @@ function maintSave() {
     filterProjectsList();
     dlg.close();
     showToast('נקבע, ' + ckFmtDate(next) + ' · תזכורת ' + maintLeadLabel(maintLeadsFor(proj)) + ' לפני');
+}
+
+// Stop following a job from the periodic-service list, without opening the
+// dialog first: the row on that screen is where you decide it is over.
+function maintStop(projectId) {
+    const proj = projectsList.find((p) => p.id === projectId);
+    if (!proj) return;
+    if (!confirm(`להפסיק את המעקב אחרי "${proj.name}"? העבודה עצמה נשארת ברשימה.`)) return;
+    proj.kind = 'job';
+    proj.maintenance = null;
+    saveProjects();
+    renderMaintenanceProjects();
+    filterProjectsList();
+    try { renderReminderBell(); } catch (e) {}
+    showToast('המעקב הופסק');
 }
 
 function maintCancel() {

@@ -391,22 +391,26 @@ test('a rendered screen is actually reachable', () => {
     // renderClientArchive() targeted an element that did not exist and was
     // never called by anything. It read as a finished feature for weeks.
     //
-    // The archive is a VIEW inside לקוחות now rather than a panel of its own, so
-    // the guard follows the route it is actually reached by: the old tab name
-    // still resolves, and the view that opens runs the renderer.
+    // The archive is a VIEW inside לקוחות rather than a panel of its own, and
+    // periodic service is a view inside עבודות (Stav, 22/08: it is about
+    // projects that come back, not about clients). The guard follows the routes
+    // they are actually reached by: the old tab names still resolve, and the
+    // view that opens runs its renderer.
     const html = read('sale/index.html');
     const app = read('sale/app.js');
     const panels = [...html.matchAll(/id="panel-([a-z]+)"/g)].map((m) => m[1]);
     assert.ok(panels.includes('clients'), 'the clients panel is gone');
     assert.ok(panels.includes('money'), 'the money panel is gone');
     assert.match(html, /id="clients-view-list"/, 'the client archive view is gone');
-    assert.match(html, /id="clients-view-checkups"/, 'the periodic-service view is gone');
+    assert.match(html, /id="projects-view-maint"/, 'the periodic-service view is gone');
+    assert.match(html, /id="ck-legacy-body"/, 'the installations list lost its home');
     assert.match(app, /tabId === 'archive'\) \{ tabId = 'clients'/,
         'the old archive tab name no longer resolves — deep links and reminders break silently');
-    assert.match(app, /tabId === 'checkups'\) \{ tabId = 'clients'/,
+    assert.match(app, /tabId === 'checkups'\) \{ tabId = 'projects'; subView = 'maint'/,
         'the old checkups tab name no longer resolves');
-    assert.match(app, /onChk \? renderCheckups\(\) : renderClientArchive\(\)/,
-        'opening a clients view no longer renders it');
+    assert.match(app, /if \(onMaint\) \{ renderMaintenanceProjects\(\); try \{ renderCheckups\(\); \} catch/,
+        'opening periodic service no longer renders it');
+    assert.match(app, /setClientFilter\(clientFilter\)/, 'opening the clients tab no longer renders the list');
 
     // The link that makes the grouping trustworthy.
     assert.match(app, /function projectClient/, 'projects can no longer name a real client');

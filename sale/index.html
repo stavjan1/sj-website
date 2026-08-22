@@ -204,13 +204,14 @@
             <section id="panel-clients" class="content-panel">
                 <div class="section-header">
                     <h2><i class="fa-solid fa-users" aria-hidden="true"></i> לקוחות</h2>
-                    <p class="section-subtitle">כל לקוח במקום אחד: הפרויקטים שלו, ומתי הבדיקה התקופתית הבאה.</p>
+                    <p class="section-subtitle">כל לקוח במקום אחד: מה עשית אצלו, כמה זה היה, ומי מהם חוזר.</p>
                 </div>
-                <div class="subtabs" role="tablist" aria-label="תצוגת לקוחות">
-                    <button type="button" class="subtab active" data-sub="list" role="tab" aria-selected="true" onclick="setClientsView('list')">כל הלקוחות</button>
-                    <button type="button" class="subtab" data-sub="checkups" role="tab" aria-selected="false" onclick="setClientsView('checkups')">
-                        שירות תקופתי <b class="sub-count" id="clients-due-count" hidden>0</b>
-                    </button>
+                <!-- One list, filtered. The periodic-service screen moved to
+                     "עבודות", where the projects it is about live. -->
+                <div class="client-filters" id="client-filters" role="tablist" aria-label="סינון לקוחות">
+                    <button type="button" class="subtab active" data-cf="all" role="tab" aria-selected="true" onclick="setClientFilter('all')">הכל</button>
+                    <button type="button" class="subtab" data-cf="maint" role="tab" aria-selected="false" onclick="setClientFilter('maint')">תחת תחזוקה <b class="sub-count" id="cf-count-maint" hidden>0</b></button>
+                    <button type="button" class="subtab" data-cf="repeat" role="tab" aria-selected="false" onclick="setClientFilter('repeat')">לקוחות חוזרים <b class="sub-count" id="cf-count-repeat" hidden>0</b></button>
                 </div>
                 <div id="clients-view-list">
                 <div class="history-controls">
@@ -221,7 +222,199 @@
                 </div>
                 <div class="archive-list" id="archive-list"></div>
             </div>
-                <div id="clients-view-checkups" hidden>
+
+            </section>
+
+            <!-- כסף — invoices, receipts and the cash view were two menu entries
+                 into the same subject. -->
+            <section id="panel-money" class="content-panel">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-shekel-sign" aria-hidden="true"></i> כסף</h2>
+                    <p class="section-subtitle">חשבוניות וקבלות, ומה נכנס בפועל: במקום אחד.</p>
+                </div>
+                <div class="subtabs" role="tablist" aria-label="תצוגת כסף">
+                    <button type="button" class="subtab active" data-sub="docs" role="tab" aria-selected="true" onclick="setMoneyView('docs')">חשבוניות וקבלות</button>
+                    <button type="button" class="subtab" data-sub="flow" role="tab" aria-selected="false" id="money-tab-flow" hidden onclick="setMoneyView('flow')">תזרים</button>
+                </div>
+                <div id="money-view-docs">
+                <div id="acct-root"><!-- populated by renderAccounting() --></div>
+            </div>
+                <div id="money-view-flow" hidden>
+                <div id="finance-root">
+                    <div class="empty"><h3>טוען נתונים…</h3></div>
+                </div>
+            </div>
+            </section>
+
+            <!-- The way in is a question, not a dashboard. Everything that used
+                 to greet you here — counters, toolbar, categories, the list — is
+                 one click away in "עבודות"; what is left is the only thing you
+                 actually arrived to do. -->
+            <section id="panel-home" class="content-panel active">
+                <div class="home-wrap">
+                    <div class="home-main">
+                        <h1 class="home-hi"><span id="home-greeting">שלום</span></h1>
+                        <p class="home-sub">מה העבודה שאתה מתמחר עכשיו?</p>
+                        <div class="home-ask">
+                            <textarea id="home-input" rows="1" placeholder="תאר את העבודה במילים שלך, למשל: החלפת לוח חשמל בדירת 4 חדרים"
+                                      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();startWorkFromHome();}"></textarea>
+                            <button type="button" class="home-send" id="home-send" onclick="startWorkFromHome()" aria-label="התחל">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                            </button>
+                            <p class="home-hint">Enter שולח, Shift+Enter שורה חדשה</p>
+                        </div>
+                        <div class="home-chips">
+                            <button type="button" class="chip" onclick="fillHomeExample(this)">התקנת עמדת טעינה 15 מטר מהלוח</button>
+                            <button type="button" class="chip" onclick="fillHomeExample(this)">החלפת לוח חשמל בדירת 4 חדרים</button>
+                            <button type="button" class="chip" onclick="fillHomeExample(this)">הוספת 6 נקודות חשמל בסלון</button>
+                            <button type="button" class="chip" onclick="fillHomeExample(this)">בדיקת תקלה · קצר במעגל</button>
+                        </div>
+                    </div>
+                    <aside class="home-side" aria-label="אחרונות">
+                        <div class="home-side-head">ממשיכים מאיפה שעצרת</div>
+                        <div class="home-recent" id="home-recent"></div>
+                        <button type="button" class="home-all" onclick="switchTab('projects')">כל העבודות ←</button>
+                    </aside>
+                </div>
+            </section>
+
+            <!-- Tab: Projects Manager -->
+            <section id="panel-projects" class="content-panel">
+                <div class="section-header">
+                    <h2><i class="fa-solid fa-folder-open"></i> ניהול פרויקטים</h2>
+                    <p class="section-subtitle">נהל את שלב התמחור והצעת המחיר לכל לקוח תחת פרויקט ייעודי.</p>
+                </div>
+                
+                <div class="subtabs" role="tablist" aria-label="תצוגת עבודות">
+                    <button type="button" class="subtab active" data-pv="all" role="tab" aria-selected="true" onclick="setProjectsTab('all')">כל העבודות</button>
+                    <button type="button" class="subtab" data-pv="maint" role="tab" aria-selected="false" onclick="setProjectsTab('maint')">
+                        שירות תקופתי <b class="sub-count" id="projects-maint-count" hidden>0</b>
+                    </button>
+                </div>
+
+                <div id="projects-view-all">
+                <div class="projects-layout">
+                <!-- CENTER: create merged with the list, list scrolls internally.
+                     The categories used to be a 210px rail on the right; they are
+                     a filter row above the list now — on an account with no
+                     categories yet that rail was an empty box taking a fifth of
+                     the width, and a filter belongs with what it filters. -->
+                <div class="projects-main">
+                    <!-- Handoff from the public /ask/ quick-chat: continue that job as a full project -->
+                    <div id="ask-handoff-banner"></div>
+                    <!-- Arrived from a calendar reminder (?p=<project>) — offers the
+                         two things you came to do instead of just naming the file -->
+                    <div id="maint-arrive"></div>
+
+                    <!-- Search + filter — only above the list -->
+                    <div class="project-search-row" style="margin-bottom:12px;">
+                        <div class="project-search-input-wrap">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="project-search-q" placeholder="חפש שם..." oninput="filterProjectsList()">
+                        </div>
+                        <!-- Two sort toggles: click to sort, click again to flip direction.
+                             The active one is highlighted and shows its arrow. -->
+                        <div class="sort-toggles" id="sort-toggles">
+                            <button type="button" class="sort-toggle active" data-field="date" onclick="toggleProjectSort('date')">
+                                תאריך <i class="fa-solid fa-arrow-down-long sort-arrow"></i>
+                            </button>
+                            <button type="button" class="sort-toggle" data-field="name" onclick="toggleProjectSort('name')">
+                                שם <i class="fa-solid fa-arrow-down-long sort-arrow"></i>
+                            </button>
+                        </div>
+                        <!-- Recurring work is a property of a project, not a screen of
+                             its own — so it is a filter here, next to the others. -->
+                        <button type="button" class="sort-toggle" id="repeat-filter" onclick="toggleRepeatFilter()" title="הצג רק עבודות שחוזרות">
+                            <i class="fa-solid fa-rotate"></i> חוזרים
+                        </button>
+                        <select id="project-status-filter" onchange="filterProjectsList()" class="project-filter-select">
+                            <option value="all">כל הסטטוסים</option>
+                            <option value="טיוטה">טיוטה</option>
+                            <option value="נשלח">נשלח</option>
+                            <option value="הושלם">הושלם</option>
+                        </select>
+                        <!-- Layout toggle: list rows vs. a compact grid of cards -->
+                        <div class="view-toggles" id="view-toggles">
+                            <button type="button" class="view-toggle active" data-view="list" onclick="setProjectsView('list')" title="תצוגת רשימה"><i class="fa-solid fa-list"></i></button>
+                            <button type="button" class="view-toggle" data-view="grid" onclick="setProjectsView('grid')" title="תצוגת קוביות"><i class="fa-solid fa-table-cells-large"></i></button>
+                            <button type="button" class="view-toggle" data-view="pipeline" onclick="switchTab('statistics')" title="תצוגת צינור · לפי שלב"><i class="fa-solid fa-diagram-project"></i></button>
+                        </div>
+                        <button type="button" class="view-toggle" onclick="openRecycleBin()" title="סל המחזור"><i class="fa-solid fa-trash-can-arrow-up"></i></button>
+                    </div>
+
+                    <!-- Follow-up nudges: quotes sent 3+ days ago with no answer -->
+                    <div id="followup-reminders"></div>
+                    <nav class="projects-cats" id="projects-cats" aria-label="סינון לפי קטגוריה"></nav>
+                    <div id="projects-list-container" class="projects-list">
+                        <!-- Dynamically loaded by script -->
+                    </div>
+                    <p class="projects-history-link" id="projects-history-link" hidden>
+                        <a href="#" onclick="switchTab('history'); return false;">כל ההצעות שהופקו · היסטוריה ←</a>
+                    </p>
+                </div>
+
+                <!-- LEFT: KPI stats stacked in a column -->
+                <aside class="projects-stats">
+                    <div class="metric-card">
+                        <div class="metric-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></svg></div>
+                        <div class="metric-info">
+                            <span class="metric-label">הצעות שנשלחו</span>
+                            <span class="metric-value" id="metric-sent-count">0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 5-5"/></svg></div>
+                        <div class="metric-info">
+                            <span class="metric-label">הצעות שאושרו</span>
+                            <span class="metric-value" id="metric-approved-count">0</span>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6 4v9a5 5 0 0 0 10 0"/><path d="M16 4v6"/><line x1="4" y1="21" x2="20" y2="21"/></svg></div>
+                        <div class="metric-info">
+                            <span class="metric-label">צבר אושר (₪)</span>
+                            <span class="metric-value" id="metric-approved-sum">0 ₪</span>
+                        </div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg></div>
+                        <div class="metric-info">
+                            <span class="metric-label">אחוז סגירה</span>
+                            <span class="metric-value" id="metric-conversion-rate">0%</span>
+                        </div>
+                    </div>
+                </aside>
+                </div>
+                </div><!-- /projects-view-all -->
+
+                <div id="projects-view-maint" hidden>
+                    <!-- The screen says what it is for before it says what is on it:
+                         this tab exists so a job that comes back once a year does
+                         not depend on anyone remembering it. -->
+                    <div class="maint-welcome">
+                        <h3>העבודות שחוזרות אליך</h3>
+                        <p>כאן יושבות העבודות שדורשות תחזוקה, כדי שתקבל תזכורת בזמן, ותחזור ללקוח עם הצעת מחיר חדשה לפני שהוא נזכר לחפש מישהו אחר.</p>
+                        <p class="mw-fine">כל עבודה שכאן מופיעה גם ברשימת העבודות המלאה. זו לא רשימה נפרדת, זו זווית עליה.</p>
+                    </div>
+
+                    <div class="maint-actions">
+                        <button type="button" class="btn btn-accent" onclick="startMaintenanceProject()">
+                            <i class="fa-solid fa-plus" aria-hidden="true"></i> עבודה חדשה לתחזוקה
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="openMaintPicker()">
+                            <i class="fa-solid fa-rotate" aria-hidden="true"></i> משיכת עבודה קיימת
+                        </button>
+                    </div>
+
+                    <div class="maint-list" id="maint-list"></div>
+
+                    <details class="ck-legacy">
+                        <summary>
+                            <span class="ss-caret" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+                            <span>רשימת מתקנים בבדיקה תקופתית</span>
+                            <span class="ck-legacy-note">הרשימה הישנה, לפי מתקן ולא לפי עבודה. נשמרת כאן עד שתעביר ממנה מה שרלוונטי.</span>
+                        </summary>
+                <div id="ck-legacy-body">
                 <div class="ck-stats" id="ck-stats"></div>
 
                 <div id="ck-due-strip"></div>
@@ -323,159 +516,7 @@
                     </div>
                 </dialog>
             </div>
-            </section>
-
-            <!-- כסף — invoices, receipts and the cash view were two menu entries
-                 into the same subject. -->
-            <section id="panel-money" class="content-panel">
-                <div class="section-header">
-                    <h2><i class="fa-solid fa-shekel-sign" aria-hidden="true"></i> כסף</h2>
-                    <p class="section-subtitle">חשבוניות וקבלות, ומה נכנס בפועל: במקום אחד.</p>
-                </div>
-                <div class="subtabs" role="tablist" aria-label="תצוגת כסף">
-                    <button type="button" class="subtab active" data-sub="docs" role="tab" aria-selected="true" onclick="setMoneyView('docs')">חשבוניות וקבלות</button>
-                    <button type="button" class="subtab" data-sub="flow" role="tab" aria-selected="false" id="money-tab-flow" hidden onclick="setMoneyView('flow')">תזרים</button>
-                </div>
-                <div id="money-view-docs">
-                <div id="acct-root"><!-- populated by renderAccounting() --></div>
-            </div>
-                <div id="money-view-flow" hidden>
-                <div id="finance-root">
-                    <div class="empty"><h3>טוען נתונים…</h3></div>
-                </div>
-            </div>
-            </section>
-
-            <!-- The way in is a question, not a dashboard. Everything that used
-                 to greet you here — counters, toolbar, categories, the list — is
-                 one click away in "עבודות"; what is left is the only thing you
-                 actually arrived to do. -->
-            <section id="panel-home" class="content-panel active">
-                <div class="home-wrap">
-                    <div class="home-main">
-                        <h1 class="home-hi"><span id="home-greeting">שלום</span></h1>
-                        <p class="home-sub">מה העבודה שאתה מתמחר עכשיו?</p>
-                        <div class="home-ask">
-                            <textarea id="home-input" rows="1" placeholder="תאר את העבודה במילים שלך, למשל: החלפת לוח חשמל בדירת 4 חדרים"
-                                      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();startWorkFromHome();}"></textarea>
-                            <button type="button" class="home-send" id="home-send" onclick="startWorkFromHome()" aria-label="התחל">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-                            </button>
-                            <p class="home-hint">Enter שולח, Shift+Enter שורה חדשה</p>
-                        </div>
-                        <div class="home-chips">
-                            <button type="button" class="chip" onclick="fillHomeExample(this)">התקנת עמדת טעינה 15 מטר מהלוח</button>
-                            <button type="button" class="chip" onclick="fillHomeExample(this)">החלפת לוח חשמל בדירת 4 חדרים</button>
-                            <button type="button" class="chip" onclick="fillHomeExample(this)">הוספת 6 נקודות חשמל בסלון</button>
-                            <button type="button" class="chip" onclick="fillHomeExample(this)">בדיקת תקלה · קצר במעגל</button>
-                        </div>
-                    </div>
-                    <aside class="home-side" aria-label="אחרונות">
-                        <div class="home-side-head">ממשיכים מאיפה שעצרת</div>
-                        <div class="home-recent" id="home-recent"></div>
-                        <button type="button" class="home-all" onclick="switchTab('projects')">כל העבודות ←</button>
-                    </aside>
-                </div>
-            </section>
-
-            <!-- Tab: Projects Manager -->
-            <section id="panel-projects" class="content-panel">
-                <div class="section-header">
-                    <h2><i class="fa-solid fa-folder-open"></i> ניהול פרויקטים</h2>
-                    <p class="section-subtitle">נהל את שלב התמחור והצעת המחיר לכל לקוח תחת פרויקט ייעודי.</p>
-                </div>
-                
-                <div class="projects-layout">
-                <!-- CENTER: create merged with the list, list scrolls internally.
-                     The categories used to be a 210px rail on the right; they are
-                     a filter row above the list now — on an account with no
-                     categories yet that rail was an empty box taking a fifth of
-                     the width, and a filter belongs with what it filters. -->
-                <div class="projects-main">
-                    <!-- Handoff from the public /ask/ quick-chat: continue that job as a full project -->
-                    <div id="ask-handoff-banner"></div>
-                    <!-- Arrived from a calendar reminder (?p=<project>) — offers the
-                         two things you came to do instead of just naming the file -->
-                    <div id="maint-arrive"></div>
-
-                    <!-- Search + filter — only above the list -->
-                    <div class="project-search-row" style="margin-bottom:12px;">
-                        <div class="project-search-input-wrap">
-                            <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="project-search-q" placeholder="חפש שם..." oninput="filterProjectsList()">
-                        </div>
-                        <!-- Two sort toggles: click to sort, click again to flip direction.
-                             The active one is highlighted and shows its arrow. -->
-                        <div class="sort-toggles" id="sort-toggles">
-                            <button type="button" class="sort-toggle active" data-field="date" onclick="toggleProjectSort('date')">
-                                תאריך <i class="fa-solid fa-arrow-down-long sort-arrow"></i>
-                            </button>
-                            <button type="button" class="sort-toggle" data-field="name" onclick="toggleProjectSort('name')">
-                                שם <i class="fa-solid fa-arrow-down-long sort-arrow"></i>
-                            </button>
-                        </div>
-                        <!-- Recurring work is a property of a project, not a screen of
-                             its own — so it is a filter here, next to the others. -->
-                        <button type="button" class="sort-toggle" id="repeat-filter" onclick="toggleRepeatFilter()" title="הצג רק עבודות שחוזרות">
-                            <i class="fa-solid fa-rotate"></i> חוזרים
-                        </button>
-                        <select id="project-status-filter" onchange="filterProjectsList()" class="project-filter-select">
-                            <option value="all">כל הסטטוסים</option>
-                            <option value="טיוטה">טיוטה</option>
-                            <option value="נשלח">נשלח</option>
-                            <option value="הושלם">הושלם</option>
-                        </select>
-                        <!-- Layout toggle: list rows vs. a compact grid of cards -->
-                        <div class="view-toggles" id="view-toggles">
-                            <button type="button" class="view-toggle active" data-view="list" onclick="setProjectsView('list')" title="תצוגת רשימה"><i class="fa-solid fa-list"></i></button>
-                            <button type="button" class="view-toggle" data-view="grid" onclick="setProjectsView('grid')" title="תצוגת קוביות"><i class="fa-solid fa-table-cells-large"></i></button>
-                            <button type="button" class="view-toggle" data-view="pipeline" onclick="switchTab('statistics')" title="תצוגת צינור · לפי שלב"><i class="fa-solid fa-diagram-project"></i></button>
-                        </div>
-                        <button type="button" class="view-toggle" onclick="openRecycleBin()" title="סל המחזור"><i class="fa-solid fa-trash-can-arrow-up"></i></button>
-                    </div>
-
-                    <!-- Follow-up nudges: quotes sent 3+ days ago with no answer -->
-                    <div id="followup-reminders"></div>
-                    <nav class="projects-cats" id="projects-cats" aria-label="סינון לפי קטגוריה"></nav>
-                    <div id="projects-list-container" class="projects-list">
-                        <!-- Dynamically loaded by script -->
-                    </div>
-                    <p class="projects-history-link" id="projects-history-link" hidden>
-                        <a href="#" onclick="switchTab('history'); return false;">כל ההצעות שהופקו · היסטוריה ←</a>
-                    </p>
-                </div>
-
-                <!-- LEFT: KPI stats stacked in a column -->
-                <aside class="projects-stats">
-                    <div class="metric-card">
-                        <div class="metric-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></svg></div>
-                        <div class="metric-info">
-                            <span class="metric-label">הצעות שנשלחו</span>
-                            <span class="metric-value" id="metric-sent-count">0</span>
-                        </div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-icon ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 5-5"/></svg></div>
-                        <div class="metric-info">
-                            <span class="metric-label">הצעות שאושרו</span>
-                            <span class="metric-value" id="metric-approved-count">0</span>
-                        </div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-icon ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6 4v9a5 5 0 0 0 10 0"/><path d="M16 4v6"/><line x1="4" y1="21" x2="20" y2="21"/></svg></div>
-                        <div class="metric-info">
-                            <span class="metric-label">צבר אושר (₪)</span>
-                            <span class="metric-value" id="metric-approved-sum">0 ₪</span>
-                        </div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg></div>
-                        <div class="metric-info">
-                            <span class="metric-label">אחוז סגירה</span>
-                            <span class="metric-value" id="metric-conversion-rate">0%</span>
-                        </div>
-                    </div>
-                </aside>
+                    </details>
                 </div>
             </section>
             
