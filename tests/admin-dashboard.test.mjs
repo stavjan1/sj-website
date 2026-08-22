@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { createContext, runInContext } from 'node:vm';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const APP = readFileSync(join(ROOT, 'sale', 'app.js'), 'utf8');
@@ -137,4 +138,34 @@ test('one token arriving refreshes every card', () => {
     assert.ok(fn.includes(card), `renderAdminAll leaves ${card} stale`);
   }
   assert.ok(!/renderAdminUsers\b/.test(APP), 'still calling a function that does not exist');
+});
+
+test('the AI card leads with who is answering customers, in words', () => {
+  // The state that went unnoticed for days: X-AI-Provider had said `cloudflare`
+  // on every single call while this card showed green bars and full quotas.
+  // Percentages cannot say "your bot is on the spare engine"; a sentence can.
+  const src = APP.slice(APP.indexOf('function aiVerdictHtml('),
+                        APP.indexOf('function aiPressureHtml('));
+  const ctx = createContext({ Date, escapeHtml: (s) => String(s) });
+  runInContext(src + ';globalThis.v = aiVerdictHtml;', ctx);
+  const v = ctx.v;
+  const today = new Date().toISOString().slice(0, 10);
+
+  assert.match(v({ events: [] }), /המנוע החזק/, 'a clean day does not say so');
+
+  // A fallback that is still in force is the loud case.
+  const down = v({ events: [{ date: today, outcome: 'fail', status: 404, note: 'עובר לספק cloudflare' }] });
+  assert.match(down, /מהמנוע החלופי/, 'a live fallback is not announced');
+  assert.match(down, /שם המודל/, 'a 404 is not explained as a model-name problem');
+  assert.match(down, /var\(--danger\)/, 'a live fallback is not styled as the problem it is');
+
+  // Quota reads differently from a broken model: one waits for tomorrow, the
+  // other needs a change. Saying "error" for both is what cost the diagnosis.
+  const quota = v({ events: [{ date: today, outcome: 'quota', note: 'עובר לספק cloudflare' }] });
+  assert.match(quota, /המכסה היומית/, 'exhausted quota is not named');
+  assert.ok(!/שם המודל/.test(quota), 'quota is being reported as a model problem');
+
+  // Yesterday's trouble is not today's headline.
+  assert.match(v({ events: [{ date: '2020-01-01', outcome: 'fail', status: 500 }] }), /המנוע החזק/,
+    'an old failure is reported as the current state');
 });

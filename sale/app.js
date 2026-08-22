@@ -6393,13 +6393,62 @@ function aiPanelHtml(ai) {
              }).join('')}</ul></div>`
         : '<p class="input-help" style="margin:0;">אין אירועי מכסה או כשל בטווח, כל הבקשות נענו על המפתח הראשון. ✓</p>';
 
-    return `${aiPressureHtml(ai.pressure)}
+    return `${aiVerdictHtml(ai)}
+        ${aiPressureHtml(ai.pressure)}
         <div class="aip-list">${rows}</div>
         <button class="btn btn-accent btn-small" onclick="saveAiCaps()" style="align-self:flex-start;">
             <i class="fa-solid fa-floppy-disk"></i> שמור תקרות
         </button>
         ${models}
         ${events}`;
+}
+
+// The one sentence this card exists for.
+//
+// Everything below it is percentages, records and day counts — all true, and
+// none of it answers the question actually being asked: is the engine talking
+// to my customers right now the good one, or the spare? That state was legible
+// only from an event log at the bottom of the card, so the pricing bot ran on
+// Llama for days while the panel showed nothing but green bars.
+function aiVerdictHtml(ai) {
+    const today = new Date().toISOString().slice(0, 10);
+    const dayOf = (e) => e.date || (e.at ? new Date(e.at).toISOString().slice(0, 10) : '');
+    const failures = (ai && ai.events || [])
+        .filter((e) => dayOf(e) === today)
+        .filter((e) => e.outcome === 'quota' || e.outcome === 'fail');
+
+    // Styled from design tokens inline rather than from a stylesheet:
+    // sale/css/** belongs to the other session under COORDINATION.md, and one
+    // banner is not worth a contested file. Tokens keep it theme-aware anyway.
+    const banner = (tone, icon, text) => `
+        <div style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;
+                    border-radius:10px;margin-bottom:14px;background:var(--surface-2);
+                    border-inline-start:4px solid ${tone};">
+            <i class="fa-solid ${icon}" aria-hidden="true" style="color:${tone};margin-top:3px;"></i>
+            <span style="font-size:0.9rem;line-height:1.55;">${text}</span>
+        </div>`;
+
+    if (!failures.length) {
+        return banner('var(--ok-text)', 'fa-circle-check',
+            'הבוט עונה מג\'מיני, המנוע החזק. לא נרשם היום אף כשל.');
+    }
+    const last = failures[0];                        // the ledger is newest-first
+    const why = (last.outcome === 'quota' || last.status === 429)
+        ? 'המכסה היומית של ג\'מיני נגמרה'
+        : last.status === 404
+            ? 'שם המודל שמוגדר אינו מוכר למפתח של גוגל'
+            : (last.status === 401 || last.status === 403)
+                ? 'גוגל דחתה את המפתח'
+                : 'ג\'מיני החזירה שגיאה' + (last.status ? ' ' + last.status : '');
+
+    // "Fell back at some point today" and "is answering from the spare right
+    // now" are different situations, and only the second is worth interrupting
+    // a working day over.
+    const onSpare = failures.some((e) => /עובר לספק|כשל מלא/.test(e.note || ''));
+    const head = onSpare ? 'לקוחות מקבלים תשובות מהמנוע החלופי.' : 'היו היום נפילות לגיבוי.';
+    const tail = onSpare ? ' התשובות ממשיכות לצאת, אבל הן חלשות יותר בעברית ובתמחור.' : '';
+    return banner(onSpare ? 'var(--danger)' : 'var(--warn-text)', 'fa-triangle-exclamation',
+        `<b>${head}</b> ${escapeHtml(why)}.${tail}`);
 }
 
 // How hard the AI is being pushed, in the three numbers that actually decide
