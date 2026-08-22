@@ -196,3 +196,24 @@ test('the spare key is reached for before anyone is made to wait', () => {
   const block = src.slice(waitAt - 400, waitAt + 200);
   assert.ok(!/scope === 'day'/.test(block), 'a spent daily quota would be waited on');
 });
+
+test('a provider known to be finished for the day is not asked again', () => {
+  // Measured on the public page with the quota dry: nine and a half seconds
+  // before the first word, every one of them spent asking two servers a
+  // question they had already refused. The daily quota resets at UTC midnight
+  // and Google names the limit it enforced, so it can simply be written down.
+  const src = readFileSync(new URL('../functions/api/_ai.js', import.meta.url), 'utf8');
+  assert.match(src, /async function geminiIsDry\(/, 'nothing remembers a spent daily quota');
+  assert.match(src, /await geminiIsDry\(env\)/, 'the memory is never consulted');
+
+  // ONLY a limit Google itself called a per-day one. Marking Gemini dead for
+  // the day over one busy minute would cost far more than the wait it saved.
+  assert.match(src, /if \(q\.scope === 'day'\) await markGeminiDry\(env\)/,
+    'the dry flag is set from something other than an explicit per-day limit');
+
+  // And it must never empty the chain: a deployment with only Gemini should get
+  // a real error from Gemini, not "no AI is configured".
+  assert.match(src, /order\.length > 1 && order\.includes\('gemini'\)/,
+    'skipping Gemini could leave no provider at all');
+  assert.match(src, /if \(without\.length\) order = without;/, 'the fallback could be emptied');
+});

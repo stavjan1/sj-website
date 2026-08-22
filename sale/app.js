@@ -3735,6 +3735,40 @@ let acctCashScope = 'month';      // 'month' | 'year'
 let acctItems = [];               // draft line items for the create form
 let acctDraftProjectId = '';      // project the draft was prefilled from
 let acctVatBasis = 'exclude';     // 'exclude' (prices pre-VAT) | 'include' | 'exempt'
+
+// Payment terms: when the money is actually expected. 'שוטף' = the end of the
+// month the document was issued in; '+N' = N days after that. Per document,
+// editable later from the list; the last choice sticks for the next document.
+let acctTerms = 'net30';
+const PAY_TERMS = [
+    { id: 'cash',  label: 'מיידי',     days: null },
+    { id: 'net0',  label: 'שוטף',      days: 0 },
+    { id: 'net30', label: 'שוטף + 30', days: 30 },
+    { id: 'net60', label: 'שוטף + 60', days: 60 },
+    { id: 'net90', label: 'שוטף + 90', days: 90 },
+];
+function acctTermsOf(doc) { return PAY_TERMS.find(t => t.id === (doc && doc.terms)) || PAY_TERMS[2]; }
+function acctDueDate(doc) {
+    const created = new Date(doc.createdAt || Date.now());
+    const t = acctTermsOf(doc);
+    if (t.days === null) return created;
+    const d = new Date(created.getFullYear(), created.getMonth() + 1, 0); // last day of the issue month
+    d.setDate(d.getDate() + t.days);
+    return d;
+}
+// A document that still owes money: issued, unpaid, and not a receipt type.
+function acctIsOpen(d) { return d.status === 'created' && !d.paid && !sbIsPaidType(d.docType); }
+function acctSetTerms(id) {
+    acctTerms = id;
+    document.querySelectorAll('.terms-pill').forEach(b => b.classList.toggle('active', b.dataset.terms === id));
+}
+function acctSetDocTerms(docId, terms) {
+    const doc = invoicesList.find(d => d.id === docId);
+    if (!doc || !PAY_TERMS.some(t => t.id === terms)) return;
+    doc.terms = terms;
+    saveInvoices();
+    renderAccounting();
+}
 let acctPayMethod = 'cash';       // receipt payment method
 // (VAT_RATE is declared once globally, near the pricing logic.)
 const isReceiptDoc = (t) => ['Receipt', 'InvoiceReceipt', 'ReceiptRefund'].includes(t);
@@ -3837,7 +3871,49 @@ function acctCashflowHtml() {
             <div class="acct-kpi"><span class="ak-num">${paidDocs.length}</span><span class="ak-lbl">מסמכים</span></div>
         </div>
         <div class="cf-chart">${rows}</div>
-        <p class="input-help" style="margin-top:10px;">הבר הכהה = סכום שהופק; החלק הירוק = שהתקבל בפועל (קבלות / חשבונית-מס-קבלה).</p>`;
+        <p class="input-help" style="margin-top:10px;">הבר הכהה = סכום שהופק; החלק הירוק = שהתקבל בפועל (קבלות / חשבונית-מס-קבלה).</p>
+        ${acctExpectedHtml()}`;
+}
+
+// What is still owed, placed on the calendar by each document's payment terms —
+// the answer to "כמה כסף ייכנס החודש / השנה", not "כמה הפקתי".
+function acctExpectedHtml() {
+    const open = invoicesList.filter(acctIsOpen);
+    if (!open.length) return `<div class="acct-sub" style="margin-top:18px;">צפוי להיכנס</div><p class="input-help">אין מסמכים פתוחים: כל מה שהופק התקבל.</p>`;
+    const now = new Date();
+    const monthKeyOf = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    const keyOf = (d) => acctCashScope === 'year' ? String(d.getFullYear()) : monthKeyOf(d);
+    const byPeriod = {};
+    let thisMonth = 0, thisYear = 0, overdue = 0;
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    open.forEach(d => {
+        const due = acctDueDate(d), amt = Number(d.total) || 0;
+        const k = keyOf(due);
+        if (!byPeriod[k]) byPeriod[k] = { sum: 0, count: 0 };
+        byPeriod[k].sum += amt; byPeriod[k].count++;
+        if (monthKeyOf(due) === monthKeyOf(now)) thisMonth += amt;
+        if (due.getFullYear() === now.getFullYear()) thisYear += amt;
+        if (due < todayStart) overdue += amt;
+    });
+    const keys = Object.keys(byPeriod).sort();
+    const max = Math.max(...keys.map(k => byPeriod[k].sum), 1);
+    const labelOf = (k) => acctCashScope === 'year' ? k
+        : new Date(k + '-01').toLocaleDateString('he-IL', { month: 'short', year: '2-digit' });
+    const rows = keys.map(k => `<div class="cf-row">
+            <span class="cf-label">${labelOf(k)}</span>
+            <div class="cf-bar"><div class="cf-bar-fill cf-bar-expected" style="width:${Math.round((byPeriod[k].sum / max) * 100)}%"></div></div>
+            <span class="cf-val">${nisFmt(byPeriod[k].sum)}<small>${byPeriod[k].count} מסמכים</small></span>
+        </div>`).join('');
+    return `
+        <div class="acct-sub" style="margin-top:18px;">צפוי להיכנס · לפי תנאי התשלום</div>
+        <div class="acct-kpis">
+            <div class="acct-kpi"><span class="ak-num" style="color:var(--ok-text)">${nisFmt(thisMonth)}</span><span class="ak-lbl">צפוי החודש</span></div>
+            <div class="acct-kpi"><span class="ak-num">${nisFmt(thisYear)}</span><span class="ak-lbl">צפוי השנה</span></div>
+            <div class="acct-kpi"><span class="ak-num" style="color:${overdue ? 'var(--danger)' : 'var(--text-3)'}">${nisFmt(overdue)}</span><span class="ak-lbl">עבר מועד</span></div>
+            <div class="acct-kpi"><span class="ak-num">${open.length}</span><span class="ak-lbl">מסמכים פתוחים</span></div>
+        </div>
+        <div class="cf-chart">${rows}</div>
+        <p class="input-help" style="margin-top:10px;">לפי תאריך ההפקה ותנאי התשלום של כל מסמך (שוטף = סוף חודש ההפקה). לשינוי תנאים למסמך: לשונית מסמכים.</p>`;
 }
 
 // ---- Documents list -------------------------------------------------------
@@ -3858,6 +3934,8 @@ function acctDocumentsHtml() {
                 <span class="doc-type">${sbDocLabel(d.docType)}</span>
                 <span class="doc-client">${escapeHtml((d.customer && d.customer.name) || '—')}</span>
                 <span class="doc-date">${new Date(d.createdAt).toLocaleDateString('he-IL')}</span>
+                ${acctIsOpen(d) ? `<span class="doc-due" title="מתי התשלום צפוי להיכנס">צפוי ${acctDueDate(d).toLocaleDateString('he-IL')} ·
+                    <select class="doc-terms" onchange="acctSetDocTerms('${d.id}', this.value)" aria-label="תנאי תשלום">${PAY_TERMS.map(t => `<option value="${t.id}" ${acctTermsOf(d).id === t.id ? 'selected' : ''}>${t.label}</option>`).join('')}</select></span>` : ''}
             </div>
             <div class="doc-side">
                 <span class="doc-total">${nisFmt(d.total)}</span>
@@ -3907,6 +3985,9 @@ function acctCreateHtml() {
             <div class="acct-sub">מע"מ</div>
             <div class="vat-pills">${vatPill('exclude', 'המחירים ללא מע"מ')}${vatPill('include', 'המחירים כולל מע"מ')}${vatPill('exempt', 'פטור ממע"מ')}</div>
             <div class="vat-breakdown" id="acct-vat-breakdown"></div>
+            <div class="acct-sub">תנאי תשלום · מתי הכסף צפוי להיכנס</div>
+            <div class="vat-pills" id="acct-terms-pills">${PAY_TERMS.map(t => `<button type="button" class="vat-pill terms-pill ${acctTerms === t.id ? 'active' : ''}" data-terms="${t.id}" onclick="acctSetTerms('${t.id}')">${t.label}</button>`).join('')}</div>
+            <p class="input-help" style="margin:4px 0 0;">שוטף = סוף החודש שבו הופק המסמך. לקבלה (תשלום שכבר התקבל) זה לא רלוונטי.</p>
             <div id="acct-payment" class="acct-payment" style="display:none;"></div>
             <div class="designer-actions" style="margin-top:14px;">
                 <button class="btn btn-secondary" onclick="switchAcctSection('documents')">ביטול</button>
@@ -4118,7 +4199,8 @@ async function acctSubmitDocument() {
             apiMessageId: d.apiMessageId || null,
             docNumber: d.docNumber || '', pdfUrl: d.pdfUrl || '',
             projectId: acctDraftProjectId || '', createdAt: Date.now(),
-            paid: sbIsPaidType(docType)
+            paid: sbIsPaidType(docType),
+            terms: sbIsPaidType(docType) ? 'cash' : acctTerms
         };
         invoicesList.unshift(doc);
         saveInvoices();

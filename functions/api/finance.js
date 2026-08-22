@@ -59,7 +59,14 @@ export async function onRequestGet(context) {
                 if (!inv || !(Number(inv.total) > 0)) continue;
                 const d = new Date(inv.createdAt);
                 if (isNaN(d.getTime())) continue;
+                // Same rule as the app's acctDueDate: שוטף = end of the issue month, +N days.
+                const TERMS = { cash: null, net0: 0, net30: 30, net60: 60, net90: 90 };
+                const days = TERMS[inv.terms] === undefined ? 30 : TERMS[inv.terms];
+                let due = d;
+                if (days !== null) { due = new Date(d.getFullYear(), d.getMonth() + 1, 0); due.setDate(due.getDate() + days); }
                 invoiceIncome.push({
+                    dueDate: due.toISOString().slice(0, 10),
+                    terms: inv.terms || 'net30',
                     id: 'inv_' + (inv.id || inv.docNumber || invoiceIncome.length),
                     date: d.toISOString().slice(0, 10),
                     amount: Number(inv.total) || 0,

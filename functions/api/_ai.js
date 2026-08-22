@@ -184,6 +184,44 @@ function quotaInfo(bodyText) {
 // answer. Beyond this the fallback is genuinely the kinder outcome.
 const MAX_QUOTA_WAIT_MS = 12000;
 
+// ==========================================================================
+// "Gemini is finished for today" — remembered, so nobody pays for it twice.
+//
+// When the daily quota is spent, every single request still tried Gemini, then
+// the second Gemini key, and only then fell to Llama. Measured on the public
+// page with the quota dry: nine and a half seconds before the first word
+// appeared, and every one of those seconds was spent asking two servers a
+// question they had already refused.
+//
+// The daily quota resets at UTC midnight, and Google says explicitly when the
+// limit it enforced was a per-DAY one. So write that down and skip the dead
+// provider until the reset. Only ever set from a limit Google named itself; a
+// per-minute limit must never land here, because it clears in seconds and
+// skipping Gemini for the rest of the day over one busy minute would be far
+// worse than the wait it saved.
+const DRY_KEY = 'ai:gemini-dry';
+
+function secondsUntilUtcMidnight() {
+  const now = new Date();
+  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  // KV requires at least 60s, and a couple of minutes of slack past the reset
+  // is cheaper than waking up one request early and re-learning this the slow way.
+  return Math.max(60, Math.round((next - now.getTime()) / 1000) + 120);
+}
+
+async function geminiIsDry(env) {
+  if (!env || !env.SJ_DATA) return false;
+  try { return !!(await env.SJ_DATA.get(DRY_KEY)); } catch { return false; }
+}
+
+async function markGeminiDry(env) {
+  if (!env || !env.SJ_DATA) return;
+  try {
+    await env.SJ_DATA.put(DRY_KEY, new Date().toISOString(),
+      { expirationTtl: secondsUntilUtcMidnight() });
+  } catch { /* a missed note costs latency, never correctness */ }
+}
+
 // What Google says it will serve for this key.
 export async function geminiServableModels(env, key) {
   const cacheKey = 'ai:gemini-models';
@@ -596,7 +634,17 @@ const SYSTEM_GUARD = `
 export async function generate(env, opts) {
   // Immutable guard: appended server-side on EVERY call (see above).
   opts = { ...opts, messages: [...(opts.messages || []), { role: 'system', content: SYSTEM_GUARD }] };
-  const order = buildOrder(opts.provider, env);
+  // Gemini already said "no more today", in Google's own words. Skipping it
+  // here is worth nine seconds on every request for the rest of the day, and
+  // costs nothing: the answer was going to come from further down the chain
+  // regardless. The order is rebuilt rather than filtered so a deployment with
+  // no other provider still tries Gemini and gets a real error, instead of
+  // being told there is no AI configured.
+  let order = buildOrder(opts.provider, env);
+  if (order.length > 1 && order.includes('gemini') && await geminiIsDry(env)) {
+    const without = order.filter((n) => n !== 'gemini');
+    if (without.length) order = without;
+  }
   if (order.length === 0) {
     return errorResponse('לא הוגדר מנוע AI בשרת. הוסיפו "AI binding" (Workers AI) בהגדרות Cloudflare Pages: חינם, ללא מפתח. אפשר גם GEMINI_API_KEY / DEEPSEEK_API_KEY.', 501);
   }
@@ -691,6 +739,8 @@ export async function generate(env, opts) {
       const q = quotaInfo(bodyText);
       quotaScope = q.scope;
       quotaRetryMs = q.retryMs;
+      // Write it down once, so the rest of the day is fast.
+      if (q.scope === 'day') await markGeminiDry(env);
       // Nothing is recorded here. The paths below already count this 429 once,
       // and counting it twice would show the pool as twice as busy as it is —
       // on the very card used to decide whether to pay for more.
