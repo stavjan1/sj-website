@@ -3865,13 +3865,15 @@ i[class^="fa-"], i[class*=" fa-"] {
     padding: var(--sp-2) var(--sp-4);
 }
 .pt-cols-mat, .pt-block .pt-row:not(.pt-row-labor):not(.pt-row-extra) {
-    grid-template-columns: 20px minmax(0, 2fr) minmax(0, 1.4fr) 64px 88px 96px 84px 68px;
+    /* The quantity lane holds a number AND its unit, so it needs room: at 64px
+       the number was squeezed to 18px and read as an empty box. */
+    grid-template-columns: 20px minmax(0, 1.8fr) minmax(0, 1.1fr) 128px 88px 96px 84px 68px;
 }
 .pt-rowbtns { display: flex; gap: 2px; justify-content: flex-end; }
 .pt-src { display: block; font-style: normal; font-size: 10px; opacity: .8; }
 .pt-add-cat:hover { color: var(--accent); }
 .pt-cols-labor, .pt-row-labor { grid-template-columns: minmax(0, 1fr) 110px 84px 32px; }
-.pt-cols-extra, .pt-row-extra { grid-template-columns: 20px minmax(0, 1fr) 84px 110px 84px; }
+.pt-cols-extra, .pt-row-extra { grid-template-columns: 20px minmax(0, 1fr) 96px 128px 84px; }
 .pt-cols {
     font: 600 var(--fs-xs) var(--font-ui); color: var(--text-3);
     border-block-end: 1px solid var(--border);
@@ -3943,3 +3945,27 @@ i[class^="fa-"], i[class*=" fa-"] {
 }
 .wi-rebuild { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); margin-block-end: var(--sp-3); }
 .wi-rebuild-note { font-size: var(--fs-xs); color: var(--text-3); }
+
+/* ---- Units, and the two ways to price time -------------------------------- */
+.pt-qtybox { display: flex; align-items: center; gap: 4px; min-width: 0; }
+#panel-pricing .pt-qtybox .pt-qty { flex: 1 1 56px; min-width: 44px; }
+#panel-pricing .pt-unit,
+#panel-pricing .pt-extra-mode {
+    flex: none; width: auto; min-height: 34px; padding: 0 var(--sp-1);
+    font: 500 var(--fs-xs) var(--font-ui);
+}
+.pt-unit-static { flex: none; font-size: var(--fs-xs); color: var(--text-3); }
+.pt-modes { display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-pill); padding: 2px; }
+.pt-mode {
+    background: none; border: none; cursor: pointer; border-radius: var(--r-pill);
+    padding: var(--sp-1) var(--sp-3); font: 600 var(--fs-xs) var(--font-ui); color: var(--text-3);
+}
+.pt-mode.on { background: var(--accent-soft); color: var(--accent); }
+.pt-lab-sum {
+    display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4); border-block-start: 1px dashed var(--border);
+    font-size: var(--fs-sm); color: var(--text-2);
+}
+.pt-lab-sum em { font-style: normal; font-size: var(--fs-xs); color: var(--text-3); }
+.pt-lab-sum b { margin-inline-start: auto; font-size: var(--fs-md); color: var(--text); direction: ltr; unicode-bidi: isolate; }
+.ptf-time { display: block; font-style: normal; font-size: var(--fs-xs); color: var(--text-3); }

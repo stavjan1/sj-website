@@ -10,24 +10,37 @@ import vm from 'node:vm';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const app = readFileSync(join(ROOT, 'sale/app.js'), 'utf8').replace(/\r\n/g, '\n');
 
-function load(catalog = [], book = {}) {
+function load(catalog = [], book = {}, rules = {}) {
     const pbStart = app.indexOf('function _pbKey(name)');
-    const pbEnd = app.indexOf('function renderMaterialsChecklist');
-    const ptStart = app.indexOf('function matQty(m)');
+    const pbEnd = app.indexOf('const MATERIAL_UNITS =');
+    const ptStart = app.indexOf('const MATERIAL_UNITS =');
     const ptEnd = app.indexOf('function openPricingTable');
     const qStart = app.indexOf('function quoteItemsFromTable(proj)');
     const qEnd = app.indexOf('function ptToQuote()');
     assert.ok(pbStart > -1 && ptStart > -1, 'the pricing helpers moved or were renamed');
     const ctx = vm.createContext({
-        appState: { settings: { priceBook: book } },
+        appState: { settings: { priceBook: book, pricingRules: rules } },
+        showToast: () => {},
+        heNum: (n) => Number(n || 0).toLocaleString('he-IL'),
+        saveProjects: () => {},
+        touchProject: () => {},
+        document: { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] },
         persistSettings: () => {},
         priceCatalog: catalog,
         document: { getElementById: () => null },
-        Date, Number, String, Object, Math, Array,
+        Date, Number, String, Object, Math, Array, JSON,
     });
+    // The rules live elsewhere in the file; the sandbox gets the same defaults.
+    vm.runInContext(`function getPricingRules() { return Object.assign(
+        { materialMarkup: 20, defaultRate: 300, ratePresets: [200,300,500], complexityMult: 1.3,
+          urgencyUrgent: 1.5, urgencyRush: 2, riskPct: 10, defaultDailyTarget: 1500,
+          dayRate: 2000, hoursPerDay: 8, dayRounding: 'full', laborMode: 'sum' },
+        (appState.settings && appState.settings.pricingRules) || {}); }`, ctx);
     return vm.runInContext(
         app.slice(pbStart, pbEnd) + '\n' + app.slice(ptStart, ptEnd) + '\n' + app.slice(qStart, qEnd)
-        + '\n;({ matQty, matLineTotal, laborItems, syncLaborPrice, pricingTotals, priceBookSet, projectExtras, QUOTE_EXTRAS, quoteItemsFromTable })',
+        + '\n;({ matQty, matUnit, matLineTotal, laborItems, syncLaborPrice, pricingTotals, priceBookSet,'
+        + ' projectExtras, QUOTE_EXTRAS, quoteItemsFromTable, hoursToDays, rowPrice, laborSummary,'
+        + ' extraState, setExtraState, extraLineTotal, laborMode, MATERIAL_UNITS })',
         ctx);
 }
 
@@ -120,4 +133,66 @@ test('an empty section carries no filler text to a customer', () => {
 test('nothing is built from an empty table', () => {
     const { quoteItemsFromTable } = load();
     assert.equal(quoteItemsFromTable({ materials: [], laborItems: [], extras: {} }).length, 0);
+});
+
+// ── Pricing by time ─────────────────────────────────────────────────────────
+// Stav's own arithmetic, which is the point of the feature: "לקנות זה שעתיים,
+// לנסוע ולחזור שעתיים, עבודה 5, יוצא יום וחצי, ואני רוצה 2,000 יומית, אז אני
+// גובה 4,000 מעל החומרים."
+const dayProject = () => ({
+    materials: [],
+    laborMode: 'days',
+    laborItems: [
+        { name: 'קניות אצל הספק', mode: 'hours', qty: 2 },
+        { name: 'נסיעות הלוך וחזור', mode: 'hours', qty: 2 },
+        { name: 'עבודה באתר', mode: 'hours', qty: 5 },
+    ],
+    extras: {},
+});
+
+test('nine hours is two days, and two days is four thousand', () => {
+    const { laborSummary, pricingTotals } = load();
+    const lab = laborSummary(dayProject());
+    assert.equal(lab.hours, 9);
+    assert.equal(lab.days, 2, 'nine hours do not fit in one day, so they are billed as two');
+    assert.equal(lab.total, 4000);
+    assert.equal(pricingTotals(dayProject()).labor, 4000);
+});
+
+test('the rounding is a choice, and each choice is honest', () => {
+    assert.equal(load().hoursToDays(9), 2, 'the default rounds up to a whole day');
+    assert.equal(load([], {}, { dayRounding: 'half' }).hoursToDays(9), 1.5);
+    assert.equal(load([], {}, { dayRounding: 'none' }).hoursToDays(9), 1.125);
+    assert.equal(load([], {}, { hoursPerDay: 9 }).hoursToDays(9), 1, 'a nine-hour day makes nine hours one day');
+});
+
+test('hours and days price a row, and a sum stays a sum', () => {
+    const { rowPrice } = load();
+    assert.equal(rowPrice({ mode: 'hours', qty: 3 }), 900, '3 × 300 an hour');
+    assert.equal(rowPrice({ mode: 'days', qty: 1.5 }), 3000, '1.5 × 2,000 a day');
+    assert.equal(rowPrice({ mode: 'sum', price: 750 }), 750);
+});
+
+test('an extra can be time too, and a legacy boolean still means "on"', () => {
+    const ctx = load();
+    const proj = { extras: { inspector: true, travel: { on: true, mode: 'hours', qty: 2 } } };
+    assert.equal(ctx.extraState(proj, 'inspector').on, true, 'the old shape must keep working');
+    const travel = ctx.QUOTE_EXTRAS.find((x) => x.key === 'travel');
+    assert.equal(ctx.extraLineTotal(proj, travel), 600, 'two hours at the hourly rate');
+});
+
+test('sold by the day, the customer sees days, not a per-line breakdown', () => {
+    const { quoteItemsFromTable } = load();
+    const items = quoteItemsFromTable(dayProject());
+    assert.equal(items.length, 1, 'the labour is one line when it is sold by the day');
+    assert.match(items[0].title, /2 ימי עבודה/);
+    assert.equal(items[0].price, 4000);
+    assert.match(items[0].description, /קניות אצל הספק/, 'what fills the days still belongs in the detail');
+});
+
+test('a material carries its unit, and defaults to a piece', () => {
+    const { matUnit, MATERIAL_UNITS } = load();
+    assert.equal(matUnit({}), MATERIAL_UNITS[0]);
+    assert.equal(matUnit({ unit: 'מטר' }), 'מטר');
+    assert.ok(MATERIAL_UNITS.includes('קומפלט'), 'קומפלט is how half his lines are sold');
 });

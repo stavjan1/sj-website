@@ -7262,7 +7262,16 @@ function getMarketAnchorsPromptBlock() {
 // Defaults (markup, rate presets, multipliers) are set ONCE in settings.pricingRules.
 // ==========================================================================
 function getPricingRules() {
-    const d = { materialMarkup: 20, defaultRate: 300, ratePresets: [200, 300, 500], complexityMult: 1.3, urgencyUrgent: 1.5, urgencyRush: 2, riskPct: 10, defaultDailyTarget: 1500 };
+    // hourRate/dayRate/hoursPerDay/dayRounding/laborMode are how Stav actually
+    // thinks about a job: "קניות שעתיים, נסיעות שעתיים, עבודה 5, זה יום וחצי,
+    // ואני רוצה 2,000 ליום". defaultRate stays the hourly rate the older engine
+    // uses, so nothing that reads it changes meaning.
+    const d = {
+        materialMarkup: 20, defaultRate: 300, ratePresets: [200, 300, 500],
+        complexityMult: 1.3, urgencyUrgent: 1.5, urgencyRush: 2, riskPct: 10,
+        defaultDailyTarget: 1500,
+        dayRate: 2000, hoursPerDay: 8, dayRounding: 'full', laborMode: 'sum',
+    };
     const r = (appState.settings && appState.settings.pricingRules) || {};
     const merged = { ...d, ...r };
     if (!Array.isArray(merged.ratePresets) || !merged.ratePresets.length) merged.ratePresets = d.ratePresets;
@@ -7500,6 +7509,22 @@ function renderPricingDefaults() {
             <label>תעריף ברירת מחדל<input type="number" id="pd-rate" value="${r.defaultRate}"></label>
             <label>תעריפים מהירים (פסיקים)<input type="text" id="pd-presets" dir="ltr" value="${r.ratePresets.join(',')}"></label>
             <label>רווח יעד ליום ₪<input type="number" id="pd-daily" value="${r.defaultDailyTarget}"></label>
+            <label>תעריף יום עבודה ₪<input type="number" id="pd-dayrate" value="${r.dayRate}"></label>
+            <label>שעות ביום עבודה<input type="number" id="pd-hpd" step="0.5" value="${r.hoursPerDay}"></label>
+            <label>עיגול ימים
+                <select id="pd-round">
+                    <option value="full" ${r.dayRounding === 'full' ? 'selected' : ''}>ליום שלם</option>
+                    <option value="half" ${r.dayRounding === 'half' ? 'selected' : ''}>לחצי יום</option>
+                    <option value="none" ${r.dayRounding === 'none' ? 'selected' : ''}>בלי עיגול</option>
+                </select>
+            </label>
+            <label>תמחור עבודה כברירת מחדל
+                <select id="pd-labormode">
+                    <option value="sum" ${r.laborMode === 'sum' ? 'selected' : ''}>לפי סעיף</option>
+                    <option value="hours" ${r.laborMode === 'hours' ? 'selected' : ''}>לפי שעות</option>
+                    <option value="days" ${r.laborMode === 'days' ? 'selected' : ''}>לפי ימים</option>
+                </select>
+            </label>
             <label>מקדם מורכבות<input type="number" step="0.1" id="pd-cx" value="${r.complexityMult}"></label>
             <label>מקדם דחוף<input type="number" step="0.1" id="pd-urgent" value="${r.urgencyUrgent}"></label>
             <label>מקדם בהול<input type="number" step="0.1" id="pd-rush" value="${r.urgencyRush}"></label>
@@ -7515,6 +7540,10 @@ function savePricingDefaults() {
         defaultRate: num('pd-rate', 300),
         ratePresets: presets.length ? presets : [200, 300, 500],
         defaultDailyTarget: num('pd-daily', 1500),
+        dayRate: num('pd-dayrate', 2000),
+        hoursPerDay: num('pd-hpd', 8),
+        dayRounding: (document.getElementById('pd-round') || {}).value || 'full',
+        laborMode: (document.getElementById('pd-labormode') || {}).value || 'sum',
         complexityMult: num('pd-cx', 1.3),
         urgencyUrgent: num('pd-urgent', 1.5),
         urgencyRush: num('pd-rush', 2),
@@ -7523,6 +7552,7 @@ function savePricingDefaults() {
     persistSettings();
     _pricingDefaultsOpen = false;
     renderPricingEngine();
+    try { renderPricingTable(); } catch (e) {}
     showToast('ברירות המחדל של התמחור נשמרו');
 }
 
@@ -11227,7 +11257,7 @@ function extraPrice(x) {
 function toggleQuoteExtra(key, on) {
     const proj = projectsList.find((p) => p.id === activeProjectId);
     if (!proj) return;
-    projectExtras(proj)[key] = !!on;
+    setExtraState(proj, key, { on: !!on });
     touchProject(proj);
     saveProjects();
     renderMaterialsChecklist(proj.materials);
@@ -11265,6 +11295,105 @@ function setMaterialPrice(idx, value) {
 // becomes a price. Every line is editable, every line can be thrown out, and
 // nothing here is parsed back out of prose: the rows ARE the data the quote is
 // built from.
+// ── Units, time, and the two ways to price labour ───────────────────────────
+//
+// A quantity means nothing without its unit: 25 of a cable is 25 metres, one of
+// an installation is a קומפלט. The list is short on purpose — these are the
+// units an electrician actually writes on a quote.
+const MATERIAL_UNITS = ["יח'", 'מטר', 'קומפלט', 'נק\'', 'מ"ר', 'ק"ג', 'חבילה', 'שעה'];
+
+function matUnit(m) {
+    const u = String((m && m.unit) || '').trim();
+    return u || MATERIAL_UNITS[0];
+}
+
+// Labour and extras can be priced three ways, and the difference is not
+// cosmetic: a sum is a number he decided, hours are a rate times time, and days
+// are how the job is actually sold — "יום וחצי" becomes two days at his daily
+// rate, because the trip to the supplier is part of the day.
+const LABOR_MODES = [
+    { key: 'sum',   label: 'לפי סעיף' },
+    { key: 'hours', label: 'לפי שעות' },
+    { key: 'days',  label: 'לפי ימים' },
+];
+
+function laborMode(proj) {
+    const rules = getPricingRules();
+    const m = (proj && proj.laborMode) || rules.laborMode || 'sum';
+    return LABOR_MODES.some((x) => x.key === m) ? m : 'sum';
+}
+function setLaborMode(mode) {
+    const proj = _ptProj(); if (!proj) return;
+    proj.laborMode = LABOR_MODES.some((x) => x.key === mode) ? mode : 'sum';
+    touchProject(proj);
+    saveProjects();
+    renderPricingTable();
+    try { renderEstimateTotal(); } catch (e) {}
+}
+
+// Hours to days, rounded the way a tradesman bills them: nine hours is not
+// 1.125 days, it is two days, because they do not fit in one.
+function hoursToDays(hours) {
+    const rules = getPricingRules();
+    const perDay = Number(rules.hoursPerDay) > 0 ? Number(rules.hoursPerDay) : 8;
+    const raw = (Number(hours) || 0) / perDay;
+    if (rules.dayRounding === 'none') return raw;
+    if (rules.dayRounding === 'half') return Math.ceil(raw * 2) / 2;
+    return Math.ceil(raw);
+}
+
+function rowHours(row) {
+    const qty = Number(row && row.qty) || 0;
+    if (!row) return 0;
+    if (row.mode === 'hours') return qty;
+    if (row.mode === 'days') return qty * (Number(getPricingRules().hoursPerDay) || 8);
+    return 0;
+}
+
+// What one row costs, whichever way it is priced.
+function rowPrice(row) {
+    const rules = getPricingRules();
+    if (!row) return 0;
+    if (row.mode === 'hours') return (Number(row.qty) || 0) * (Number(rules.defaultRate) || 0);
+    if (row.mode === 'days') return (Number(row.qty) || 0) * (Number(rules.dayRate) || 0);
+    return Number(row.price) || 0;
+}
+
+// In "לפי ימים" the whole labour block is one decision, not a sum of lines: add
+// up the hours, round to days, multiply by the daily rate. This is the
+// arithmetic Stav does in his head, written down.
+function laborSummary(proj) {
+    const rows = laborItems(proj);
+    const mode = laborMode(proj);
+    const rules = getPricingRules();
+    const hours = rows.reduce((sum, r) => sum + rowHours(r), 0);
+    if (mode === 'days') {
+        const days = hoursToDays(hours);
+        return { mode, hours, days, rate: Number(rules.dayRate) || 0, total: days * (Number(rules.dayRate) || 0) };
+    }
+    const total = rows.reduce((sum, r) => sum + rowPrice(r), 0);
+    return { mode, hours, days: hours ? hoursToDays(hours) : 0, rate: Number(rules.defaultRate) || 0, total };
+}
+
+// Extras carry the same three ways, so "נסיעות" can be two hours instead of a
+// number someone has to remember.
+function extraState(proj, key) {
+    const raw = projectExtras(proj)[key];
+    if (raw && typeof raw === 'object') return raw;
+    return { on: !!raw, mode: 'sum', qty: 0 };   // legacy: a plain boolean
+}
+function setExtraState(proj, key, patch) {
+    const next = { ...extraState(proj, key), ...patch };
+    projectExtras(proj)[key] = next;
+    return next;
+}
+function extraLineTotal(proj, x) {
+    const st = extraState(proj, x.key);
+    if (!st.on) return 0;
+    if (st.mode === 'hours' || st.mode === 'days') return rowPrice({ mode: st.mode, qty: st.qty });
+    return extraPrice(x);
+}
+
 function matQty(m) {
     const q = Number(m && m.qty);
     return q > 0 ? q : 1;
@@ -11285,7 +11414,7 @@ function laborItems(proj) {
     return proj.laborItems;
 }
 function syncLaborPrice(proj) {
-    proj.laborPrice = laborItems(proj).reduce((sum, x) => sum + (Number(x.price) || 0), 0);
+    proj.laborPrice = laborSummary(proj).total;
     const input = document.getElementById('wizard-labor-price');
     if (input) input.value = proj.laborPrice;
 }
@@ -11293,10 +11422,9 @@ function syncLaborPrice(proj) {
 function pricingTotals(proj) {
     const materials = (proj.materials || []).filter((m) => m && m.checked)
         .reduce((sum, m) => sum + matLineTotal(m), 0);
-    const labor = laborItems(proj).reduce((sum, x) => sum + (Number(x.price) || 0), 0);
-    const extras = QUOTE_EXTRAS.filter((x) => projectExtras(proj)[x.key])
-        .reduce((sum, x) => sum + extraPrice(x), 0);
-    return { materials, labor, extras, total: materials + labor + extras };
+    const lab = laborSummary(proj);
+    const extras = QUOTE_EXTRAS.reduce((sum, x) => sum + extraLineTotal(proj, x), 0);
+    return { materials, labor: lab.total, extras, total: materials + lab.total + extras, lab };
 }
 
 function openPricingTable() {
@@ -11325,7 +11453,12 @@ function renderPricingTable() {
             <input type="checkbox" class="pt-chk" ${m.checked ? 'checked' : ''} onchange="toggleMaterialChecked(${i}, this.checked)" aria-label="לכלול בהצעה">
             <input type="text" class="pt-name" value="${escapeHtml(m.name || '')}" onchange="ptSetMatName(${i}, this.value)" aria-label="שם הפריט">
             <input type="text" class="pt-note" value="${escapeHtml(m.details || '')}" placeholder="פירוט" onchange="ptSetMatDetails(${i}, this.value)" aria-label="פירוט">
-            <input type="number" class="pt-qty" min="0" step="1" value="${matQty(m)}" onchange="ptSetMatQty(${i}, this.value)" aria-label="כמות">
+            <span class="pt-qtybox">
+                <input type="number" class="pt-qty" min="0" step="1" value="${matQty(m)}" onchange="ptSetMatQty(${i}, this.value)" aria-label="כמות">
+                <select class="pt-unit" onchange="ptSetMatUnit(${i}, this.value)" aria-label="יחידה">
+                    ${MATERIAL_UNITS.map((u) => `<option value="${escapeHtml(u)}" ${matUnit(m) === u ? 'selected' : ''}>${escapeHtml(u)}</option>`).join('')}
+                </select>
+            </span>
             <span class="pt-sugg${changed ? ' is-old' : ''}" title="${escapeHtml(ptSourceLabel(m))}">
                 ${suggested ? heNum(suggested) + ' ₪' : '—'}
                 <em class="pt-src">${escapeHtml(ptSourceShort(m))}</em>
@@ -11340,24 +11473,60 @@ function renderPricingTable() {
     }).join('');
 
     const labor = laborItems(proj);
-    const laborRows = labor.map((x, i) => `
+    const lab = laborSummary(proj);
+    const mode = lab.mode;
+    const rules = getPricingRules();
+    const laborRows = labor.map((x, i) => {
+        const rowMode = x.mode || (mode === 'sum' ? 'sum' : mode);
+        const timeUnit = rowMode === 'days' ? 'ימים' : 'שעות';
+        return `
         <div class="pt-row pt-row-labor">
             <input type="text" class="pt-name" value="${escapeHtml(x.name || '')}" placeholder="תיאור העבודה" onchange="ptSetLaborName(${i}, this.value)" aria-label="תיאור העבודה">
-            <input type="number" class="pt-price" min="0" step="10" value="${Number(x.price) || ''}" onchange="ptSetLaborPrice(${i}, this.value)" aria-label="מחיר">
-            <span class="pt-total">${heNum(Number(x.price) || 0)} ₪</span>
+            ${rowMode === 'sum'
+                ? `<input type="number" class="pt-price" min="0" step="10" value="${Number(x.price) || ''}" onchange="ptSetLaborPrice(${i}, this.value)" aria-label="מחיר">`
+                : `<span class="pt-qtybox">
+                       <input type="number" class="pt-qty" min="0" step="0.5" value="${Number(x.qty) || ''}" onchange="ptSetLaborQty(${i}, this.value)" aria-label="${timeUnit}">
+                       <span class="pt-unit-static">${timeUnit}</span>
+                   </span>`}
+            <span class="pt-total">${mode === 'days' ? '—' : heNum(Math.round(rowPrice({ ...x, mode: rowMode }))) + ' ₪'}</span>
             <button type="button" class="pt-del" onclick="ptRemoveLabor(${i})" title="הסרה" aria-label="הסרת השורה"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
-        </div>`).join('');
+        </div>`;
+    }).join('');
+
+    const modeChips = LABOR_MODES.map((m) => `
+        <button type="button" class="pt-mode${mode === m.key ? ' on' : ''}" onclick="setLaborMode('${m.key}')">${escapeHtml(m.label)}</button>`).join('');
+
+    // The line that shows his own arithmetic back to him.
+    const laborSummaryHtml = mode === 'sum' ? '' : `
+        <div class="pt-lab-sum">
+            <span>${heNum(lab.hours)} שעות</span>
+            ${mode === 'days'
+                ? `<span>= ${heNum(lab.days)} ${lab.days === 1 ? 'יום עבודה' : 'ימי עבודה'} <em>(${_dayRoundLabel()})</em></span>
+                   <span>× ${heNum(rules.dayRate)} ₪ ליום</span>
+                   <b>${heNum(Math.round(lab.total))} ₪</b>`
+                : `<span>× ${heNum(rules.defaultRate)} ₪ לשעה</span><b>${heNum(Math.round(lab.total))} ₪</b>`}
+        </div>`;
 
     const extrasRows = QUOTE_EXTRAS.map((x) => {
-        const on = !!projectExtras(proj)[x.key];
+        const st = extraState(proj, x.key);
         const mine = priceBookGet(x.label);
+        const byTime = st.mode === 'hours' || st.mode === 'days';
         return `
-        <div class="pt-row pt-row-extra${on ? '' : ' is-off'}">
-            <input type="checkbox" class="pt-chk" ${on ? 'checked' : ''} onchange="toggleQuoteExtra('${x.key}', this.checked)" aria-label="לכלול בהצעה">
+        <div class="pt-row pt-row-extra${st.on ? '' : ' is-off'}">
+            <input type="checkbox" class="pt-chk" ${st.on ? 'checked' : ''} onchange="toggleQuoteExtra('${x.key}', this.checked)" aria-label="לכלול בהצעה">
             <span class="pt-name pt-name-static">${escapeHtml(x.label)}</span>
-            <span class="pt-sugg${mine !== null && mine !== x.suggested ? ' is-old' : ''}">${heNum(x.suggested)} ₪</span>
-            <input type="number" class="pt-price" min="0" step="10" value="${mine !== null ? mine : ''}" placeholder="${x.suggested}" onchange="setExtraPrice('${x.key}', this.value)" aria-label="המחיר שלי">
-            <span class="pt-total">${on ? heNum(extraPrice(x)) + ' ₪' : '—'}</span>
+            <select class="pt-unit pt-extra-mode" onchange="setExtraMode('${x.key}', this.value)" aria-label="דרך חישוב">
+                <option value="sum" ${!byTime ? 'selected' : ''}>סכום</option>
+                <option value="hours" ${st.mode === 'hours' ? 'selected' : ''}>שעות</option>
+                <option value="days" ${st.mode === 'days' ? 'selected' : ''}>ימים</option>
+            </select>
+            ${byTime
+                ? `<span class="pt-qtybox">
+                       <input type="number" class="pt-qty" min="0" step="0.5" value="${Number(st.qty) || ''}" onchange="setExtraQty('${x.key}', this.value)" aria-label="${st.mode === 'days' ? 'ימים' : 'שעות'}">
+                       <span class="pt-unit-static">${st.mode === 'days' ? 'ימים' : 'שעות'}</span>
+                   </span>`
+                : `<input type="number" class="pt-price" min="0" step="10" value="${mine !== null ? mine : ''}" placeholder="${x.suggested}" onchange="setExtraPrice('${x.key}', this.value)" aria-label="המחיר שלי">`}
+            <span class="pt-total">${st.on ? heNum(Math.round(extraLineTotal(proj, x))) + ' ₪' : '—'}</span>
         </div>`;
     }).join('');
 
@@ -11375,7 +11544,7 @@ function renderPricingTable() {
                 </div>
             </header>
             <div class="pt-cols pt-cols-mat">
-                <span></span><span>פריט</span><span>פירוט</span><span>כמות</span><span>מוצע</span><span>המחיר שלי</span><span>סה"כ</span><span></span>
+                <span></span><span>פריט</span><span>פירוט</span><span>כמות ויחידה</span><span>מוצע</span><span>המחיר שלי</span><span>סה"כ</span><span></span>
             </div>
             ${matRows || '<p class="pt-empty">אין עדיין חומרים. אפשר להוסיף מהמאגר, או לבקש מהסוכן רשימה בשיחה.</p>'}
         </section>
@@ -11383,17 +11552,19 @@ function renderPricingTable() {
         <section class="pt-block">
             <header class="pt-head">
                 <h3>עבודה</h3>
+                <div class="pt-modes" role="group" aria-label="דרך תמחור העבודה">${modeChips}</div>
                 <button type="button" class="btn btn-secondary btn-small" onclick="ptAddLabor()">
                     <i class="fa-solid fa-plus" aria-hidden="true"></i> שורת עבודה
                 </button>
             </header>
-            <div class="pt-cols pt-cols-labor"><span>מה עושים</span><span>מחיר</span><span>סה"כ</span><span></span></div>
+            <div class="pt-cols pt-cols-labor"><span>מה עושים</span><span>${mode === 'sum' ? 'מחיר' : (mode === 'days' ? 'זמן' : 'שעות')}</span><span>סה"כ</span><span></span></div>
             ${laborRows || '<p class="pt-empty">אין עדיין שורות עבודה. הוסף שורה לכל חלק בעבודה, כמו שאתה מסביר אותה ללקוח.</p>'}
+            ${laborSummaryHtml}
         </section>
 
         <section class="pt-block">
             <header class="pt-head"><h3>תוספות</h3></header>
-            <div class="pt-cols pt-cols-extra"><span></span><span>סעיף</span><span>מוצע</span><span>המחיר שלי</span><span>סה"כ</span></div>
+            <div class="pt-cols pt-cols-extra"><span></span><span>סעיף</span><span>איך מחשבים</span><span>כמה</span><span>סה"כ</span></div>
             ${extrasRows}
             <p class="pt-note">מחיר שתכתוב כאן נשמר, ויחזור לבד בכל הצעה הבאה.</p>
         </section>`;
@@ -11403,7 +11574,8 @@ function renderPricingTable() {
         foot.innerHTML = `
             <div class="ptf-nums">
                 <span>חומרים <b>${heNum(Math.round(t.materials))} ₪</b></span>
-                <span>עבודה <b>${heNum(Math.round(t.labor))} ₪</b></span>
+                <span>עבודה <b>${heNum(Math.round(t.labor))} ₪</b>${t.lab && t.lab.mode !== 'sum' && t.lab.hours
+                    ? `<em class="ptf-time">${heNum(t.lab.hours)} שעות${t.lab.mode === 'days' ? `, ${heNum(t.lab.days)} ימים` : ''}</em>` : ''}</span>
                 <span>תוספות <b>${heNum(Math.round(t.extras))} ₪</b></span>
                 <span class="ptf-sum">סה"כ לפני מע"מ <b>${heNum(Math.round(t.total))} ₪</b></span>
             </div>
@@ -11500,6 +11672,45 @@ function ptAddMaterial() {
     }, 30);
 }
 
+function _dayRoundLabel() {
+    const r = getPricingRules().dayRounding;
+    return r === 'none' ? 'בלי עיגול' : r === 'half' ? 'עיגול לחצי יום' : 'עיגול ליום שלם';
+}
+
+function ptSetMatUnit(i, value) {
+    const proj = _ptProj(); if (!proj || !proj.materials[i]) return;
+    proj.materials[i].unit = String(value || '').trim();
+    _ptSave(proj);
+}
+
+function ptSetLaborQty(i, value) {
+    const proj = _ptProj(); if (!proj) return;
+    const items = laborItems(proj);
+    if (!items[i]) return;
+    items[i].mode = items[i].mode || (laborMode(proj) === 'sum' ? 'hours' : laborMode(proj));
+    items[i].qty = Math.max(0, Number(value) || 0);
+    items[i].price = rowPrice(items[i]);
+    syncLaborPrice(proj);
+    _ptSave(proj);
+}
+
+function setExtraMode(key, mode) {
+    const proj = _ptProj(); if (!proj) return;
+    setExtraState(proj, key, { mode: ['hours', 'days'].includes(mode) ? mode : 'sum', on: true });
+    touchProject(proj);
+    saveProjects();
+    renderPricingTable();
+    try { renderMaterialsChecklist(proj.materials); renderEstimateTotal(); } catch (e) {}
+}
+function setExtraQty(key, value) {
+    const proj = _ptProj(); if (!proj) return;
+    setExtraState(proj, key, { qty: Math.max(0, Number(value) || 0), on: true });
+    touchProject(proj);
+    saveProjects();
+    renderPricingTable();
+    try { renderEstimateTotal(); } catch (e) {}
+}
+
 function ptSetLaborName(i, value) {
     const proj = _ptProj(); if (!proj) return;
     const items = laborItems(proj);
@@ -11511,6 +11722,7 @@ function ptSetLaborPrice(i, value) {
     const proj = _ptProj(); if (!proj) return;
     const items = laborItems(proj);
     if (!items[i]) return;
+    items[i].mode = 'sum';
     items[i].price = Math.max(0, Number(value) || 0);
     priceBookSet(items[i].name, items[i].price);
     syncLaborPrice(proj);
@@ -11524,7 +11736,8 @@ function ptRemoveLabor(i) {
 }
 function ptAddLabor() {
     const proj = _ptProj(); if (!proj) return;
-    laborItems(proj).push({ name: '', price: 0 });
+    const mode = laborMode(proj);
+    laborItems(proj).push(mode === 'sum' ? { name: '', price: 0, mode: 'sum' } : { name: '', qty: 0, mode, price: 0 });
     _ptSave(proj);
 }
 
@@ -11542,33 +11755,45 @@ function ptAddLabor() {
 function quoteItemsFromTable(proj) {
     const items = [];
 
-    laborItems(proj).filter((x) => (x.name || '').trim() || Number(x.price) > 0).forEach((x) => {
+    const lab = laborSummary(proj);
+    const rows = laborItems(proj).filter((x) => (x.name || '').trim() || Number(x.qty) > 0 || Number(x.price) > 0);
+    if (lab.mode === 'days' && lab.days > 0) {
+        // Sold by the day: the customer buys days, and the lines are what fills
+        // them. A per-line price here would be a number nobody quoted.
         items.push({
-            title: (x.name || 'עבודה').trim(),
-            description: '',
-            price: Math.round(Number(x.price) || 0),
+            title: `עבודת חשמל, ${lab.days === 1 ? 'יום עבודה' : `${heNum(lab.days)} ימי עבודה`}`,
+            description: rows.map((x) => x.name).filter(Boolean).join('\n'),
+            price: Math.round(lab.total),
         });
-    });
+    } else {
+        rows.forEach((x) => {
+            items.push({
+                title: (x.name || 'עבודה').trim(),
+                description: '',
+                price: Math.round(rowPrice(x)),
+            });
+        });
+    }
 
     const mats = (proj.materials || []).filter((m) => m && m.checked && String(m.name || '').trim());
     if (mats.length) {
         items.push({
             title: 'חומרים וציוד',
             description: mats.map((m) => {
-                const qty = matQty(m) > 1 ? ` × ${matQty(m)}` : '';
+                const qty = matQty(m) > 1 ? ` × ${matQty(m)} ${matUnit(m)}` : '';
                 return `${m.name}${qty}${m.details ? ` (${m.details})` : ''}`;
             }).join('\n'),
             price: Math.round(mats.reduce((sum, m) => sum + matLineTotal(m), 0)),
         });
     }
 
-    QUOTE_EXTRAS.filter((x) => projectExtras(proj)[x.key]).forEach((x) => {
+    QUOTE_EXTRAS.filter((x) => extraState(proj, x.key).on).forEach((x) => {
         items.push({
             title: x.label,
             description: x.key === 'inspector'
                 ? 'סעיף נפרד. הבדיקה מבוצעת על ידי חשמלאי בודק מוסמך ואינה חלק ממחיר ההתקנה.'
                 : '',
-            price: Math.round(extraPrice(x)),
+            price: Math.round(extraLineTotal(proj, x)),
         });
     });
 
@@ -11685,7 +11910,7 @@ function renderMaterialsChecklist(materials) {
         <div class="extras-block">
             <div class="extras-head">תוספות להצעה</div>
             ${QUOTE_EXTRAS.map((x) => {
-                const on = !!projectExtras(proj)[x.key];
+                const on = extraState(proj, x.key).on;
                 const mine = priceBookGet(x.label);
                 return `
                 <div class="extra-row${on ? ' is-on' : ''}">
@@ -11759,9 +11984,9 @@ function renderEstimateTotal() {
     if (!proj) { box.hidden = true; return; }
     const mats = (proj.materials || []).filter((m) => m && m.checked)
         .reduce((sum, m) => sum + matLineTotal(m), 0);
-    const labor = Number(proj.laborPrice) || 0;
-    const extras = QUOTE_EXTRAS.filter((x) => projectExtras(proj)[x.key]);
-    const extrasSum = extras.reduce((sum, x) => sum + extraPrice(x), 0);
+    const labor = laborSummary(proj).total;
+    const extras = QUOTE_EXTRAS.filter((x) => extraState(proj, x.key).on);
+    const extrasSum = extras.reduce((sum, x) => sum + extraLineTotal(proj, x), 0);
     if (!mats && !labor && !extrasSum) { box.hidden = true; return; }
     box.hidden = false;
     box.innerHTML = `
