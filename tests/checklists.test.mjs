@@ -265,7 +265,12 @@ test('changing an answer does not destroy it first', () => {
         'the control does not pre-fill the existing answer');
     assert.ok(/value="\$\{escapeAttr\(current\)\}"/.test(renderBody),
         'the text input does not show the current answer');
-    assert.ok(/c === current \? ' active' : ''/.test(renderBody),
+    // EVERY chosen chip, not just "the" chosen one: some questions take more
+    // than one answer now, and re-opening such a field has to show all of them
+    // lit, or correcting one silently drops the rest.
+    assert.ok(/const chosen = f\.multi \? specValues\(current\) : \[current\]/.test(renderBody),
+        'the control does not work out which chips are currently chosen');
+    assert.ok(/chosen\.includes\(c\) \? ' active' : ''/.test(renderBody),
         'the chosen chip is not marked when re-opening an answered question');
 });
 

@@ -146,3 +146,9 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
   * `sale/index.html` — ONE new card, `#admin-feedback-card`, in the admin panel.
   * `sale/finance.js` — the funnel's catch now uses the shared failure renderer.
   No CSS touched; the strip is styled inline from tokens.
+- 2026-08-22 — Session B made 19 characterisation questions multi-answer.
+  SHARED files, minimal diffs: `sale/app.js` (setSpecChip rewritten, one guard
+  added to renderSpecCard's auto-advance, one line in the chip renderer),
+  `sale/coverage.js` (two JSON keys added to 19 fields — the file stays
+  JSON-parseable, which tests/checklists.test.mjs depends on), and one
+  assertion updated in `tests/checklists.test.mjs`. No CSS, no HTML.

@@ -9863,7 +9863,11 @@ function setSpecAnswer(fieldId, value, source) {
 function maybeAskFollowUp(proj, fieldId, value) {
     const field = (getChecklist(proj).fields || []).find(f => f.id === fieldId);
     const fu = field && field.followUp;
-    if (!fu || !Array.isArray(fu.when) || !fu.when.includes(value)) return;
+    // ANY of the chosen answers can be the one that forks the job — a
+    // multi-answer field hands over a joined string, and testing that string
+    // whole would only ever match a field with exactly one answer selected.
+    if (!fu || !Array.isArray(fu.when)
+        || !specValues(value).some((v) => fu.when.includes(v))) return;
     // Asked once. Re-answering the same way should not re-open a decision the
     // customer already made.
     const spec = ensureSpec(proj);
@@ -10088,12 +10092,72 @@ function specToText(proj) {
 
 // Chips are addressed by index so no user-authored Hebrew ever lands inside an
 // inline handler: nothing to escape, nothing to break.
+// ── Questions with more than one true answer ────────────────────────────────
+//
+// Most of this card asks something with a single answer: what size is the main
+// breaker, what is the ceiling made of. A run of them does not.
+//
+// "יש תשתיות סמויות בקירות?" can be underfloor heating AND water pipes AND a
+// mini-central unit in the ceiling. "איך עובר הכבל מהלוח לעמדה?" is routinely
+// four of its options in sequence — the field research has an electrician
+// describing exactly that: ten metres through existing conduit, four floors
+// down a riser, thirty-five more in the car park, then a cored wall. Forcing
+// one answer means the other three never reach the quote, and they were the
+// expensive ones. `inspection/measurements_scope` gives the game away most
+// plainly: three of its four chips literally begin with "+".
+//
+// Stored as a joined string rather than an array, deliberately. Four separate
+// readers treat an answer as text — the coverage counter, the assumption
+// printer, the handoff message and the server's prompt block — and an array
+// would mean changing all four to gain nothing the separator does not already
+// give. No chip in the file contains a pipe, and a test keeps it that way.
+const SPEC_MULTI_SEP = ' | ';
+
+function specValues(value) {
+    return String(value == null ? '' : value).split(SPEC_MULTI_SEP).filter(Boolean);
+}
+
+// Chips that cannot share an answer with anything else: "no hidden
+// infrastructure", "don't know", "everything is indoors". Declared by index on
+// the field, because no wording rule catches both "אין הצללה" and "גישה חופשית
+// לכל הלוחות" without also catching answers that are perfectly combinable.
+function specSoloChips(field) {
+    return (field.solo || []).map((i) => (field.chips || [])[i]).filter(Boolean);
+}
+
 function setSpecChip(fieldId, chipIndex) {
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (!proj) return;
     const field = getChecklist(proj).fields.find(f => f.id === fieldId);
     if (!field || !Array.isArray(field.chips)) return;
-    setSpecAnswer(fieldId, field.chips[chipIndex], 'user');
+    const chip = field.chips[chipIndex];
+    if (chip == null) return;
+    if (!field.multi) { setSpecAnswer(fieldId, chip, 'user'); return; }
+
+    const current = specValues((ensureSpec(proj).answers[fieldId] || {}).value);
+    const solo = specSoloChips(field);
+    let next;
+    if (current.includes(chip)) {
+        next = current.filter((c) => c !== chip);                 // tap again to remove
+    } else if (solo.includes(chip)) {
+        next = [chip];                                            // "none" stands alone
+    } else {
+        next = current.filter((c) => !solo.includes(c)).concat(chip);
+    }
+    // Ordered by the checklist, never by the order they were tapped, so the
+    // same set of answers always reads the same way in the quote.
+    next.sort((a, b) => field.chips.indexOf(a) - field.chips.indexOf(b));
+    setSpecAnswer(fieldId, next.join(SPEC_MULTI_SEP), 'user');
+}
+
+// The only thing that closes a multi-answer question. Without it the card
+// advances to the next gap on the first tap — which is exactly what a question
+// with several true answers must not do.
+function doneSpecField() {
+    specOpenField = null;
+    specEditingField = null;
+    const proj = projectsList.find(p => p.id === activeProjectId);
+    if (proj) renderSpecCard(proj);
 }
 
 const JOB_TYPE_LABELS = {
@@ -10197,8 +10261,14 @@ function renderSpecCard(proj) {
     // Nothing open, or the open one just got answered → move to the next gap.
     // Unless it was opened on purpose to be changed, in which case moving on is
     // exactly the wrong thing to do.
+    // …and a question with several true answers must not close on the first
+    // tap. It stays open until "המשך", which is the only thing that moves the
+    // card past it. Without this the second option is literally unreachable.
+    const openField = list.fields.find(f => f.id === specOpenField);
+    const holdMulti = !!(openField && openField.multi && answers[specOpenField]);
+
     const editingOpen = specEditingField && specEditingField === specOpenField;
-    if (!editingOpen && (!specOpenField || answers[specOpenField] || !visibleFields.some(f => f.id === specOpenField))) {
+    if (!editingOpen && !holdMulti && (!specOpenField || answers[specOpenField] || !visibleFields.some(f => f.id === specOpenField))) {
         const next = nextSpecField(project, visibleFields);
         specOpenField = next ? next.id : null;
     }
@@ -10240,8 +10310,18 @@ function renderSpecCard(proj) {
 
         let control = '';
         if (f.type === 'chips' && Array.isArray(f.chips)) {
+            const chosen = f.multi ? specValues(current) : [current];
             control = `<div class="spec-chips">${f.chips.map((c, i) =>
-                `<button type="button" class="spec-chip${c === current ? ' active' : ''}" onclick="setSpecChip('${f.id}',${i})">${escapeHtml(c)}</button>`).join('')}</div>`;
+                `<button type="button" class="spec-chip${chosen.includes(c) ? ' active' : ''}" onclick="setSpecChip('${f.id}',${i})">${escapeHtml(c)}</button>`).join('')}</div>`;
+            // Said out loud, because a chip row that takes one answer and a chip
+            // row that takes several look identical until you have tapped twice
+            // and lost the first one.
+            if (f.multi) {
+                control += `<div class="spec-inline" style="margin-top:8px;gap:10px;align-items:center;">
+                    <button type="button" class="btn btn-secondary btn-small" onclick="doneSpecField()">המשך</button>
+                    <span class="input-help" style="margin:0;">אפשר לסמן כמה תשובות</span>
+                </div>`;
+            }
         } else if (f.type === 'number') {
             // Stored as "15 מ'": the unit rides along for the quote, so strip it
             // back off before it goes into a number input that would reject it.
