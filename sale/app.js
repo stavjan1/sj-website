@@ -1627,21 +1627,34 @@ function updateBackButton() {
 // disappears when the bell has nothing to say either.
 function placeBackButton() {
     const btn = document.getElementById('ctx-back');
+    const bell = document.getElementById('reminder-bell');
     const bar = document.querySelector('.ctx-bar');
     if (!btn || !bar) return;
     const panel = document.querySelector('.content-panel.active');
-    const h2 = panel && panel.querySelector('.section-header h2');
+    // The home screen's heading is the greeting itself; every other screen has
+    // a section header. Either way there is a title line to ride in, so no
+    // screen keeps a strip of its own just to hold a bell.
+    const h2 = panel && panel.querySelector('.section-header h2, .home-hi');
     const headerVisible = h2 && h2.offsetParent !== null;
     if (headerVisible) {
+        // Both controls ride in the screen's own title line: the back button at
+        // its start, the bell at its end. The bar they used to live in is then
+        // an empty row, so it goes away entirely.
+        h2.classList.add('has-ctx-btns');
         if (btn.parentElement !== h2) h2.insertBefore(btn, h2.firstChild);
+        if (bell && bell.parentElement !== h2) h2.appendChild(bell);
         btn.classList.add('in-title');
+        if (bell) bell.classList.add('in-title');
     } else {
+        // No visible heading on this screen (the chat on a phone): the strip
+        // comes back, because the two controls still need somewhere to be.
+        document.querySelectorAll('.section-header h2.has-ctx-btns').forEach((el) => el.classList.remove('has-ctx-btns'));
         if (btn.parentElement !== bar) bar.insertBefore(btn, bar.firstChild);
+        if (bell && bell.parentElement !== bar) bar.appendChild(bell);
         btn.classList.remove('in-title');
+        if (bell) bell.classList.remove('in-title');
     }
-    const bell = document.getElementById('reminder-bell');
-    const bellShown = bell && !bell.hidden && bell.offsetParent !== null;
-    bar.classList.toggle('is-empty', headerVisible && !bellShown);
+    bar.classList.toggle('is-empty', headerVisible);
 }
 
 

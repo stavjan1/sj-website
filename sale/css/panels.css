@@ -3783,6 +3783,22 @@ i[class^="fa-"], i[class*=" fa-"] {
 }
 .ctx-back.in-title svg { width: 16px; height: 16px; }
 .ctx-bar.is-empty { display: none; }
+
+/* The title line hosts them: back at the start, bell at the end, and the row
+   they used to occupy stops existing. */
+.section-header h2.has-ctx-btns {
+    display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
+}
+.home-hi.has-ctx-btns { flex-wrap: wrap; }
+.section-header h2.has-ctx-btns .ctx-bell,
+.home-hi.has-ctx-btns .ctx-bell {
+    margin-inline-start: auto;
+    width: 32px; height: 32px; flex: none;
+}
+/* On the home screen the greeting is the title line, and it is large: the
+   controls in it stay small so they read as tools, not as part of the words. */
+.home-hi.has-ctx-btns .ctx-back { align-self: center; }
+.home-hi.has-ctx-btns .ctx-bell svg { width: 18px; height: 18px; }
 .bc-groupbtn { margin-inline-start: auto; }
 
 /* ---- Suggested price vs. my price, and the extras that are a yes/no --------
