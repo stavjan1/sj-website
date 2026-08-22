@@ -3718,12 +3718,15 @@ function renderStatistics() {
     const openValue = totalValue - paidValue;
     wirePipelineDnD(board);
 
+    // Waiting longer than 30 days since the status changed = late money.
+    const lateValue = cols.awaiting.filter(p => projectIdleDays(p) >= 30).reduce((s2, p) => s2 + projectAmount(p), 0);
     const head = document.getElementById('pipeline-summary');
     if (head) head.innerHTML = `
         <div class="pipe-stat"><span class="pipe-stat-num">${totalCount}</span><span class="pipe-stat-lbl">פרויקטים</span></div>
         <div class="pipe-stat"><span class="pipe-stat-num">${nis(totalValue)}</span><span class="pipe-stat-lbl">שווי צבר כולל</span></div>
         <div class="pipe-stat"><span class="pipe-stat-num" style="color:var(--warn-text)">${nis(openValue)}</span><span class="pipe-stat-lbl">פתוח (טרם שולם)</span></div>
-        <div class="pipe-stat"><span class="pipe-stat-num" style="color:var(--ok-text)">${nis(paidValue)}</span><span class="pipe-stat-lbl">שולם</span></div>`;
+        <div class="pipe-stat"><span class="pipe-stat-num" style="color:var(--ok-text)">${nis(paidValue)}</span><span class="pipe-stat-lbl">שולם</span></div>
+        ${lateValue ? `<div class="pipe-stat"><span class="pipe-stat-num" style="color:var(--danger)">${nis(lateValue)}</span><span class="pipe-stat-lbl">מאחר מעל 30 יום</span></div>` : ''}`;
 }
 
 // One place decides what a column MEANS for a project, so a drag and a button
