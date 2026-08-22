@@ -2231,7 +2231,7 @@ function switchTab(tabId, opts) {
     setTimeout(updateBackButton, 0);
 
     // Project-scoped tabs (chat / editor / reports) need an open project.
-    if ((tabId === 'wizard' || tabId === 'create' || tabId === 'reports') && !activeProjectId) {
+    if ((tabId === 'wizard' || tabId === 'create' || tabId === 'reports' || tabId === 'pricing') && !activeProjectId) {
         showToast('אנא בחר או צור פרויקט תחילה בלשונית ניהול פרויקטים', 'error');
         switchTab('projects');
         return;
@@ -2308,6 +2308,9 @@ function switchTab(tabId, opts) {
     }
     if (tabId === 'wizard') {
         try { renderPricingEngine(); } catch (e) {}
+    }
+    if (tabId === 'pricing') {
+        try { renderPricingTable(); } catch (e) {}
     }
     // Refresh the in-project rail's active step (desktop stage nav).
     updateProjectRail();
@@ -3150,6 +3153,7 @@ function updateActiveProjectBanner(proj) {
 // are reserved (shown as "בקרוב") for the accounting flow.
 const PROJECT_RAIL_STAGES = [
     { tab: 'wizard',  label: 'אפיון ותמחור', icon: 'fa-compass-drafting' },
+    { tab: 'pricing', label: 'טבלת תמחור',   icon: 'fa-table-list' },
     { tab: 'create',  label: 'הצעת מחיר',    icon: 'fa-file-invoice-dollar' },
     { tab: 'reports', label: 'דוח בדיקה',    icon: 'fa-clipboard-check' },
 ];
@@ -7238,7 +7242,7 @@ function getPricingRules() {
 function pricingNis(n) { return '₪' + Math.round(Number(n) || 0).toLocaleString('he-IL'); }
 function projectMaterialsCost(proj) {
     return ((proj && proj.materials) || []).filter(m => m && m.checked !== false)
-        .reduce((s, m) => s + (Number(m.price) || 0), 0);
+        .reduce((s, m) => s + matLineTotal(m), 0);
 }
 function ensureProjectPricing(proj) {
     const rules = getPricingRules();
@@ -11225,6 +11229,353 @@ function setMaterialPrice(idx, value) {
     try { calculateWizardTotal(); } catch (e) {}
 }
 
+// ── The pricing table ───────────────────────────────────────────────────────
+//
+// Stav: "כפתור תמחר שיעביר למסך חדש עם כל האביזרים, ויהיה אפשר להוסיף מהמאגר".
+// The conversation is what produces the first list; this is where that list
+// becomes a price. Every line is editable, every line can be thrown out, and
+// nothing here is parsed back out of prose: the rows ARE the data the quote is
+// built from.
+function matQty(m) {
+    const q = Number(m && m.qty);
+    return q > 0 ? q : 1;
+}
+function matLineTotal(m) {
+    return matQty(m) * (Number(m && m.price) || 0);
+}
+
+// Labour used to be one number. A real job has lines — pulling the cable,
+// mounting the stand, working in the panel — so it is a list now, and
+// proj.laborPrice stays as its sum so everything downstream keeps working.
+function laborItems(proj) {
+    if (!Array.isArray(proj.laborItems)) {
+        proj.laborItems = Number(proj.laborPrice) > 0
+            ? [{ name: 'עבודה', price: Number(proj.laborPrice) }]
+            : [];
+    }
+    return proj.laborItems;
+}
+function syncLaborPrice(proj) {
+    proj.laborPrice = laborItems(proj).reduce((sum, x) => sum + (Number(x.price) || 0), 0);
+    const input = document.getElementById('wizard-labor-price');
+    if (input) input.value = proj.laborPrice;
+}
+
+function pricingTotals(proj) {
+    const materials = (proj.materials || []).filter((m) => m && m.checked)
+        .reduce((sum, m) => sum + matLineTotal(m), 0);
+    const labor = laborItems(proj).reduce((sum, x) => sum + (Number(x.price) || 0), 0);
+    const extras = QUOTE_EXTRAS.filter((x) => projectExtras(proj)[x.key])
+        .reduce((sum, x) => sum + extraPrice(x), 0);
+    return { materials, labor, extras, total: materials + labor + extras };
+}
+
+function openPricingTable() {
+    if (!activeProjectId) { showToast('אין פרויקט פתוח', 'error'); return; }
+    switchTab('pricing');
+}
+
+function renderPricingTable() {
+    const box = document.getElementById('pricing-table');
+    const foot = document.getElementById('pricing-foot');
+    if (!box) return;
+    const proj = projectsList.find((p) => p.id === activeProjectId);
+    if (!proj) {
+        box.innerHTML = '<p class="input-help">אין פרויקט פתוח.</p>';
+        if (foot) foot.innerHTML = '';
+        return;
+    }
+
+    const mats = proj.materials || [];
+    const matRows = mats.map((m, i) => {
+        const suggested = m.suggested !== undefined ? Number(m.suggested) : Number(m.price) || 0;
+        const mine = Number(m.price) || 0;
+        const changed = suggested > 0 && Math.round(mine) !== Math.round(suggested);
+        return `
+        <div class="pt-row${m.checked ? '' : ' is-off'}">
+            <input type="checkbox" class="pt-chk" ${m.checked ? 'checked' : ''} onchange="toggleMaterialChecked(${i}, this.checked)" aria-label="לכלול בהצעה">
+            <input type="text" class="pt-name" value="${escapeHtml(m.name || '')}" onchange="ptSetMatName(${i}, this.value)" aria-label="שם הפריט">
+            <input type="text" class="pt-note" value="${escapeHtml(m.details || '')}" placeholder="פירוט" onchange="ptSetMatDetails(${i}, this.value)" aria-label="פירוט">
+            <input type="number" class="pt-qty" min="0" step="1" value="${matQty(m)}" onchange="ptSetMatQty(${i}, this.value)" aria-label="כמות">
+            <span class="pt-sugg${changed ? ' is-old' : ''}" title="${escapeHtml(ptSourceLabel(m))}">
+                ${suggested ? heNum(suggested) + ' ₪' : '—'}
+                <em class="pt-src">${escapeHtml(ptSourceShort(m))}</em>
+            </span>
+            <input type="number" class="pt-price" min="0" step="1" value="${mine || ''}" placeholder="${suggested || 0}" onchange="setMaterialPrice(${i}, this.value)" aria-label="המחיר שלי">
+            <span class="pt-total">${heNum(Math.round(matLineTotal(m)))} ₪</span>
+            <div class="pt-rowbtns">
+                ${ptInCatalog(m.name) ? '' : `<button type="button" class="pt-del pt-add-cat" onclick="ptSaveToCatalog(${i})" title="שמירה במאגר המחירים" aria-label="שמירה במאגר"><i class="fa-solid fa-bookmark" aria-hidden="true"></i></button>`}
+                <button type="button" class="pt-del" onclick="ptRemoveMaterial(${i})" title="הסרה" aria-label="הסרת השורה"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            </div>
+        </div>`;
+    }).join('');
+
+    const labor = laborItems(proj);
+    const laborRows = labor.map((x, i) => `
+        <div class="pt-row pt-row-labor">
+            <input type="text" class="pt-name" value="${escapeHtml(x.name || '')}" placeholder="תיאור העבודה" onchange="ptSetLaborName(${i}, this.value)" aria-label="תיאור העבודה">
+            <input type="number" class="pt-price" min="0" step="10" value="${Number(x.price) || ''}" onchange="ptSetLaborPrice(${i}, this.value)" aria-label="מחיר">
+            <span class="pt-total">${heNum(Number(x.price) || 0)} ₪</span>
+            <button type="button" class="pt-del" onclick="ptRemoveLabor(${i})" title="הסרה" aria-label="הסרת השורה"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+        </div>`).join('');
+
+    const extrasRows = QUOTE_EXTRAS.map((x) => {
+        const on = !!projectExtras(proj)[x.key];
+        const mine = priceBookGet(x.label);
+        return `
+        <div class="pt-row pt-row-extra${on ? '' : ' is-off'}">
+            <input type="checkbox" class="pt-chk" ${on ? 'checked' : ''} onchange="toggleQuoteExtra('${x.key}', this.checked)" aria-label="לכלול בהצעה">
+            <span class="pt-name pt-name-static">${escapeHtml(x.label)}</span>
+            <span class="pt-sugg${mine !== null && mine !== x.suggested ? ' is-old' : ''}">${heNum(x.suggested)} ₪</span>
+            <input type="number" class="pt-price" min="0" step="10" value="${mine !== null ? mine : ''}" placeholder="${x.suggested}" onchange="setExtraPrice('${x.key}', this.value)" aria-label="המחיר שלי">
+            <span class="pt-total">${on ? heNum(extraPrice(x)) + ' ₪' : '—'}</span>
+        </div>`;
+    }).join('');
+
+    box.innerHTML = `
+        <section class="pt-block">
+            <header class="pt-head">
+                <h3>חומרים וציוד</h3>
+                <div class="pt-head-actions">
+                    <button type="button" class="btn btn-secondary btn-small" onclick="openCatalogPicker()">
+                        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> הוספה מהמאגר
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-small" onclick="ptAddMaterial()">
+                        <i class="fa-solid fa-plus" aria-hidden="true"></i> שורה חדשה
+                    </button>
+                </div>
+            </header>
+            <div class="pt-cols pt-cols-mat">
+                <span></span><span>פריט</span><span>פירוט</span><span>כמות</span><span>מוצע</span><span>המחיר שלי</span><span>סה"כ</span><span></span>
+            </div>
+            ${matRows || '<p class="pt-empty">אין עדיין חומרים. אפשר להוסיף מהמאגר, או לבקש מהסוכן רשימה בשיחה.</p>'}
+        </section>
+
+        <section class="pt-block">
+            <header class="pt-head">
+                <h3>עבודה</h3>
+                <button type="button" class="btn btn-secondary btn-small" onclick="ptAddLabor()">
+                    <i class="fa-solid fa-plus" aria-hidden="true"></i> שורת עבודה
+                </button>
+            </header>
+            <div class="pt-cols pt-cols-labor"><span>מה עושים</span><span>מחיר</span><span>סה"כ</span><span></span></div>
+            ${laborRows || '<p class="pt-empty">אין עדיין שורות עבודה. הוסף שורה לכל חלק בעבודה, כמו שאתה מסביר אותה ללקוח.</p>'}
+        </section>
+
+        <section class="pt-block">
+            <header class="pt-head"><h3>תוספות</h3></header>
+            <div class="pt-cols pt-cols-extra"><span></span><span>סעיף</span><span>מוצע</span><span>המחיר שלי</span><span>סה"כ</span></div>
+            ${extrasRows}
+            <p class="pt-note">מחיר שתכתוב כאן נשמר, ויחזור לבד בכל הצעה הבאה.</p>
+        </section>`;
+
+    if (foot) {
+        const t = pricingTotals(proj);
+        foot.innerHTML = `
+            <div class="ptf-nums">
+                <span>חומרים <b>${heNum(Math.round(t.materials))} ₪</b></span>
+                <span>עבודה <b>${heNum(Math.round(t.labor))} ₪</b></span>
+                <span>תוספות <b>${heNum(Math.round(t.extras))} ₪</b></span>
+                <span class="ptf-sum">סה"כ לפני מע"מ <b>${heNum(Math.round(t.total))} ₪</b></span>
+            </div>
+            <div class="ptf-actions">
+                <button type="button" class="btn btn-secondary btn-small" onclick="switchTab('wizard')">
+                    <i class="fa-solid fa-comments" aria-hidden="true"></i> חזרה לשיחה
+                </button>
+                <button type="button" class="btn btn-accent btn-small" onclick="ptToQuote()">
+                    המשך להצעת מחיר <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                </button>
+            </div>`;
+    }
+}
+
+// Where a number came from, said in two words. An item the conversation
+// invented is an estimate until he says otherwise; an item from the catalog
+// carries a real supplier price.
+function ptInCatalog(name) {
+    const key = _pbKey(name);
+    return !!key && (priceCatalog || []).some((it) => _pbKey(it.name) === key);
+}
+function ptSourceShort(m) {
+    if (priceBookGet(m.name) !== null) return 'המחיר שלך';
+    if (m.source === 'catalog' || ptInCatalog(m.name)) return 'מהמאגר';
+    return 'הערכה';
+}
+function ptSourceLabel(m) {
+    if (priceBookGet(m.name) !== null) return 'המחיר ששמרת לפריט הזה';
+    if (m.source === 'catalog' || ptInCatalog(m.name)) return 'מחיר מתוך מאגר המחירים שלך';
+    return 'הערכה של הסוכן, לא מחיר מחירון. שווה לתקן למחיר שאתה משלם, ואז לשמור אותו במאגר';
+}
+
+// The answer to "מה קורה עם סעיף שהצ'אט מכיר והמאגר לא": you price it once,
+// and one press puts it in the catalog with your price, so the next job finds
+// it there. The estimate becomes your price list, item by item.
+function ptSaveToCatalog(i) {
+    const proj = _ptProj();
+    const m = proj && (proj.materials || [])[i];
+    if (!m || !String(m.name || '').trim()) { showToast('אין שם לפריט', 'error'); return; }
+    const price = Number(m.price) || 0;
+    if (!(price > 0)) { showToast('קבע מחיר לפריט לפני השמירה במאגר', 'error'); return; }
+    priceCatalog = priceCatalog || [];
+    const key = _pbKey(m.name);
+    const existing = priceCatalog.find((it) => _pbKey(it.name) === key);
+    const unit = /יחידה:\s*(.+)/.exec(m.details || '');
+    if (existing) existing.price = price;
+    else priceCatalog.unshift({ name: m.name.trim(), price, unit: unit ? unit[1].trim() : '', source: 'ידני' });
+    savePriceCatalog();
+    priceBookSet(m.name, price);
+    renderPricingTable();
+    try { renderPriceCatalog(); } catch (e) {}
+    showToast(existing ? 'המחיר במאגר עודכן' : 'הפריט נוסף למאגר המחירים');
+}
+
+// ---- row edits ----
+function _ptProj() { return projectsList.find((p) => p.id === activeProjectId); }
+function _ptSave(proj, rerender = true) {
+    touchProject(proj);
+    saveProjects();
+    if (rerender) renderPricingTable();
+    try { renderMaterialsChecklist(proj.materials); } catch (e) {}
+    try { renderEstimateTotal(); } catch (e) {}
+}
+
+function ptSetMatName(i, value) {
+    const proj = _ptProj(); if (!proj || !proj.materials[i]) return;
+    proj.materials[i].name = String(value || '').trim();
+    _ptSave(proj, false);
+}
+function ptSetMatDetails(i, value) {
+    const proj = _ptProj(); if (!proj || !proj.materials[i]) return;
+    proj.materials[i].details = String(value || '').trim();
+    _ptSave(proj, false);
+}
+function ptSetMatQty(i, value) {
+    const proj = _ptProj(); if (!proj || !proj.materials[i]) return;
+    proj.materials[i].qty = Math.max(0, Number(value) || 0) || 1;
+    _ptSave(proj);
+}
+function ptRemoveMaterial(i) {
+    const proj = _ptProj(); if (!proj || !proj.materials[i]) return;
+    proj.materials.splice(i, 1);
+    _ptSave(proj);
+}
+function ptAddMaterial() {
+    const proj = _ptProj(); if (!proj) return;
+    proj.materials = proj.materials || [];
+    proj.materials.push({ name: '', details: '', qty: 1, price: 0, suggested: 0, checked: true });
+    _ptSave(proj);
+    setTimeout(() => {
+        const rows = document.querySelectorAll('#pricing-table .pt-row .pt-name');
+        const last = rows[proj.materials.length - 1];
+        if (last) last.focus();
+    }, 30);
+}
+
+function ptSetLaborName(i, value) {
+    const proj = _ptProj(); if (!proj) return;
+    const items = laborItems(proj);
+    if (!items[i]) return;
+    items[i].name = String(value || '').trim();
+    _ptSave(proj, false);
+}
+function ptSetLaborPrice(i, value) {
+    const proj = _ptProj(); if (!proj) return;
+    const items = laborItems(proj);
+    if (!items[i]) return;
+    items[i].price = Math.max(0, Number(value) || 0);
+    priceBookSet(items[i].name, items[i].price);
+    syncLaborPrice(proj);
+    _ptSave(proj);
+}
+function ptRemoveLabor(i) {
+    const proj = _ptProj(); if (!proj) return;
+    laborItems(proj).splice(i, 1);
+    syncLaborPrice(proj);
+    _ptSave(proj);
+}
+function ptAddLabor() {
+    const proj = _ptProj(); if (!proj) return;
+    laborItems(proj).push({ name: '', price: 0 });
+    _ptSave(proj);
+}
+
+// The table is the source of truth for the quote: hand the engine the real
+// materials cost before moving on, so the two never disagree.
+function ptToQuote() {
+    const proj = _ptProj(); if (!proj) return;
+    try {
+        const p = ensureProjectPricing(proj);
+        p.materialsCost = pricingTotals(proj).materials;
+        saveProjects();
+        renderPricingEngine();
+    } catch (e) { /* the engine is optional */ }
+    goToDraft();
+}
+
+// ---- add from the catalog ----
+function openCatalogPicker() {
+    const old = document.getElementById('cat-picker');
+    if (old) old.remove();
+    const dlg = document.createElement('dialog');
+    dlg.id = 'cat-picker';
+    dlg.className = 'ck-dialog';
+    dlg.innerHTML = `
+        <h3>הוספה מהמאגר</h3>
+        <div class="search-bar">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="text" id="cat-picker-q" placeholder="חיפוש פריט…" oninput="renderCatalogPicker()">
+        </div>
+        <div class="cp-list" id="cat-picker-list"></div>
+        <div class="ck-dialog-actions">
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('cat-picker').close()">סגירה</button>
+        </div>`;
+    document.body.appendChild(dlg);
+    renderCatalogPicker();
+    dlg.showModal();
+    const q = document.getElementById('cat-picker-q');
+    if (q) q.focus();
+}
+
+function renderCatalogPicker() {
+    const box = document.getElementById('cat-picker-list');
+    if (!box) return;
+    const q = (document.getElementById('cat-picker-q') || {}).value || '';
+    const needle = q.trim().toLowerCase();
+    const items = (priceCatalog || []).filter((it) => !needle || String(it.name || '').toLowerCase().includes(needle));
+    if (!items.length) {
+        box.innerHTML = (priceCatalog || []).length
+            ? '<p class="input-help">לא נמצא פריט תואם.</p>'
+            : '<p class="input-help">המאגר ריק. אפשר למלא אותו בלשונית "מאגר מחירים", מקובץ או מדף ספק.</p>';
+        return;
+    }
+    box.innerHTML = items.slice(0, 60).map((it) => {
+        const idx = (priceCatalog || []).indexOf(it);
+        return `
+        <button type="button" class="cp-row" onclick="ptAddFromCatalog(${idx})">
+            <span class="cp-name">${escapeHtml(it.name || '')}</span>
+            <span class="cp-price">${heNum(Number(it.price) || 0)} ₪${it.unit ? ' / ' + escapeHtml(it.unit) : ''}</span>
+        </button>`;
+    }).join('');
+}
+
+function ptAddFromCatalog(idx) {
+    const it = (priceCatalog || [])[idx];
+    const proj = _ptProj();
+    if (!it || !proj) return;
+    const price = Number(it.price) || 0;
+    // A price he already set for this item wins over the catalog's, because
+    // that is what the price book is for.
+    const mine = priceBookGet(it.name);
+    proj.materials = proj.materials || [];
+    proj.materials.push({
+        name: it.name, details: it.unit ? `יחידה: ${it.unit}` : '',
+        qty: 1, price: mine === null ? price : mine, suggested: price,
+        checked: true, source: 'catalog',
+    });
+    _ptSave(proj);
+    showToast(`${it.name} נוסף`);
+}
+
 function renderMaterialsChecklist(materials) {
     const container = document.getElementById('wizard-materials-list');
     if (!container) return;
@@ -11307,17 +11658,17 @@ function renderEstimateTotal() {
     const proj = projectsList.find((p) => p.id === activeProjectId);
     if (!proj) { box.hidden = true; return; }
     const mats = (proj.materials || []).filter((m) => m && m.checked)
-        .reduce((sum, m) => sum + (Number(m.price) || 0), 0);
+        .reduce((sum, m) => sum + matLineTotal(m), 0);
     const labor = Number(proj.laborPrice) || 0;
     const extras = QUOTE_EXTRAS.filter((x) => projectExtras(proj)[x.key]);
     const extrasSum = extras.reduce((sum, x) => sum + extraPrice(x), 0);
     if (!mats && !labor && !extrasSum) { box.hidden = true; return; }
     box.hidden = false;
     box.innerHTML = `
-        <div class="et-row"><span>חומרים מסומנים</span><b>${heNum(mats)} ₪</b></div>
+        <div class="et-row"><span>חומרים מסומנים</span><b>${heNum(Math.round(mats))} ₪</b></div>
         <div class="et-row"><span>עבודה</span><b>${heNum(labor)} ₪</b></div>
         ${extras.length ? `<div class="et-row"><span>תוספות (${extras.map((x) => escapeHtml(x.label)).join(', ')})</span><b>${heNum(extrasSum)} ₪</b></div>` : ''}
-        <div class="et-row et-sum"><span>סה"כ לפני מע"מ</span><b>${heNum(mats + labor + extrasSum)} ₪</b></div>`;
+        <div class="et-row et-sum"><span>סה"כ לפני מע"מ</span><b>${heNum(Math.round(mats + labor + extrasSum))} ₪</b></div>`;
 }
 
 // ==========================================================================
@@ -11353,8 +11704,15 @@ async function exportChatToQuote() {
     
     // Checked materials list
     const checkedMats = (proj.materials || []).filter(m => m.checked);
-    const checkedMatsText = checkedMats.map(m => `• ${m.name} (${m.details}) - ${m.price} ₪`).join('\n');
-    const materialsCost = checkedMats.reduce((sum, m) => sum + m.price, 0);
+    const checkedMatsText = checkedMats.map(m =>
+        `• ${m.name}${m.details ? ` (${m.details})` : ''}${matQty(m) > 1 ? ` × ${matQty(m)}` : ''} - ${matLineTotal(m)} ₪`).join('\n');
+    const materialsCost = checkedMats.reduce((sum, m) => sum + matLineTotal(m), 0);
+    // Labour reaches the writer line by line when the table has lines, because
+    // "עבודת לוח 600" reads to a customer and a lump sum does not.
+    const laborLines = laborItems(proj).filter((x) => x.name || x.price);
+    const laborText = laborLines.length
+        ? laborLines.map((x) => `• ${x.name || 'עבודה'}: ${Number(x.price) || 0} ₪`).join('\n')
+        : '';
     // Extras are switched on per project and priced from the price book. They
     // travel to the writer as their own lines, because a customer reads them
     // that way: the inspector is not part of the installation price.
@@ -11393,7 +11751,7 @@ ${conversationText}
 
 והנה רשימת החומרים והמחירים שנבחרו:
 """
-מחיר עבודה מוערך: ${proj.laborPrice || 0} ש"ח
+מחיר עבודה מוערך: ${proj.laborPrice || 0} ש"ח${laborText ? `\nפירוט העבודה:\n${laborText}` : ''}
 חומרים שנבחרו:
 ${checkedMatsText}
 ${extrasText ? `תוספות שסתיו סימן (כל אחת סעיף נפרד בהצעה, אין לגלגל אותן לתוך מחיר ההתקנה):\n${extrasText}` : ''}

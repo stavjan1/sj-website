@@ -3843,3 +3843,101 @@ i[class^="fa-"], i[class*=" fa-"] {
 .et-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); font-size: var(--fs-sm); color: var(--text-2); }
 .et-row b { font-weight: 700; color: var(--text); direction: ltr; unicode-bidi: isolate; }
 .et-sum { margin-block-start: var(--sp-2); padding-block-start: var(--sp-2); border-block-start: 1px solid var(--border); font-weight: 700; color: var(--text); }
+
+/* ============================================================================
+   The pricing table: the list from the conversation, as rows you can price.
+   ============================================================================ */
+#panel-pricing { --pt-gap: var(--sp-2); }
+.pt-block {
+    margin-block-end: var(--sp-5); min-width: 0;
+    border: 1px solid var(--border); border-radius: var(--r-md);
+    background: var(--surface); overflow: hidden;
+}
+.pt-head {
+    display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-4);
+    border-block-end: 1px solid var(--border); background: var(--surface-2);
+}
+.pt-head h3 { margin: 0; flex: 1; font: 700 var(--fs-md)/1.2 var(--font-display); color: var(--text); }
+.pt-head-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.pt-cols, .pt-row {
+    display: grid; align-items: center; gap: var(--pt-gap);
+    padding: var(--sp-2) var(--sp-4);
+}
+.pt-cols-mat, .pt-block .pt-row:not(.pt-row-labor):not(.pt-row-extra) {
+    grid-template-columns: 20px minmax(0, 2fr) minmax(0, 1.4fr) 64px 88px 96px 84px 68px;
+}
+.pt-rowbtns { display: flex; gap: 2px; justify-content: flex-end; }
+.pt-src { display: block; font-style: normal; font-size: 10px; opacity: .8; }
+.pt-add-cat:hover { color: var(--accent); }
+.pt-cols-labor, .pt-row-labor { grid-template-columns: minmax(0, 1fr) 110px 84px 32px; }
+.pt-cols-extra, .pt-row-extra { grid-template-columns: 20px minmax(0, 1fr) 84px 110px 84px; }
+.pt-cols {
+    font: 600 var(--fs-xs) var(--font-ui); color: var(--text-3);
+    border-block-end: 1px solid var(--border);
+}
+.pt-row { border-block-end: 1px solid var(--border); }
+.pt-row:last-child { border-block-end: none; }
+.pt-row.is-off { opacity: .55; }
+.pt-chk { width: 16px; height: 16px; accent-color: var(--accent); }
+#panel-pricing .pt-row input[type="text"],
+#panel-pricing .pt-row input[type="number"] {
+    width: 100%; min-height: 34px; padding: 0 var(--sp-2);
+    font: 400 var(--fs-sm) var(--font-ui);
+}
+#panel-pricing .pt-row input[type="number"] { text-align: center; font-weight: 600; }
+.pt-name-static { font: 500 var(--fs-sm) var(--font-ui); color: var(--text); }
+.pt-sugg { font-size: var(--fs-xs); color: var(--text-3); text-align: center; }
+.pt-sugg.is-old { text-decoration: line-through; opacity: .7; }
+.pt-total { font: 700 var(--fs-sm) var(--font-ui); color: var(--text); text-align: start; direction: ltr; unicode-bidi: isolate; }
+.pt-del {
+    width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
+    background: none; border: 1px solid transparent; border-radius: var(--r-sm);
+    color: var(--text-3); cursor: pointer;
+}
+.pt-del:hover { color: var(--danger); border-color: var(--border); background: var(--surface-2); }
+.pt-empty { margin: 0; padding: var(--sp-5) var(--sp-4); text-align: center; font-size: var(--fs-sm); color: var(--text-3); }
+.pt-note { margin: 0; padding: var(--sp-2) var(--sp-4) var(--sp-3); font-size: var(--fs-xs); color: var(--text-3); }
+
+.pt-foot {
+    position: sticky; inset-block-end: 0; z-index: 4;
+    display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4); margin-block-start: var(--sp-2);
+    border: 1px solid var(--border); border-radius: var(--r-md);
+    background: var(--surface); box-shadow: var(--shadow-1);
+}
+.ptf-nums { display: flex; flex-wrap: wrap; gap: var(--sp-4); flex: 1; font-size: var(--fs-xs); color: var(--text-3); }
+.ptf-nums b { font-size: var(--fs-sm); color: var(--text); margin-inline-start: 4px; direction: ltr; unicode-bidi: isolate; }
+.ptf-sum b { font-size: var(--fs-lg); color: var(--accent); }
+.ptf-actions { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+
+.cp-list { display: flex; flex-direction: column; gap: 2px; max-height: 52vh; overflow-y: auto; margin-block: var(--sp-3); }
+.cp-row {
+    display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3);
+    padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm);
+    background: none; border: 1px solid transparent; cursor: pointer; text-align: start;
+}
+.cp-row:hover { background: var(--surface-2); border-color: var(--border); }
+.cp-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font: 500 var(--fs-sm) var(--font-ui); color: var(--text); }
+.cp-price { flex: none; font: 600 var(--fs-xs) var(--font-ui); color: var(--text-2); }
+
+@media (max-width: 860px) {
+    /* On a phone a row is a small card: the name across the top, then the
+       numbers in a line under it. Grid columns that narrow are unusable, so the
+       row switches to a wrapping flex. */
+    .pt-cols { display: none; }
+    .pt-block .pt-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+    .pt-row .pt-chk { flex: none; }
+    .pt-row .pt-name { flex: 1 1 40%; min-width: 0; }
+    .pt-row .pt-rowbtns { flex: none; margin-inline-start: auto; }
+    .pt-row .pt-note { flex: 1 1 100%; }
+    .pt-row .pt-qty { flex: 0 0 72px; }
+    .pt-row .pt-sugg { flex: 0 0 auto; }
+    .pt-row .pt-price { flex: 0 0 96px; }
+    .pt-row .pt-total { flex: 1 1 auto; text-align: end; }
+    .pt-row .pt-del { flex: none; }
+    .pt-foot { flex-direction: column; align-items: stretch; }
+    .ptf-actions .btn { flex: 1; justify-content: center; }
+}
+}
