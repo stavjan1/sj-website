@@ -800,6 +800,11 @@ i[class^="fa-"], i[class*=" fa-"] {
 /* Chat log + bubbles */
 .chat-messages {
     flex-grow: 1;
+    /* min-height:0 is what lets it scroll: a flex item's automatic minimum is
+       its content, so without this the log pushed the whole column past the
+       panel and the conversation could not be scrolled at all — it was simply
+       clipped. */
+    min-height: 0;
     overflow-y: auto;
     padding: var(--sp-4);
     display: flex;
@@ -3743,3 +3748,21 @@ i[class^="fa-"], i[class*=" fa-"] {
 .spec-strip i { font-size: 12px; }
 .sst-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sst-go { flex: none; font-weight: 700; }
+
+/* The bolt in front of the greeting: the same mark as the rail, at text size. */
+.home-hi { display: flex; align-items: center; gap: var(--sp-3); }
+.home-bolt {
+    flex: none; display: inline-flex; align-items: center; justify-content: center;
+    width: 1em; height: 1em; color: var(--action, var(--accent));
+}
+.home-bolt svg { width: 100%; height: 100%; }
+
+/* The back button rides in the screen's title line instead of owning a row. */
+.ctx-back.in-title {
+    vertical-align: middle;
+    margin-inline-end: var(--sp-3);
+    min-height: 30px; padding: 0 var(--sp-2) 0 var(--sp-3);
+    font-size: var(--fs-xs);
+}
+.ctx-back.in-title svg { width: 16px; height: 16px; }
+.ctx-bar.is-empty { display: none; }

@@ -454,7 +454,7 @@ function setQuotaCharging(on) {
 // (offline / local testing) we fall back to sane defaults by login state.
 const TIER_LABELS = { guest: 'אורח', free: 'חינם', pro: 'Pro ⚡', business: 'עסקי', admin: 'מנהל מערכת' };
 const TIER_FALLBACK = {
-    guest:    { aiDaily: 10,  projects: 1,  quotesPerMonth: 0,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, pdfCredit: true },
+    guest:    { aiDaily: 100,  projects: 1,  quotesPerMonth: 0,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, pdfCredit: true },
     free:     { aiDaily: 20,  projects: 3,  quotesPerMonth: 3,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, pdfCredit: true },
     pro:      { aiDaily: 150, projects: -1, quotesPerMonth: -1, catalogItems: 1000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  pdfCredit: false },
     business: { aiDaily: 300, projects: -1, quotesPerMonth: -1, catalogItems: 2000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  pdfCredit: false },
@@ -1596,9 +1596,46 @@ function goBackTab() {
     updateBackButton();
 }
 
+// The phone's back gesture used to leave the app entirely and land on the זרם
+// landing page, because every screen here lives at the same URL and the browser
+// had nothing else to go back to. Each screen change now leaves a history
+// entry, so back walks the screens: project → the works list → home.
+function pushHistoryStep(tabId) {
+    try { history.pushState({ sjTab: tabId }, ''); } catch (e) { /* private mode */ }
+}
+window.addEventListener('popstate', () => {
+    // The browser has already stepped back over one of our entries; mirror it
+    // inside the app. With nothing left to unwind, the next press leaves, which
+    // is what a back button at the root should do.
+    if (navBackStack.length) goBackTab();
+});
+
 function updateBackButton() {
     const btn = document.getElementById('ctx-back');
     if (btn) btn.hidden = navBackStack.length === 0;
+    placeBackButton();
+}
+
+// The button used to sit alone in a bar of its own, which cost a whole row on
+// every screen. It rides in the screen's own title line instead, and the bar
+// disappears when the bell has nothing to say either.
+function placeBackButton() {
+    const btn = document.getElementById('ctx-back');
+    const bar = document.querySelector('.ctx-bar');
+    if (!btn || !bar) return;
+    const panel = document.querySelector('.content-panel.active');
+    const h2 = panel && panel.querySelector('.section-header h2');
+    const headerVisible = h2 && h2.offsetParent !== null;
+    if (headerVisible) {
+        if (btn.parentElement !== h2) h2.insertBefore(btn, h2.firstChild);
+        btn.classList.add('in-title');
+    } else {
+        if (btn.parentElement !== bar) bar.insertBefore(btn, bar.firstChild);
+        btn.classList.remove('in-title');
+    }
+    const bell = document.getElementById('reminder-bell');
+    const bellShown = bell && !bell.hidden && bell.offsetParent !== null;
+    bar.classList.toggle('is-empty', headerVisible && !bellShown);
 }
 
 
@@ -2062,6 +2099,7 @@ function switchTab(tabId, opts) {
         if (from && from !== tabId) {
             navBackStack.push(from);
             if (navBackStack.length > 20) navBackStack.shift();
+            pushHistoryStep(tabId);
         }
     }
     setTimeout(updateBackButton, 0);
@@ -2630,7 +2668,14 @@ function renderHome() {
     const greet = document.getElementById('home-greeting');
     if (greet) {
         const h = new Date().getHours();
-        const part = h < 5 ? 'לילה טוב' : h < 12 ? 'בוקר טוב' : h < 17 ? 'צהריים טובים' : h < 21 ? 'ערב טוב' : 'לילה טוב';
+        // 17:15 is not evening. The day is cut where a person feels it: morning
+        // until eleven, noon until two, afternoon until six, evening until ten.
+        const part = h < 5 ? 'לילה טוב'
+            : h < 11 ? 'בוקר טוב'
+            : h < 14 ? 'צהריים טובים'
+            : h < 18 ? 'אחר הצהריים טובים'
+            : h < 22 ? 'ערב טוב'
+            : 'לילה טוב';
         let name = '';
         try { name = (localStorage.getItem('gsi_name') || '').split(' ')[0] || ''; } catch (e) {}
         greet.textContent = name ? `${part}, ${name}` : part;

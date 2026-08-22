@@ -22,12 +22,12 @@ export const ADMIN_EMAIL = 'stavjan19989@gmail.com';
 //   pdfCredit      — whether PDFs carry the "הופק באמצעות זרם" credit line
 export const TIER_DEFAULTS = {
   guest: {
-    // 10 → 25 on 2026-08-21 at Stav's request ("בינתיים"). This is the quota
-    // every anonymous visitor gets, so it is a cost lever as much as a limit:
-    // the per-minute burst guard in chat.js still caps abuse, but the daily
-    // ceiling is what bounds a bad day. Easy to walk back — set `config:tiers`
-    // in KV rather than redeploying.
-    aiDaily: 25, projects: 1, quotesPerMonth: 0, catalogItems: 10,
+    // 10 → 25 (21.8.2026) → 100 (22.8.2026), both at Stav's request. This is
+    // the quota every anonymous visitor gets, counted per IP per day, so it is
+    // a cost lever as much as a limit: the per-minute burst guard in chat.js
+    // still caps abuse, but the daily ceiling is what bounds a bad day. Easy to
+    // walk back, and without a deploy: set `config:tiers` in KV.
+    aiDaily: 100, projects: 1, quotesPerMonth: 0, catalogItems: 10,
     reports: false, reminders: false, shareLink: false, advancedModel: false, pdfCredit: true,
   },
   free: {
