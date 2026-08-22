@@ -137,3 +137,12 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
     site.test.mjs guard requires them to agree).
   Session A's CSS files were not touched: `.admin-auth` already existed in
   `sale/css/panels.css` and is reused as-is.
+- 2026-08-22 — Session B added the price-feedback widget (the backend has
+  existed since 21.8 and had never received a verdict, because nothing in the
+  UI ever asked). SHARED files, minimal diffs:
+  * `sale/app.js` — one call inside the renderChatHistory loop plus a new block
+    of functions after it, and one new admin card renderer. Nothing existing
+    reordered.
+  * `sale/index.html` — ONE new card, `#admin-feedback-card`, in the admin panel.
+  * `sale/finance.js` — the funnel's catch now uses the shared failure renderer.
+  No CSS touched; the strip is styled inline from tokens.

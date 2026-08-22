@@ -6040,6 +6040,70 @@ function renderAdminAuthStatus() {
     show(adminAuthHtml('צריך אישור מגוגל כדי למשוך את הנתונים.'));
 }
 
+// ---- Admin: was the price right? ------------------------------------------
+//
+// Every other card on this panel measures whether the machine ANSWERED. This is
+// the only one that measures whether it was RIGHT, and the two are unrelated: a
+// bot at 100% uptime quoting 40% high is worse than one that fails outright,
+// because the failure gets noticed and the drift gets sent to customers.
+//
+// Rates, not counts. Three complaints out of five quotes is an emergency and
+// three out of three hundred is noise, and a bare count cannot tell them apart.
+async function renderAdminFeedback() {
+    if (!isAdmin()) return;
+    const box = document.getElementById('admin-feedback-body');
+    if (!box) return;
+    box.innerHTML = '<p class="input-help">טוען…</p>';
+    try {
+        const res = await adminRes('/api/feedback');
+        const d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        box.innerHTML = adminFeedbackHtml(d);
+    } catch (e) {
+        box.innerHTML = adminErrorHtml(e);
+    }
+}
+
+function adminFeedbackHtml(d) {
+    const total = d.total || 0;
+    if (!total) {
+        return `<p class="input-help" style="margin:0;">עוד לא ניתן משוב.
+            מתחת לכל תמחור בצ'אט יש שורה אחת: בול / קצת גבוה / קצת נמוך / ממש לא.</p>`;
+    }
+    const jobs = Object.entries(d.rates || {}).sort((a, b) => b[1].total - a[1].total);
+
+    // A job type with two verdicts under it has no rate worth reading, and
+    // presenting one anyway is how a dashboard talks somebody into changing a
+    // price he had right.
+    const MIN = 4;
+    const rows = jobs.map(([job, r]) => {
+        const thin = r.total < MIN;
+        const lean = r.bias < -0.4 ? 'מתמחר גבוה' : r.bias > 0.4 ? 'מתמחר נמוך' : 'מכוון';
+        const tone = r.bias < -0.4 || r.bias > 0.4 ? 'var(--warn-text)' : 'var(--ok-text)';
+        return `<tr>
+            <td>${escapeHtml(JOB_TYPE_LABELS[job] || job)}</td>
+            <td>${r.total}</td>
+            <td>${thin ? '<span class="input-help">מעט מדי</span>'
+                       : `<b style="color:${tone};">${escapeHtml(lean)}</b> <small>(${r.bias})</small>`}</td>
+            <td>${thin ? '—' : Math.round(r.wrongRate * 100) + '%'}</td>
+        </tr>`;
+    }).join('');
+
+    const notes = (d.entries || []).filter((e) => e.note).slice(0, 8).map((e) => `
+        <li><span class="tk">${escapeHtml(new Date(e.at).toLocaleDateString('he-IL'))} ·
+            ${escapeHtml(JOB_TYPE_LABELS[e.jobType] || e.jobType || 'עבודה')}
+            ${e.price ? '· ' + Number(e.price).toLocaleString('he-IL') + ' ₪' : ''}
+            — ${escapeHtml(e.note)}</span></li>`).join('');
+
+    return `<p style="margin:0;font-size:0.95rem;"><b>${total}</b> משובים נאספו.</p>
+        <table class="admin-stats-tbl">
+            <thead><tr><th>סוג עבודה</th><th>משובים</th><th>הטיה</th><th>"ממש לא"</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+        ${notes ? `<h5 class="tcol-title"><i class="fa-solid fa-comment"></i> מה נכתב</h5>
+                   <ul class="tlist">${notes}</ul>` : ''}`;
+}
+
 // ---- Admin: aggregate stats dashboard (no PII) ----
 async function renderAdminStats() {
     if (!isAdmin()) return;
@@ -11195,6 +11259,11 @@ function renderChatHistory(projOrHistory) {
     if (!proj) { log.innerHTML = ''; return; }
     const rows = buildChatView(proj);
 
+    // The newest pricing answer, which is the only one worth grading: an older
+    // one has already been superseded by the conversation that followed it.
+    const lastPriced = rows.filter((r) => r.stage === 'price' && r.msg
+        && r.msg.role === 'model' && !r.msg.hidden).pop() || null;
+
     // Starter chips only help an empty conversation — once it's rolling they
     // just eat chat height. "Empty" is the whole thread now, not one half.
     const sugg = document.querySelector('.chat-suggestions');
@@ -11279,10 +11348,172 @@ function renderChatHistory(projOrHistory) {
             holder.dataset.index = msgIndex;
             ZeremListCards.render(holder, listsData, { job: proj.name || '' });
         }
+        // "Was that price right?" — under the last pricing answer only.
+        if (row === lastPriced) {
+            const strip = priceFeedbackEl(proj, msgIndex);
+            if (strip) log.appendChild(strip);
+        }
     });
 
     scrollChatToActiveStage(log);
     applyChatSearch();
+}
+
+// ── "Was that price right?" ─────────────────────────────────────────────────
+//
+// Asked of the only person who can answer, at the only moment he actually
+// knows: reading the number, before he has adjusted it into his own. Ask after
+// he applies it to the quote and he is grading a figure he already corrected,
+// which reads as agreement and is worth nothing.
+//
+// What the widget has to obey to stay welcome:
+//   • one strip, under the LAST pricing answer — not on every bubble in the
+//     thread, and never on the characterisation stage, which has no price yet;
+//   • one tap and it is gone for good. The verdict is stored on the message
+//     itself, so a reload, a stage switch or a re-render never asks twice;
+//   • agreement is recorded as carefully as disagreement. Three complaints out
+//     of five quotes is an emergency and three out of three hundred is noise —
+//     a verdict means nothing without its denominator;
+//   • only "ממש לא" asks a follow-up, because only "ממש לא" puts a notification
+//     on Stav's phone, and a notification with no reason attached is an
+//     interruption rather than information.
+const PRICE_VERDICTS = [
+    { id: 'spot_on',  label: 'בול',      icon: 'fa-check' },
+    { id: 'bit_high', label: 'קצת גבוה', icon: 'fa-arrow-down' },
+    { id: 'bit_low',  label: 'קצת נמוך', icon: 'fa-arrow-up' },
+    { id: 'way_off',  label: 'ממש לא',   icon: 'fa-xmark' },
+];
+
+// Styled from tokens inline: sale/css/** is the other session's under
+// COORDINATION.md, and this is four chips on one line.
+const PF_WRAP = 'display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:2px 0 14px;'
+    + 'padding:9px 12px;border-radius:10px;background:var(--surface-2);font-size:0.85rem;';
+const PF_CHIP = 'border:1px solid var(--border);background:var(--surface);color:var(--text);'
+    + 'border-radius:999px;padding:5px 12px;font:inherit;cursor:pointer;';
+
+const PF_INPUT = 'flex:1;min-width:170px;border:1px solid var(--border);border-radius:8px;'
+    + 'padding:6px 10px;background:var(--surface);color:var(--text);font:inherit;';
+
+function _pfBox(index) {
+    const el = document.createElement('div');
+    el.className = 'price-feedback';
+    el.dataset.index = index;
+    el.style.cssText = PF_WRAP;
+    return el;
+}
+
+// The question that asks why, shown only for "ממש לא".
+function _pfNoteHtml(index) {
+    return `<span style="color:var(--text-2);">מה היה לא בסדר?</span>
+        <input class="pf-note" type="text" maxlength="200" placeholder="למשל: פי שתיים ממה שגובים כאן" style="${PF_INPUT}">
+        <button type="button" style="${PF_CHIP}" onclick="submitPriceFeedback(${index}, this)">שלח</button>
+        <button type="button" style="${PF_CHIP}opacity:0.65;" onclick="submitPriceFeedback(${index}, this, true)">דלג</button>`;
+}
+
+// The strip for this answer, or null when there is nothing to grade and nothing
+// left to send.
+//
+// Three states, and the middle one is the reason this is a render function
+// rather than a one-shot: a verdict recorded but not yet sent comes BACK on the
+// next render. Otherwise tapping "ממש לא" and then switching tabs before typing
+// the reason would mark the message answered and quietly drop the alert — and
+// "ממש לא" is the only verdict that reaches Stav in the moment, so dropping it
+// is the single most expensive thing this widget could do.
+function priceFeedbackEl(proj, index) {
+    const msg = (proj.chatHistory || [])[index];
+    if (!msg) return null;
+    if (msg.feedbackSent) return null;
+
+    if (msg.feedback) {
+        const el = _pfBox(index);
+        el.innerHTML = _pfNoteHtml(index);
+        return el;
+    }
+
+    // The model's own number. Materials come from the catalogue and the fees
+    // from the rules, so labour is the part that is genuinely its judgement —
+    // which makes it the only part worth asking about.
+    if (!(Number(proj.laborPrice) > 0)) return null;
+
+    // …and THIS message must be the one that priced something. laborPrice
+    // survives from an earlier answer, so without this the strip would appear
+    // under a follow-up question and ask "does this price look right?" about a
+    // message that contains no price at all.
+    const raw = (msg.parts && msg.parts[0] && msg.parts[0].text) || '';
+    if (!/laborPriceEstimate|₪/.test(raw)) return null;
+
+    const el = _pfBox(index);
+    el.innerHTML = `<span style="color:var(--text-2);">המחיר הזה נראה לך נכון?</span>`
+        + PRICE_VERDICTS.map((v) => `<button type="button" style="${PF_CHIP}"
+              onclick="sendPriceFeedback(${index}, '${v.id}', this)">
+              <i class="fa-solid ${v.icon}" aria-hidden="true"></i> ${v.label}</button>`).join('');
+    return el;
+}
+
+function _pfDone(el, text) {
+    if (!el) return;
+    el.innerHTML = `<span style="color:var(--text-2);">
+        <i class="fa-solid fa-circle-check" aria-hidden="true" style="color:var(--ok-text);"></i>
+        ${escapeHtml(text)}</span>`;
+}
+
+function sendPriceFeedback(index, verdict, btn) {
+    const proj = projectsList.find((p) => p.id === activeProjectId);
+    if (!proj) return;
+    const el = btn && btn.closest('.price-feedback');
+    const msg = (proj.chatHistory || [])[index];
+    if (msg) { msg.feedback = verdict; saveProjects(); }
+
+    // "ממש לא" is the one that puts a notification on his phone, so it is the
+    // one that earns a second question. The other three are a single tap and
+    // are over — asking a satisfied user to explain himself is how a widget
+    // stops being used.
+    if (verdict === 'way_off') {
+        if (el) {
+            el.innerHTML = _pfNoteHtml(index);
+            const inp = el.querySelector('.pf-note');
+            if (inp) inp.focus();
+        }
+        return;
+    }
+    _pfMarkSent(proj, index);
+    _pfDone(el, 'תודה, נרשם.');
+    postPriceFeedback(proj, verdict, '');
+}
+
+function submitPriceFeedback(index, btn, skip) {
+    const proj = projectsList.find((p) => p.id === activeProjectId);
+    if (!proj) return;
+    const el = btn && btn.closest('.price-feedback');
+    const inp = el && el.querySelector('.pf-note');
+    const note = skip ? '' : ((inp && inp.value) || '').trim();
+    const msg = (proj.chatHistory || [])[index];
+    _pfMarkSent(proj, index);
+    _pfDone(el, 'תודה, זה מגיע לסתיו עכשיו.');
+    postPriceFeedback(proj, (msg && msg.feedback) || 'way_off', note);
+}
+
+function _pfMarkSent(proj, index) {
+    const msg = (proj.chatHistory || [])[index];
+    if (msg) { msg.feedbackSent = true; saveProjects(); }
+}
+
+// Telemetry, therefore best-effort and silent. A feedback widget that can show
+// the user an error is a feedback widget that costs more than it returns.
+function postPriceFeedback(proj, verdict, note) {
+    try {
+        fetch('/api/feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                verdict,
+                price: Math.round(Number(proj.laborPrice) || 0),
+                jobType: (proj.spec && proj.spec.jobType) || 'generic',
+                quoteId: String(proj.id || '').slice(0, 60),
+                note,
+            }),
+        }).catch(() => {});
+    } catch (e) { /* never let telemetry reach the user */ }
 }
 
 // ── Voice dictation ──────────────────────────────────────────────────────────
@@ -13474,6 +13705,7 @@ function renderAdminAll(opts) {
         () => adminLoadPricingMap(),
         () => adminRefreshUserList(),
         () => window.renderAdminFunnel && window.renderAdminFunnel(),
+        () => renderAdminFeedback(),
     ];
     for (const job of jobs) { try { job(); } catch (e) {} }
 }
