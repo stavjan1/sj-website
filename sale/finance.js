@@ -1,4 +1,5 @@
-// ZEREM — finance dashboard (תזרים מזומנים, owner only) + Telegram report import.
+// ZEREM PRO — cash-flow dashboard (תזרים מזומנים): bank/card accounts, anchor-day
+// cycles, safety floor, past+forecast curve, Financy connector; + Telegram report import.
 // Loads after app.js and uses its globals (isAdmin, showToast, getStorageKey,
 // switchTab, escapeHtml). Server side: /api/finance (admin-gated).
 (function () {
@@ -110,90 +111,216 @@
     // A pending edit must not die with the tab — flush it on the way out.
     addEventListener('pagehide', () => { if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; saveNow(true); } });
 
-    // ── math: running balance, past + forecast ─────────────────────────────
-    function buildCurve() {
-        const days = 60, ahead = 30;
-        const now = new Date(); now.setHours(12, 0, 0, 0);
-        const base = (fin.accounts || []).reduce((s, a) => s + (Number(a.balance) || 0), 0);
-        const all = [...(fin.entries || [])];
-        // paid ZEREM invoices count as real income history
-        invoiceIncome.forEach(inv => { if (inv.paid) all.push(inv); });
+    // ── settings with defaults (stored in the KV record, per account) ─────
+    const BANKS = {
+        leumi:    { label: 'לאומי',        color: '#1E5AA8', mark: 'L' },
+        hapoalim: { label: 'הפועלים',      color: '#D9272E', mark: 'P' },
+        discount: { label: 'דיסקונט',      color: '#0A7A3E', mark: 'D' },
+        mizrahi:  { label: 'מזרחי-טפחות',  color: '#E8770F', mark: 'M' },
+        onezero:  { label: 'OneZero',      color: '#111111', mark: '0' },
+        pepper:   { label: 'פפר',          color: '#E3007D', mark: 'p' },
+        yahav:    { label: 'יהב',          color: '#7A4B9E', mark: 'Y' },
+        jerusalem:{ label: 'ירושלים',      color: '#1F6F8B', mark: 'J' },
+        max:      { label: 'MAX',          color: '#5A2D82', mark: 'mx' },
+        isracard: { label: 'ישראכרט',      color: '#0A66C2', mark: 'IC' },
+        cal:      { label: 'כאל',          color: '#00A19B', mark: 'C' },
+        amex:     { label: 'אמריקן אקספרס', color: '#2E77BB', mark: 'AX' },
+        other:    { label: 'אחר',          color: '#79716B', mark: '·' },
+    };
+    const HE_MONTHS = ['ינו', 'פבר', 'מרץ', 'אפר', 'מאי', 'יוני', 'יולי', 'אוג', 'ספט', 'אוק', 'נוב', 'דצמ'];
+    let finCycleOffset = 0;
+    let finView = 'open';      // 'open' (Financy bank feed) | 'manual' (hand-kept books)   // 0 = the current cycle, -1 = the one before…
 
-        const byDay = {};
-        all.forEach(e => {
-            if (!e.date) return;
-            byDay[e.date] = (byDay[e.date] || 0) + (Number(e.amount) || 0);
-        });
+    function settings() {
+        fin.settings = fin.settings || {};
+        const s = fin.settings;
+        if (!Number(s.anchorDay)) s.anchorDay = 10;
+        if (typeof s.safetyFloor !== 'number') s.safetyFloor = 0;
+        if (!Array.isArray(s.selected)) s.selected = [];
+        if (typeof s.multi !== 'boolean') s.multi = false;
+        if (!s.viewYear) s.viewYear = new Date().getFullYear();
+        return s;
+    }
+    const accounts = () => (fin.accounts || []);
+    const isCard = (a) => a.kind === 'card';
+    function selectedAccounts() {
+        const s = settings();
+        const all = accounts();
+        const sel = all.filter(a => s.selected.includes(a.id));
+        return sel.length ? sel : all;
+    }
+    function bankOf(a) { return BANKS[a.institution] || BANKS.other; }
+    function localISO(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+    const today = () => { const d = new Date(); d.setHours(12, 0, 0, 0); return d; };
 
-        // Past: walk BACK from today's known balance.
-        const past = [];
-        let bal = base;
-        for (let i = 0; i <= days; i++) {
-            const d = new Date(now); d.setDate(d.getDate() - i);
-            const iso = d.toISOString().slice(0, 10);
-            past.unshift({ date: iso, bal });
-            bal -= (byDay[iso] || 0);
-        }
-
-        // Forecast: recurring charges + unpaid ZEREM invoices as expected income.
-        const future = [];
-        let fbal = base;
-        for (let i = 1; i <= ahead; i++) {
-            const d = new Date(now); d.setDate(d.getDate() + i);
-            const iso = d.toISOString().slice(0, 10);
-            (fin.recurring || []).forEach(r => {
-                if (Number(r.dayOfMonth) === d.getDate()) fbal += (Number(r.amount) || 0);
-            });
-            // Open documents land on the day their payment terms say (שוטף+N,
-            // computed server-side from the document); anything already overdue
-            // is expected any day now, so it is booked on day one.
-            invoiceIncome.forEach(inv => {
-                if (inv.paid) return;
-                const due = inv.dueDate || '';
-                if (due === iso || (i === 1 && due && due < todayISO())) fbal += inv.amount;
-            });
-            future.push({ date: iso, bal: fbal });
-        }
-        return { past, future };
+    // ── cycles: anchor day to anchor day (credit-card charge / salary day) ──
+    function anchorOnOrBefore(d) {
+        const a = settings().anchorDay;
+        const x = new Date(d.getFullYear(), d.getMonth(), Math.min(a, 28), 12);
+        if (x > d) x.setMonth(x.getMonth() - 1);
+        return x;
+    }
+    function addMonths(d, n) { const x = new Date(d); x.setMonth(x.getMonth() + n); return x; }
+    function cycleAt(offset) {
+        const start = addMonths(anchorOnOrBefore(today()), offset);
+        const end = addMonths(start, 1);            // exclusive
+        return { start, end, label: `${start.getDate()}.${start.getMonth() + 1} – ${end.getDate()}.${end.getMonth() + 1}` };
     }
 
-    // Everything that lands in one calendar month, expected and actual:
-    // documents by their payment terms, fixed charges, and manual entries.
-    function monthItems(ym) {
-        const [y, m] = ym.split('-').map(Number);
-        const inMonth = (iso) => typeof iso === 'string' && iso.slice(0, 7) === ym;
+    // Everything that lands in a window [from, to): actuals (entries + paid
+    // documents), expected documents (by terms), fixed charges, card charges.
+    function itemsBetween(from, to) {
+        const fromISO = localISO(from), toISO = localISO(to);
+        const inWin = (iso) => typeof iso === 'string' && iso >= fromISO && iso < toISO;
+        const sel = new Set(selectedAccounts().map(a => a.id));
         const items = [];
-        (fin.entries || []).forEach(e => { if (inMonth(e.date)) items.push({ date: e.date, desc: e.desc, amount: Number(e.amount) || 0, kind: 'actual' }); });
-        invoiceIncome.forEach(inv => {
-            if (inv.paid) { if (inMonth(inv.date)) items.push({ date: inv.date, desc: inv.desc, amount: inv.amount, kind: 'actual' }); }
-            else if (inMonth(inv.dueDate)) items.push({ date: inv.dueDate, desc: inv.desc + ' (לפי תנאי התשלום)', amount: inv.amount, kind: 'expected' });
+        (fin.entries || []).forEach(e => {
+            if (e.accountId && !sel.has(e.accountId)) return;
+            if (inWin(e.date)) items.push({ date: e.date, desc: e.desc, amount: Number(e.amount) || 0, kind: 'actual' });
         });
-        const daysInMonth = new Date(y, m, 0).getDate();
-        (fin.recurring || []).forEach(r => {
-            const day = Math.min(Math.max(Number(r.dayOfMonth) || 1, 1), daysInMonth);
-            items.push({ date: `${ym}-${String(day).padStart(2, '0')}`, desc: r.name || 'חיוב קבוע', amount: Number(r.amount) || 0, kind: 'recurring' });
+        invoiceIncome.forEach(inv => {
+            if (inv.paid) { if (inWin(inv.date)) items.push({ date: inv.date, desc: inv.desc, amount: inv.amount, kind: 'actual' }); }
+            else if (inWin(inv.dueDate)) items.push({ date: inv.dueDate, desc: inv.desc + ' (לפי תנאי התשלום)', amount: inv.amount, kind: 'expected' });
+        });
+        // fixed charges: once per calendar month in the window, on their day
+        for (let d = new Date(from.getFullYear(), from.getMonth(), 1); d < to; d = addMonths(d, 1)) {
+            const dim = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+            (fin.recurring || []).forEach(r => {
+                const day = Math.min(Math.max(Number(r.dayOfMonth) || 1, 1), dim);
+                const iso = localISO(new Date(d.getFullYear(), d.getMonth(), day, 12));
+                if (inWin(iso) && iso >= localISO(today())) items.push({ date: iso, desc: r.name || 'חיוב קבוע', amount: Number(r.amount) || 0, kind: 'recurring' });
+            });
+        }
+        // credit cards: the outstanding balance is charged on the next anchor day
+        const nextAnchor = addMonths(anchorOnOrBefore(today()), 1);
+        const nextISO = localISO(nextAnchor);
+        if (inWin(nextISO)) selectedAccounts().filter(isCard).forEach(c => {
+            const due = -Math.abs(Number(c.balance) || 0);
+            if (due) items.push({ date: nextISO, desc: `חיוב ${bankOf(c).label}${c.mask ? ' ' + c.mask : ''}`, amount: due, kind: 'card' });
         });
         return items.sort((a, b) => a.date.localeCompare(b.date));
     }
 
-    function monthSectionHtml() {
-        if (!finMonth) finMonth = todayISO().slice(0, 7);
-        const items = monthItems(finMonth);
-        const inSum = items.filter(i => i.amount > 0).reduce((s, i) => s + i.amount, 0);
-        const outSum = items.filter(i => i.amount < 0).reduce((s, i) => s + i.amount, 0);
-        const label = new Date(finMonth + '-01T12:00:00').toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
-        const isPast = finMonth < todayISO().slice(0, 7);
+    // ── the curve: actual balance reconstructed backwards, forecast forwards ──
+    function buildCurve() {
+        const s = settings();
+        const now = today();
+        const cashNow = selectedAccounts().filter(a => !isCard(a)).reduce((t, a) => t + (Number(a.balance) || 0), 0);
+        const yearStart = new Date(s.viewYear, 0, 1, 12);
+        const from = (s.viewYear === now.getFullYear()) ? (now - yearStart > 120 * 864e5 ? new Date(now - 120 * 864e5) : yearStart) : yearStart;
+        const pastEnd = (s.viewYear === now.getFullYear()) ? now : new Date(s.viewYear, 11, 31, 12);
+        // actuals by day (selected accounts)
+        const sel = new Set(selectedAccounts().map(a => a.id));
+        const byDay = {};
+        (fin.entries || []).forEach(e => { if (e.date && !(e.accountId && !sel.has(e.accountId))) byDay[e.date] = (byDay[e.date] || 0) + (Number(e.amount) || 0); });
+        invoiceIncome.forEach(inv => { if (inv.paid && inv.date) byDay[inv.date] = (byDay[inv.date] || 0) + inv.amount; });
+        const past = [];
+        let bal = cashNow;
+        for (let d = new Date(pastEnd); d >= from; d.setDate(d.getDate() - 1)) {
+            const iso = localISO(d);
+            past.unshift({ date: iso, bal });
+            bal -= (byDay[iso] || 0);
+        }
+        const future = [];
+        if (s.viewYear === now.getFullYear()) {
+            const horizon = addMonths(anchorOnOrBefore(now), 2); // through the end of the next full cycle
+            const fut = itemsBetween(new Date(now.getTime() + 864e5), horizon);
+            let f = cashNow;
+            for (let d = new Date(now.getTime() + 864e5); d < horizon; d.setDate(d.getDate() + 1)) {
+                const iso = localISO(d);
+                fut.forEach(i => { if (i.date === iso) f += i.amount; });
+                future.push({ date: iso, bal: f });
+            }
+        }
+        return { past, future, cashNow };
+    }
+
+    function curveSvg() {
+        const { past, future } = buildCurve();
+        const s = settings();
+        const pts = [...past, ...future];
+        if (pts.length < 2) return '<div class="empty"><h3>אין עדיין נתונים לעקומה</h3><p>חברו בנק (Financy) או הוסיפו חשבון ותנועות.</p></div>';
+        const W = 760, H = 240, PL = 44, PR = 16, PT = 26, PB = 28;
+        const vals = pts.map(p => p.bal);
+        let min = Math.min(...vals, 0, s.safetyFloor || 0), max = Math.max(...vals, 1, s.safetyFloor || 0);
+        if (max === min) max = min + 1;
+        const x = (i) => PL + (W - PL - PR) * (i / (pts.length - 1));
+        const y = (v) => H - PB - (H - PT - PB) * ((v - min) / (max - min));
+        const line = (arr, off) => arr.map((p, i) => `${x(i + off).toFixed(1)},${y(p.bal).toFixed(1)}`).join(' ');
+        const todayX = x(past.length - 1);
+        const grid = [min, (min + max) / 2, max];
+        // month labels where the month changes
+        const labels = [];
+        pts.forEach((p, i) => { if (i === 0 || p.date.slice(5, 7) !== pts[i - 1].date.slice(5, 7)) labels.push({ x: x(i), t: HE_MONTHS[Number(p.date.slice(5, 7)) - 1] }); });
+        const floorY = s.safetyFloor ? y(s.safetyFloor) : null;
+        const dips = s.safetyFloor ? future.some(p => p.bal < s.safetyFloor) : false;
+        return `
+        <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="עקומת המזומן, עבר וצפי" style="width:100%;height:auto;direction:ltr;">
+            ${grid.map(v => `<line x1="${PL}" x2="${W - PR}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="var(--border)" stroke-width="1"/>
+            <text x="${PL - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--text-3)">${Math.round(v / 1000)}k</text>`).join('')}
+            ${labels.map(l => `<text x="${l.x.toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="10" fill="var(--text-3)">${l.t}</text>`).join('')}
+            ${floorY !== null ? `<line x1="${PL}" x2="${W - PR}" y1="${floorY.toFixed(1)}" y2="${floorY.toFixed(1)}" stroke="var(--danger)" stroke-width="1" stroke-dasharray="4 4"/>
+            <text x="${W - PR}" y="${(floorY - 5).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--danger)">סף ביטחון</text>` : ''}
+            <line x1="${todayX.toFixed(1)}" x2="${todayX.toFixed(1)}" y1="${PT}" y2="${H - PB}" stroke="var(--text-3)" stroke-width="1" stroke-dasharray="3 3"/>
+            <text x="${todayX.toFixed(1)}" y="${PT - 8}" text-anchor="middle" font-size="10" fill="var(--text-2)">היום</text>
+            <polyline points="${line(past, 0)}" fill="none" stroke="var(--accent)" stroke-width="2.2"/>
+            ${future.length ? `<polyline points="${line([past[past.length - 1], ...future], past.length - 1)}" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-dasharray="6 5" opacity="0.8"/>` : ''}
+        </svg>
+        ${dips ? `<p class="fin-warn">הצפי יורד מתחת לסף הביטחון במהלך המחזור הבא.</p>` : ''}`;
+    }
+
+    // ── pieces of the screen ────────────────────────────────────────────────
+    function accountsHtml() {
+        const s = settings();
+        const all = accounts();
+        if (!all.length) return `<div class="fin-accounts-empty"><p class="fin-muted">עוד אין חשבונות. חברו את הבנקים דרך Financy, או הוסיפו חשבון ידנית למטה.</p></div>`;
+        const selected = new Set(s.selected.length ? s.selected : all.map(a => a.id));
+        return `<div class="fin-accounts">${all.map(a => {
+            const b = bankOf(a);
+            const on = selected.has(a.id);
+            const amt = Number(a.balance) || 0;
+            return `<button type="button" class="fin-acc ${on ? 'on' : ''} ${isCard(a) ? 'card' : ''}" data-acc-pick="${esc(a.id)}" title="${on ? 'מוצג' : 'לחץ להצגה'}">
+                <span class="bank-badge" style="--bank:${b.color}">${esc(b.mark)}</span>
+                <span class="fin-acc-text"><b>${esc(a.name || b.label)}</b><small>${esc(isCard(a) ? 'חיוב קרוב' : 'יתרה')}${a.mask ? ' · ' + esc(a.mask) : ''}</small></span>
+                <span class="fin-acc-amt num ${isCard(a) ? 'status-danger' : ''}">${fmtILS(isCard(a) ? -Math.abs(amt) : amt)}</span>
+                <span class="fin-acc-check" aria-hidden="true">${on ? '✓' : ''}</span>
+            </button>`;
+        }).join('')}</div>`;
+    }
+
+    function chipsHtml() {
+        const s = settings();
+        const years = Array.from(new Set([new Date().getFullYear(), ...(fin.entries || []).map(e => Number(String(e.date || '').slice(0, 4))).filter(Boolean)])).sort();
+        return `<div class="fin-chips">
+            <span class="fin-chip-label">יום עוגן</span>
+            ${[1, 10, 15].map(d => `<button type="button" class="chip ${s.anchorDay === d ? 'on' : ''}" data-anchor="${d}">${d}</button>`).join('')}
+            <input class="input fin-anchor-custom" type="number" min="1" max="28" value="${[1, 10, 15].includes(s.anchorDay) ? '' : s.anchorDay}" placeholder="אחר" data-anchor-custom aria-label="יום עוגן אחר">
+            <span class="fin-chip-sep"></span>
+            <button type="button" class="chip ${s.multi ? 'on' : ''}" data-multi>בחירה מרובה</button>
+            <span class="fin-chip-sep"></span>
+            ${years.map(y => `<button type="button" class="chip ${s.viewYear === y ? 'on' : ''}" data-year="${y}">${y}</button>`).join('')}
+            <span class="fin-chip-sep"></span>
+            <label class="fin-floor">סף ביטחון <input class="input num" type="number" step="500" value="${s.safetyFloor || ''}" placeholder="₪" data-floor></label>
+        </div>`;
+    }
+
+    function cycleCardHtml() {
+        const c = cycleAt(finCycleOffset);
+        const items = itemsBetween(c.start, c.end);
+        const inSum = items.filter(i => i.amount > 0).reduce((t, i) => t + i.amount, 0);
+        const outSum = items.filter(i => i.amount < 0).reduce((t, i) => t + i.amount, 0);
+        const title = finCycleOffset === 0 ? 'המחזור הנוכחי' : finCycleOffset < 0 ? 'מחזור שנסגר' : 'מחזור עתידי';
         const rows = items.length ? items.map(i => `<li class="${i.kind}">
                 <span>${esc(i.desc)}</span>
                 <span class="num ${i.amount >= 0 ? 'status-ok' : 'status-danger'}">${fmtILS(i.amount)}</span>
-                <small>${esc(i.date.slice(8, 10))}/${esc(i.date.slice(5, 7))}${i.kind === 'expected' ? ' · צפוי' : i.kind === 'recurring' ? ' · קבוע' : ''}</small>
-            </li>`).join('') : '<li class="fin-muted">אין תנועות או צפי לחודש הזה.</li>';
+                <small>${esc(i.date.slice(8, 10))}.${esc(i.date.slice(5, 7))}${i.kind === 'expected' ? ' · צפוי' : i.kind === 'recurring' ? ' · קבוע' : i.kind === 'card' ? ' · אשראי' : ''}</small>
+            </li>`).join('') : '<li class="fin-muted">אין תנועות או צפי במחזור הזה.</li>';
         return `
         <div class="card fin-month-card">
             <div class="fin-month-head">
-                <button type="button" class="btn btn-ghost btn-sm" data-fin-month="next" aria-label="חודש הבא">‹</button>
-                <h3>${isPast ? 'מה נכנס ויצא ב' : 'צפוי ב'}${esc(label)}</h3>
-                <button type="button" class="btn btn-ghost btn-sm" data-fin-month="prev" aria-label="חודש קודם">›</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-cycle="1" aria-label="המחזור הבא">‹</button>
+                <h3>${title} <small>${esc(c.label)}</small></h3>
+                <button type="button" class="btn btn-ghost btn-sm" data-cycle="-1" aria-label="המחזור הקודם">›</button>
             </div>
             <div class="fin-cards fin-month-kpis">
                 <div><div class="fin-kpi-label">נכנס</div><div class="fin-kpi num status-ok">${fmtILS(inSum)}</div></div>
@@ -204,38 +331,23 @@
         </div>`;
     }
 
-    function shiftMonth(dir) {
-        const [y, m] = (finMonth || todayISO().slice(0, 7)).split('-').map(Number);
-        const d = new Date(y, m - 1 + dir, 1);
-        finMonth = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-        window.renderFinance();
-    }
-
-    function curveSvg() {
-        const { past, future } = buildCurve();
-        const pts = [...past, ...future.map(p => ({ ...p, f: true }))];
-        if (!pts.length) return '';
-        const W = 720, H = 220, PAD = 34;
-        const vals = pts.map(p => p.bal);
-        let min = Math.min(...vals, 0), max = Math.max(...vals, 1);
-        if (max === min) max = min + 1;
-        const x = (i) => PAD + (W - PAD * 2) * (i / (pts.length - 1));
-        const y = (v) => H - PAD - (H - PAD * 2) * ((v - min) / (max - min));
-        const line = (arr, off) => arr.map((p, i) => `${x(i + off).toFixed(1)},${y(p.bal).toFixed(1)}`).join(' ');
-        const zeroY = y(0);
-        const todayX = x(past.length - 1);
-        const gridVals = [min, (min + max) / 2, max];
-        // RTL page, LTR time axis inside the SVG — dates flow left→right.
+    function financyCardHtml() {
+        const fz = (fin.settings && fin.settings.financy) || {};
+        const status = fz.connected
+            ? `<span class="status-ok">מחובר</span> · סנכרון אחרון: ${fz.lastSync ? esc(new Date(fz.lastSync).toLocaleString('he-IL')) : 'עדיין לא'}${fz.lastError ? ` · <span class="status-danger">${esc(fz.lastError)}</span>` : ''}`
+            : '<span class="fin-muted">לא מחובר</span>';
         return `
-        <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="עקומת מזומן · 60 יום אחורה ו-30 קדימה" style="width:100%;height:auto;direction:ltr;">
-            ${gridVals.map(v => `<line x1="${PAD}" x2="${W - PAD}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="var(--border)" stroke-width="1"/>
-            <text x="${PAD - 6}" y="${(y(v) + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--text-3)">${Math.round(v / 1000)}k</text>`).join('')}
-            ${min < 0 ? `<line x1="${PAD}" x2="${W - PAD}" y1="${zeroY.toFixed(1)}" y2="${zeroY.toFixed(1)}" stroke="var(--danger)" stroke-width="1" stroke-dasharray="2 4"/>` : ''}
-            <line x1="${todayX.toFixed(1)}" x2="${todayX.toFixed(1)}" y1="${PAD}" y2="${H - PAD}" stroke="var(--text-3)" stroke-width="1" stroke-dasharray="3 3"/>
-            <text x="${todayX.toFixed(1)}" y="${PAD - 8}" text-anchor="middle" font-size="10" fill="var(--text-3)">היום</text>
-            <polyline points="${line(past, 0)}" fill="none" stroke="var(--accent)" stroke-width="2"/>
-            <polyline points="${line(future, past.length)}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-dasharray="5 4" opacity="0.75"/>
-        </svg>`;
+        <div class="card fin-financy">
+            <h3>חיבור לבנקים · Financy (בנקאות פתוחה)</h3>
+            <p class="fin-muted">היתרות והתנועות של כל הבנקים והאשראי נמשכות לבד, בקריאה בלבד, בפיקוח בנק ישראל. פעם אחת: נרשמים ב-Financy, מחברים שם את הבנקים, ומדביקים כאן את מפתח ה-API.</p>
+            <p class="fin-financy-status">${status}</p>
+            <div class="fin-form-row">
+                <input class="input" type="password" id="fin-financy-key" placeholder="מפתח API מ-Financy" autocomplete="off" dir="ltr">
+                <button type="button" class="btn btn-primary" data-financy="save">שמור מפתח</button>
+                <button type="button" class="btn btn-quiet" data-financy="sync" ${fz.connected ? '' : 'disabled'}>סנכרן עכשיו</button>
+            </div>
+            <p class="fin-muted"><a href="https://financy.open-finance.ai/" target="_blank" rel="noopener">להרשמה ולחיבור הבנקים ב-Financy ↗</a></p>
+        </div>`;
     }
 
     // ── render ─────────────────────────────────────────────────────────────
@@ -245,12 +357,7 @@
         if (!hasProAccess()) {
             root.innerHTML = `<div class="card fin-locked">
                 <h3>תזרים מזומנים — תכונת PRO</h3>
-                <p>יתרות החשבונות, עקומת מזומן של 60 יום אחורה ו-30 קדימה, חיובים קבועים שמופיעים לבד, והכנסות שנמשכות ישירות מהמסמכים שהפקת כאן — בלי להקליד שוב.</p>
-                <ul>
-                    <li>מזומן זמין עכשיו, במבט אחד</li>
-                    <li>מה ייכנס ומה ייצא — לפני שזה קורה</li>
-                    <li>ייבוא תנועות מהבנק ב-CSV, וחיבור בנקאות פתוחה בהמשך</li>
-                </ul>
+                <p>הבנקים והאשראי שלך במקום אחד, מזומן זמין עכשיו, עקומת מזומן עבר וצפי, מחזורי חיוב לפי יום עוגן, סף ביטחון, והכנסות שנמשכות ישירות מהמסמכים שהפקת כאן.</p>
                 <div class="fin-locked-actions">
                     <button class="btn btn-primary" onclick="typeof showUpgradeModal === 'function' ? showUpgradeModal('general') : null">שדרוג ל-PRO</button>
                 </div>
@@ -275,78 +382,89 @@
             }
         }
 
-        const cash = (fin.accounts || []).reduce((s, a) => s + (Number(a.balance) || 0), 0);
-        const monthlyRecurring = (fin.recurring || []).reduce((s, r) => s + (Number(r.amount) || 0), 0);
-        const openInvoices = invoiceIncome.filter(i => !i.paid);
-        const openSum = openInvoices.reduce((s, i) => s + i.amount, 0);
+        const s = settings();
+        const { cashNow } = buildCurve();
+        const closed = cycleAt(-1);
+        const closedItems = itemsBetween(closed.start, closed.end).filter(i => i.kind === 'actual');
+        const closedNet = closedItems.reduce((t, i) => t + i.amount, 0);
+        const openDocs = invoiceIncome.filter(i => !i.paid);
+        const openSum = openDocs.reduce((t, i) => t + i.amount, 0);
+        const fz = (s.financy || {});
+        const stamp = fz.lastSync ? new Date(fz.lastSync) : new Date();
+        const stampTxt = stamp.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
 
-        const upcoming = (fin.recurring || []).map(r => {
-            const d = new Date();
-            const day = Math.min(Math.max(Number(r.dayOfMonth) || 1, 1), 28);
-            if (d.getDate() >= day) d.setMonth(d.getMonth() + 1);
-            d.setDate(day);
-            return { ...r, next: d.toISOString().slice(0, 10) };
-        }).sort((a, b) => a.next.localeCompare(b.next)).slice(0, 8);
-
-        const recent = [...(fin.entries || [])].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 12);
-
+        root.className = 'fin-view-' + finView;
         root.innerHTML = `
+        <div class="fin-subtabs" role="tablist">
+            <button type="button" class="subtab ${finView === 'open' ? 'active' : ''}" role="tab" data-view="open">Open Finance · בנקים</button>
+            <button type="button" class="subtab ${finView === 'manual' ? 'active' : ''}" role="tab" data-view="manual">ניהול ידני</button>
+        </div>
+        <div class="fin-head">
+            <div>
+                <h3 class="fin-title">תזרים מזומנים</h3>
+                <p class="fin-sub">${fz.connected ? 'מהפיד החי של הבנקים' : 'מהנתונים שהוזנו כאן'} • עבר = יתרות בפועל, קדימה = צפי</p>
+            </div>
+            <span class="fin-stamp num">${esc(stampTxt)}</span>
+        </div>
+
+        <div class="fin-open-only">${accountsHtml()}</div>
+        ${chipsHtml()}
+
         <div class="fin-cards">
-            <div class="card"><div class="fin-kpi-label">מזומן זמין עכשיו</div><div class="fin-kpi num">${fmtILS(cash)}</div>
-                <div class="fin-kpi-sub">${(fin.accounts || []).length ? (fin.accounts || []).map(a => `${esc(a.name)}: ${fmtILS(a.balance)}`).join(' · ') : 'עדיין לא הוגדרו חשבונות'}</div></div>
-            <div class="card"><div class="fin-kpi-label">ממתין לתשלום (הצעות/חשבוניות)</div><div class="fin-kpi num status-ok">${fmtILS(openSum)}</div>
-                <div class="fin-kpi-sub">${openInvoices.length} מסמכים פתוחים${(() => { const n = openInvoices.map(i => i.dueDate).filter(Boolean).sort()[0]; return n ? ' · הקרוב צפוי ב-' + new Date(n).toLocaleDateString('he-IL') : ''; })()}</div></div>
-            <div class="card"><div class="fin-kpi-label">הוצאות קבועות בחודש</div><div class="fin-kpi num status-danger">${fmtILS(Math.abs(monthlyRecurring))}</div>
-                <div class="fin-kpi-sub">${(fin.recurring || []).length} חיובים קבועים</div></div>
+            <div class="card"><div class="fin-kpi-label">מזומן זמין עכשיו</div><div class="fin-kpi num">${fmtILS(cashNow)}</div>
+                <div class="fin-kpi-sub">${selectedAccounts().filter(a => !isCard(a)).length} חשבונות${selectedAccounts().some(isCard) ? ' · אשראי נפרד' : ''}</div></div>
+            <div class="card"><div class="fin-kpi-label">מחזור אחרון שנסגר ← (${closed.end.getDate()}.${closed.end.getMonth() + 1})</div><div class="fin-kpi num ${closedNet >= 0 ? 'status-ok' : 'status-danger'}">${fmtILS(closedNet)}</div>
+                <div class="fin-kpi-sub">נטו ${esc(closed.label)}</div></div>
+            <div class="card"><div class="fin-kpi-label">ממתין לתשלום מלקוחות</div><div class="fin-kpi num status-ok">${fmtILS(openSum)}</div>
+                <div class="fin-kpi-sub">${openDocs.length} מסמכים פתוחים${(() => { const n = openDocs.map(i => i.dueDate).filter(Boolean).sort()[0]; return n ? ' · הקרוב ' + new Date(n).toLocaleDateString('he-IL') : ''; })()}</div></div>
         </div>
 
         <div class="card fin-chart-card">
-            <h3>עקומת המזומן · עבר וצפי</h3>
-            ${((fin.entries || []).length || (fin.accounts || []).length) ? curveSvg() : '<div class="empty"><h3>אין עדיין נתונים לעקומה</h3><p>הוסיפו חשבון עם יתרה ותנועות, או ייבאו CSV, והעקומה תופיע כאן.</p></div>'}
-            <div class="fin-legend"><span><i class="fin-dot solid"></i> בפועל</span><span><i class="fin-dot dashed"></i> צפי (חיובים קבועים + מסמכים פתוחים)</span></div>
+            <h3>עקומת המזומן • עבר וצפי</h3>
+            ${curveSvg()}
+            <div class="fin-legend"><span><i class="fin-dot solid"></i> בפועל</span><span><i class="fin-dot dashed"></i> צפי: מסמכים לפי תנאי תשלום, חיובים קבועים, חיוב אשראי ביום העוגן</span></div>
         </div>
 
-        ${monthSectionHtml()}
+        ${cycleCardHtml()}
 
-        <div class="fin-grid">
-            <div class="card">
-                <h3>חיובים קרובים</h3>
-                ${upcoming.length ? `<ul class="fin-list">${upcoming.map(u => `<li><span>${esc(u.name)}</span><span class="num">${fmtILS(u.amount)}</span><small>${esc(u.next)}</small></li>`).join('')}</ul>` : '<p class="fin-muted">אין חיובים קבועים. הוסיפו למטה, שכירות, תוכנות, ביטוחים.</p>'}
-            </div>
-            <div class="card">
-                <h3>תנועות אחרונות</h3>
-                ${recent.length ? `<ul class="fin-list">${recent.map(e => `<li><span>${esc(e.desc)}</span><span class="num ${e.amount >= 0 ? 'status-ok' : 'status-danger'}">${fmtILS(e.amount)}</span><small>${esc(e.date)}</small>
-                    <button class="fin-x" data-del="${esc(e.id)}" title="מחיקה">×</button></li>`).join('')}</ul>` : '<p class="fin-muted">אין תנועות עדיין.</p>'}
-            </div>
+        <div class="fin-open-only">${financyCardHtml()}</div>
+
+        <div class="card fin-manual-only fin-books-soon">
+            <h3>ניהול כספי</h3>
+            <p class="fin-muted">הכנסות לפי חודש, הפרשות (מס הכנסה, ביטוח לאומי, קרן השתלמות, פנסיה) והוצאות, לפי הגיליון "ניהול כספי" שלך. נבנה בסבב הבא.</p>
         </div>
-
-        <div class="fin-grid">
-            <div class="card">
-                <h3>הוספה מהירה</h3>
-                <form id="fin-add-form">
-                    <div class="fin-form-row">
-                        <input class="input" type="date" id="fin-f-date" value="${todayISO()}" required>
-                        <input class="input num" type="number" id="fin-f-amount" placeholder="סכום (מינוס = הוצאה)" required>
-                    </div>
-                    <div class="fin-form-row">
-                        <input class="input" type="text" id="fin-f-desc" placeholder="תיאור" required>
-                        <button class="btn btn-primary" type="submit">הוסף</button>
-                    </div>
-                </form>
-                <details class="fin-details"><summary>ייבוא CSV (תאריך,סכום,תיאור)</summary>
-                    <textarea class="textarea" id="fin-csv" rows="4" placeholder="2026-08-01,-450,דלק&#10;2026-08-03,5200,קאנטרי רעננה"></textarea>
-                    <button class="btn btn-quiet btn-sm" id="fin-csv-go">ייבוא</button>
-                </details>
-                <details class="fin-details"><summary>חשבונות ויתרות</summary>
-                    <div id="fin-accounts">${(fin.accounts || []).map(a => `
+        <details class="card fin-manual fin-manual-only" ${finView === 'manual' ? 'open' : ''}>
+            <summary>נתונים ידניים · חשבונות, תנועות, חיובים קבועים</summary>
+            <div class="fin-grid">
+                <div>
+                    <h4>הוספה מהירה</h4>
+                    <form id="fin-add-form">
+                        <div class="fin-form-row">
+                            <input class="input" type="date" id="fin-f-date" value="${todayISO()}" required>
+                            <input class="input num" type="number" id="fin-f-amount" placeholder="סכום (מינוס = הוצאה)" required>
+                        </div>
+                        <div class="fin-form-row">
+                            <input class="input" type="text" id="fin-f-desc" placeholder="תיאור" required>
+                            <button class="btn btn-primary" type="submit">הוסף</button>
+                        </div>
+                    </form>
+                    <details class="fin-details"><summary>ייבוא CSV (תאריך,סכום,תיאור)</summary>
+                        <textarea class="textarea" id="fin-csv" rows="4" placeholder="2026-08-01,-450,דלק&#10;2026-08-03,5200,קאנטרי רעננה"></textarea>
+                        <button class="btn btn-quiet btn-sm" id="fin-csv-go">ייבוא</button>
+                    </details>
+                </div>
+                <div>
+                    <h4>חשבונות ויתרות</h4>
+                    <div id="fin-accounts">${accounts().map(a => `
                         <div class="fin-form-row" data-acc="${esc(a.id)}">
-                            <input class="input" type="text" value="${esc(a.name)}" data-f="name" placeholder="שם החשבון">
-                            <input class="input num" type="number" value="${Number(a.balance) || 0}" data-f="balance" placeholder="יתרה">
+                            <select class="input" data-f="institution" aria-label="בנק">${Object.keys(BANKS).map(k => `<option value="${k}" ${(a.institution || 'other') === k ? 'selected' : ''}>${esc(BANKS[k].label)}</option>`).join('')}</select>
+                            <select class="input" data-f="kind" aria-label="סוג"><option value="bank" ${a.kind !== 'card' ? 'selected' : ''}>עו"ש</option><option value="card" ${a.kind === 'card' ? 'selected' : ''}>אשראי</option></select>
+                            <input class="input" type="text" value="${esc(a.name || '')}" data-f="name" placeholder="שם">
+                            <input class="input num" type="number" value="${Number(a.balance) || 0}" data-f="balance" placeholder="${a.kind === 'card' ? 'חיוב קרוב' : 'יתרה'}">
                             <button class="fin-x" data-delacc="${esc(a.id)}" title="מחיקה">×</button>
                         </div>`).join('')}</div>
                     <button class="btn btn-quiet btn-sm" id="fin-acc-add">הוסף חשבון</button>
-                </details>
-                <details class="fin-details"><summary>חיובים קבועים</summary>
+                    <h4 style="margin-block-start: var(--sp-4);">חיובים קבועים</h4>
                     <div id="fin-recurring">${(fin.recurring || []).map(r => `
                         <div class="fin-form-row" data-rec="${esc(r.id)}">
                             <input class="input" type="text" value="${esc(r.name)}" data-f="name" placeholder="שם">
@@ -355,27 +473,60 @@
                             <button class="fin-x" data-delrec="${esc(r.id)}" title="מחיקה">×</button>
                         </div>`).join('')}</div>
                     <button class="btn btn-quiet btn-sm" id="fin-rec-add">הוסף חיוב קבוע</button>
-                </details>
-            </div>
-            <div class="card">
-                <h3>חיבורים</h3>
-                <p class="fin-muted">הכנסות נמשכות אוטומטית מהמסמכים שהפקת במערכת (הנהלת חשבונות).</p>
-                <div class="fin-connector">
-                    <b>בנקאות פתוחה (Financy)</b>
-                    <p class="fin-muted">חיבור קריאה-בלבד לבנקים ולאשראי, בפיקוח בנק ישראל, היתרות והתנועות יתעדכנו לבד. דורש הרשמה חד-פעמית שלך ב-financy.open-finance.ai; אחרי שיהיו מפתחות, החיבור כאן.</p>
-                </div>
-                <div class="fin-connector">
-                    <b>טיפ: בוט ההוצאות של SUMIT בוואטסאפ</b>
-                    <p class="fin-muted">שולחים צילום קבלה לוואטסאפ של SUMIT, והכל מתויק לבד באתר שלהם, חינם. נוח להצמיד את השיחה למעלה ולשמור קבלות מהשטח בשנייה.</p>
                 </div>
             </div>
-        </div>`;
+            <p class="fin-muted" style="margin-block-start: var(--sp-3);">טיפ: בוט ההוצאות של SUMIT בוואטסאפ מתייק קבלות לבד, חינם, נוח להצמיד את השיחה למעלה.</p>
+        </details>`;
 
         wire(root);
     };
 
     function wire(root) {
-        root.querySelectorAll('[data-fin-month]').forEach(b => b.addEventListener('click', () => shiftMonth(b.dataset.finMonth === 'next' ? 1 : -1)));
+        const s = settings();
+        const rerender = () => { scheduleSave(); window.renderFinance(); };
+        root.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => { finView = b.dataset.view; window.renderFinance(); }));
+        root.querySelectorAll('[data-acc-pick]').forEach(b => b.addEventListener('click', () => {
+            const id = b.dataset.accPick;
+            const all = accounts().map(a => a.id);
+            const cur = s.selected.length ? s.selected.slice() : all.slice();
+            if (s.multi) {
+                const i = cur.indexOf(id);
+                if (i >= 0) { if (cur.length > 1) cur.splice(i, 1); } else cur.push(id);
+            } else {
+                cur.splice(0, cur.length, id);
+            }
+            s.selected = (cur.length === all.length) ? [] : cur;
+            rerender();
+        }));
+        root.querySelectorAll('[data-anchor]').forEach(b => b.addEventListener('click', () => { s.anchorDay = Number(b.dataset.anchor); finCycleOffset = 0; rerender(); }));
+        const custom = root.querySelector('[data-anchor-custom]');
+        if (custom) custom.addEventListener('change', () => { const v = Number(custom.value); if (v >= 1 && v <= 28) { s.anchorDay = v; finCycleOffset = 0; rerender(); } });
+        const multi = root.querySelector('[data-multi]');
+        if (multi) multi.addEventListener('click', () => { s.multi = !s.multi; rerender(); });
+        root.querySelectorAll('[data-year]').forEach(b => b.addEventListener('click', () => { s.viewYear = Number(b.dataset.year); rerender(); }));
+        const floor = root.querySelector('[data-floor]');
+        if (floor) floor.addEventListener('change', () => { s.safetyFloor = Number(floor.value) || 0; rerender(); });
+        root.querySelectorAll('[data-cycle]').forEach(b => b.addEventListener('click', () => { finCycleOffset += Number(b.dataset.cycle); window.renderFinance(); }));
+
+        root.querySelectorAll('[data-financy]').forEach(b => b.addEventListener('click', async () => {
+            const action = b.dataset.financy;
+            const key = (root.querySelector('#fin-financy-key') || {}).value || '';
+            if (action === 'save' && !key.trim()) { if (typeof showToast === 'function') showToast('הדביקו את מפתח ה-API מ-Financy', 'error'); return; }
+            b.disabled = true; const label = b.textContent; b.textContent = action === 'save' ? 'שומר…' : 'מסנכרן…';
+            try {
+                const token = await liveToken();
+                const res = await fetch('/api/financy', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                    body: JSON.stringify(action === 'save' ? { action: 'saveKey', key: key.trim() } : { action: 'sync' }) });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error((data.error && data.error.message) || 'נכשל');
+                if (typeof showToast === 'function') showToast(data.message || (action === 'save' ? 'המפתח נשמר' : 'סונכרן'));
+                fin = null; window.renderFinance();
+            } catch (e) {
+                if (typeof showToast === 'function') showToast('Financy: ' + e.message, 'error');
+                b.disabled = false; b.textContent = label;
+            }
+        }));
+
         const form = root.querySelector('#fin-add-form');
         if (form) form.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -384,14 +535,13 @@
             const date = root.querySelector('#fin-f-date').value;
             if (!amount || !desc || !date) return;
             fin.entries.push({ id: 'e' + Date.now(), date, amount, desc, category: '', source: 'manual' });
-            scheduleSave(); window.renderFinance();
+            rerender();
         });
         const csvGo = root.querySelector('#fin-csv-go');
         if (csvGo) csvGo.addEventListener('click', () => {
             const lines = (root.querySelector('#fin-csv').value || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
             let added = 0;
             lines.forEach(l => {
-                // date,amount,desc — amount may carry thousands separators ("1,250")
                 const m = l.match(/^\s*(\d{4}-\d{2}-\d{2})\s*,\s*(-?[\d,]+(?:\.\d+)?)\s*,\s*(.+)$/);
                 if (!m) return;
                 const amt = Number(m[2].replace(/,/g, ''));
@@ -400,31 +550,14 @@
                 added++;
             });
             if (typeof showToast === 'function') showToast(added ? `נוספו ${added} תנועות` : 'לא זוהו שורות תקינות (תאריך,סכום,תיאור)');
-            if (added) { scheduleSave(); window.renderFinance(); }
+            if (added) rerender();
         });
-        root.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
-            fin.entries = fin.entries.filter(e => e.id !== b.dataset.del);
-            scheduleSave(); window.renderFinance();
-        }));
-        root.querySelectorAll('[data-delacc]').forEach(b => b.addEventListener('click', () => {
-            fin.accounts = fin.accounts.filter(a => a.id !== b.dataset.delacc);
-            scheduleSave(); window.renderFinance();
-        }));
-        root.querySelectorAll('[data-delrec]').forEach(b => b.addEventListener('click', () => {
-            fin.recurring = fin.recurring.filter(r => r.id !== b.dataset.delrec);
-            scheduleSave(); window.renderFinance();
-        }));
+        root.querySelectorAll('[data-delacc]').forEach(b => b.addEventListener('click', () => { fin.accounts = fin.accounts.filter(a => a.id !== b.dataset.delacc); rerender(); }));
+        root.querySelectorAll('[data-delrec]').forEach(b => b.addEventListener('click', () => { fin.recurring = fin.recurring.filter(r => r.id !== b.dataset.delrec); rerender(); }));
         const accAdd = root.querySelector('#fin-acc-add');
-        if (accAdd) accAdd.addEventListener('click', () => {
-            fin.accounts.push({ id: 'a' + Date.now(), name: '', kind: 'bank', balance: 0, asOf: todayISO() });
-            window.renderFinance();
-        });
+        if (accAdd) accAdd.addEventListener('click', () => { fin.accounts.push({ id: 'a' + Date.now(), name: '', kind: 'bank', institution: 'other', balance: 0, asOf: todayISO(), source: 'manual' }); window.renderFinance(); });
         const recAdd = root.querySelector('#fin-rec-add');
-        if (recAdd) recAdd.addEventListener('click', () => {
-            fin.recurring.push({ id: 'r' + Date.now(), name: '', amount: 0, dayOfMonth: 1 });
-            window.renderFinance();
-        });
-        // inline edits on accounts/recurring
+        if (recAdd) recAdd.addEventListener('click', () => { fin.recurring.push({ id: 'r' + Date.now(), name: '', amount: 0, dayOfMonth: s.anchorDay }); window.renderFinance(); });
         root.querySelectorAll('[data-acc] .input, [data-rec] .input').forEach(inp => {
             inp.addEventListener('change', () => {
                 const row = inp.closest('[data-acc], [data-rec]');
@@ -432,9 +565,10 @@
                 const item = list.find(x => x.id === (row.dataset.acc || row.dataset.rec));
                 if (!item) return;
                 const f = inp.dataset.f;
-                item[f] = (f === 'name') ? inp.value : Number(inp.value) || 0;
+                item[f] = (f === 'name' || f === 'institution' || f === 'kind') ? inp.value : Number(inp.value) || 0;
                 if (row.dataset.acc) item.asOf = todayISO();
                 scheduleSave();
+                if (f === 'kind' || f === 'institution') window.renderFinance();
             });
         });
     }
