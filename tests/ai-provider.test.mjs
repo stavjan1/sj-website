@@ -8,20 +8,67 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { toGemini, supportsThinkingOff } from '../functions/api/_ai.js';
+import { readFileSync } from 'node:fs';
+
+import { toGemini, supportsThinkingOff, PROVIDERS, modelScore } from '../functions/api/_ai.js';
 import { MODEL_CLASS } from '../functions/api/_tiers.js';
+
+const RETIRED = [/gemini-1\.5/, /gemini-2\.0/, /gemini-2\.5-flash\b/];
 
 test('the shipped default model is not one Google has retired', () => {
   // gemini-2.5-flash started returning 404 "no longer available to new users"
   // and took the pricing chat down. gemini-2.0-flash did the same in June.
   // A retired model must never sit in the shipped defaults again.
-  const retired = [/gemini-1\.5/, /gemini-2\.0/, /gemini-2\.5-flash\b/];
   for (const cls of ['basic', 'advanced']) {
     const model = MODEL_CLASS[cls].model;
-    for (const rx of retired) {
+    for (const rx of RETIRED) {
       assert.ok(!rx.test(model), `${cls} is pinned to a retired model: ${model}`);
     }
   }
+});
+
+test('the provider fallback model is not retired either', () => {
+  // The blind spot that let a dead model sit in production with a green suite.
+  // The test above only ever looked at MODEL_CLASS, while
+  // PROVIDERS.gemini.defaultModel — used whenever a caller names no model at
+  // all — was still gemini-2.5-flash, the exact name Google had stopped
+  // serving.
+  for (const rx of RETIRED) {
+    assert.ok(!rx.test(PROVIDERS.gemini.defaultModel),
+      `the no-model-named fallback is retired: ${PROVIDERS.gemini.defaultModel}`);
+  }
+});
+
+test('a refused model is replaced by the best Flash, not by Pro', () => {
+  // Promoting a broken free-tier Flash call to Pro would spend the advanced
+  // pool that paying work depends on: a quiet way to turn a model outage into
+  // a billing one.
+  const want = 'gemini-3.6-flash';
+  const offered = ['gemini-3.7-flash', 'gemini-2.5-pro', 'gemini-3.5-flash-lite',
+                   'gemini-3-flash-preview', 'gemini-2.5-flash'];
+  const best = offered.slice().sort((a, b) => modelScore(b, want) - modelScore(a, want))[0];
+  assert.equal(best, 'gemini-3.7-flash');
+
+  // Preview ids lose to stable ones: the choice is cached for hours, and a
+  // preview can change or vanish underneath it.
+  assert.ok(modelScore('gemini-3.5-flash', 'x') > modelScore('gemini-3-flash-preview', 'x'));
+  // Lite wins only when Lite is what was asked for.
+  assert.ok(modelScore('gemini-3.5-flash', want) > modelScore('gemini-3.5-flash-lite', want));
+  assert.ok(modelScore('gemini-3.5-flash-lite', 'gemini-3.5-flash-lite')
+          > modelScore('gemini-3.5-flash-lite', 'gemini-3.5-flash'));
+});
+
+test('a healed model name survives the whitelist that rejected it', () => {
+  // The substitute comes from Google's own list, so by definition it is not in
+  // the hardcoded PROVIDERS list. Running it back through pickModel would
+  // reject it and hand over the very default that just 404ed — a loop of one.
+  const src = readFileSync(new URL('../functions/api/_ai.js', import.meta.url), 'utf8');
+  assert.ok(/const model = opts\._resolvedModel \|\| pickModel\(/.test(src),
+    'callOnce still filters the healed name through the whitelist');
+  // And the healer must only ever run on 404 — a 429 means the pool is spent,
+  // and swapping models on quota just spends a second pool.
+  assert.ok(/name === 'gemini' && upstream\.status === 404/.test(src),
+    'the model healer fires on statuses that are not about the model');
 });
 
 test('thinkingBudget:0 is only sent to models that accept it', () => {
