@@ -1902,7 +1902,7 @@ function broadcastAudience(kind) {
             id: key, name,
             phone: (linked && linked.phone) || p.clientPhone || '',
             email: (linked && linked.email) || p.clientEmail || '',
-            projects: 0, maint: false,
+            projects: 0, maint: false, tags: (linked && linked.tags) || [],
         };
         rec.projects++;
         if (projectRepeats(byId.get(p.id))) rec.maint = true;
@@ -1913,11 +1913,15 @@ function broadcastAudience(kind) {
     (clientsList || []).forEach((c) => {
         const key = 'id:' + c.id;
         if (rows.has(key)) return;
-        rows.set(key, { id: key, name: c.name, phone: c.phone || '', email: c.email || '', projects: 0, maint: false });
+        rows.set(key, { id: key, name: c.name, phone: c.phone || '', email: c.email || '', projects: 0, maint: false, tags: c.tags || [] });
     });
     let list = [...rows.values()];
     if (kind === 'maint') list = list.filter((r) => r.maint);
     else if (kind === 'repeat') list = list.filter((r) => r.projects > 1);
+    else if (String(kind).startsWith('tag:')) {
+        const tag = String(kind).slice(4);
+        list = list.filter((r) => (r.tags || []).includes(tag));
+    }
     return list.sort((a, b) => a.name.localeCompare(b.name, 'he'));
 }
 
@@ -1927,6 +1931,7 @@ let _bcCampaign = 'msg';
 function openBroadcast(campaignKey) {
     _bcCampaign = campaignKey || 'msg';
     _bcAudience = 'all';
+    _bcPicked = new Set(broadcastAudience('all').map((r) => r.id));
     const holiday = HOLIDAYS.find((h) => h.key === campaignKey);
     // The date is only for the title; the greeting itself works whenever it is
     // opened, including from the "הודעה ללקוחות" button months in advance.
@@ -1939,11 +1944,7 @@ function openBroadcast(campaignKey) {
     dlg.innerHTML = `
         <h3>${escapeHtml(upcoming ? 'ברכת ' + upcoming.name : 'הודעה ללקוחות')}</h3>
         <p class="input-help">בוחרים למי, כותבים פעם אחת, ושולחים אחד-אחד בוואטסאפ. אין כאן שליחה אוטומטית בשמך.</p>
-        <div class="bc-aud" id="bc-aud">
-            <button type="button" class="subtab active" onclick="setBroadcastAudience('all')">כל הלקוחות</button>
-            <button type="button" class="subtab" onclick="setBroadcastAudience('maint')">תחת תחזוקה</button>
-            <button type="button" class="subtab" onclick="setBroadcastAudience('repeat')">לקוחות חוזרים</button>
-        </div>
+        <div class="bc-aud" id="bc-aud"></div>
         <textarea id="bc-text" class="bc-text" rows="5">${escapeHtml(upcoming ? holidayGreetingText(upcoming) : '')}</textarea>
         <div class="bc-actions">
             <button type="button" class="btn btn-secondary btn-small" onclick="copyBroadcastText()">העתקת ההודעה</button>
@@ -1954,36 +1955,150 @@ function openBroadcast(campaignKey) {
             <button type="button" class="btn btn-secondary" onclick="document.getElementById('bc-dialog').close()">סגירה</button>
         </div>`;
     document.body.appendChild(dlg);
+    _renderBroadcastChips();
     renderBroadcastList();
     dlg.showModal();
 }
 
-function setBroadcastAudience(kind) {
-    _bcAudience = kind;
-    document.querySelectorAll('#bc-aud .subtab').forEach((b, i) => {
-        b.classList.toggle('active', ['all', 'maint', 'repeat'][i] === kind);
-    });
-    renderBroadcastList();
-}
+// Who gets it is a choice per person, not only a preset: the chips above are a
+// fast way to tick a whole group, and every line can still be ticked or
+// unticked by hand.
+let _bcPicked = new Set();
 
 function renderBroadcastList() {
     const box = document.getElementById('bc-list');
     if (!box) return;
-    const list = broadcastAudience(_bcAudience);
+    const list = broadcastAudience('all');
     const done = _broadcastDone(_bcCampaign);
+    _bcRows = list;
     if (!list.length) {
-        box.innerHTML = '<p class="input-help">אין לקוחות בקבוצה הזו.</p>';
+        box.innerHTML = '<p class="input-help">אין עדיין לקוחות. הם נוספים מעבודות ומהלשונית "לקוחות".</p>';
         return;
     }
-    box.innerHTML = `<div class="bc-count">${list.length} לקוחות · נשלחו ${[...done].filter((id) => list.some((r) => r.id === id)).length}</div>` +
-        list.map((r) => `
-        <div class="bc-row${done.has(r.id) ? ' is-done' : ''}" id="bc-row-${escapeHtml(r.id)}">
-            <span class="bc-name">${escapeHtml(r.name)}</span>
-            <span class="bc-meta">${escapeHtml(r.phone || r.email || 'אין פרטי קשר')}</span>
+    const picked = list.filter((r) => _bcPicked.has(r.id));
+    const reachable = picked.filter((r) => r.phone || r.email).length;
+
+    box.innerHTML = `
+        <div class="bc-count">
+            <span>${picked.length} נבחרו מתוך ${list.length}${reachable < picked.length ? `, ל-${picked.length - reachable} אין פרטי קשר` : ''}</span>
+            <button type="button" class="bc-linkbtn" onclick="broadcastPickAll(${picked.length === list.length ? 'false' : 'true'})">
+                ${picked.length === list.length ? 'ניקוי הבחירה' : 'בחירת הכל'}
+            </button>
+        </div>` +
+        list.map((r) => {
+            const contact = [r.phone, r.email].filter(Boolean).join(' · ');
+            return `
+        <div class="bc-row${done.has(r.id) ? ' is-done' : ''}${_bcPicked.has(r.id) ? ' is-picked' : ''}" id="bc-row-${escapeHtml(r.id)}">
+            <label class="bc-check">
+                <input type="checkbox" ${_bcPicked.has(r.id) ? 'checked' : ''} onchange="broadcastToggle('${escapeHtml(r.id)}', this.checked)">
+                <span class="bc-name">${escapeHtml(r.name)}</span>
+            </label>
+            <span class="bc-meta">${escapeHtml(contact || 'אין פרטי קשר')}</span>
+            <button type="button" class="bc-icon" title="עריכת פרטי קשר" aria-label="עריכת פרטי קשר"
+                    onclick="broadcastEditContact('${escapeHtml(r.id)}')">
+                <i class="fa-solid fa-pen" aria-hidden="true"></i>
+            </button>
             ${r.phone
                 ? `<button type="button" class="btn btn-secondary btn-small" onclick="broadcastSend('${escapeHtml(r.id)}', '${escapeHtml(r.phone)}')">וואטסאפ</button>`
-                : '<span class="bc-meta">אין טלפון</span>'}
-        </div>`).join('');
+                : '<span class="bc-meta bc-missing">אין טלפון</span>'}
+        </div>`;
+        }).join('');
+}
+
+let _bcRows = [];
+
+function broadcastToggle(id, on) {
+    if (on) _bcPicked.add(id); else _bcPicked.delete(id);
+    renderBroadcastList();
+}
+
+function broadcastPickAll(on) {
+    if (on) broadcastAudience('all').forEach((r) => _bcPicked.add(r.id));
+    else _bcPicked.clear();
+    renderBroadcastList();
+}
+
+// The chips are a shortcut for ticking a group, not a separate filter: after
+// pressing one you can still take someone off the list by hand.
+function setBroadcastAudience(kind) {
+    _bcAudience = kind;
+    _renderBroadcastChips();
+    _bcPicked = new Set(broadcastAudience(kind).map((r) => r.id));
+    renderBroadcastList();
+}
+
+// A row can come from a client record or from a name typed on a quote. Anything
+// that has to be REMEMBERED about a person (a phone, a group) needs the record,
+// so this makes one on demand and points the matching projects at it.
+function _ensureClientForRow(row) {
+    if (row.id.startsWith('id:')) {
+        const found = clientsList.find((c) => c.id === row.id.slice(3));
+        if (found) return found;
+    }
+    const client = { id: 'cli' + Date.now() + Math.floor(Math.random() * 1000),
+        name: row.name, dealerNumber: '', phone: row.phone || '', email: row.email || '', address: '', city: '', tags: [] };
+    clientsList.unshift(client);
+    (projectsList || []).forEach((p) => {
+        const typed = ((p.quoteData || {}).clientName || '').trim();
+        if (!p.clientId && _clientKey(typed) === _clientKey(row.name)) p.clientId = client.id;
+    });
+    saveProjects();
+    return client;
+}
+
+// Groups, the way they actually help: not one per project (a project has one
+// customer, so that group is a customer), but a label you put on people —
+// "קבלנים", "ועדי בית" — and then reach in one press. The three built-in chips
+// are the same idea computed for you.
+function clientTags() {
+    const set = new Set();
+    (clientsList || []).forEach((c) => (c.tags || []).forEach((t) => t && set.add(t)));
+    return [...set].sort((a, b) => a.localeCompare(b, 'he'));
+}
+
+function saveBroadcastGroup() {
+    const rows = (_bcRows || []).filter((r) => _bcPicked.has(r.id));
+    if (!rows.length) { showToast('אף אחד לא מסומן', 'error'); return; }
+    const name = (window.prompt('שם הקבוצה (למשל: קבלנים, ועדי בית):') || '').trim();
+    if (!name) return;
+    rows.forEach((row) => {
+        const client = _ensureClientForRow(row);
+        client.tags = Array.isArray(client.tags) ? client.tags : [];
+        if (!client.tags.includes(name)) client.tags.push(name);
+    });
+    saveClients();
+    _renderBroadcastChips();
+    showToast(`${rows.length} לקוחות סומנו כ"${name}"`);
+}
+
+function _renderBroadcastChips() {
+    const box = document.getElementById('bc-aud');
+    if (!box) return;
+    const presets = [['all', 'כל הלקוחות'], ['maint', 'תחת תחזוקה'], ['repeat', 'לקוחות חוזרים']];
+    box.innerHTML = presets.map(([k, label]) =>
+        `<button type="button" class="subtab${_bcAudience === k ? ' active' : ''}" data-aud="${k}" onclick="setBroadcastAudience('${k}')">${escapeHtml(label)}</button>`).join('')
+        + clientTags().map((t) =>
+        `<button type="button" class="subtab${_bcAudience === 'tag:' + t ? ' active' : ''}" data-aud="tag:${escapeHtml(t)}" onclick="setBroadcastAudience('tag:${escapeHtml(t)}')">${escapeHtml(t)}</button>`).join('')
+        + `<button type="button" class="bc-linkbtn bc-groupbtn" onclick="saveBroadcastGroup()">שמירת הבחירה כקבוצה</button>`;
+}
+
+// A list of names with no phone numbers is a list you cannot use. Adding the
+// number here writes it to the client record, so it is there next time too.
+function broadcastEditContact(id) {
+    const row = (_bcRows || []).find((r) => r.id === id);
+    if (!row) return;
+    const phone = window.prompt(`טלפון של ${row.name}:`, row.phone || '');
+    if (phone === null) return;
+    const email = window.prompt(`מייל של ${row.name} (אפשר להשאיר ריק):`, row.email || '');
+    if (email === null) return;
+
+    const client = _ensureClientForRow(row);
+    client.phone = phone.trim();
+    client.email = email.trim();
+    saveClients();
+    renderBroadcastList();
+    try { renderClientArchive(); } catch (e) {}
+    showToast('פרטי הקשר נשמרו');
 }
 
 function broadcastText() {
@@ -2012,7 +2127,7 @@ function broadcastSend(id, phone) {
 // One mail to everyone who has an address, with the list in BCC so nobody sees
 // anybody else's address.
 function broadcastMailto() {
-    const list = broadcastAudience(_bcAudience).filter((r) => r.email);
+    const list = broadcastAudience('all').filter((r) => _bcPicked.has(r.id) && r.email);
     if (!list.length) { showToast('לאף לקוח בקבוצה אין כתובת מייל', 'error'); return; }
     const text = broadcastText();
     const subject = (text.split('\n')[0] || 'הודעה').slice(0, 60);
