@@ -165,6 +165,24 @@
   .trust b{color:var(--sub); font-weight:700}
   .send:hover{filter:brightness(0.94)}
   .send:active{transform:scale(.94)}
+  /* A quiet notice on the way in: this mode is a taste, and nothing typed here
+     is kept. Said once per device, dismissed with one press. */
+  .nosave-wrap{position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center;
+    padding:20px; background:rgba(12,10,9,.6); backdrop-filter:blur(2px)}
+  .nosave{max-width:420px; width:100%; max-height:86vh; overflow-y:auto;
+    background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    padding:20px; box-shadow:0 20px 60px rgba(0,0,0,.45)}
+  .nosave h2{margin:0 0 8px; font-size:1.05rem; color:var(--ink)}
+  .nosave p{margin:0 0 6px; font-size:.9rem; line-height:1.65; color:var(--sub)}
+  .nosave .fine{font-size:.8rem; color:var(--muted)}
+  .nosave-actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px}
+  .nosave-actions button, .nosave-actions a{flex:1 1 150px; min-height:44px; border-radius:10px;
+    font:700 .9rem inherit; display:inline-flex; align-items:center; justify-content:center;
+    cursor:pointer; text-decoration:none}
+  .nosave-ok{background:var(--accent); color:var(--accent-ink); border:none}
+  .nosave-full{background:transparent; color:var(--ink); border:1px solid var(--line)}
+  @media (max-width:600px){ .nosave-wrap{padding:14px} .nosave{max-width:none} }
+
   @media (max-width:600px){
     .intro h1{font-size:1.25rem}
     .chip{font-size:.9rem; padding:9px 15px}   /* thumb-friendly tap targets */
@@ -471,6 +489,21 @@ function showCTA(){
   wrap.appendChild(c); feed.scrollTop = feed.scrollHeight;
 }
 
+// When a send fails, the thing he typed must not be lost: one button puts it
+// back on its way, without retyping it.
+function addRetry(text){
+  const holder = document.createElement('div');
+  holder.className = 'msg-actions';
+  const btn = document.createElement('button');
+  btn.className = 'msg-act retry-act';
+  btn.type = 'button';
+  btn.textContent = 'שליחה מחדש';
+  btn.onclick = () => { holder.remove(); send(text); };
+  holder.appendChild(btn);
+  wrap.appendChild(holder);
+  feed.scrollTop = feed.scrollHeight;
+}
+
 async function send(text, opts){
   if (busy) return;
   opts = opts || {};
@@ -495,11 +528,23 @@ async function send(text, opts){
       body: JSON.stringify({ modelClass:'basic', stream:false, max_tokens: opts.lists ? 2000 : 1200, thinkingBudget:0,
         messages: [{ role:'system', content:SYSTEM }, ...history.map(m=>({ role:m.role, content:m.content }))] })
     });
-    const d = await res.json();
+    // A gateway error can answer with an empty body or with HTML, and then
+    // res.json() throws before anyone looks at the status. Read the text first,
+    // so a 502 says "502" instead of "the chat is unavailable".
+    const raw = await res.text();
+    let d = null;
+    try { d = raw ? JSON.parse(raw) : null; } catch (e) { d = null; }
     typing.remove();
     if (!res.ok){
-      const m = (d && d.error && d.error.message) || 'שגיאה זמנית · נסה שוב עוד רגע.';
+      const m = (d && d.error && d.error.message)
+        || (res.status === 429 ? 'הגעת למכסת השאלות היומית. אפשר להתחבר עם Google ולקבל מכסה גדולה יותר.'
+        : res.status >= 500 ? `מנוע ה-AI לא ענה כרגע (שגיאה ${res.status}). זה בדרך כלל חולף תוך כמה שניות.`
+        : 'שגיאה זמנית, נסה שוב עוד רגע.');
       addMsg('ai', m);
+      addRetry(text);
+    } else if (!d) {
+      addMsg('ai', 'התשובה חזרה ריקה מהשרת. נסה שוב.');
+      addRetry(text);
     } else {
       const reply = d.choices && d.choices[0] ? d.choices[0].message.content : 'לא התקבלה תשובה, נסה שוב.';
       addMsg('ai', reply);
@@ -511,7 +556,10 @@ async function send(text, opts){
     }
   }catch(e){
     typing.remove();
-    addMsg('ai', 'הצ\'אט לא זמין כרגע, נסה שוב עוד רגע.');
+    addMsg('ai', navigator.onLine === false
+      ? 'אין חיבור לאינטרנט כרגע. ברגע שיחזור, אפשר לשלוח שוב.'
+      : 'לא הצלחתי להגיע לשרת. נסה שוב עוד רגע.');
+    addRetry(text);
   }finally{
     busy = false; sendBtn.disabled = false; input.focus();
   }
@@ -613,9 +661,11 @@ document.getElementById('acct-btn').addEventListener('click', ()=>{
   if (authToken) fetchMe();
 })();
 
-// Transparent quota note: guests count locally (10/day server-side, per-IP);
-// connected accounts show the real plan numbers from /api/me.
-const GUEST_DAILY = 10;
+// Transparent quota note: guests count locally (the server's guest ceiling is
+// per IP per day, see functions/api/_tiers.js); connected accounts show the
+// real plan numbers from /api/me. Keep this in step with the server, or the
+// page tells people they are out when they are not.
+const GUEST_DAILY = 100;
 function quotaKey(){ return 'zerem_ask_q_' + new Date().toISOString().slice(0,10); }
 function bumpQuota(){
   if (me && me.email){ meDelta++; updateQuotaNote(); return; }
@@ -676,8 +726,39 @@ sendBtn.addEventListener('click', ()=>send());
 input.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }});
 input.addEventListener('input', ()=>{ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,120)+'px'; });
 document.getElementById('chips').addEventListener('click', e=>{ if(e.target.classList.contains('chip')) send(e.target.textContent); });
+// Said once per device, and never in the middle of a conversation: this mode
+// is a taste, and nothing typed here is kept.
+function maybeShowNoSave(){
+  try{ if (localStorage.getItem('sj_ask_nosave') === '1') return; }catch(e){ /* private mode: show it */ }
+  if (document.querySelectorAll('#wrap .msg').length) return;   // already talking
+  const wrap = document.createElement('div');
+  wrap.className = 'nosave-wrap';
+  wrap.innerHTML = `
+    <div class="nosave" role="dialog" aria-modal="true" aria-labelledby="nosave-t">
+      <h2 id="nosave-t">רק שתדעו, זו טעימה</h2>
+      <p>השיחה כאן לא נשמרת. סוגרים את הדף, והכל נעלם, כולל המחיר שיצא.</p>
+      <p class="fine">במערכת המלאה כל עבודה נשמרת עם האפיון, החומרים וההצעה, ואפשר לחזור אליה מכל מכשיר. ההתחברות עם Google, בחינם.</p>
+      <div class="nosave-actions">
+        <button type="button" class="nosave-ok" id="nosave-ok">הבנתי, בואו נתמחר</button>
+        <a class="nosave-full" href="/sale/">למערכת המלאה</a>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+  const close = () => {
+    try{ localStorage.setItem('sj_ask_nosave','1'); }catch(e){}
+    wrap.remove();
+    input.focus();
+  };
+  wrap.querySelector('#nosave-ok').addEventListener('click', close);
+  wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
+  document.addEventListener('keydown', function esc(e){
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); }
+  });
+}
+setTimeout(maybeShowNoSave, 500);
+
 input.focus();
 </script>
-    <script src="/track.js?v=348" defer></script>
+    <script src="/track.js?v=349" defer></script>
 </body>
 </html>

@@ -2865,12 +2865,13 @@ function renderHome() {
     if (!box) return;
     // "Continue where you left off" means work you are actually in the middle
     // of, so a conversation that stopped a week ago is not offered here either.
-    const recent = (projectsList || []).filter((p) => !isStaleDraft(p)).slice(0, 4);
+    const recent = (projectsList || []).filter((p) => !isStaleDraft(p)).slice(0, 3);
     box.innerHTML = recent.length
         ? recent.map((p) => `
-            <button type="button" class="home-recent-item" onclick="openRecentProject('${p.id}')">
+            <button type="button" class="home-recent-item" onclick="openRecentProject('${p.id}')"
+                    title="${escapeHtml((p.status || 'טיוטה') + ' · ' + (formatHebrewDate(p.created) || ''))}">
                 <span class="hr-name">${escapeHtml((p.autoName && p.name === 'פרויקט חדש') ? draftPreview(p) : p.name)}</span>
-                <span class="hr-meta">${escapeHtml(p.status || 'טיוטה')} · ${escapeHtml(formatHebrewDate(p.created) || '')}</span>
+                <span class="hr-meta">${escapeHtml(formatHebrewDate(p.created) || '')}</span>
             </button>`).join('')
         : '<p class="home-empty">עוד לא פתחת עבודה. תאר אחת ונתחיל.</p>';
 }
