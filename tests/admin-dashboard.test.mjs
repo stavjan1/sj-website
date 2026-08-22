@@ -205,3 +205,40 @@ test('exactly one button offers to reconnect', () => {
   const sites = (code.match(/adminAuthHtml\(/g) || []).length;
   assert.ok(sites <= 3, `adminAuthHtml appears at ${sites} sites; a card is rendering its own button`);
 });
+
+test('every admin card belongs to exactly one tab', () => {
+  // Thirteen cards on one scroll answered four unrelated questions at once. The
+  // grouping is declared in the HTML rather than listed in JS, so a card added
+  // later picks its own home — and a card that forgets to would silently become
+  // unreachable, visible under no tab at all.
+  const panel = HTML.slice(HTML.indexOf('ניהול מערכת · Admin'));
+  const body = panel.slice(0, panel.indexOf('</section>'));
+  const cards = body.match(/class="section-card"[^>]*/g) || [];
+  const untagged = cards.filter((c) => !/data-admin-tab=/.test(c) && !/admin-auth-card/.test(c));
+  assert.deepEqual(untagged, [], `card with no tab would be unreachable: ${untagged.join(' | ')}`);
+
+  // And every tab in the bar has at least one card behind it.
+  const tabs = [...body.matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]);
+  const homes = new Set([...body.matchAll(/data-admin-tab="(\w+)"/g)].map((m) => m[1]));
+  assert.ok(tabs.length >= 4, 'the tab bar is missing');
+  for (const t of tabs) assert.ok(homes.has(t), `tab "${t}" opens onto nothing`);
+});
+
+test('the recovery strip and the headline numbers are never behind a tab', () => {
+  // They answer "can this screen read anything" and "what happened today",
+  // which are true whichever question is being asked.
+  const panel = HTML.slice(HTML.indexOf('ניהול מערכת · Admin'));
+  const body = panel.slice(0, panel.indexOf('</section>'));
+  const auth = body.slice(body.indexOf('id="admin-auth-card"') - 120, body.indexOf('id="admin-auth-card"') + 40);
+  assert.ok(!/data-admin-tab/.test(auth), 'the reconnect strip can be hidden by a tab');
+  const overview = body.slice(body.indexOf('id="admin-overview"') - 120, body.indexOf('id="admin-overview"') + 40);
+  assert.ok(!/data-admin-tab/.test(overview), 'the day\'s headline numbers can be hidden by a tab');
+});
+
+test('a re-render keeps the tab you were on', () => {
+  // Every card refresh calls renderAdminAll, which rebuilds card contents. If
+  // the tab were not re-applied, one refresh would dump all thirteen cards back
+  // onto the page at once.
+  const fn = body('function renderAdminAll(');
+  assert.match(fn, /setAdminTab\(_adminTab\)/, 'a refresh forgets which tab was open');
+});

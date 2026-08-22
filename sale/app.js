@@ -101,6 +101,10 @@ function adminRefreshStatus() {
     const hasKey2 = !!getGeminiApiKeyBackup();
     if (keyEl) { keyEl.textContent = hasKey ? 'מוגדר ✓' : 'לא מוגדר'; keyEl.style.color = hasKey ? 'var(--color-success)' : 'var(--color-danger)'; }
     if (key2El) { key2El.textContent = hasKey2 ? 'מוגדר ✓' : 'לא מוגדר'; key2El.style.color = hasKey2 ? 'var(--color-success)' : 'var(--warn-text)'; }
+    // This line reads the GOOGLE token, and used to be labelled "גיבוי ענן (KV)".
+    // Two unrelated things: KV is the server's own store and is always on, while
+    // this is the hour-long browser session that syncs projects to Drive. The
+    // old label sent its reader hunting for a broken database that was fine.
     if (cloudEl) { cloudEl.textContent = googleAccessToken ? 'פעיל ✓' : 'לא מחובר'; cloudEl.style.color = googleAccessToken ? 'var(--color-success)' : 'var(--warn-text)'; }
 
     // Pre-fill existing values
@@ -6071,6 +6075,38 @@ function renderAdminAuthStatus() {
     show(adminAuthHtml('צריך אישור מגוגל כדי למשוך את הנתונים.'));
 }
 
+// ---- Admin: four questions, four tabs -------------------------------------
+//
+// Thirteen cards on one scroll, answering four unrelated questions at once:
+// who came, what the AI did, what the bot knows, and who the users are.
+// Nothing on that page could be found a second time, and the cards that
+// mattered most sat below the fold behind the ones that mattered least.
+//
+// Grouped by the question each card answers, declared in the HTML as
+// data-admin-tab, so a new card picks its own home instead of needing a list
+// here kept in step by hand. The recovery strip and the day's headline numbers
+// stay above the tabs: they are true whichever question is being asked.
+let _adminTab = 'stats';
+
+function setAdminTab(tab) {
+    _adminTab = tab || 'stats';
+    document.querySelectorAll('#admin-tabs .spec-chip').forEach((b) => {
+        const on = b.dataset.tab === _adminTab;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    document.querySelectorAll('#panel-admin [data-admin-tab]').forEach((card) => {
+        card.hidden = card.dataset.adminTab !== _adminTab;
+    });
+    // Some of these cards are one column of a two-column grid, and a grid whose
+    // children are all hidden still reserves its gap and its margin. Collapse
+    // the wrappers that have nothing left to show.
+    document.querySelectorAll('#panel-admin .section-grid, #panel-admin .admin-grid').forEach((g) => {
+        const cards = [...g.querySelectorAll('[data-admin-tab]')];
+        if (cards.length) g.hidden = cards.every((c) => c.hidden);
+    });
+}
+
 // ---- Admin: was the price right? ------------------------------------------
 //
 // Every other card on this panel measures whether the machine ANSWERED. This is
@@ -6120,19 +6156,23 @@ function adminFeedbackHtml(d) {
         </tr>`;
     }).join('');
 
-    const notes = (d.entries || []).filter((e) => e.note).slice(0, 8).map((e) => `
+    // Every verdict, not only the ones with a note: "who said it" is most of the
+    // signal when the same person keeps saying the price is high.
+    const who = (e) => e.by ? escapeHtml(e.by) : 'אורח (לא מחובר)';
+    const recent = (d.entries || []).slice(0, 10).map((e) => `
         <li><span class="tk">${escapeHtml(new Date(e.at).toLocaleDateString('he-IL'))} ·
+            <b>${who(e)}</b> ·
             ${escapeHtml(JOB_TYPE_LABELS[e.jobType] || e.jobType || 'עבודה')}
             ${e.price ? '· ' + Number(e.price).toLocaleString('he-IL') + ' ₪' : ''}
-            — ${escapeHtml(e.note)}</span></li>`).join('');
+            — ${escapeHtml(VERDICT_LABELS[e.verdict] || e.verdict)}${e.note ? ' · ' + escapeHtml(e.note) : ''}</span></li>`).join('');
 
     return `<p style="margin:0;font-size:0.95rem;"><b>${total}</b> משובים נאספו.</p>
         <table class="admin-stats-tbl">
             <thead><tr><th>סוג עבודה</th><th>משובים</th><th>הטיה</th><th>"ממש לא"</th></tr></thead>
             <tbody>${rows}</tbody>
         </table>
-        ${notes ? `<h5 class="tcol-title"><i class="fa-solid fa-comment"></i> מה נכתב</h5>
-                   <ul class="tlist">${notes}</ul>` : ''}`;
+        ${recent ? `<h5 class="tcol-title"><i class="fa-solid fa-comment"></i> מי אמר מה</h5>
+                   <ul class="tlist">${recent}</ul>` : ''}`;
 }
 
 // ---- Admin: aggregate stats dashboard (no PII) ----
@@ -9864,7 +9904,11 @@ function setSpecAnswer(fieldId, value, source) {
 function maybeAskFollowUp(proj, fieldId, value) {
     const field = (getChecklist(proj).fields || []).find(f => f.id === fieldId);
     const fu = field && field.followUp;
-    if (!fu || !Array.isArray(fu.when) || !fu.when.includes(value)) return;
+    // ANY of the chosen answers can be the one that forks the job — a
+    // multi-answer field hands over a joined string, and testing that string
+    // whole would only ever match a field with exactly one answer selected.
+    if (!fu || !Array.isArray(fu.when)
+        || !specValues(value).some((v) => fu.when.includes(v))) return;
     // Asked once. Re-answering the same way should not re-open a decision the
     // customer already made.
     const spec = ensureSpec(proj);
@@ -10089,12 +10133,72 @@ function specToText(proj) {
 
 // Chips are addressed by index so no user-authored Hebrew ever lands inside an
 // inline handler: nothing to escape, nothing to break.
+// ── Questions with more than one true answer ────────────────────────────────
+//
+// Most of this card asks something with a single answer: what size is the main
+// breaker, what is the ceiling made of. A run of them does not.
+//
+// "יש תשתיות סמויות בקירות?" can be underfloor heating AND water pipes AND a
+// mini-central unit in the ceiling. "איך עובר הכבל מהלוח לעמדה?" is routinely
+// four of its options in sequence — the field research has an electrician
+// describing exactly that: ten metres through existing conduit, four floors
+// down a riser, thirty-five more in the car park, then a cored wall. Forcing
+// one answer means the other three never reach the quote, and they were the
+// expensive ones. `inspection/measurements_scope` gives the game away most
+// plainly: three of its four chips literally begin with "+".
+//
+// Stored as a joined string rather than an array, deliberately. Four separate
+// readers treat an answer as text — the coverage counter, the assumption
+// printer, the handoff message and the server's prompt block — and an array
+// would mean changing all four to gain nothing the separator does not already
+// give. No chip in the file contains a pipe, and a test keeps it that way.
+const SPEC_MULTI_SEP = ' | ';
+
+function specValues(value) {
+    return String(value == null ? '' : value).split(SPEC_MULTI_SEP).filter(Boolean);
+}
+
+// Chips that cannot share an answer with anything else: "no hidden
+// infrastructure", "don't know", "everything is indoors". Declared by index on
+// the field, because no wording rule catches both "אין הצללה" and "גישה חופשית
+// לכל הלוחות" without also catching answers that are perfectly combinable.
+function specSoloChips(field) {
+    return (field.solo || []).map((i) => (field.chips || [])[i]).filter(Boolean);
+}
+
 function setSpecChip(fieldId, chipIndex) {
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (!proj) return;
     const field = getChecklist(proj).fields.find(f => f.id === fieldId);
     if (!field || !Array.isArray(field.chips)) return;
-    setSpecAnswer(fieldId, field.chips[chipIndex], 'user');
+    const chip = field.chips[chipIndex];
+    if (chip == null) return;
+    if (!field.multi) { setSpecAnswer(fieldId, chip, 'user'); return; }
+
+    const current = specValues((ensureSpec(proj).answers[fieldId] || {}).value);
+    const solo = specSoloChips(field);
+    let next;
+    if (current.includes(chip)) {
+        next = current.filter((c) => c !== chip);                 // tap again to remove
+    } else if (solo.includes(chip)) {
+        next = [chip];                                            // "none" stands alone
+    } else {
+        next = current.filter((c) => !solo.includes(c)).concat(chip);
+    }
+    // Ordered by the checklist, never by the order they were tapped, so the
+    // same set of answers always reads the same way in the quote.
+    next.sort((a, b) => field.chips.indexOf(a) - field.chips.indexOf(b));
+    setSpecAnswer(fieldId, next.join(SPEC_MULTI_SEP), 'user');
+}
+
+// The only thing that closes a multi-answer question. Without it the card
+// advances to the next gap on the first tap — which is exactly what a question
+// with several true answers must not do.
+function doneSpecField() {
+    specOpenField = null;
+    specEditingField = null;
+    const proj = projectsList.find(p => p.id === activeProjectId);
+    if (proj) renderSpecCard(proj);
 }
 
 const JOB_TYPE_LABELS = {
@@ -10198,8 +10302,14 @@ function renderSpecCard(proj) {
     // Nothing open, or the open one just got answered → move to the next gap.
     // Unless it was opened on purpose to be changed, in which case moving on is
     // exactly the wrong thing to do.
+    // …and a question with several true answers must not close on the first
+    // tap. It stays open until "המשך", which is the only thing that moves the
+    // card past it. Without this the second option is literally unreachable.
+    const openField = list.fields.find(f => f.id === specOpenField);
+    const holdMulti = !!(openField && openField.multi && answers[specOpenField]);
+
     const editingOpen = specEditingField && specEditingField === specOpenField;
-    if (!editingOpen && (!specOpenField || answers[specOpenField] || !visibleFields.some(f => f.id === specOpenField))) {
+    if (!editingOpen && !holdMulti && (!specOpenField || answers[specOpenField] || !visibleFields.some(f => f.id === specOpenField))) {
         const next = nextSpecField(project, visibleFields);
         specOpenField = next ? next.id : null;
     }
@@ -10241,8 +10351,18 @@ function renderSpecCard(proj) {
 
         let control = '';
         if (f.type === 'chips' && Array.isArray(f.chips)) {
+            const chosen = f.multi ? specValues(current) : [current];
             control = `<div class="spec-chips">${f.chips.map((c, i) =>
-                `<button type="button" class="spec-chip${c === current ? ' active' : ''}" onclick="setSpecChip('${f.id}',${i})">${escapeHtml(c)}</button>`).join('')}</div>`;
+                `<button type="button" class="spec-chip${chosen.includes(c) ? ' active' : ''}" onclick="setSpecChip('${f.id}',${i})">${escapeHtml(c)}</button>`).join('')}</div>`;
+            // Said out loud, because a chip row that takes one answer and a chip
+            // row that takes several look identical until you have tapped twice
+            // and lost the first one.
+            if (f.multi) {
+                control += `<div class="spec-inline" style="margin-top:8px;gap:10px;align-items:center;">
+                    <button type="button" class="btn btn-secondary btn-small" onclick="doneSpecField()">המשך</button>
+                    <span class="input-help" style="margin:0;">אפשר לסמן כמה תשובות</span>
+                </div>`;
+            }
         } else if (f.type === 'number') {
             // Stored as "15 מ'": the unit rides along for the quote, so strip it
             // back off before it goes into a number input that would reject it.
@@ -11582,6 +11702,11 @@ function renderChatHistory(projOrHistory) {
 //   • only "ממש לא" asks a follow-up, because only "ממש לא" puts a notification
 //     on Stav's phone, and a notification with no reason attached is an
 //     interruption rather than information.
+// The same four, by id, for reading a stored verdict back in the admin panel.
+const VERDICT_LABELS = {
+    spot_on: 'בול', bit_high: 'קצת גבוה', bit_low: 'קצת נמוך', way_off: 'ממש לא',
+};
+
 const PRICE_VERDICTS = [
     { id: 'spot_on',  label: 'בול',      icon: 'fa-check' },
     { id: 'bit_high', label: 'קצת גבוה', icon: 'fa-arrow-down' },
@@ -11707,9 +11832,17 @@ function _pfMarkSent(proj, index) {
 // the user an error is a feedback widget that costs more than it returns.
 function postPriceFeedback(proj, verdict, note) {
     try {
+        // The token rides along when there is one, so the server can attribute
+        // the verdict to a verified account. A name is never put in the body:
+        // client-supplied identity would let anyone file a complaint under
+        // someone else's, in the store that decides whether a price gets
+        // re-examined. No token simply means an anonymous verdict, which is
+        // still perfectly usable.
+        const headers = { 'Content-Type': 'application/json' };
+        if (googleAccessToken) headers.Authorization = 'Bearer ' + googleAccessToken;
         fetch('/api/feedback', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify({
                 verdict,
                 price: Math.round(Number(proj.laborPrice) || 0),
@@ -13915,6 +14048,8 @@ function renderAdminAll(opts) {
         () => adminRefreshUserList(),
         () => window.renderAdminFunnel && window.renderAdminFunnel(),
         () => renderAdminFeedback(),
+        () => setAdminTab(_adminTab),      // re-apply the chosen tab after a re-render
+        () => adminRefreshStatus(),        // and the status lines, which read live token state
     ];
     for (const job of jobs) { try { job(); } catch (e) {} }
 }

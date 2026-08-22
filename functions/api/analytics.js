@@ -187,7 +187,9 @@ export async function onRequestGet(context) {
   const wantSummary = url.searchParams.get('summary') === '1';
   const summary = {};
   if (wantSummary) {
-    for (const site of SITES) summary[site] = await visitorSummary(env, site);
+    // One cold month across all three sites per request, not twelve each.
+    const budget = coldMonthBudget(1);
+    for (const site of SITES) summary[site] = await visitorSummary(env, site, budget);
   }
 
   return jsonResponse({
@@ -303,7 +305,7 @@ function period(days, prevDays, map) {
 // A finished month never changes, so it is computed once from its days and
 // then kept as a rollup. The current month is always recomputed — it is still
 // moving, and a cached "today" is worse than no number at all.
-async function monthTotals(env, site, ym, todayIso, recent) {
+async function monthTotals(env, site, ym, todayIso, recent, budget) {
   const currentYm = todayIso.slice(0, 7);
   const key = `roll:${site}:${ym}`;
   if (ym !== currentYm) {
@@ -314,6 +316,18 @@ async function monthTotals(env, site, ym, todayIso, recent) {
   const days = daysOfMonth(ym, todayIso);
   const missing = days.filter((d) => !recent.has(d));
   if (missing.length) {
+    // Building one cold month costs a read per day of it, and this screen wants
+    // twelve months across three sites. Doing all of them in a single request
+    // is what killed this endpoint: several hundred KV reads, the Function ran
+    // past its limits, and Cloudflare answered with an HTML error page — which
+    // arrived in the panel as
+    //     Unexpected token '<', "<!DOCTYPE "... is not valid JSON
+    // and read, to the only person looking at it, as "the dashboard is broken".
+    //
+    // So: one cold month per request. The others report whatever is already
+    // rolled up and are marked pending, and a few refreshes finish the set for
+    // good — a finished month is written once and never recomputed.
+    if (!budget.take()) return { views: 0, visitors: 0, pending: true };
     const raw = await Promise.all(missing.map((d) => env.SJ_DATA.get(dayHitsKey(site, d))));
     missing.forEach((d, i) => recent.set(d, dayTotals(raw[i])));
   }
@@ -328,7 +342,15 @@ async function monthTotals(env, site, ym, todayIso, recent) {
   return total;
 }
 
-async function visitorSummary(env, site) {
+// How many cold months one request is allowed to build, across every site.
+// Shared rather than per-site, because the limit that was being exceeded is a
+// property of the request, not of a site.
+function coldMonthBudget(n) {
+  let left = n;
+  return { take: () => (left > 0 ? (left--, true) : false) };
+}
+
+async function visitorSummary(env, site, budget) {
   const todayIso = dayKey();
   const w = periodWindows(todayIso);
 
@@ -338,8 +360,11 @@ async function visitorSummary(env, site) {
   const map = new Map();
   recentKeys.forEach((d, i) => map.set(d, dayTotals(raw[i])));
 
+  // Sequentially on purpose, even though it is slower: monthTotals mutates the
+  // shared day map and spends from a shared budget, and running twelve of those
+  // concurrently would have them racing over both.
   const months = [];
-  for (const ym of w.months) months.push({ ym, ...(await monthTotals(env, site, ym, todayIso, map)) });
+  for (const ym of w.months) months.push({ ym, ...(await monthTotals(env, site, ym, todayIso, map, budget)) });
   const year = w.yearMonths.reduce((acc, ym) => {
     const m = months.find((x) => x.ym === ym) || { views: 0, visitors: 0 };
     return { views: acc.views + m.views, visitors: acc.visitors + m.visitors };
@@ -369,12 +394,24 @@ async function aiUsage(env, dates) {
   const series = [];
   const events = [];
 
+  // KV has no prefix scan on Pages KV without list(), which is paginated and
+  // slow; the label set is small and known, so the keys are read directly.
+  //
+  // In one batch, not one at a time. Thirty days across seven pools was 210
+  // reads issued strictly in sequence, and this runs on BOTH admin requests —
+  // it was the largest single cost on a screen that had started returning
+  // Cloudflare's HTML error page instead of JSON. Same reads, same results,
+  // one round of waiting instead of two hundred.
+  const cells = [];
+  for (const d of dates) for (const label of AI_POOLS) cells.push({ d, label });
+  const rawCells = await Promise.all(cells.map((c) => env.SJ_DATA.get(`aiuse:${c.d}:${c.label}`)));
+  const cellAt = new Map();
+  cells.forEach((c, i) => cellAt.set(c.d + '|' + c.label, safeParse(rawCells[i], null)));
+
   for (const d of dates) {
     const day = { date: d, pools: {} };
-    // KV has no prefix scan on Pages KV without list(), which is paginated and
-    // slow; the label set is small and known, so we read it directly.
     for (const label of AI_POOLS) {
-      const rec = safeParse(await env.SJ_DATA.get(`aiuse:${d}:${label}`), null);
+      const rec = cellAt.get(d + '|' + label);
       if (!rec) continue;
       const used = (rec.ok || 0) + (rec.quota || 0) + (rec.fail || 0);
       day.pools[label] = { ok: rec.ok || 0, quota: rec.quota || 0, fail: rec.fail || 0, used, models: rec.models || {} };
@@ -388,10 +425,12 @@ async function aiUsage(env, dates) {
 
   // Events are only worth reading for the recent window — that is where a
   // "why did it get slow yesterday" question actually gets answered.
-  for (const d of dates.slice(-7)) {
-    const list = safeParse(await env.SJ_DATA.get(`aiuse:events:${d}`), []) || [];
+  const eventDays = dates.slice(-7);
+  const rawEvents = await Promise.all(eventDays.map((d) => env.SJ_DATA.get(`aiuse:events:${d}`)));
+  eventDays.forEach((d, i) => {
+    const list = safeParse(rawEvents[i], []) || [];
     if (Array.isArray(list)) events.push(...list.map((e) => ({ ...e, date: d })));
-  }
+  });
 
   const today = dates[dates.length - 1];
   const todayRow = series.find((s) => s.date === today) || { pools: {} };
