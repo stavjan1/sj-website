@@ -358,6 +358,159 @@
         </div>`;
     }
 
+    // ── ניהול כספי: the owner's spreadsheet, as a screen ──────────────────────
+    // Monthly income per client → provisions (מס הכנסה, ביטוח לאומי, קרן
+    // השתלמות, פנסיה) at configurable rates with a "paid" box per month → net;
+    // plus expenses per month and yearly totals. Stored additively in the
+    // finance record under `books`.
+    const BOOK_MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+    const PROVISIONS = [
+        { id: 'tax',     label: 'מס הכנסה',    rate: 7 },
+        { id: 'bituach', label: 'ביטוח לאומי', rate: 8.61 },
+        { id: 'keren',   label: 'קרן השתלמות', rate: 22.85 },
+        { id: 'pension', label: 'פנסיה',       rate: 8.27 },
+    ];
+    let bookYear = new Date().getFullYear();
+    function books() {
+        fin.books = fin.books || {};
+        const b = fin.books;
+        if (!Array.isArray(b.incomes)) b.incomes = [];
+        if (!Array.isArray(b.expenses)) b.expenses = [];
+        if (!b.rates) b.rates = {};
+        PROVISIONS.forEach(pv => { if (typeof b.rates[pv.id] !== 'number') b.rates[pv.id] = pv.rate; });
+        if (!b.paid) b.paid = {};
+        return b;
+    }
+    const ym = (y, m) => `${y}-${String(m).padStart(2, '0')}`;
+    function monthRows(year) {
+        const b = books();
+        return Array.from({ length: 12 }, (_, i) => {
+            const key = ym(year, i + 1);
+            const incomes = b.incomes.filter(x => x.month === key);
+            const expenses = b.expenses.filter(x => x.month === key);
+            const income = incomes.reduce((t, x) => t + (Number(x.amount) || 0), 0);
+            const prov = {};
+            PROVISIONS.forEach(pv => { prov[pv.id] = Math.round(income * (Number(b.rates[pv.id]) || 0) / 100); });
+            const provTotal = Object.values(prov).reduce((t, v) => t + v, 0);
+            const expense = expenses.reduce((t, x) => t + (Number(x.amount) || 0), 0);
+            return { key, i, incomes, expenses, income, prov, provTotal, net: income - provTotal, expense, paid: b.paid[key] || {} };
+        });
+    }
+
+    function booksSectionHtml() {
+        const b = books();
+        const years = Array.from(new Set([new Date().getFullYear(), ...b.incomes.map(x => Number(String(x.month).slice(0, 4))), ...b.expenses.map(x => Number(String(x.month).slice(0, 4)))].filter(Boolean))).sort();
+        if (!years.includes(bookYear)) years.push(bookYear), years.sort();
+        const rows = monthRows(bookYear);
+        const tot = rows.reduce((t, r) => { t.income += r.income; t.prov += r.provTotal; t.net += r.net; t.expense += r.expense; PROVISIONS.forEach(pv => { t[pv.id] = (t[pv.id] || 0) + r.prov[pv.id]; }); return t; }, { income: 0, prov: 0, net: 0, expense: 0 });
+        const rateTotal = PROVISIONS.reduce((t, pv) => t + (Number(b.rates[pv.id]) || 0), 0);
+        const cur = ym(new Date().getFullYear(), new Date().getMonth() + 1);
+        const unpaidDue = rows.filter(r => r.key <= cur && r.income > 0).flatMap(r => PROVISIONS.filter(pv => !r.paid[pv.id]).map(pv => ({ r, pv }))).length;
+
+        const tableRows = rows.map(r => `
+            <tr class="${r.key === cur ? 'is-current' : ''} ${r.income ? '' : 'is-empty'}">
+                <th>${BOOK_MONTHS[r.i]}</th>
+                <td class="num"><button type="button" class="bk-cell" data-bk-month="${r.key}" title="הכנסות החודש">${r.income ? fmtILS(r.income) : '—'}</button>
+                    ${r.incomes.length ? `<small>${r.incomes.map(x => esc(x.client)).join(' · ')}</small>` : ''}</td>
+                ${PROVISIONS.map(pv => `<td class="num bk-prov">
+                    <label class="bk-paid ${r.paid[pv.id] ? 'on' : ''}"><input type="checkbox" data-bk-paid="${r.key}" data-prov="${pv.id}" ${r.paid[pv.id] ? 'checked' : ''} ${r.income ? '' : 'disabled'}> <span>${r.income ? fmtILS(r.prov[pv.id]) : '—'}</span></label>
+                </td>`).join('')}
+                <td class="num bk-net">${r.income ? fmtILS(r.net) : '—'}</td>
+                <td class="num"><button type="button" class="bk-cell" data-bk-exp-month="${r.key}" title="הוצאות החודש">${r.expense ? fmtILS(r.expense) : '—'}</button></td>
+            </tr>`).join('');
+
+        return `
+        <div class="card fin-books">
+            <div class="fin-month-head">
+                <h3>ניהול כספי <small>הכנסות, הפרשות והוצאות לפי חודש</small></h3>
+                <div class="fin-chips" style="margin:0">${years.map(y => `<button type="button" class="chip ${y === bookYear ? 'on' : ''}" data-bk-year="${y}">${y}</button>`).join('')}</div>
+            </div>
+            <div class="fin-cards fin-month-kpis">
+                <div><div class="fin-kpi-label">הכנסות ${bookYear}</div><div class="fin-kpi num">${fmtILS(tot.income)}</div></div>
+                <div><div class="fin-kpi-label">הפרשות (${rateTotal.toFixed(2)}%)</div><div class="fin-kpi num status-danger">${fmtILS(tot.prov)}</div></div>
+                <div><div class="fin-kpi-label">נטו (${(100 - rateTotal).toFixed(2)}%)</div><div class="fin-kpi num status-ok">${fmtILS(tot.net)}</div></div>
+                <div><div class="fin-kpi-label">הוצאות</div><div class="fin-kpi num">${fmtILS(tot.expense)}</div></div>
+            </div>
+            ${unpaidDue ? `<p class="fin-warn">${unpaidDue} הפרשות של חודשים שעברו עדיין לא סומנו כשולמו.</p>` : ''}
+            <div class="table-scroll">
+            <table class="bk-table">
+                <thead><tr><th>חודש</th><th>הכנסות</th>${PROVISIONS.map(pv => `<th>${pv.label}<br><input class="input bk-rate" type="number" step="0.01" min="0" max="100" value="${Number(b.rates[pv.id])}" data-bk-rate="${pv.id}" aria-label="אחוז ${pv.label}">%</th>`).join('')}<th>נטו</th><th>הוצאות</th></tr></thead>
+                <tbody>${tableRows}</tbody>
+                <tfoot><tr><th>סה"כ</th><td class="num">${fmtILS(tot.income)}</td>${PROVISIONS.map(pv => `<td class="num">${fmtILS(tot[pv.id] || 0)}</td>`).join('')}<td class="num">${fmtILS(tot.net)}</td><td class="num">${fmtILS(tot.expense)}</td></tr></tfoot>
+            </table>
+            </div>
+            <p class="fin-muted">סימון ✓ ליד הפרשה = שולמה לחודש הזה. לחיצה על סכום הכנסות/הוצאות פותחת את פירוט החודש.</p>
+            <div class="fin-grid" style="margin-block-start: var(--sp-3);">
+                <form id="bk-income-form" class="bk-form">
+                    <h4>הכנסה חדשה</h4>
+                    <div class="fin-form-row">
+                        <input class="input" type="month" id="bk-inc-month" value="${cur}" required>
+                        <input class="input" type="text" id="bk-inc-client" placeholder="לקוח / מקור" required>
+                        <input class="input num" type="number" id="bk-inc-amount" placeholder="סכום" min="0" required>
+                        <button class="btn btn-primary" type="submit">הוסף</button>
+                    </div>
+                </form>
+                <form id="bk-expense-form" class="bk-form">
+                    <h4>הוצאה חדשה</h4>
+                    <div class="fin-form-row">
+                        <input class="input" type="month" id="bk-exp-month" value="${cur}" required>
+                        <input class="input" type="text" id="bk-exp-desc" placeholder="על מה" required>
+                        <input class="input num" type="number" id="bk-exp-amount" placeholder="סכום" min="0" required>
+                        <button class="btn btn-primary" type="submit">הוסף</button>
+                    </div>
+                </form>
+            </div>
+            <div id="bk-detail"></div>
+        </div>`;
+    }
+
+    function booksDetailHtml(key, kind) {
+        const b = books();
+        const list = (kind === 'exp' ? b.expenses : b.incomes).filter(x => x.month === key);
+        const [y, m] = key.split('-').map(Number);
+        return `<div class="bk-detail card">
+            <h4>${kind === 'exp' ? 'הוצאות' : 'הכנסות'} · ${BOOK_MONTHS[m - 1]} ${y}</h4>
+            ${list.length ? `<ul class="fin-list">${list.map(x => `<li><span>${esc(kind === 'exp' ? x.desc : x.client)}</span><span class="num">${fmtILS(x.amount)}</span>
+                <button class="fin-x" data-bk-del="${esc(x.id)}" data-kind="${kind}" title="מחיקה">×</button></li>`).join('')}</ul>` : '<p class="fin-muted">אין רשומות בחודש הזה.</p>'}
+        </div>`;
+    }
+
+    function wireBooks(root) {
+        const b = books();
+        const rerender = () => { scheduleSave(); window.renderFinance(); };
+        root.querySelectorAll('[data-bk-year]').forEach(el => el.addEventListener('click', () => { bookYear = Number(el.dataset.bkYear); window.renderFinance(); }));
+        root.querySelectorAll('[data-bk-rate]').forEach(el => el.addEventListener('change', () => { b.rates[el.dataset.bkRate] = Math.max(0, Math.min(100, Number(el.value) || 0)); rerender(); }));
+        root.querySelectorAll('[data-bk-paid]').forEach(el => el.addEventListener('change', () => {
+            const key = el.dataset.bkPaid; b.paid[key] = b.paid[key] || {}; b.paid[key][el.dataset.prov] = el.checked; rerender();
+        }));
+        const inc = root.querySelector('#bk-income-form');
+        if (inc) inc.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const month = root.querySelector('#bk-inc-month').value, client = root.querySelector('#bk-inc-client').value.trim(), amount = Number(root.querySelector('#bk-inc-amount').value);
+            if (!/^\d{4}-\d{2}$/.test(month) || !client || !(amount > 0)) return;
+            b.incomes.push({ id: 'bi' + Date.now(), month, client, amount }); bookYear = Number(month.slice(0, 4)); rerender();
+        });
+        const exp = root.querySelector('#bk-expense-form');
+        if (exp) exp.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const month = root.querySelector('#bk-exp-month').value, desc = root.querySelector('#bk-exp-desc').value.trim(), amount = Number(root.querySelector('#bk-exp-amount').value);
+            if (!/^\d{4}-\d{2}$/.test(month) || !desc || !(amount > 0)) return;
+            b.expenses.push({ id: 'be' + Date.now(), month, desc, amount }); bookYear = Number(month.slice(0, 4)); rerender();
+        });
+        const detail = root.querySelector('#bk-detail');
+        const showDetail = (key, kind) => {
+            if (!detail) return;
+            detail.innerHTML = booksDetailHtml(key, kind);
+            detail.querySelectorAll('[data-bk-del]').forEach(x => x.addEventListener('click', () => {
+                if (x.dataset.kind === 'exp') b.expenses = b.expenses.filter(r => r.id !== x.dataset.bkDel);
+                else b.incomes = b.incomes.filter(r => r.id !== x.dataset.bkDel);
+                rerender();
+            }));
+        };
+        root.querySelectorAll('[data-bk-month]').forEach(el => el.addEventListener('click', () => showDetail(el.dataset.bkMonth, 'inc')));
+        root.querySelectorAll('[data-bk-exp-month]').forEach(el => el.addEventListener('click', () => showDetail(el.dataset.bkExpMonth, 'exp')));
+    }
+
     // ── render ─────────────────────────────────────────────────────────────
     window.renderFinance = async function renderFinance() {
         const root = document.getElementById('finance-root');
@@ -437,10 +590,7 @@
 
         <div class="fin-open-only">${financyCardHtml()}</div>
 
-        <div class="card fin-manual-only fin-books-soon">
-            <h3>ניהול כספי</h3>
-            <p class="fin-muted">הכנסות לפי חודש, הפרשות (מס הכנסה, ביטוח לאומי, קרן השתלמות, פנסיה) והוצאות, לפי הגיליון "ניהול כספי" שלך. נבנה בסבב הבא.</p>
-        </div>
+        <div class="fin-manual-only">${booksSectionHtml()}</div>
         <details class="card fin-manual fin-manual-only" ${finView === 'manual' ? 'open' : ''}>
             <summary>נתונים ידניים · חשבונות, תנועות, חיובים קבועים</summary>
             <div class="fin-grid">
@@ -487,6 +637,7 @@
         </details>`;
 
         wire(root);
+        wireBooks(root);
     };
 
     function wire(root) {
