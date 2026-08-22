@@ -15,6 +15,8 @@ function load(catalog = [], book = {}) {
     const pbEnd = app.indexOf('function renderMaterialsChecklist');
     const ptStart = app.indexOf('function matQty(m)');
     const ptEnd = app.indexOf('function openPricingTable');
+    const qStart = app.indexOf('function quoteItemsFromTable(proj)');
+    const qEnd = app.indexOf('function ptToQuote()');
     assert.ok(pbStart > -1 && ptStart > -1, 'the pricing helpers moved or were renamed');
     const ctx = vm.createContext({
         appState: { settings: { priceBook: book } },
@@ -24,8 +26,8 @@ function load(catalog = [], book = {}) {
         Date, Number, String, Object, Math, Array,
     });
     return vm.runInContext(
-        app.slice(pbStart, pbEnd) + '\n' + app.slice(ptStart, ptEnd)
-        + '\n;({ matQty, matLineTotal, laborItems, syncLaborPrice, pricingTotals, priceBookSet, projectExtras, QUOTE_EXTRAS })',
+        app.slice(pbStart, pbEnd) + '\n' + app.slice(ptStart, ptEnd) + '\n' + app.slice(qStart, qEnd)
+        + '\n;({ matQty, matLineTotal, laborItems, syncLaborPrice, pricingTotals, priceBookSet, projectExtras, QUOTE_EXTRAS, quoteItemsFromTable })',
         ctx);
 }
 
@@ -87,4 +89,35 @@ test('an item the catalog does not have can be put into it', () => {
     assert.match(app, /priceCatalog\.unshift\(\{ name: m\.name\.trim\(\), price/, 'saving no longer writes the item');
     // And the reverse: adding from the catalog respects a price he already set.
     assert.match(app, /const mine = priceBookGet\(it\.name\);/, 'the catalog add ignores his own price');
+});
+
+test('the quote is built from the rows, in the order a customer reads them', () => {
+    const { quoteItemsFromTable } = load();
+    const items = quoteItemsFromTable(proj());
+    const titles = items.map((x) => x.title);
+
+    // Labour first: that is the work being bought.
+    assert.deepEqual(JSON.parse(JSON.stringify(titles.slice(0, 3))), ['השחלה', 'התקנה', 'לוח']);
+    // Then the materials, as one section with the list inside it.
+    assert.equal(titles[3], 'חומרים וציוד');
+    assert.equal(items[3].price, 810, 'the materials section is priced by the table');
+    assert.match(items[3].description, /כבל 5x10 × 25/, 'quantities belong in the description');
+    assert.doesNotMatch(items[3].description, /עמוד/, 'an unticked material must not reach the quote');
+    // And each extra as its own line, never folded into the installation price.
+    assert.equal(titles[4], 'בדיקת חשמלאי בודק');
+    assert.equal(items[4].price, 600);
+    assert.match(items[4].description, /סעיף נפרד/);
+
+    const sum = items.reduce((s, x) => s + x.price, 0);
+    assert.equal(sum, 3610, 'the sections must add up to the table total');
+});
+
+test('an empty section carries no filler text to a customer', () => {
+    // "אין פירוט לסעיף זה" used to print under every labour line.
+    assert.doesNotMatch(app, /\|\| 'אין פירוט לסעיף זה'/, 'the placeholder is back in the PDF');
+});
+
+test('nothing is built from an empty table', () => {
+    const { quoteItemsFromTable } = load();
+    assert.equal(quoteItemsFromTable({ materials: [], laborItems: [], extras: {} }).length, 0);
 });

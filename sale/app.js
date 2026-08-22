@@ -8142,7 +8142,7 @@ function updatePreviewFromForm() {
                 <td style="font-family: 'Outfit', sans-serif; font-weight: 700; text-align: center;">${idx + 1}</td>
                 <td>
                     <div style="font-weight: 700; color: var(--pdf-primary); text-decoration: underline; margin-bottom: 4px;">${escapeHtml(item.title) || 'סעיף ללא כותרת'}</div>
-                    <div style="white-space: pre-line; line-height: 1.5; color: var(--pdf-text-main); font-size: 0.9rem;">${escapeHtml(item.description) || 'אין פירוט לסעיף זה'}</div>
+                    ${item.description ? `<div style="white-space: pre-line; line-height: 1.5; color: var(--pdf-text-main); font-size: 0.9rem;">${escapeHtml(item.description)}</div>` : ''}
                 </td>
                 <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight: 700; text-align: left; color: var(--pdf-primary);">${formatPriceString(item.price || 0)} ₪</td>
             `;
@@ -8155,7 +8155,7 @@ function updatePreviewFromForm() {
             itemEl.className = 'pdf-work-item';
             itemEl.innerHTML = `
                 <div class="pdf-item-title">${idx + 1}. ${escapeHtml(item.title) || 'סעיף ללא כותרת'}</div>
-                <div class="pdf-item-desc">${escapeHtml(item.description) || 'אין פירוט לסעיף זה'}</div>
+                ${item.description ? `<div class="pdf-item-desc">${escapeHtml(item.description)}</div>` : ''}
             `;
             pdfItemsContainer.appendChild(itemEl);
         });
@@ -11383,7 +11383,7 @@ function renderPricingTable() {
                     <i class="fa-solid fa-comments" aria-hidden="true"></i> חזרה לשיחה
                 </button>
                 <button type="button" class="btn btn-accent btn-small" onclick="ptToQuote()">
-                    המשך להצעת מחיר <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                    בניית ההצעה מהטבלה <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
                 </button>
             </div>`;
     }
@@ -11499,17 +11499,88 @@ function ptAddLabor() {
     _ptSave(proj);
 }
 
-// The table is the source of truth for the quote: hand the engine the real
-// materials cost before moving on, so the two never disagree.
+// ── The quote, built from the table ─────────────────────────────────────────
+//
+// Until now the quote was written by an agent reading the conversation, which
+// is why a number in it could disagree with the number he had just set. The
+// table is the source of truth: these rows become the quote's sections, and
+// the agent's job shrinks to what it is actually good at — the wording.
+//
+// Labour first, because that is the work the customer is buying, then the
+// materials as one priced section with the list inside it, then each extra as
+// its own line. Rolling the inspector into the installation price is exactly
+// what a customer must not see.
+function quoteItemsFromTable(proj) {
+    const items = [];
+
+    laborItems(proj).filter((x) => (x.name || '').trim() || Number(x.price) > 0).forEach((x) => {
+        items.push({
+            title: (x.name || 'עבודה').trim(),
+            description: '',
+            price: Math.round(Number(x.price) || 0),
+        });
+    });
+
+    const mats = (proj.materials || []).filter((m) => m && m.checked && String(m.name || '').trim());
+    if (mats.length) {
+        items.push({
+            title: 'חומרים וציוד',
+            description: mats.map((m) => {
+                const qty = matQty(m) > 1 ? ` × ${matQty(m)}` : '';
+                return `${m.name}${qty}${m.details ? ` (${m.details})` : ''}`;
+            }).join('\n'),
+            price: Math.round(mats.reduce((sum, m) => sum + matLineTotal(m), 0)),
+        });
+    }
+
+    QUOTE_EXTRAS.filter((x) => projectExtras(proj)[x.key]).forEach((x) => {
+        items.push({
+            title: x.label,
+            description: x.key === 'inspector'
+                ? 'סעיף נפרד. הבדיקה מבוצעת על ידי חשמלאי בודק מוסמך ואינה חלק ממחיר ההתקנה.'
+                : '',
+            price: Math.round(extraPrice(x)),
+        });
+    });
+
+    return items;
+}
+
 function ptToQuote() {
     const proj = _ptProj(); if (!proj) return;
+    const items = quoteItemsFromTable(proj);
+    if (!items.length) {
+        showToast('אין עדיין שורות בטבלה, אז אין ממה לבנות הצעה', 'error');
+        return;
+    }
+    // Anything already written in the editor is his, so it is never replaced
+    // without asking.
+    const existing = ((proj.quoteData || {}).items || []).filter((x) => x && (x.title || x.description));
+    if (existing.length && !confirm(`בהצעה כבר יש ${existing.length} סעיפים. להחליף אותם במה שבטבלה?`)) return;
+
+    const totals = pricingTotals(proj);
+    proj.quoteData = proj.quoteData || {};
+    proj.quoteData.items = items;
+    proj.quoteData.basePrice = Math.round(totals.total);
+    if (!String(proj.quoteData.subject || '').trim()) proj.quoteData.subject = proj.name;
+
+    // The engine and the table must never disagree about what the materials cost.
     try {
         const p = ensureProjectPricing(proj);
-        p.materialsCost = pricingTotals(proj).materials;
-        saveProjects();
-        renderPricingEngine();
+        p.materialsCost = totals.materials;
     } catch (e) { /* the engine is optional */ }
+
+    touchProject(proj);
+    saveProjects();
+    appState.currentQuote = { id: proj.id, ...proj.quoteData };
     goToDraft();
+    try {
+        fillFormFromState();
+        if (appState.currentQuote.showItemizedPrices) calculateItemizedTotal();
+        else calculateTotal();
+        renderPricingEngine();
+    } catch (e) { /* the editor fills itself on the next paint anyway */ }
+    showToast(`ההצעה נבנתה מהטבלה: ${items.length} סעיפים, ${heNum(Math.round(totals.total))} ₪ לפני מע"מ`);
 }
 
 // ---- add from the catalog ----

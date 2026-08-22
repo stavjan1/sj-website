@@ -3941,3 +3941,5 @@ i[class^="fa-"], i[class*=" fa-"] {
     .ptf-actions .btn { flex: 1; justify-content: center; }
 }
 }
+.wi-rebuild { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); margin-block-end: var(--sp-3); }
+.wi-rebuild-note { font-size: var(--fs-xs); color: var(--text-3); }
