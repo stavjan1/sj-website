@@ -297,6 +297,40 @@ function md(s){
   return h;
 }
 
+// Read an OpenAI-style SSE stream, calling onProgress(fullText) as it grows.
+// The same shape the full app has used for months (sale/app.js).
+async function consumeSSE(response, onProgress){
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '', full = '';
+  while (true){
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream:true });
+    let nl;
+    while ((nl = buffer.indexOf('\n')) !== -1){
+      const line = buffer.slice(0, nl).trim();
+      buffer = buffer.slice(nl + 1);
+      if (!line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === '[DONE]') continue;
+      try{
+        const j = JSON.parse(payload);
+        const delta = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
+        if (delta){ full += delta; if (onProgress) onProgress(full); }
+      }catch(_){ /* keep-alive or a half-arrived line */ }
+    }
+  }
+  return full;
+}
+
+// While the answer is still arriving, the machine blocks must not flash on
+// screen as raw JSON. Everything from an opening [[ onwards is held back until
+// its closing tag lands; the final render (addMsg) parses them properly.
+function streamPreview(t){
+  return t.replace(/\[\[(שאלות|מחשבון|רשימות|פתוח)\]\][\s\S]*?(\[\[\/\1\]\]|$)/g, '').trim();
+}
+
 function addMsg(role, text){
   let questions = null, calc = null, lists = null, openItems = null;
   if (role !== 'user'){
@@ -551,9 +585,41 @@ async function send(text, opts){
     if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
     const res = await fetch('/api/chat', {
       method:'POST', headers,
-      body: JSON.stringify({ modelClass:'basic', stream:false, max_tokens: opts.lists ? 2000 : 1200, thinkingBudget:0,
+      body: JSON.stringify({ modelClass:'basic', stream:true, max_tokens: opts.lists ? 2000 : 1200, thinkingBudget:0,
         messages: [{ role:'system', content:SYSTEM }, ...history.map(m=>({ role:m.role, content:m.content }))] })
     });
+    // Streaming, because this is the page a stranger opens from a WhatsApp
+    // link. Measured before this change: 18, 18 and 24 seconds for three
+    // people asking at once, with a blank screen for every one of those
+    // seconds. The full app has streamed for months; the public front, the one
+    // page whose first impression actually decides anything, did not.
+    //
+    // The stream is only a PREVIEW. Whatever arrives is shown as it comes, then
+    // the bubble is thrown away and the complete text goes through addMsg
+    // exactly as before — so the questions, the calculator and the "what is
+    // still open" block are parsed by the same code as always, and none of
+    // that had to be made stream-aware.
+    const ct = res.headers.get('content-type') || '';
+    if (res.ok && ct.includes('text/event-stream')){
+      typing.remove();
+      const live = document.createElement('div');
+      live.className = 'msg ai';
+      wrap.appendChild(live);
+      let stuck = false;
+      const full = await consumeSSE(res, (t) => {
+        live.innerHTML = md(streamPreview(t));
+        if (!stuck) { feed.scrollTop = feed.scrollHeight; }
+      });
+      live.remove();
+      const reply = full.trim() || 'לא התקבלה תשובה, נסה שוב.';
+      addMsg('ai', reply);
+      history.push({ role:'assistant', content:reply });
+      bumpQuota();
+      saveSession();
+      if (!opts.lists) saveHandoff(reply);
+      return;
+    }
+
     // A gateway error can answer with an empty body or with HTML, and then
     // res.json() throws before anyone looks at the status. Read the text first,
     // so a 502 says "502" instead of "the chat is unavailable".
