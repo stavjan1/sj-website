@@ -3671,3 +3671,35 @@ i[class^="fa-"], i[class*=" fa-"] {
 .aov-k { font-size: var(--fs-xs); color: var(--text-3); font-weight: 600; }
 .aov-v { font: 700 1.7rem/1.1 var(--font-display); color: var(--text); direction: ltr; unicode-bidi: isolate; text-align: start; }
 .aov-s { font-size: var(--fs-xs); color: var(--text-3); line-height: 1.5; }
+
+/* ---- Holiday nudge + a message to the customer list ----------------------- */
+.hol-bar {
+    display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4); margin-block-end: var(--sp-3);
+    border: 1px solid var(--accent); border-radius: var(--r-md);
+    background: var(--accent-soft);
+}
+.hol-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.hol-text b { font-size: var(--fs-sm); color: var(--text); }
+.hol-text span { font-size: var(--fs-xs); color: var(--text-2); }
+.clients-actions { display: flex; gap: var(--sp-2); margin-block-end: var(--sp-3); }
+
+.bc-dialog { max-width: min(560px, 94vw); }
+.bc-aud { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-block: var(--sp-3) var(--sp-2); }
+.bc-text {
+    width: 100%; resize: vertical; min-height: 110px;
+    font: 400 var(--fs-sm)/1.6 var(--font-ui);
+}
+.bc-actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-block: var(--sp-2) var(--sp-3); }
+.bc-count { font-size: var(--fs-xs); color: var(--text-3); margin-block-end: var(--sp-2); }
+.bc-list { max-height: 44vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.bc-row {
+    display: flex; align-items: center; gap: var(--sp-2); min-width: 0;
+    padding: var(--sp-2) var(--sp-2); border-radius: var(--r-sm); border: 1px solid transparent;
+}
+.bc-row:hover { background: var(--surface-2); border-color: var(--border); }
+.bc-row.is-done { opacity: .55; }
+.bc-row.is-done .bc-name::after { content: ' ✓'; color: var(--ok-text, var(--accent)); }
+.bc-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font: 500 var(--fs-sm) var(--font-ui); color: var(--text); }
+.bc-meta { flex: none; font-size: var(--fs-xs); color: var(--text-3); }

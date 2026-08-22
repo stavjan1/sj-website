@@ -1737,12 +1737,254 @@ function maintPick(projectId) {
     openMaintenanceDialog(projectId);
 }
 
+// ── Holidays, and a message to everyone ─────────────────────────────────────
+//
+// Stav's idea: two weeks before a holiday the system should say "שבועות
+// מתקרב", and sending a greeting to the customer list should take one screen.
+//
+// The dates are computed, not typed into a table that goes stale: the browser
+// already knows the Hebrew calendar (Intl with ca-hebrew), so we walk the next
+// weeks and read each day's Hebrew date. A leap year names its months "Adar I"
+// and "Adar II", and Purim belongs to the second one.
+const HOLIDAYS = [
+    { key: 'rosh',      m: 'Tishri', d: 1,  name: 'ראש השנה',    greet: 'שנה טובה ומתוקה' },
+    { key: 'kippur',    m: 'Tishri', d: 10, name: 'יום כיפור',    greet: 'גמר חתימה טובה וצום קל' },
+    { key: 'sukkot',    m: 'Tishri', d: 15, name: 'סוכות',        greet: 'חג סוכות שמח' },
+    { key: 'hanukkah',  m: 'Kislev', d: 25, name: 'חנוכה',        greet: 'חג אורים שמח' },
+    { key: 'purim',     m: 'Adar',   d: 14, name: 'פורים',        greet: 'פורים שמח' },
+    { key: 'pesach',    m: 'Nisan',  d: 15, name: 'פסח',          greet: 'חג פסח כשר ושמח' },
+    { key: 'atzmaut',   m: 'Iyar',   d: 5,  name: 'יום העצמאות',  greet: 'יום עצמאות שמח' },
+    { key: 'shavuot',   m: 'Sivan',  d: 6,  name: 'שבועות',       greet: 'חג שבועות שמח' },
+];
+
+const _hebFmt = () => new Intl.DateTimeFormat('en-u-ca-hebrew', { day: 'numeric', month: 'long' });
+
+function hebrewParts(date) {
+    try {
+        const parts = _hebFmt().formatToParts(date);
+        const day = parseInt((parts.find((x) => x.type === 'day') || {}).value, 10);
+        let month = (parts.find((x) => x.type === 'month') || {}).value || '';
+        // Purim is in Adar II of a leap year; every other Adar date is plain Adar.
+        const isAdarII = /Adar\s*II/i.test(month);
+        if (/Adar/i.test(month)) month = 'Adar';
+        return { day, month, isAdarII, leapAdar: /Adar\s*I{1,2}/i.test((parts.find((x) => x.type === 'month') || {}).value || '') };
+    } catch (e) { return null; }
+}
+
+// יום העצמאות moves so it never touches Shabbat: 5 Iyar on Friday or Saturday
+// is marked earlier in the week, and on Monday it is pushed to Tuesday.
+function _atzmautShift(date) {
+    const dow = date.getDay();               // 0=Sun … 6=Sat
+    if (dow === 5) return -1;                // Friday   → Thursday
+    if (dow === 6) return -2;                // Saturday → Thursday
+    if (dow === 1) return 1;                 // Monday   → Tuesday
+    return 0;
+}
+
+// Every holiday inside the next `days` days, nearest first.
+function upcomingHolidays(days = 30, from = new Date()) {
+    const out = [];
+    const start = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+    for (let i = 0; i <= days; i++) {
+        const d = new Date(start.getTime() + i * 86400000);
+        const h = hebrewParts(new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), 12)));
+        if (!h) break;
+        for (const holiday of HOLIDAYS) {
+            if (h.month !== holiday.m || h.day !== holiday.d) continue;
+            if (holiday.key === 'purim' && h.leapAdar && !h.isAdarII) continue;
+            let when = d;
+            if (holiday.key === 'atzmaut') {
+                const shift = _atzmautShift(d);
+                when = new Date(d.getTime() + shift * 86400000);
+            }
+            const daysAway = Math.round((when - start) / 86400000);
+            if (daysAway < 0) continue;
+            out.push({ ...holiday, date: when, iso: when.toISOString().slice(0, 10), daysAway });
+        }
+    }
+    return out.sort((a, b) => a.daysAway - b.daysAway);
+}
+
+// The banner appears from two weeks out, which is when a greeting still feels
+// early rather than late, and disappears the day after.
+const HOLIDAY_LEAD_DAYS = 14;
+
+function holidayGreetingText(h) {
+    const biz = (appState.settings && appState.settings.businessDetails) || {};
+    const who = [biz.owner, biz.name].filter(Boolean).join(', ');
+    return `${h.greet}!\nמאחל לכם חג שמח ושקט, ואם צריך משהו בחשמל אני כאן.\n${who}`;
+}
+
+function _broadcastDoneKey(campaign) { return getStorageKey('sj_broadcast_' + campaign); }
+function _broadcastDone(campaign) {
+    try { return new Set(JSON.parse(localStorage.getItem(_broadcastDoneKey(campaign)) || '[]')); }
+    catch (e) { return new Set(); }
+}
+function _broadcastMarkDone(campaign, id) {
+    const set = _broadcastDone(campaign);
+    set.add(id);
+    try { localStorage.setItem(_broadcastDoneKey(campaign), JSON.stringify([...set])); } catch (e) {}
+}
+
+function renderHolidayBar() {
+    const box = document.getElementById('holiday-bar');
+    if (!box) return;
+    const next = upcomingHolidays(HOLIDAY_LEAD_DAYS)[0];
+    if (!next) { box.innerHTML = ''; box.hidden = true; return; }
+    box.hidden = false;
+    const when = next.daysAway === 0 ? 'היום' : next.daysAway === 1 ? 'מחר' : `בעוד ${next.daysAway} ימים`;
+    box.innerHTML = `
+        <div class="hol-bar">
+            <div class="hol-text">
+                <b>${escapeHtml(next.name)} ${escapeHtml(when)}</b>
+                <span>רגע טוב לשלוח ברכה קצרה ללקוחות. הם זוכרים את מי ששלח.</span>
+            </div>
+            <button type="button" class="btn btn-accent btn-small" onclick="openBroadcast('${escapeHtml(next.key)}')">
+                <i class="fa-brands fa-whatsapp" aria-hidden="true"></i> שליחת ברכה
+            </button>
+        </div>`;
+}
+
+// The audience is the same three angles as the list, so what you see is what
+// gets the message.
+function broadcastAudience(kind) {
+    const byId = new Map((projectsList || []).map((p) => [p.id, p]));
+    const rows = new Map();
+    (projectsList || []).forEach((p) => {
+        const linked = projectClient(p);
+        const name = linked ? linked.name : ((p.quoteData || {}).clientName || '').trim();
+        if (!name) return;
+        const key = linked ? 'id:' + linked.id : _clientKey(name);
+        const rec = rows.get(key) || {
+            id: key, name,
+            phone: (linked && linked.phone) || p.clientPhone || '',
+            email: (linked && linked.email) || p.clientEmail || '',
+            projects: 0, maint: false,
+        };
+        rec.projects++;
+        if (projectRepeats(byId.get(p.id))) rec.maint = true;
+        if (!rec.phone && p.clientPhone) rec.phone = p.clientPhone;
+        if (!rec.email && p.clientEmail) rec.email = p.clientEmail;
+        rows.set(key, rec);
+    });
+    (clientsList || []).forEach((c) => {
+        const key = 'id:' + c.id;
+        if (rows.has(key)) return;
+        rows.set(key, { id: key, name: c.name, phone: c.phone || '', email: c.email || '', projects: 0, maint: false });
+    });
+    let list = [...rows.values()];
+    if (kind === 'maint') list = list.filter((r) => r.maint);
+    else if (kind === 'repeat') list = list.filter((r) => r.projects > 1);
+    return list.sort((a, b) => a.name.localeCompare(b.name, 'he'));
+}
+
+let _bcAudience = 'all';
+let _bcCampaign = 'msg';
+
+function openBroadcast(campaignKey) {
+    _bcCampaign = campaignKey || 'msg';
+    _bcAudience = 'all';
+    const holiday = HOLIDAYS.find((h) => h.key === campaignKey);
+    // The date is only for the title; the greeting itself works whenever it is
+    // opened, including from the "הודעה ללקוחות" button months in advance.
+    const upcoming = holiday ? (upcomingHolidays(400).find((h) => h.key === campaignKey) || holiday) : null;
+    const old = document.getElementById('bc-dialog');
+    if (old) old.remove();
+    const dlg = document.createElement('dialog');
+    dlg.id = 'bc-dialog';
+    dlg.className = 'ck-dialog bc-dialog';
+    dlg.innerHTML = `
+        <h3>${escapeHtml(upcoming ? 'ברכת ' + upcoming.name : 'הודעה ללקוחות')}</h3>
+        <p class="input-help">בוחרים למי, כותבים פעם אחת, ושולחים אחד-אחד בוואטסאפ. אין כאן שליחה אוטומטית בשמך.</p>
+        <div class="bc-aud" id="bc-aud">
+            <button type="button" class="subtab active" onclick="setBroadcastAudience('all')">כל הלקוחות</button>
+            <button type="button" class="subtab" onclick="setBroadcastAudience('maint')">תחת תחזוקה</button>
+            <button type="button" class="subtab" onclick="setBroadcastAudience('repeat')">לקוחות חוזרים</button>
+        </div>
+        <textarea id="bc-text" class="bc-text" rows="5">${escapeHtml(upcoming ? holidayGreetingText(upcoming) : '')}</textarea>
+        <div class="bc-actions">
+            <button type="button" class="btn btn-secondary btn-small" onclick="copyBroadcastText()">העתקת ההודעה</button>
+            <button type="button" class="btn btn-secondary btn-small" onclick="broadcastMailto()">פתיחת מייל לכולם</button>
+        </div>
+        <div class="bc-list" id="bc-list"></div>
+        <div class="ck-dialog-actions">
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('bc-dialog').close()">סגירה</button>
+        </div>`;
+    document.body.appendChild(dlg);
+    renderBroadcastList();
+    dlg.showModal();
+}
+
+function setBroadcastAudience(kind) {
+    _bcAudience = kind;
+    document.querySelectorAll('#bc-aud .subtab').forEach((b, i) => {
+        b.classList.toggle('active', ['all', 'maint', 'repeat'][i] === kind);
+    });
+    renderBroadcastList();
+}
+
+function renderBroadcastList() {
+    const box = document.getElementById('bc-list');
+    if (!box) return;
+    const list = broadcastAudience(_bcAudience);
+    const done = _broadcastDone(_bcCampaign);
+    if (!list.length) {
+        box.innerHTML = '<p class="input-help">אין לקוחות בקבוצה הזו.</p>';
+        return;
+    }
+    box.innerHTML = `<div class="bc-count">${list.length} לקוחות · נשלחו ${[...done].filter((id) => list.some((r) => r.id === id)).length}</div>` +
+        list.map((r) => `
+        <div class="bc-row${done.has(r.id) ? ' is-done' : ''}" id="bc-row-${escapeHtml(r.id)}">
+            <span class="bc-name">${escapeHtml(r.name)}</span>
+            <span class="bc-meta">${escapeHtml(r.phone || r.email || 'אין פרטי קשר')}</span>
+            ${r.phone
+                ? `<button type="button" class="btn btn-secondary btn-small" onclick="broadcastSend('${escapeHtml(r.id)}', '${escapeHtml(r.phone)}')">וואטסאפ</button>`
+                : '<span class="bc-meta">אין טלפון</span>'}
+        </div>`).join('');
+}
+
+function broadcastText() {
+    const ta = document.getElementById('bc-text');
+    return (ta && ta.value || '').trim();
+}
+
+function copyBroadcastText() {
+    const text = broadcastText();
+    if (!text) { showToast('אין מה להעתיק', 'error'); return; }
+    navigator.clipboard.writeText(text)
+        .then(() => showToast('ההודעה הועתקה'))
+        .catch(() => showToast('ההעתקה נכשלה', 'error'));
+}
+
+function broadcastSend(id, phone) {
+    const text = broadcastText();
+    const num = String(phone).replace(/\D/g, '').replace(/^0/, '972');
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
+    _broadcastMarkDone(_bcCampaign, id);
+    const row = document.getElementById('bc-row-' + id);
+    if (row) row.classList.add('is-done');
+    renderBroadcastList();
+}
+
+// One mail to everyone who has an address, with the list in BCC so nobody sees
+// anybody else's address.
+function broadcastMailto() {
+    const list = broadcastAudience(_bcAudience).filter((r) => r.email);
+    if (!list.length) { showToast('לאף לקוח בקבוצה אין כתובת מייל', 'error'); return; }
+    const text = broadcastText();
+    const subject = (text.split('\n')[0] || 'הודעה').slice(0, 60);
+    const href = `mailto:?bcc=${encodeURIComponent(list.map((r) => r.email).join(','))}`
+        + `&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
+    window.location.href = href;
+}
+
 // ── The clients list, filtered ───────────────────────────────────────────────
 // Not a screen per filter: one list, three ways to look at it.
 let clientFilter = 'all';
 
 function setClientFilter(f) {
     clientFilter = ['maint', 'repeat'].includes(f) ? f : 'all';
+    try { renderHolidayBar(); } catch (e) {}
     document.querySelectorAll('#client-filters .subtab').forEach((b) => {
         const on = b.dataset.cf === clientFilter;
         b.classList.toggle('active', on);
