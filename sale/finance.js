@@ -194,9 +194,10 @@
         // credit cards: the outstanding balance is charged on the next anchor day
         const nextAnchor = addMonths(anchorOnOrBefore(today()), 1);
         const nextISO = localISO(nextAnchor);
-        if (inWin(nextISO)) selectedAccounts().filter(isCard).forEach(c => {
+        selectedAccounts().filter(isCard).forEach(c => {
             const due = -Math.abs(Number(c.balance) || 0);
-            if (due) items.push({ date: nextISO, desc: `חיוב ${bankOf(c).label}${c.mask ? ' ' + c.mask : ''}`, amount: due, kind: 'card' });
+            const when = (c.dueDate && c.dueDate >= localISO(today())) ? c.dueDate : nextISO;
+            if (due && inWin(when)) items.push({ date: when, desc: `חיוב ${bankOf(c).label}${c.mask ? ' ' + c.mask : ''}`, amount: due, kind: 'card' });
         });
         return items.sort((a, b) => a.date.localeCompare(b.date));
     }
@@ -333,20 +334,27 @@
 
     function financyCardHtml() {
         const fz = (fin.settings && fin.settings.financy) || {};
-        const status = fz.connected
-            ? `<span class="status-ok">מחובר</span> · סנכרון אחרון: ${fz.lastSync ? esc(new Date(fz.lastSync).toLocaleString('he-IL')) : 'עדיין לא'}${fz.lastError ? ` · <span class="status-danger">${esc(fz.lastError)}</span>` : ''}`
+        const connected = !!fz.connected || !!(fz.clientId && fz.userId);
+        const status = connected
+            ? `<span class="status-ok">מחובר</span> · נתוני בנק נכון ל-${fz.dataDate ? esc(new Date(fz.dataDate).toLocaleDateString('he-IL')) : '—'} · סנכרון אחרון ${fz.lastSync ? esc(new Date(fz.lastSync).toLocaleString('he-IL')) : 'עדיין לא'}${fz.lastError ? ` · <span class="status-danger">${esc(fz.lastError)}</span>` : ''}`
             : '<span class="fin-muted">לא מחובר</span>';
         return `
         <div class="card fin-financy">
             <h3>חיבור לבנקים · Financy (בנקאות פתוחה)</h3>
-            <p class="fin-muted">היתרות והתנועות של כל הבנקים והאשראי נמשכות לבד, בקריאה בלבד, בפיקוח בנק ישראל. פעם אחת: נרשמים ב-Financy, מחברים שם את הבנקים, ומדביקים כאן את מפתח ה-API.</p>
+            <p class="fin-muted">היתרות והתנועות של הבנקים והאשראי נמשכות לבד, בקריאה בלבד, בפיקוח בנק ישראל. נרשמים ב-Financy, מחברים שם את הבנקים, ומדביקים כאן את שלושת פרטי הגישה מהגדרות Financy → "גישה ל-API". הגישה ל-API דורשת את תוכנית Starter (₪49 לחודש); קופון מהמדריך של אילון: JC4Y-ASF5-DJTH.</p>
             <p class="fin-financy-status">${status}</p>
-            <div class="fin-form-row">
-                <input class="input" type="password" id="fin-financy-key" placeholder="מפתח API מ-Financy" autocomplete="off" dir="ltr">
-                <button type="button" class="btn btn-primary" data-financy="save">שמור מפתח</button>
-                <button type="button" class="btn btn-quiet" data-financy="sync" ${fz.connected ? '' : 'disabled'}>סנכרן עכשיו</button>
+            <div class="fin-form-row fin-financy-fields">
+                <input class="input" type="text" id="fin-fz-user" placeholder="User ID" autocomplete="off" dir="ltr">
+                <input class="input" type="text" id="fin-fz-client" placeholder="Client ID" autocomplete="off" dir="ltr">
+                <input class="input" type="password" id="fin-fz-secret" placeholder="Client Secret" autocomplete="off" dir="ltr">
             </div>
-            <p class="fin-muted"><a href="https://financy.open-finance.ai/" target="_blank" rel="noopener">להרשמה ולחיבור הבנקים ב-Financy ↗</a></p>
+            <div class="fin-form-row">
+                <button type="button" class="btn btn-primary" data-financy="saveCreds">שמור פרטי גישה</button>
+                <button type="button" class="btn btn-quiet" data-financy="sync" ${connected ? '' : 'disabled'}>סנכרן עכשיו</button>
+                <button type="button" class="btn btn-ghost" data-financy="refresh" ${connected ? '' : 'disabled'} title="מבקש מ-Financy למשוך נתונים טריים מהבנקים, עולה 20 קרדיטים">רענון מהבנקים</button>
+                ${connected ? '<button type="button" class="btn btn-ghost" data-financy="disconnect">ניתוק</button>' : ''}
+            </div>
+            <p class="fin-muted"><a href="https://financy.open-finance.ai?ref=eilon" target="_blank" rel="noopener">להרשמה ולחיבור הבנקים ב-Financy ↗</a> · הנתונים מתעדכנים אצלם פעם ביום בבוקר (Starter) או כל 6 שעות (Pro).</p>
         </div>`;
     }
 
@@ -510,16 +518,21 @@
 
         root.querySelectorAll('[data-financy]').forEach(b => b.addEventListener('click', async () => {
             const action = b.dataset.financy;
-            const key = (root.querySelector('#fin-financy-key') || {}).value || '';
-            if (action === 'save' && !key.trim()) { if (typeof showToast === 'function') showToast('הדביקו את מפתח ה-API מ-Financy', 'error'); return; }
-            b.disabled = true; const label = b.textContent; b.textContent = action === 'save' ? 'שומר…' : 'מסנכרן…';
+            const val = (id) => ((root.querySelector(id) || {}).value || '').trim();
+            const payload = { action };
+            if (action === 'saveCreds') {
+                Object.assign(payload, { userId: val('#fin-fz-user'), clientId: val('#fin-fz-client'), clientSecret: val('#fin-fz-secret') });
+                if (!payload.userId || !payload.clientId || !payload.clientSecret) { if (typeof showToast === 'function') showToast('מלאו את שלושת הפרטים מהגדרות Financy → גישה ל-API', 'error'); return; }
+            }
+            if (action === 'disconnect' && !confirm('לנתק את Financy ולהסיר את נתוני הבנקים מהתזרים?')) return;
+            b.disabled = true; const label = b.textContent; b.textContent = action === 'saveCreds' ? 'שומר…' : action === 'sync' ? 'מסנכרן…' : 'רגע…';
             try {
                 const token = await liveToken();
                 const res = await fetch('/api/financy', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                    body: JSON.stringify(action === 'save' ? { action: 'saveKey', key: key.trim() } : { action: 'sync' }) });
+                    body: JSON.stringify(payload) });
                 const data = await res.json().catch(() => ({}));
                 if (!res.ok) throw new Error((data.error && data.error.message) || 'נכשל');
-                if (typeof showToast === 'function') showToast(data.message || (action === 'save' ? 'המפתח נשמר' : 'סונכרן'));
+                if (typeof showToast === 'function') showToast(data.message || 'בוצע');
                 fin = null; window.renderFinance();
             } catch (e) {
                 if (typeof showToast === 'function') showToast('Financy: ' + e.message, 'error');

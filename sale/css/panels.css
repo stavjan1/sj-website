@@ -4144,3 +4144,6 @@ i[class^="fa-"], i[class*=" fa-"] {
 .fin-view-manual .fin-open-only { display: none; }
 .fin-books-soon { margin-block-end: var(--sp-4); }
 .fin-books-soon h3 { font-size: var(--fs-lg); margin-block-end: var(--sp-1); }
+
+.fin-financy-fields { flex-wrap: wrap; }
+.fin-financy-fields .input { flex: 1 1 160px; }

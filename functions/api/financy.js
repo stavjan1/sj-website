@@ -1,14 +1,13 @@
 // Cloudflare Pages Function — Financy (Open-Finance.ai) bank connector for PRO.
 //
 //   GET  /api/financy                    → { connected, lastSync, lastError }
-//   POST /api/financy { action:'saveKey', key }   → store the user's Financy API key
-//   POST /api/financy { action:'sync' }           → pull accounts + transactions into
-//                                                   the user's finance record
+//   POST /api/financy { action:'saveCreds', userId, clientId, clientSecret }
+//   POST /api/financy { action:'sync' }      → pull accounts + transactions into the record
+//   POST /api/financy { action:'refresh' }   → ask Financy to re-fetch the banks (20 credits)
 //   POST /api/financy { action:'disconnect' }
 //
-// The key is the user's own credential for THEIR Financy account (read-only
-// open-banking data). It lives in the user's finance record in KV, never in
-// a response. Sync writes accounts (bank + cards, with balances) and entries
+// The credentials are the user's own (Financy Settings → גישה ל-API, Starter
+// plan). They live in the user's finance record in KV and are never echoed. Sync writes accounts (bank + cards, with balances) and entries
 // (transactions, de-duplicated by external id) — manual data is left alone.
 
 import { verifyGoogleEmail, bearerToken, getTierForEmail, jsonResponse, ADMIN_EMAIL, rateLimit } from './_tiers.js';
@@ -34,12 +33,12 @@ function saveRecord(env, email, rec) {
 }
 function publicStatus(rec) {
     const fz = (rec.settings && rec.settings.financy) || {};
-    return { connected: !!fz.apiKey, lastSync: fz.lastSync || null, lastError: fz.lastError || null };
+    return { connected: !!(fz.clientId && fz.clientSecret && fz.userId), lastSync: fz.lastSync || null, dataDate: fz.dataDate || null, lastError: fz.lastError || null };
 }
 
 // ── Financy adapter ────────────────────────────────────────────────────────
 // Filled in against the documented API; until then sync reports what it needs.
-import { financySync } from './_financy.js';
+import { financySync, financyRefresh } from './_financy.js';
 
 export async function onRequestGet(context) {
     const { request, env } = context;
@@ -63,14 +62,15 @@ export async function onRequestPost(context) {
     rec.settings = rec.settings || {};
     const fz = rec.settings.financy = rec.settings.financy || {};
 
-    if (body.action === 'saveKey') {
-        const key = String(body.key || '').trim();
-        if (key.length < 8 || key.length > 512) return jsonResponse({ error: { message: 'מפתח לא תקין.' } }, 400);
-        fz.apiKey = key;
-        fz.connectedAt = Date.now();
-        fz.lastError = null;
+    if (body.action === 'saveCreds') {
+        const clean = (v) => String(v || '').trim();
+        const userId = clean(body.userId), clientId = clean(body.clientId), clientSecret = clean(body.clientSecret);
+        if (!userId || !clientId || clientSecret.length < 8 || [userId, clientId, clientSecret].some(v => v.length > 512)) {
+            return jsonResponse({ error: { message: 'חסרים פרטים: User ID, Client ID ו-Client Secret (מהגדרות Financy → גישה ל-API).' } }, 400);
+        }
+        Object.assign(fz, { userId, clientId, clientSecret, token: null, tokenExp: 0, connectedAt: Date.now(), lastError: null });
         await saveRecord(env, gate.email, rec);
-        return jsonResponse({ ok: true, message: 'המפתח נשמר. עכשיו "סנכרן עכשיו".', ...publicStatus(rec) });
+        return jsonResponse({ ok: true, message: 'הפרטים נשמרו. עכשיו "סנכרן עכשיו".', ...publicStatus(rec) });
     }
 
     if (body.action === 'disconnect') {
@@ -82,17 +82,29 @@ export async function onRequestPost(context) {
     }
 
     if (body.action === 'sync') {
-        if (!fz.apiKey) return jsonResponse({ error: { message: 'אין מפתח Financy שמור.' } }, 400);
+        if (!(fz.clientId && fz.clientSecret && fz.userId)) return jsonResponse({ error: { message: 'אין פרטי Financy שמורים.' } }, 400);
         try {
-            const result = await financySync(fz.apiKey, rec);
+            const result = await financySync(fz, rec);
             fz.lastSync = Date.now();
-            fz.lastError = null;
+            if (result.dataDate) fz.dataDate = result.dataDate;
+            if (!fz.lastError) fz.lastError = null;
             await saveRecord(env, gate.email, rec);
             return jsonResponse({ ok: true, message: result.message, ...publicStatus(rec) });
         } catch (e) {
             fz.lastError = String(e && e.message || e).slice(0, 160);
             await saveRecord(env, gate.email, rec);
             return jsonResponse({ error: { message: fz.lastError } }, 502);
+        }
+    }
+
+    if (body.action === 'refresh') {
+        if (!(fz.clientId && fz.clientSecret && fz.userId)) return jsonResponse({ error: { message: 'אין פרטי Financy שמורים.' } }, 400);
+        try {
+            const message = await financyRefresh(fz);
+            await saveRecord(env, gate.email, rec); // the minted token is cached in the record
+            return jsonResponse({ ok: true, message, ...publicStatus(rec) });
+        } catch (e) {
+            return jsonResponse({ error: { message: String(e && e.message || e).slice(0, 160) } }, 502);
         }
     }
 
