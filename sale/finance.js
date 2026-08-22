@@ -34,6 +34,7 @@
     const todayISO = () => new Date().toISOString().slice(0, 10);
     const esc = (s) => (typeof escapeHtml === 'function' ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s));
 
+    let finMonth = null;     // 'YYYY-MM' shown in the monthly view (default: this month)
     let fin = null;          // the KV record
     let invoiceIncome = [];  // derived from ZEREM invoices (server)
     let saveTimer = null;
@@ -48,9 +49,30 @@
         return authToken();
     }
 
+    class NoTokenError extends Error {}
+
+    // The out-loud Google sign-in must start on the click itself (popup rules),
+    // so this runs from the card's button, then waits for the token to land.
+    window.proSignIn = function proSignIn(btn) {
+        if (btn) { btn.disabled = true; btn.textContent = 'מתחבר…'; }
+        try {
+            if (typeof adminSignInNow === 'function') adminSignInNow(btn);
+            else if (typeof handleGoogleLogin === 'function') handleGoogleLogin();
+        } catch (e) { /* the poll below decides */ }
+        const started = Date.now();
+        const poll = setInterval(() => {
+            const fresh = (typeof _tokenIsFresh === 'function') ? _tokenIsFresh() : !!authToken();
+            if (fresh) { clearInterval(poll); fin = null; window.renderFinance(); }
+            else if (Date.now() - started > 25000) {
+                clearInterval(poll);
+                if (btn) { btn.disabled = false; btn.textContent = 'התחבר מחדש'; }
+            }
+        }, 500);
+    };
+
     async function loadFinance(retried) {
         const token = await liveToken();
-        if (!token) throw new Error('נדרשת התחברות');
+        if (!token) throw new NoTokenError('no-token');
         const res = await fetch('/api/finance', { headers: { Authorization: 'Bearer ' + token } });
         if (res.status === 401 && !retried) {
             // The app refreshes its Google token silently right after boot —
@@ -135,6 +157,60 @@
         return { past, future };
     }
 
+    // Everything that lands in one calendar month, expected and actual:
+    // documents by their payment terms, fixed charges, and manual entries.
+    function monthItems(ym) {
+        const [y, m] = ym.split('-').map(Number);
+        const inMonth = (iso) => typeof iso === 'string' && iso.slice(0, 7) === ym;
+        const items = [];
+        (fin.entries || []).forEach(e => { if (inMonth(e.date)) items.push({ date: e.date, desc: e.desc, amount: Number(e.amount) || 0, kind: 'actual' }); });
+        invoiceIncome.forEach(inv => {
+            if (inv.paid) { if (inMonth(inv.date)) items.push({ date: inv.date, desc: inv.desc, amount: inv.amount, kind: 'actual' }); }
+            else if (inMonth(inv.dueDate)) items.push({ date: inv.dueDate, desc: inv.desc + ' (לפי תנאי התשלום)', amount: inv.amount, kind: 'expected' });
+        });
+        const daysInMonth = new Date(y, m, 0).getDate();
+        (fin.recurring || []).forEach(r => {
+            const day = Math.min(Math.max(Number(r.dayOfMonth) || 1, 1), daysInMonth);
+            items.push({ date: `${ym}-${String(day).padStart(2, '0')}`, desc: r.name || 'חיוב קבוע', amount: Number(r.amount) || 0, kind: 'recurring' });
+        });
+        return items.sort((a, b) => a.date.localeCompare(b.date));
+    }
+
+    function monthSectionHtml() {
+        if (!finMonth) finMonth = todayISO().slice(0, 7);
+        const items = monthItems(finMonth);
+        const inSum = items.filter(i => i.amount > 0).reduce((s, i) => s + i.amount, 0);
+        const outSum = items.filter(i => i.amount < 0).reduce((s, i) => s + i.amount, 0);
+        const label = new Date(finMonth + '-01T12:00:00').toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
+        const isPast = finMonth < todayISO().slice(0, 7);
+        const rows = items.length ? items.map(i => `<li class="${i.kind}">
+                <span>${esc(i.desc)}</span>
+                <span class="num ${i.amount >= 0 ? 'status-ok' : 'status-danger'}">${fmtILS(i.amount)}</span>
+                <small>${esc(i.date.slice(8, 10))}/${esc(i.date.slice(5, 7))}${i.kind === 'expected' ? ' · צפוי' : i.kind === 'recurring' ? ' · קבוע' : ''}</small>
+            </li>`).join('') : '<li class="fin-muted">אין תנועות או צפי לחודש הזה.</li>';
+        return `
+        <div class="card fin-month-card">
+            <div class="fin-month-head">
+                <button type="button" class="btn btn-ghost btn-sm" data-fin-month="next" aria-label="חודש הבא">‹</button>
+                <h3>${isPast ? 'מה נכנס ויצא ב' : 'צפוי ב'}${esc(label)}</h3>
+                <button type="button" class="btn btn-ghost btn-sm" data-fin-month="prev" aria-label="חודש קודם">›</button>
+            </div>
+            <div class="fin-cards fin-month-kpis">
+                <div><div class="fin-kpi-label">נכנס</div><div class="fin-kpi num status-ok">${fmtILS(inSum)}</div></div>
+                <div><div class="fin-kpi-label">יוצא</div><div class="fin-kpi num status-danger">${fmtILS(Math.abs(outSum))}</div></div>
+                <div><div class="fin-kpi-label">נטו</div><div class="fin-kpi num">${fmtILS(inSum + outSum)}</div></div>
+            </div>
+            <ul class="fin-list">${rows}</ul>
+        </div>`;
+    }
+
+    function shiftMonth(dir) {
+        const [y, m] = (finMonth || todayISO().slice(0, 7)).split('-').map(Number);
+        const d = new Date(y, m - 1 + dir, 1);
+        finMonth = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+        window.renderFinance();
+    }
+
     function curveSvg() {
         const { past, future } = buildCurve();
         const pts = [...past, ...future.map(p => ({ ...p, f: true }))];
@@ -185,6 +261,14 @@
             root.innerHTML = '<div class="empty"><h3>טוען נתונים…</h3></div>';
             try { await loadFinance(); }
             catch (e) {
+                if (e instanceof NoTokenError) {
+                    root.innerHTML = `<div class="card fin-auth">
+                        <h3>צריך חיבור חי לחשבון Google</h3>
+                        <p>החיבור הקודם פג (גוגל מחדשת אותו רק לפעמים בשקט). לחיצה אחת ואני טוען את התזרים.</p>
+                        <button type="button" class="btn btn-primary" onclick="proSignIn(this)">התחבר מחדש</button>
+                    </div>`;
+                    return;
+                }
                 root.innerHTML = `<div class="empty"><h3>לא הצלחתי לטעון</h3><p>${esc(e.message)}</p>
                     <button class="btn btn-quiet" onclick="renderFinance()">נסה שוב</button></div>`;
                 return;
@@ -221,6 +305,8 @@
             ${((fin.entries || []).length || (fin.accounts || []).length) ? curveSvg() : '<div class="empty"><h3>אין עדיין נתונים לעקומה</h3><p>הוסיפו חשבון עם יתרה ותנועות, או ייבאו CSV, והעקומה תופיע כאן.</p></div>'}
             <div class="fin-legend"><span><i class="fin-dot solid"></i> בפועל</span><span><i class="fin-dot dashed"></i> צפי (חיובים קבועים + מסמכים פתוחים)</span></div>
         </div>
+
+        ${monthSectionHtml()}
 
         <div class="fin-grid">
             <div class="card">
@@ -289,6 +375,7 @@
     };
 
     function wire(root) {
+        root.querySelectorAll('[data-fin-month]').forEach(b => b.addEventListener('click', () => shiftMonth(b.dataset.finMonth === 'next' ? 1 : -1)));
         const form = root.querySelector('#fin-add-form');
         if (form) form.addEventListener('submit', (e) => {
             e.preventDefault();

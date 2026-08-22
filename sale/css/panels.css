@@ -4079,3 +4079,13 @@ i[class^="fa-"], i[class*=" fa-"] {
 .doc-due { display: inline-flex; align-items: center; gap: var(--sp-1); font-size: var(--fs-xs); color: var(--text-3); }
 .doc-due .doc-terms { min-height: 28px; padding: 0 var(--sp-2); font-size: var(--fs-xs); }
 .cf-bar-expected { background: var(--accent-soft); border: 1px solid var(--accent); }
+
+
+/* PRO: monthly view + sign-in card */
+.fin-month-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin-block-end: var(--sp-3); }
+.fin-month-head h3 { margin: 0; font-size: var(--fs-lg); }
+.fin-month-kpis > div { padding: var(--sp-2) 0; }
+.fin-list li.expected { opacity: 0.85; }
+.fin-auth { max-width: 480px; }
+.fin-auth h3 { margin-block-end: var(--sp-2); }
+.fin-auth p { color: var(--text-2); }
