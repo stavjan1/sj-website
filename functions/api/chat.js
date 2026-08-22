@@ -17,6 +17,7 @@ import { getPricingMap } from './_pricing_map.js';
 import { getKitBlock } from './_electrical_kit.js';
 import { getMaterialsBlock, getTaxonomyBlock, renderQuoteChecklist } from './_materials.js';
 import { renderPanelSizerBlock } from './_panel_sizer.js';
+import { getCoverageBlock } from './_coverage.js';
 import {
   ADMIN_EMAIL, loadModelClass, loadTierConfig, getTierForEmail,
   verifyGoogleEmail, bearerToken, dayKey, rateLimit,
@@ -121,6 +122,17 @@ export async function onRequestPost(context) {
       if (taxonomy) messages.push({ role: 'system', content: taxonomy });
     } catch { /* catalog is an enhancement, never a dependency */ }
   }
+
+  // What moves the price in a job of THIS type — Stav's own coverage
+  // checklists, which until now drove the question UI and never reached the
+  // model. Thirty-nine of these lines carry real money at a specificity
+  // nothing else in the prompt has ("שקע 450 ₪, מאור 450-485 ₪"), plus the
+  // exclusions that answer "מה לא כלול" and the red flags worth a warning.
+  // One job type only, so it costs ~4KB rather than the file's 70.
+  try {
+    const coverage = await getCoverageBlock(request, lastUserText(body.messages));
+    if (coverage) messages.push({ role: 'system', content: coverage });
+  } catch { /* an enhancement, never a dependency */ }
 
   // Panel work only: the DIN module table and the counting rules. This is the
   // one number a whole panel quote multiplies by — ~150 ₪ per equipped module —

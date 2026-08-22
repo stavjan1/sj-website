@@ -95,8 +95,15 @@ export function hydrate(raw) {
   // 7,364 items being fuzzy-compared on every search.
   const tokenSet = new Set();
   const byFold = new Map();
+  // How many products each token appears in. This is the weight that matters:
+  // a word's usefulness in a trade query is how RARE it is, not whether it
+  // contains a digit. "פקט" names 30 products, "מוגן" and "מים" describe
+  // hundreds, and "IP65" is a digit token that a water-resistant HEATER shares
+  // with a switch. Counting the documents is the only way to know that.
+  const df = new Map();
   for (const it of items) {
     for (const t of it._toks) {
+      df.set(t, (df.get(t) || 0) + 1);
       if (t.length < 3 || tokenSet.has(t)) continue;
       tokenSet.add(t);
       const f = fold(t);
@@ -106,8 +113,8 @@ export function hydrate(raw) {
     }
     delete it._toks;
   }
-  return { meta: raw.meta || null, cats, units, items, tokenSet, byFold,
-           vocab: [...tokenSet] };
+  return { meta: raw.meta || null, cats, units, items, tokenSet, byFold, df,
+           n: items.length, vocab: [...tokenSet] };
 }
 
 // Hebrew spelling folding.
@@ -277,6 +284,21 @@ function stem(term) {
   return s.length >= 4 && s !== term ? s : null;
 }
 
+// How much a term is worth, from how rare it is in the catalog.
+//
+// Replaces a digit heuristic that scored any token containing a number at 12
+// and everything else at 3. That put "IP65" — shared by switches, heaters and
+// light fittings — above "פקט", which names the product. Rarity gets both
+// right without either being special-cased, and it needs no maintenance as the
+// catalog grows.
+function termWeight(db, t) {
+  if (!db || !db.df) return /\d/.test(t) ? 5 : 3;
+  const freq = db.df.get(t) || 0;
+  if (!freq) return 3;                       // unknown word: middling
+  const idf = Math.log(db.n / freq);         // ~9 for a unique token, ~0 for a ubiquitous one
+  return Math.max(1, Math.min(14, idf * 1.6));
+}
+
 function expand(terms, db) {
   // Each query term becomes a CONCEPT: the literal term, its synonyms, and —
   // when the term matches nothing in the catalog's vocabulary — the words it was
@@ -316,14 +338,20 @@ export function searchMaterials(db, query, limit = DEFAULT_LIMIT) {
   //
   // Capping it says what we actually mean: matching six of the query's ideas is
   // already a strong match, and nothing beyond that should be required.
-  const denom = Math.min(concepts.length, 6);
+  // The first two content terms are the head of the phrase — what the item IS.
+  const heads = concepts.length > 2 ? [0, 1] : [];
+
+  const denom = Math.min(
+    concepts.reduce((sum, c) => sum + Math.max(1, termWeight(db, c[0].t) / 4), 0), 6);
 
   const cap = Math.min(limit, MAX_LIMIT);
   const scored = [];
   for (const it of db.items) {
     let score = 0;
     let covered = 0;
-    for (const concept of concepts) {
+    let headMatched = heads.length === 0;
+    for (let ci = 0; ci < concepts.length; ci++) {
+      const concept = concepts[ci];
       let best = 0;
       for (const { t, literal } of concept) {
         if (it.skuNorm === t) { best = Math.max(best, 200); continue; }
@@ -339,18 +367,34 @@ export function searchMaterials(db, query, limit = DEFAULT_LIMIT) {
           && (it.catHay.includes(t) || (st && it.catHay.includes(st)));
         if (!whole && !partial && !stemmed && !inCat) continue;
 
-        // A size or model token ("5x6", "n2xy", "16a") pins down the item;
-        // a category word ("כבל") only narrows it to a department.
-        let w = /\d/.test(t) ? 5 : 3;
+        // Weighted by how rare the term is in the catalog: the word that names
+        // the product beats the words that merely describe it.
+        let w = termWeight(db, t);
         if (t.length >= 5) w += 1;
         if (partial || stemmed) w = Math.max(1, w - 2);
         if (inCat) w = 1;              // filed near it, not named it
         if (!literal) w = Math.min(w, 2); // a synonym, not the user's own word
         best = Math.max(best, w);
       }
-      if (best > 0) { score += best; covered += 1; }
+      // Coverage counts the WEIGHT of what was covered, not how many words.
+      // Matching "פקט" is worth more than matching "מוגן" and "מים" together,
+      // and a plain count said the opposite.
+      if (best > 0) {
+        score += best;
+        covered += Math.max(1, best / 4);
+        if (heads.includes(ci)) headMatched = true;
+      }
     }
     if (!covered) continue;
+
+    // A product line names the thing first and qualifies it afterwards:
+    // "מפסק פקט מוגן מים IP65" is a PAKAT that happens to be weather-rated.
+    // Rarity alone cannot see that — "מוגן" and "מים" score nearly as high as
+    // "פקט" in this catalog — so a match that picks up only the qualifiers and
+    // none of the head words was tying with the real part and winning on price.
+    // It returned a water-resistant HEATER. Hebrew puts the noun first on both
+    // sides of this comparison, which makes position a usable signal.
+    if (!headMatched) score *= 0.25;
     // Coverage is the deciding factor, not the sum. An item matching two of the
     // three things asked for beats one that matches a single term very strongly
     // — which is how "מא\"ז 3x25" used to return WERA screwdriver bits, whose
@@ -394,15 +438,28 @@ export function searchMaterials(db, query, limit = DEFAULT_LIMIT) {
 // paragraph is cut back into the item phrases it is made of, and each one is
 // looked up on its own, which is both far more accurate and far cheaper than it
 // sounds — the same index scan, just aimed properly.
-const LIST_MARKERS = /(?:רשימת\s*(?:מוצרים|חומרים)|חומרים|מוצרים|BOM|כתב\s*כמויות)\s*:?/;
+// Only headings that actually introduce a list. Bare "חומרים" / "מוצרים" used
+// to be in here and it was the bug: the handoff opens with "תמחר את העבודה
+// במלואה, עבודה + חומרים", the marker matched THAT, and everything after it —
+// including the 14 question bullets of the characterisation card — was treated
+// as products. The card's questions then ate the lookup budget and four of the
+// six real items never got searched.
+//
+// The heading only, never to end-of-line: a list is often written on the SAME
+// line as its heading ("רשימת מוצרים: כבל N2XY 5x4, ממסר פחת…"), and consuming
+// the rest of the line swallowed exactly the items it was meant to find.
+const LIST_MARKERS = /(?:רשימת\s+(?:ה?מוצרים|ה?חומרים|ה?ציוד)|כתב\s*כמויות|BOM)\s*:?\s*/g;
 
 export function extractItemQueries(text, max = 24) {
   const raw = String(text || '');
   if (!raw.trim()) return [];
-  // If the message names a product list, everything after that marker is the
-  // part worth looking up; otherwise treat the whole message as candidates.
-  const m = raw.match(LIST_MARKERS);
-  const body = m ? raw.slice(m.index + m[0].length) : raw;
+  // The LAST such heading, not the first: a message can mention a list before
+  // it presents one, and the one that matters is the one the items follow.
+  let body = raw;
+  let m, last = null;
+  LIST_MARKERS.lastIndex = 0;
+  while ((m = LIST_MARKERS.exec(raw)) !== null) last = m;
+  if (last) body = raw.slice(last.index + last[0].length);
 
   const phrases = body
     .split(/[,\n•·;|]+|(?:\s-\s)/)
@@ -412,10 +469,14 @@ export function extractItemQueries(text, max = 24) {
   const out = [];
   const seen = new Set();
   for (const p of phrases) {
-    // Two words minimum of real content, and short enough to still be a thing
-    // rather than a sentence about a thing.
+    // A product line, not a sentence about products. Ten words rather than
+    // seven, because real BOM lines carry qualifiers — "צינור גמיש לבן PG 21
+    // לפניות ליד הלוח והעמדה" is eight and was being dropped, which is how the
+    // conduit went unpriced. Sentences are excluded by their punctuation
+    // instead, which is what actually distinguishes them.
+    if (/[.?!]\s*$/.test(p.trim())) continue;
     const words = norm(p).split(' ').filter((w) => w.length >= 2 && !STOP.has(w));
-    if (!words.length || words.length > 7) continue;
+    if (!words.length || words.length > 10) continue;
     const key = words.join(' ');
     if (key.length < 3 || seen.has(key)) continue;
     seen.add(key);

@@ -185,7 +185,7 @@ function dataUrlToInlinePart(dataUrl) {
 // treated as unable to disable thinking — the safe assumption, since guessing
 // wrong here returns 400 on every single request.
 const THINKING_OFF_SUPPORTED = /gemini-2\.5-flash/;
-const THINKING_HEADROOM = 2048;
+const THINKING_HEADROOM = 4096;
 
 export function supportsThinkingOff(model) {
   return THINKING_OFF_SUPPORTED.test(String(model || ''));
@@ -231,12 +231,18 @@ export function toGemini(messages, opts = {}) {
   // caller passing 0 was really saying "I need the whole budget for the answer"
   // and on these models thinking will quietly take a slice of it. A larger
   // budget costs tokens; a truncated quote is worth nothing at all.
-  if (opts.thinkingBudget != null) {
-    if (opts.thinkingBudget > 0 || supportsThinkingOff(opts.model)) {
-      gc.thinkingConfig = { thinkingBudget: opts.thinkingBudget };
-    } else if (opts.max_tokens) {
-      gc.maxOutputTokens = opts.max_tokens + THINKING_HEADROOM;
-    }
+  if (opts.thinkingBudget > 0 || (opts.thinkingBudget === 0 && supportsThinkingOff(opts.model))) {
+    // A budget the caller chose, on a model that accepts it.
+    gc.thinkingConfig = { thinkingBudget: opts.thinkingBudget };
+  } else if (opts.max_tokens && !supportsThinkingOff(opts.model)) {
+    // Thinking cannot be switched off here and its tokens come out of
+    // maxOutputTokens, so the visible answer is competing with it for the same
+    // budget. Observed on a real pricing turn: a quote stopped mid-word at item
+    // 5 of the bill of quantities, at max_tokens 3000. Padding the budget keeps
+    // the reasoning AND lets the answer finish. Applies whether the caller
+    // asked for thinking off or said nothing at all — saying nothing is the
+    // common case and was the one starving.
+    gc.maxOutputTokens = opts.max_tokens + THINKING_HEADROOM;
   }
   if (Object.keys(gc).length) body.generationConfig = gc;
   return body;
