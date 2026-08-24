@@ -4327,3 +4327,33 @@ i[class^="fa-"], i[class*=" fa-"] {
 .mk-table tr.is-high .mk-gap { color: var(--warn-text); }
 .mk-table tr.is-low .mk-gap { color: var(--ok-text); }
 .mk-none { color: var(--text-3); font-weight: 400; font-size: var(--fs-xs); }
+
+/* ── The route, drawn ────────────────────────────────────────────────────────
+   A sketch, not a diagram: the strokes wobble (a displacement filter in the
+   SVG itself) and the words are set in a marker face, because what this
+   replaces is a drawing on the back of a page. The text is NOT wobbled — a
+   drawing you cannot read is a decoration. */
+.route-dlg { width: min(96vw, 940px); max-width: 96vw; }
+.route-scroll { overflow-x: auto; margin-block: var(--sp-3); }
+/* It fits the dialog on a desk and scrolls on a phone, rather than always
+   scrolling: a sketch you have to drag sideways to see the far end of is a
+   worse drawing than a small one. */
+.route-sketch { color: var(--text-2); width: 100%; min-width: 620px; height: auto; }
+/* Stacked down the page on a phone: no minimum, no sideways drag. */
+.route-sketch-v { min-width: 0; max-width: 340px; margin-inline: auto; display: block; }
+/* The SVG lays out left-to-right (the mirroring is done in the coordinates),
+   but each label is Hebrew: without this, "כבל 5x10 N2XY" comes out reordered. */
+.route-sketch text {
+    font-family: 'Gveret Levin AlefAlefAlef', var(--font-ui);
+    fill: var(--text); direction: rtl;
+}
+.route-sketch .rs-seglbl { font-size: 15px; font-weight: 600; }
+.route-sketch .rs-endlbl { font-size: 15px; font-weight: 700; }
+.route-sketch .rs-segnum { font-size: 11px; fill: var(--text-3); }
+.route-sketch .rs-note   { font-size: 12px; fill: var(--text-2); }
+.route-sketch .rs-missing, .route-sketch .rs-len { fill: var(--text-3); font-size: 12px; }
+/* Digging, cutting, coring: the segments that cost money and time are dashed,
+   the way you would circle them on paper. */
+.route-sketch .rs-heavy rect { stroke-dasharray: 6 4; }
+.route-notes { margin: 0; padding-inline-start: var(--sp-5, 20px); color: var(--text-2); font-size: var(--fs-xs); }
+.route-notes li { margin-block: 2px; }

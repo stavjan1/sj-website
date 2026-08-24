@@ -14,7 +14,7 @@
 // keeps a single definition of it here.
 
 import { generate } from './_ai.js';
-import { rateLimit } from './_tiers.js';
+import { rateLimit, dailyQuota } from './_tiers.js';
 import { sendMail, SJ_FROM } from './_mail.js';
 
 // web3forms key: prefer the env var (Cloudflare → Settings → Env vars,
@@ -65,6 +65,27 @@ export async function onRequestPost(context) {
     .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
     .slice(-20);
   if (turns.length === 0) return json({ error: { message: 'אין שיחה לשלוח.' } }, 400);
+  // A real "email me this conversation" has a conversation behind it: the
+  // visitor asked something and the assistant answered. One fabricated turn is
+  // the cheapest possible way to use this endpoint as a mailer.
+  if (!turns.some((m) => m.role === 'user') || !turns.some((m) => m.role === 'assistant')) {
+    return json({ error: { message: 'אין שיחה לשלוח.' } }, 400);
+  }
+
+  // The abuse this endpoint is exposed to once RESEND_API_KEY exists is not
+  // volume from one IP — the per-minute limiter above already answers that. It
+  // is that ANYONE can make SJ's domain send mail to an address they choose,
+  // carrying text they wrote. Two ceilings bound that without asking a real
+  // visitor for anything: how many times one address can be mailed, and how
+  // many can go out in a day at all. Both are checked before the AI call, so a
+  // flood costs no tokens either.
+  const addrKey = 'lead:' + email.toLowerCase().replace(/[^\w@.+-]/g, '');
+  if (!(await dailyQuota(env, addrKey, 2))) {
+    return json({ error: { message: 'כבר נשלח סיכום לכתובת הזאת היום.' } }, 429);
+  }
+  if (!(await dailyQuota(env, 'lead:all', 60))) {
+    return json({ error: { message: 'נשלחו היום הרבה סיכומים. נסו שוב מחר או פנו אלינו ישירות.' } }, 429);
+  }
 
   const transcript = turns
     // Each turn is bounded like /api/assistant does it: this endpoint is public

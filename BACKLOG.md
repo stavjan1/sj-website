@@ -112,11 +112,18 @@ Stav's actions / decisions:
       that never reach a Function), so a partial rotation loses leads silently.
       A test now pins all five together. This line sat here as a 🔴 long after
       the audit that cleared it, and got re-reported as an open security hole.
-- [ ] 🟠 /api/lead email abuse: once RESEND_API_KEY is on, the endpoint can send
-      SJ-branded mail to an attacker-chosen address (rate-limited 3/min). Before
-      enabling Resend — decide on a guard (confirm-link / tighter limit).
-- [ ] 🟢 Content-Security-Policy: add after testing against inline scripts + GIS +
-      html2pdf CDN + Gemini (deferred — would break the app if added blind).
+- [x] 🟠 /api/lead email abuse — **guarded 22/08/2026.** Per-minute-per-IP was
+      never the answer (a botnet sending one each is under it); what bounds the
+      damage is how many times ONE address can be mailed and how many can go out
+      at all. Both are daily KV counters checked *before* the model call, so a
+      flood costs no tokens either: 2 per address per day, 60 per day total. The
+      endpoint also now refuses a "conversation" without both a visitor turn and
+      an assistant turn. Five tests, including that a dead KV opens the gate
+      rather than taking the endpoint down.
+- [x] 🟢 Content-Security-Policy — **shipped and enforcing** (see the header block
+      at the top of `_headers`, which records how it was verified: eight page
+      types loaded with zero violations, every real destination confirmed
+      allowed, an attacker domain confirmed blocked).
 - [ ] 🟢 Optional: run Strix (external black-box pentest) against the LIVE site
       from a session with open network — complements the code audit above.
 Reviewed and found solid: Google token verification (audience-checked), admin
@@ -132,8 +139,16 @@ gating (server-side ADMIN_EMAIL on every admin endpoint), per-user KV keying
       client→quote handoff button that opens a prefilled project.
 - [ ] Periodic-service v3: bulk "add ALL to calendar"; surface due checkups on the
       projects dashboard too.
+- [x] The shipped supplier catalog reaches the USER, not only the agent
+      (22/08/2026): the "הוספה מהמאגר" picker searches his own prices first and
+      then /api/materials (7,364 ARCA items), with a remembered trade-discount
+      percentage — retail stays the suggestion, his cost becomes the price, and
+      the price book still wins. The price-book screen got the same search with
+      the opposite destination: find what you buy, add it to your own list.
 - [ ] Ingest full Dekel book into the system catalog (data already local in
-      "הקמת תשתית/כתב כמויות" — dekel_clean_perfect.xlsx). Highest-value remaining data work.
+      "הקמת תשתית/כתב כמויות" — dekel_clean_perfect.xlsx). Stav has the file;
+      it is not in the repo, so this waits on him uploading it (or on the
+      catalog screen's import, which takes name/price/unit columns today).
 - [ ] More adversarial training rounds — waiting for Stav's time: he feeds real examples,
       we check the model's guesses, fix the map each round.
 - [ ] SUMIT selling point surfaced in provider UI (badge exists; consider onboarding highlight).
@@ -153,9 +168,26 @@ gating (server-side ADMIN_EMAIL on every admin endpoint), per-user KV keying
 - [ ] "Loved by AIs" expansion: keep llms.txt fresh; consider FAQ page for GEO.
 
 ## Tech debt
-- [ ] 🟢 checkups: extract the duplicated periodic-service core (dates/ICS/calendar/
-      import) shared by /checkups/app.js and sale/app.js into one file (found in the
-      pre-deploy review 08/08; both copies fixed identically for now).
+- [x] 🟢 checkups: duplicated periodic-service core — **extracted 22/08/2026** to
+      `assets/checkups-core.js` (dates, recurrence rule, calendar event, .ics).
+      Both screens delegate to it and keep their own rendering and their own
+      words; nine tests pin the arithmetic (month-end clamping, leap year, RFC
+      5545 escaping) and one asserts neither file has grown its own copy again.
+
+## The route, drawn (shipped 22/08/2026)
+
+The idea that survived the removal of the auto-generated sketches, built as its
+own feature: **שרטוט המסלול**, a button on the pricing screen and a section at
+the top of the printed work order. The segments are the route answers he ticked,
+in checklist order; the conduit and the cable are read off the priced lines, so
+the drawing can never disagree with the quote; digging and cutting are dashed.
+Hand-drawn on purpose (a displacement filter on the strokes, a marker face for
+the words — the text is not wobbled, because a drawing you cannot read is a
+decoration). Horizontal on a desk, stacked down the page on a phone.
+
+Still open on this thread: per-segment *lengths* (today one total for the run)
+and heights ("הרכבה בגובה 120") — both need a place in the characterization to
+say them, which is a checklist change, not a drawing change.
 
 ## Dropped, with the part worth keeping
 - [x] ~~Auto-generated job sketches~~ — **removed 12/08/2026 on Stav's call.**
@@ -208,3 +240,16 @@ gating (server-side ADMIN_EMAIL on every admin endpoint), per-user KV keying
 מה לבדוק לפני שמיישמים: כמה ימים בלי נגיעה זה "נזנח" (הצעה: 7), ואם
 לקרוא לזה "טיוטות" או "התחלות". שווה גם לשקול שהסוכן ייתן שם לעבודה
 כבר מהמשפט הראשון, כדי שהרשימה לא תתמלא ב"פרויקט חדש".
+
+**בוצע (21-22.8.2026):** סתיו אישר 7 ימים. מדף "טיוטות" מקופל בתחתית רשימת
+העבודות, עם המשך/מחיקה ומחיקה מרובה, והסוכן נותן שם לעבודה מהמשפט הראשון
+(`autoName`). לא נבנתה תיבת דואר שנייה למיין, בכוונה.
+
+## ברירות מחדל סטנדרטיות באפיון (22.8.2026)
+
+כל 111 שאלות הצ'יפים והמספרים בתשעת השאלונים נפתחות על התשובה שנכונה לרוב
+העבודות (`COVERAGE_DEFAULTS`), כך שפרויקט חדש ניתן לתמחור מיד. ברירת מחדל לא
+דורסת תשובה של המשתמש, של הסוכן או דילוג; היא מסומנת "סטנדרט" עד שמאשרים;
+ושדה חובה שנשאר עליה נכתב בהצעה כהנחה. **מה שנשאר פתוח:** לעבור על הרשימה
+עם סתיו ולאשר שהברירות באמת הנפוצות אצלו (זה הדבר היחיד כאן שדורש חשמלאי,
+לא מתכנת) — `COVERAGE_DEFAULTS` בסוף `sale/coverage.js`, שורה אחת לכל שדה.

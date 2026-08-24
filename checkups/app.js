@@ -44,54 +44,21 @@ function init() {
 
 // ---------- dates ----------
 
-function todayStr() {
-    const d = new Date();
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-}
-function pad(n) { return String(n).padStart(2, '0'); }
-
-// Add months to YYYY-MM-DD, clamping the day (31.1 + 1mo → 28.2, not 3.3).
-function addMonths(dateStr, months) {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const t = new Date(y, m - 1 + months, 1);
-    const lastDay = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
-    t.setDate(Math.min(d, lastDay));
-    return t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate());
-}
-
-// The date the next checkup is due: explicit override wins, else last + interval.
-function nextDue(c) {
-    if (c.next) return c.next;
-    if (c.last && c.months) return addMonths(c.last, c.months);
-    return null;
-}
-
-function daysUntil(dateStr) {
-    return Math.round((new Date(dateStr + 'T00:00:00') - new Date(todayStr() + 'T00:00:00')) / 86400000);
-}
-
-function fmtDate(dateStr) {
-    const [y, m, d] = dateStr.split('-');
-    return d + '.' + m + '.' + y;
-}
-
-function intervalLabel(months) {
-    if (months === 12) return 'כל שנה';
-    if (months === 24) return 'כל שנתיים';
-    if (months % 12 === 0) return 'כל ' + (months / 12) + ' שנים';
-    return 'כל ' + months + ' חודשים';
-}
+// The arithmetic and the file formats are shared with the same feature inside
+// /sale/ (assets/checkups-core.js). Two copies of "when is this due" is a
+// missed visit waiting to happen; the screens keep their own words and their
+// own rendering, and agree on the dates.
+function todayStr() { return SJ_CK.today(); }
+function pad(n) { return SJ_CK.pad(n); }
+function addMonths(dateStr, months) { return SJ_CK.addMonths(dateStr, months); }
+function nextDue(c) { return SJ_CK.nextDue(c); }
+function daysUntil(dateStr) { return SJ_CK.daysUntil(dateStr); }
+function fmtDate(dateStr) { return SJ_CK.fmtDate(dateStr); }
+function intervalLabel(months) { return SJ_CK.intervalLabel(months); }
 
 // ---------- rendering ----------
 
-function statusOf(c) {
-    const due = nextDue(c);
-    if (!due) return 'missing';
-    const days = daysUntil(due);
-    if (days < 0) return 'overdue';
-    if (days <= SOON_DAYS) return 'soon';
-    return 'ok';
-}
+function statusOf(c) { return SJ_CK.statusOf(c, SOON_DAYS); }
 
 function render() {
     const q = (document.getElementById('search').value || '').trim().toLowerCase();
@@ -370,44 +337,9 @@ function ensureCalendarToken() {
     });
 }
 
-function rruleFor(months) {
-    return months % 12 === 0
-        ? 'RRULE:FREQ=YEARLY;INTERVAL=' + (months / 12)
-        : 'RRULE:FREQ=MONTHLY;INTERVAL=' + months;
-}
-
-function eventBody(c) {
-    const due = nextDue(c);
-    return {
-        summary: '⚡ ' + (c.type || 'בדיקה תקופתית') + ', ' + c.name,
-        location: c.site || undefined,
-        description: [
-            c.phone ? 'טלפון: ' + c.phone : '',
-            'תדירות: ' + intervalLabel(c.months),
-            c.notes || '',
-            '(נוצר אוטומטית ממעקב הבדיקות של SJ הנדסת חשמל)',
-        ].filter(Boolean).join('\n'),
-        start: { date: due },
-        end: { date: addDays(due, 1) },
-        recurrence: [rruleFor(c.months)],
-        // Calendar does the reminding: email a month ahead (to book the visit),
-        // then email a week ahead, then a popup the day before.
-        reminders: {
-            useDefault: false,
-            overrides: [
-                { method: 'email', minutes: 28 * 1440 },
-                { method: 'email', minutes: 7 * 1440 },
-                { method: 'popup', minutes: 1440 },
-            ],
-        },
-    };
-}
-
-function addDays(dateStr, n) {
-    const d = new Date(dateStr + 'T00:00:00');
-    d.setDate(d.getDate() + n);
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-}
+function rruleFor(months) { return SJ_CK.rrule(months); }
+function eventBody(c) { return SJ_CK.eventBody(c, '(נוצר אוטומטית ממעקב הבדיקות של SJ הנדסת חשמל)'); }
+function addDays(dateStr, n) { return SJ_CK.addDays(dateStr, n); }
 
 async function syncCalendar(id) {
     const c = clients.find((x) => x.id === id);
@@ -448,36 +380,14 @@ async function syncCalendar(id) {
 
 // RFC 5545 TEXT escaping — raw newlines/commas/semicolons in a property value
 // make the whole file unparseable for Apple Calendar/Outlook.
-function icsText(s) {
-    return String(s || '').replace(/\\/g, '\\\\').replace(/[,;]/g, (m) => '\\' + m).replace(/\r?\n/g, '\\n');
-}
+function icsText(s) { return SJ_CK.icsText(s); }
 
 function downloadIcs(id) {
     const c = clients.find((x) => x.id === id);
     if (!c) return;
     const due = nextDue(c);
     if (!due) { toast('קודם קבע תאריך בדיקה (עריכה ✏)'); return; }
-    const dt = due.replace(/-/g, '');
-    const summary = icsText((c.type || 'בדיקה תקופתית') + ', ' + c.name);
-    const desc = icsText([c.phone ? 'טלפון: ' + c.phone : '', c.notes || ''].filter(Boolean).join('\n'));
-    const ics = [
-        'BEGIN:VCALENDAR',
-        'VERSION:2.0',
-        'PRODID:-//SJ Electrical Engineering//Checkups//HE',
-        'BEGIN:VEVENT',
-        'UID:' + c.id + '@sj-eng.co.il',
-        'DTSTAMP:' + dt + 'T000000Z',
-        'DTSTART;VALUE=DATE:' + dt,
-        'DTEND;VALUE=DATE:' + addDays(due, 1).replace(/-/g, ''),
-        rruleFor(c.months),
-        'SUMMARY:' + summary,
-        c.site ? 'LOCATION:' + icsText(c.site) : '',
-        desc ? 'DESCRIPTION:' + desc : '',
-        'BEGIN:VALARM', 'TRIGGER:-P28D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
-        'BEGIN:VALARM', 'TRIGGER:-P7D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
-        'END:VEVENT',
-        'END:VCALENDAR',
-    ].filter(Boolean).join('\r\n');
+    const ics = SJ_CK.icsFile(c);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
     a.download = 'checkup-' + (c.name || 'client').replace(/[^\w֐-׿-]+/g, '_') + '.ics';

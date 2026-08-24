@@ -10967,6 +10967,234 @@ function renderSpecCard(proj) {
 // job is, what to load onto the van, and what to watch out for. Deliberately
 // NOT the customer's document — this one carries the materials and the method,
 // which is exactly what you don't hand to someone collecting quotes.
+// ── The route, drawn instead of listed ───────────────────────────────────────
+// Stav's own idea, recorded in the backlog after the schematic side views were
+// removed: "כל אחד יכול לדמיין את הפרטות הזאת" — but not the run itself. What
+// he asked for is the riser and the way out of the flat, annotated segment by
+// segment with the real dimensions: "קידוח 30 עם צינור 25", "מריכון 25", a bend
+// marked "שרשורי". That is the work order drawn rather than written, and it is
+// built from answers the card already holds plus the lines already priced.
+//
+// Nothing here is invented. The segments are the route answers he ticked, in
+// checklist order (which is the order they happen in); the cable and conduit
+// are read off the priced material lines, so the drawing can never disagree
+// with the quote. What is missing is drawn as a question mark, not as a guess.
+const ROUTE_PLANS = {
+    charger:  { steps: 'route_type',       length: 'distance_m',            from: 'לוח החשמל', to: 'עמדת הטעינה' },
+    infra:    { steps: 'route_method',     length: 'route_length_m',        from: 'הלוח המזין', to: 'הקצה' },
+    points:   { steps: 'existing_conduit', length: null,                    from: 'לוח החשמל', to: 'הנקודות' },
+    earthing: { steps: 'route_type',       length: 'distance_to_electrode', from: 'לוח החשמל', to: 'האלקטרודה' },
+    lighting: { steps: null,               length: 'cable_route_meters',    from: 'לוח החשמל', to: 'גופי התאורה' },
+    solar:    { steps: null,               length: 'route_meters',          from: 'האינוורטר',  to: 'הלוח הראשי' },
+    panel:    { steps: null,               length: null,                    from: 'המונה',      to: 'הלוח' },
+};
+
+// A chip is a sentence; a segment on a drawing has room for two words. The
+// rules read the chip rather than mapping all thirty of them one by one, so a
+// new chip in coverage.js draws itself without a code change.
+const ROUTE_KINDS = [
+    { re: /קידוח|מעבר קיר/,                    label: 'קידוח קיר',        heavy: false },
+    { re: /חפירה|אדמה|גינה|קרקע/,              label: 'חפירה',            heavy: true },
+    { re: /ניסור|חציבה|בטון|אספלט|ריצוף|משתלב/, label: 'חציבה או ניסור',   heavy: true },
+    { re: /פיר|riser/i,                        label: 'פיר קיים',         heavy: false },
+    { re: /צנרת|חוט משיכה|השחלה|מוביל/,        label: 'השחלה בצנרת',      heavy: false },
+    { re: /תעלה|עה"ט|על הטיח|גלוי|פיטינג/,     label: 'תעלה גלויה',       heavy: false },
+    { re: /סולם כבלים|רשת/,                    label: 'תעלת רשת',         heavy: false },
+    { re: /גבס/,                               label: 'מעל תקרת גבס',     heavy: false },
+];
+
+function routeKind(text) {
+    const hit = ROUTE_KINDS.find((k) => k.re.test(text || ''));
+    return hit || { label: String(text || '').slice(0, 18), heavy: false };
+}
+
+// The cable and the conduit are whatever the table says they are.
+function routeMaterial(proj, re) {
+    const hit = (proj.materials || []).find((m) => m.checked !== false && re.test(String(m.name || '')));
+    return hit ? String(hit.name).trim() : '';
+}
+
+function routePlan(proj) {
+    if (!proj) return null;
+    const type = (proj.spec && proj.spec.jobType) || 'generic';
+    const cfg = ROUTE_PLANS[type];
+    if (!cfg) return null;
+    const answers = (proj.spec && proj.spec.answers) || {};
+    const val = (id) => {
+        const a = id && answers[id];
+        return a && !a.skipped ? String(a.value || '') : '';
+    };
+
+    const stepsRaw = cfg.steps ? specValues(val(cfg.steps)) : [];
+    const segments = (stepsRaw.length ? stepsRaw : ['']).map((chip) => {
+        const k = routeKind(chip);
+        return { chip, label: k.label || 'מסלול', heavy: !!k.heavy };
+    });
+
+    const cable = routeMaterial(proj, /כבל|N2XY|NYY|XLPE|H07|כבלים/i);
+    const conduit = routeMaterial(proj, /מריכף|מריכון|שרשור|צינור|כפיף|PG|תעלה/i);
+
+    const notes = [];
+    const mount = val('mounting') || val('mount');
+    if (mount) notes.push('התקנה: ' + mount);
+    const earth = val('earthing_system') || val('earthing') || val('earthing_rcd');
+    if (earth) notes.push('הארקה: ' + earth);
+
+    return {
+        from: cfg.from,
+        to: cfg.to,
+        length: val(cfg.length),
+        segments,
+        cable,
+        conduit,
+        notes,
+        assumed: !stepsRaw.length,
+    };
+}
+
+// Drawn by hand, on purpose — Stav: "שרבוט יותר ציורי, שבן אדם יחשוב שהוא צייר
+// משהו עם דף ועט". The wobble is a displacement filter on the strokes only;
+// text stays crisp, because a drawing you cannot read is a decoration.
+function routeSketchSvg(plan, opts) {
+    if (!plan) return '';
+    // A phone is where a work order actually gets read, and six boxes in a row
+    // on a 390px screen is either unreadable or a sideways drag. Same drawing,
+    // stacked down the page.
+    if (opts && opts.vertical) return routeSketchSvgVertical(plan);
+    const segs = plan.segments.slice(0, 6);
+    const boxW = 132, gap = 26, endW = 116, h = 210;
+    const width = endW * 2 + segs.length * boxW + (segs.length + 1) * gap;
+    const midY = 96;
+    // RTL: the start is on the right, so x is measured from the right edge.
+    const rx = (x, w) => width - x - w;
+
+    let x = gap;
+    const parts = [];
+    // Pushed as two entries, not one string: everything that starts with <g or
+    // <line goes into the wobbling group below, and a wobbled label is a label
+    // nobody can read.
+    parts.push(`<g class="rs-end"><rect x="${rx(x, endW)}" y="${midY - 34}" width="${endW}" height="68" rx="8"/></g>`);
+    parts.push(`<text class="rs-endlbl" x="${rx(x + endW / 2, 0)}" y="${midY + 5}" text-anchor="middle">${escapeHtml(plan.from)}</text>`);
+    x += endW;
+
+    segs.forEach((s, i) => {
+        const sx = x + gap;
+        parts.push(`<line class="rs-line" x1="${rx(x, 0)}" y1="${midY}" x2="${rx(sx, 0)}" y2="${midY}"/>`);
+        parts.push(`<g class="rs-seg${s.heavy ? ' rs-heavy' : ''}"><rect x="${rx(sx, boxW)}" y="${midY - 26}" width="${boxW}" height="52" rx="8"/></g>`);
+        parts.push(`<text class="rs-seglbl" x="${rx(sx + boxW / 2, 0)}" y="${midY - 2}" text-anchor="middle">${escapeHtml(s.label)}</text>`);
+        parts.push(`<text class="rs-segnum" x="${rx(sx + boxW / 2, 0)}" y="${midY + 16}" text-anchor="middle">${i + 1}</text>`);
+        // What passes inside this segment, written under it like a note on paper.
+        const under = [plan.conduit, plan.cable].filter(Boolean);
+        if (under.length) {
+            under.forEach((t, j) => {
+                parts.push(`<text class="rs-note" x="${rx(sx + boxW / 2, 0)}" y="${midY + 46 + j * 17}" text-anchor="middle">${escapeHtml(t)}</text>`);
+            });
+        } else {
+            parts.push(`<text class="rs-note rs-missing" x="${rx(sx + boxW / 2, 0)}" y="${midY + 46}" text-anchor="middle">צינור וכבל · לא תומחרו עדיין</text>`);
+        }
+        x = sx + boxW;
+    });
+
+    parts.push(`<line class="rs-line" x1="${rx(x, 0)}" y1="${midY}" x2="${rx(x + gap, 0)}" y2="${midY}"/>`);
+    x += gap;
+    parts.push(`<g class="rs-end"><rect x="${rx(x, endW)}" y="${midY - 34}" width="${endW}" height="68" rx="8"/></g>`);
+    parts.push(`<text class="rs-endlbl" x="${rx(x + endW / 2, 0)}" y="${midY + 5}" text-anchor="middle">${escapeHtml(plan.to)}</text>`);
+
+    const lengthText = plan.length ? `אורך המסלול בפועל: ${plan.length}` : 'אורך המסלול: לא נמדד עדיין';
+    return `
+<svg class="route-sketch" viewBox="0 0 ${width} ${h}" style="direction:ltr" role="img"
+     aria-label="שרטוט מסלול העבודה: ${escapeHtml(plan.from)} עד ${escapeHtml(plan.to)}">
+  <defs>
+    <filter id="rs-rough" x="-6%" y="-20%" width="112%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.021" numOctaves="3" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  <g filter="url(#rs-rough)" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    ${parts.filter((p) => p.startsWith('<g') || p.startsWith('<line')).join('\n    ')}
+  </g>
+  ${parts.filter((p) => p.startsWith('<text')).join('\n  ')}
+  <text class="rs-len" x="${width / 2}" y="${h - 12}" text-anchor="middle">${escapeHtml(lengthText)}</text>
+</svg>`;
+}
+
+function routeSketchSvgVertical(plan) {
+    const segs = plan.segments.slice(0, 6);
+    const W = 320, endH = 60, segH = 50, noteH = 36, gap = 22;
+    const h = endH + gap + segs.length * (segH + noteH + gap) + endH + 24;
+    const cx = W / 2;
+    const shapes = [];
+    const labels = [];
+    let y = 10;
+
+    shapes.push(`<rect x="${cx - 110}" y="${y}" width="220" height="${endH}" rx="8"/>`);
+    labels.push(`<text class="rs-endlbl" x="${cx}" y="${y + endH / 2 + 5}" text-anchor="middle">${escapeHtml(plan.from)}</text>`);
+    y += endH;
+
+    segs.forEach((s, i) => {
+        shapes.push(`<line x1="${cx}" y1="${y}" x2="${cx}" y2="${y + gap}"/>`);
+        y += gap;
+        shapes.push(`<g class="${s.heavy ? 'rs-heavy' : ''}"><rect x="${cx - 100}" y="${y}" width="200" height="${segH}" rx="8"/></g>`);
+        labels.push(`<text class="rs-seglbl" x="${cx}" y="${y + 22}" text-anchor="middle">${escapeHtml(s.label)}</text>`);
+        labels.push(`<text class="rs-segnum" x="${cx}" y="${y + 40}" text-anchor="middle">${i + 1}</text>`);
+        y += segH;
+        const under = [plan.conduit, plan.cable].filter(Boolean);
+        if (under.length) {
+            under.forEach((t, j) => labels.push(
+                `<text class="rs-note" x="${cx}" y="${y + 16 + j * 16}" text-anchor="middle">${escapeHtml(t)}</text>`));
+        } else {
+            labels.push(`<text class="rs-note rs-missing" x="${cx}" y="${y + 16}" text-anchor="middle">צינור וכבל · לא תומחרו עדיין</text>`);
+        }
+        y += noteH;
+    });
+
+    shapes.push(`<line x1="${cx}" y1="${y}" x2="${cx}" y2="${y + gap}"/>`);
+    y += gap;
+    shapes.push(`<rect x="${cx - 110}" y="${y}" width="220" height="${endH}" rx="8"/>`);
+    labels.push(`<text class="rs-endlbl" x="${cx}" y="${y + endH / 2 + 5}" text-anchor="middle">${escapeHtml(plan.to)}</text>`);
+
+    const lengthText = plan.length ? `אורך המסלול בפועל: ${plan.length}` : 'אורך המסלול: לא נמדד עדיין';
+    return `
+<svg class="route-sketch route-sketch-v" viewBox="0 0 ${W} ${h}" style="direction:ltr" role="img"
+     aria-label="שרטוט מסלול העבודה: ${escapeHtml(plan.from)} עד ${escapeHtml(plan.to)}">
+  <defs>
+    <filter id="rs-rough-v" x="-6%" y="-4%" width="112%" height="108%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.021" numOctaves="3" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  <g filter="url(#rs-rough-v)" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    ${shapes.join('\n    ')}
+  </g>
+  ${labels.join('\n  ')}
+  <text class="rs-len" x="${cx}" y="${h - 4}" text-anchor="middle">${escapeHtml(lengthText)}</text>
+</svg>`;
+}
+
+function openRouteSketch() {
+    const proj = projectsList.find((p) => p.id === activeProjectId);
+    const plan = routePlan(proj);
+    if (!plan) { showToast('אין לעבודה הזאת מסלול לשרטט', 'error'); return; }
+    const old = document.getElementById('route-dlg');
+    if (old) old.remove();
+    const narrow = window.matchMedia('(max-width: 700px)').matches;
+    const dlg = document.createElement('dialog');
+    dlg.id = 'route-dlg';
+    dlg.className = 'ck-dialog route-dlg';
+    dlg.innerHTML = `
+        <h3>המסלול, כמו ששרטטו אותו על דף</h3>
+        <p class="input-help">הקטעים הם התשובות שסימנת באפיון, לפי הסדר. הצינור והכבל נקראים מהטבלה, כדי שהשרטוט לא יגיד משהו אחר מההצעה.</p>
+        <div class="route-scroll">${routeSketchSvg(plan, { vertical: narrow })}</div>
+        ${plan.assumed ? '<p class="input-help">לא סומנו קטעי מסלול באפיון, לכן מצויר קטע אחד כללי.</p>' : ''}
+        ${plan.notes.length ? `<ul class="route-notes">${plan.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}</ul>` : ''}
+        <div class="ck-dialog-actions">
+            <button type="button" class="btn btn-secondary" onclick="openFieldWorkOrder()">פקודת עבודה מלאה</button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('route-dlg').close()">סגירה</button>
+        </div>`;
+    document.body.appendChild(dlg);
+    dlg.showModal();
+}
+
 function openFieldWorkOrder() {
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (!proj) return;
@@ -10995,6 +11223,7 @@ function openFieldWorkOrder() {
         : '<li class="muted">לא הופקה רשימת כלים עדיין.</li>';
 
     const flags = (list.redFlags || []).slice(0, 8).map(f => `<li>${escapeHtml(f)}</li>`).join('');
+    const routeSvg = routeSketchSvg(routePlan(proj));
 
     const w = window.open('', '_blank');
     if (!w) { showToast('הדפדפן חסם את החלון, אפשר לאשר חלונות קופצים ולנסות שוב', 'error'); return; }
@@ -11017,10 +11246,22 @@ function openFieldWorkOrder() {
   .flags ul li{border:none;padding:2px 0;display:list-item;list-style:disc;margin-inline-start:16px}
   .notes{border:1px dashed #bbb;height:110px;margin-top:8px}
   .foot{margin-top:28px;color:#888;font-size:.75rem;border-top:1px solid #ddd;padding-top:10px}
+  .route-wrap{overflow-x:auto;margin:8px 0 18px}
+  .route-sketch{width:100%;min-width:620px;height:auto;color:#111}
+  .route-sketch text{font-family:'Gveret Levin AlefAlefAlef','Rubik',sans-serif;fill:#111;direction:rtl}
+  .route-sketch .rs-seglbl{font-size:15px;font-weight:600}
+  .route-sketch .rs-endlbl{font-size:15px;font-weight:700}
+  .route-sketch .rs-segnum{font-size:11px;fill:#777}
+  .route-sketch .rs-note{font-size:12px;fill:#444}
+  .route-sketch .rs-missing{fill:#999}
+  .route-sketch .rs-len{font-size:12px;fill:#666}
+  .route-sketch .rs-heavy rect{stroke-dasharray:6 4}
   @media print{body{padding:0}@page{margin:14mm}}
 </style></head><body onload="window.print()">
   <h1>פקודת עבודה · ${escapeHtml(proj.name || 'ללא שם')}</h1>
   <div class="sub">${escapeHtml(biz.name || 'SJ הנדסת חשמל')} · ${escapeHtml(list.label)} · ${escapeHtml(getTodayDateString())}</div>
+
+  ${routeSvg ? `<h2>המסלול</h2><div class="route-wrap">${routeSvg}</div>` : ''}
 
   <h2>האפיון</h2>
   <table><tbody>${specRows}</tbody></table>
@@ -16495,53 +16736,20 @@ function renderCheckups() {
 
 // ---------- dates ----------
 
-function ckToday() {
-    const d = new Date();
-    return d.getFullYear() + '-' + ckPad(d.getMonth() + 1) + '-' + ckPad(d.getDate());
-}
-function ckPad(n) { return String(n).padStart(2, '0'); }
-
-// Add months to YYYY-MM-DD, clamping the day (31.1 + 1mo → 28.2, not 3.3).
-function ckAddMonths(dateStr, months) {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const t = new Date(y, m - 1 + months, 1);
-    const lastDay = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
-    t.setDate(Math.min(d, lastDay));
-    return t.getFullYear() + '-' + ckPad(t.getMonth() + 1) + '-' + ckPad(t.getDate());
-}
-function ckAddDays(dateStr, n) {
-    const d = new Date(dateStr + 'T00:00:00');
-    d.setDate(d.getDate() + n);
-    return d.getFullYear() + '-' + ckPad(d.getMonth() + 1) + '-' + ckPad(d.getDate());
-}
-
-// The date the next checkup is due: explicit override wins, else last + interval.
-function ckNextDue(c) {
-    if (c.next) return c.next;
-    if (c.last && c.months) return ckAddMonths(c.last, c.months);
-    return null;
-}
-function ckDaysUntil(dateStr) {
-    return Math.round((new Date(dateStr + 'T00:00:00') - new Date(ckToday() + 'T00:00:00')) / 86400000);
-}
-function ckFmtDate(dateStr) {
-    const [y, m, d] = dateStr.split('-');
-    return d + '.' + m + '.' + y;
-}
-function ckIntervalLabel(months) {
-    if (months === 12) return 'כל שנה';
-    if (months === 24) return 'כל שנתיים';
-    if (months % 12 === 0) return 'כל ' + (months / 12) + ' שנים';
-    return 'כל ' + months + ' חודשים';
-}
-function ckStatusOf(c) {
-    const due = ckNextDue(c);
-    if (!due) return 'missing';
-    const days = ckDaysUntil(due);
-    if (days < 0) return 'overdue';
-    if (days <= CK_SOON_DAYS) return 'soon';
-    return 'ok';
-}
+// The dates, the recurrence rule and the .ics file are shared with the
+// standalone /checkups/ tracker (assets/checkups-core.js). They were two copies
+// of the same nine functions until a fix in the 08/08 review had to be applied
+// twice by hand — and two copies that can disagree about when a checkup is due
+// is a missed visit. The screens keep their own words and their own rendering.
+function ckToday() { return SJ_CK.today(); }
+function ckPad(n) { return SJ_CK.pad(n); }
+function ckAddMonths(dateStr, months) { return SJ_CK.addMonths(dateStr, months); }
+function ckAddDays(dateStr, n) { return SJ_CK.addDays(dateStr, n); }
+function ckNextDue(c) { return SJ_CK.nextDue(c); }
+function ckDaysUntil(dateStr) { return SJ_CK.daysUntil(dateStr); }
+function ckFmtDate(dateStr) { return SJ_CK.fmtDate(dateStr); }
+function ckIntervalLabel(months) { return SJ_CK.intervalLabel(months); }
+function ckStatusOf(c) { return SJ_CK.statusOf(c, CK_SOON_DAYS); }
 
 // ---------- rendering ----------
 
@@ -16777,37 +16985,10 @@ function ckEnsureCalToken() {
     });
 }
 
-function ckRrule(months) {
-    return months % 12 === 0
-        ? 'RRULE:FREQ=YEARLY;INTERVAL=' + (months / 12)
-        : 'RRULE:FREQ=MONTHLY;INTERVAL=' + months;
-}
+function ckRrule(months) { return SJ_CK.rrule(months); }
 
 function ckEventBody(c) {
-    const due = ckNextDue(c);
-    return {
-        summary: '⚡ ' + (c.type || 'בדיקה תקופתית') + ', ' + c.name,
-        location: c.site || undefined,
-        description: [
-            c.phone ? 'טלפון: ' + c.phone : '',
-            'תדירות: ' + ckIntervalLabel(c.months),
-            c.notes || '',
-            '(נוצר אוטומטית מהשירות התקופתי של זרם)',
-        ].filter(Boolean).join('\n'),
-        start: { date: due },
-        end: { date: ckAddDays(due, 1) },
-        recurrence: [ckRrule(c.months)],
-        // Calendar does the reminding: email a month ahead (to book the visit),
-        // then email a week ahead, then a popup the day before.
-        reminders: {
-            useDefault: false,
-            overrides: [
-                { method: 'email', minutes: 28 * 1440 },
-                { method: 'email', minutes: 7 * 1440 },
-                { method: 'popup', minutes: 1440 },
-            ]
-        }
-    };
+    return SJ_CK.eventBody(c, '(נוצר אוטומטית מהשירות התקופתי של זרם)');
 }
 
 async function ckSyncCalendar(id) {
@@ -16850,36 +17031,14 @@ async function ckSyncCalendar(id) {
 
 // RFC 5545 TEXT escaping — raw newlines/commas/semicolons in a property value
 // make the whole file unparseable for Apple Calendar/Outlook.
-function ckIcsText(s) {
-    return String(s || '').replace(/\\/g, '\\\\').replace(/[,;]/g, (m) => '\\' + m).replace(/\r?\n/g, '\\n');
-}
+function ckIcsText(s) { return SJ_CK.icsText(s); }
 
 function ckDownloadIcs(id) {
     const c = ckClients.find((x) => x.id === id);
     if (!c) return;
     const due = ckNextDue(c);
     if (!due) { showToast('קודם קבע תאריך בדיקה (כפתור העריכה)', 'error'); return; }
-    const dt = due.replace(/-/g, '');
-    const summary = ckIcsText((c.type || 'בדיקה תקופתית') + ', ' + c.name);
-    const desc = ckIcsText([c.phone ? 'טלפון: ' + c.phone : '', c.notes || ''].filter(Boolean).join('\n'));
-    const ics = [
-        'BEGIN:VCALENDAR',
-        'VERSION:2.0',
-        'PRODID:-//SJ Electrical Engineering//Checkups//HE',
-        'BEGIN:VEVENT',
-        'UID:' + c.id + '@sj-eng.co.il',
-        'DTSTAMP:' + dt + 'T000000Z',
-        'DTSTART;VALUE=DATE:' + dt,
-        'DTEND;VALUE=DATE:' + ckAddDays(due, 1).replace(/-/g, ''),
-        ckRrule(c.months),
-        'SUMMARY:' + summary,
-        c.site ? 'LOCATION:' + ckIcsText(c.site) : '',
-        desc ? 'DESCRIPTION:' + desc : '',
-        'BEGIN:VALARM', 'TRIGGER:-P28D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
-        'BEGIN:VALARM', 'TRIGGER:-P7D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
-        'END:VEVENT',
-        'END:VCALENDAR',
-    ].filter(Boolean).join('\r\n');
+    const ics = SJ_CK.icsFile(c);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
     a.download = 'checkup-' + (c.name || 'client').replace(/[^\w֐-׿-]+/g, '_') + '.ics';

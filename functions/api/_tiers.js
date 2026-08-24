@@ -248,6 +248,29 @@ export async function rateLimit(env, request, bucket, maxPerMinute) {
   }
 }
 
+// A counter with a window measured in days rather than minutes, for the things
+// where "3 per minute per IP" is not the question. An open endpoint that sends
+// SJ-branded mail to an address the caller chooses is the example: one IP
+// sending three a minute is rate-limited already, and a botnet sending one each
+// is not — what bounds the damage there is "how many can this address receive"
+// and "how many can go out at all today".
+//
+// Same failure posture as rateLimit: if KV is unavailable the guard opens, since
+// a limiter that takes the endpoint down with it is worse than no limiter.
+export async function dailyQuota(env, key, max) {
+  if (!env || !env.SJ_DATA) return true;
+  const day = new Date().toISOString().slice(0, 10);
+  const k = `dq:${key}:${day}`;
+  try {
+    const used = parseInt((await env.SJ_DATA.get(k)) || '0', 10);
+    if (used >= max) return false;
+    await env.SJ_DATA.put(k, String(used + 1), { expirationTtl: 172800 });
+    return true;
+  } catch {
+    return true;
+  }
+}
+
 // SSRF guard: reject URLs that resolve to loopback/link-local/private ranges or
 // non-web schemes, so /api/scrape can't be turned into a server-side fetch of
 // internal services or cloud metadata endpoints.
