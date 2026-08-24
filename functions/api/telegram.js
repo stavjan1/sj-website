@@ -10,14 +10,30 @@
 // The reply links to the printable view and to a one-click import into the app
 // (/sale/?tgreport=<token>).
 //
-// Env: TELEGRAM_BOT_TOKEN (required), TELEGRAM_WEBHOOK_SECRET (recommended),
-//      TELEGRAM_ALLOWED_CHATS (comma-separated chat ids; unset = closed, the
-//      bot replies with the chat id so it can be allow-listed).
+// Configuration lives in KV under `config:telegram` and is written from the
+// admin screen (/api/telegram-setup): { botToken, secret, allowed:[chatId] }.
+// Env vars of the same names still work and win if present, so an existing
+// deployment keeps behaving exactly as before.
 // KV:  tgsess:<chatId>  — active session (TTL 24h)
 //      tgreport:<token> — finished report record (TTL 60 days)
 
 import { generate } from './_ai.js';
 import { rateLimit } from './_tiers.js';
+
+// One read per request, cached for the life of the invocation.
+async function loadConfig(env) {
+    let cfg = {};
+    try { cfg = JSON.parse(await env.SJ_DATA.get('config:telegram') || '{}') || {}; } catch { cfg = {}; }
+    return {
+        botToken: env.TELEGRAM_BOT_TOKEN || cfg.botToken || '',
+        secret: env.TELEGRAM_WEBHOOK_SECRET || cfg.secret || '',
+        allowed: (env.TELEGRAM_ALLOWED_CHATS
+            ? String(env.TELEGRAM_ALLOWED_CHATS).split(',')
+            : (Array.isArray(cfg.allowed) ? cfg.allowed : [])
+        ).map(v => String(v).trim()).filter(Boolean),
+        openToFirst: !!cfg.openToFirst,   // "the next chat that writes gets in"
+    };
+}
 
 const SESS_TTL = 60 * 60 * 24;        // one working day, generous
 const REPORT_TTL = 60 * 60 * 24 * 60; // 60 days to import/print
@@ -64,8 +80,8 @@ function todayIsrael() {
     return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date());
 }
 
-async function tg(env, method, payload) {
-    const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${method}`, {
+async function tg(cfg, method, payload) {
+    const res = await fetch(`https://api.telegram.org/bot${cfg.botToken}/${method}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -73,8 +89,8 @@ async function tg(env, method, payload) {
     return res.json().catch(() => ({}));
 }
 
-function say(env, chatId, text) {
-    return tg(env, 'sendMessage', { chat_id: chatId, text });
+function say(cfg, chatId, text) {
+    return tg(cfg, 'sendMessage', { chat_id: chatId, text });
 }
 
 // Pick a mid-size photo (~≤1000px wide): big enough for a report, small enough
@@ -86,11 +102,11 @@ function pickPhoto(photos) {
     return (fit.length ? fit[fit.length - 1] : sorted[0]);
 }
 
-async function fetchPhotoDataUrl(env, fileId) {
-    const info = await tg(env, 'getFile', { file_id: fileId });
+async function fetchPhotoDataUrl(env, cfg, fileId) {
+    const info = await tg(cfg, 'getFile', { file_id: fileId });
     const path = info && info.result && info.result.file_path;
     if (!path) return null;
-    const res = await fetch(`https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${path}`);
+    const res = await fetch(`https://api.telegram.org/file/bot${cfg.botToken}/${path}`);
     if (!res.ok) return null;
     const buf = await res.arrayBuffer();
     if (buf.byteLength > 500 * 1024) return null; // defensive cap per photo
@@ -169,8 +185,8 @@ async function normalizeFindings(env, sess) {
     });
 }
 
-async function finalizeReport(env, chatId, sess) {
-    await say(env, chatId, `מסדר את ${sess.findings.length} הממצאים ומכין את הדוח…`);
+async function finalizeReport(env, cfg, chatId, sess) {
+    await say(cfg, chatId, `מסדר את ${sess.findings.length} הממצאים ומכין את הדוח…`);
     const rows = await normalizeFindings(env, sess);
 
     // Photo budget: stay under the Workers subrequest cap (each photo costs
@@ -182,7 +198,7 @@ async function finalizeReport(env, chatId, sess) {
     let embedded = 0, embeddedBytes = 0;
     for (let i = 0; i < findings.length; i += 4) {
         const chunk = findings.slice(i, i + 4).filter(f => f.fileId && embedded < MAX_PHOTOS);
-        const imgs = await Promise.all(chunk.map(f => fetchPhotoDataUrl(env, f.fileId).catch(() => null)));
+        const imgs = await Promise.all(chunk.map(f => fetchPhotoDataUrl(env, cfg, f.fileId).catch(() => null)));
         chunk.forEach((f, j) => {
             const img = imgs[j];
             if (img && embedded < MAX_PHOTOS && embeddedBytes + img.length <= MAX_EMBED_BYTES) {
@@ -215,7 +231,7 @@ async function finalizeReport(env, chatId, sess) {
     await env.SJ_DATA.delete(sessKey(chatId));
 
     const base = 'https://www.sj-eng.co.il';
-    await say(env, chatId, [
+    await say(cfg, chatId, [
         `הדוח מוכן · ${findings.length} ממצאים.`,
         '',
         `לצפייה והדפסה (מהדפדפן אפשר לשמור כ-PDF):`,
@@ -228,17 +244,30 @@ async function finalizeReport(env, chatId, sess) {
     ].join('\n'));
 }
 
-async function handleUpdate(env, update) {
+async function handleUpdate(env, cfg, update) {
     const msg = update && (update.message || update.edited_message);
     if (!msg || !msg.chat) return;
     const chatId = msg.chat.id;
 
-    if (!env.TELEGRAM_BOT_TOKEN) return;
+    if (!cfg.botToken) return;
 
-    // Closed bot: only allow-listed chats may use it.
-    const allowed = String(env.TELEGRAM_ALLOWED_CHATS || '').split(',').map(s => s.trim()).filter(Boolean);
-    if (!allowed.includes(String(chatId))) {
-        await say(env, chatId, `הבוט הזה פרטי. מזהה הצ'אט שלך: ${chatId}\nכדי לאשר אותו, מוסיפים את המזהה למשתנה TELEGRAM_ALLOWED_CHATS בהגדרות האתר.`);
+    // Closed bot: only allow-listed chats may use it. The admin screen can arm
+    // "the next chat that writes gets in", which is how the owner pairs his own
+    // phone without ever copying a chat id by hand.
+    if (!cfg.allowed.includes(String(chatId))) {
+        if (cfg.openToFirst) {
+            cfg.allowed.push(String(chatId));
+            try {
+                const raw = JSON.parse(await env.SJ_DATA.get('config:telegram') || '{}');
+                raw.allowed = cfg.allowed;
+                raw.openToFirst = false;               // one pairing, then closed again
+                raw.pairedAt = Date.now();
+                await env.SJ_DATA.put('config:telegram', JSON.stringify(raw));
+            } catch { }
+            await say(cfg, chatId, 'הצ\'אט הזה חובר לזרם ✅\n' + HELP_TEXT);
+            return;
+        }
+        await say(cfg, chatId, `הבוט הזה פרטי. מזהה הצ'אט שלך: ${chatId}\nכדי לאשר אותו, פותחים בזרם: ניהול → בוט הטלגרם.`);
         return;
     }
 
@@ -247,27 +276,27 @@ async function handleUpdate(env, update) {
     let sess = await loadSession(env, chatId);
 
     if (text === '/start' || /^עזרה$/.test(text)) {
-        await say(env, chatId, HELP_TEXT);
+        await say(cfg, chatId, HELP_TEXT);
         return;
     }
 
     if (CANCEL_RE.test(text)) {
         if (sess) await env.SJ_DATA.delete(sessKey(chatId));
-        await say(env, chatId, sess ? 'בוטל. אפשר להתחיל דוח חדש מתי שרוצים.' : 'אין דוח פתוח כרגע.');
+        await say(cfg, chatId, sess ? 'בוטל. אפשר להתחיל דוח חדש מתי שרוצים.' : 'אין דוח פתוח כרגע.');
         return;
     }
 
     if (FINISH_RE.test(text)) {
         if (!sess || !sess.findings.length) {
-            await say(env, chatId, 'אין עדיין ממצאים בדוח. שלחו תמונה עם כיתוב "מיקום - ליקוי" ואז "סיים".');
+            await say(cfg, chatId, 'אין עדיין ממצאים בדוח. שלחו תמונה עם כיתוב "מיקום - ליקוי" ואז "סיים".');
             return;
         }
         // Any failure must reach the user — a silent waitUntil death means
         // "סיים" and then nothing, forever.
         try {
-            await finalizeReport(env, chatId, sess);
+            await finalizeReport(env, cfg, chatId, sess);
         } catch (e) {
-            await say(env, chatId, 'משהו נכשל בהכנת הדוח. נסו "סיים" שוב; אם זה חוזר, שלחו פחות תמונות לדוח אחד.');
+            await say(cfg, chatId, 'משהו נכשל בהכנת הדוח. נסו "סיים" שוב; אם זה חוזר, שלחו פחות תמונות לדוח אחד.');
         }
         return;
     }
@@ -276,7 +305,7 @@ async function handleUpdate(env, update) {
     // the command as a finding of the old report (a stale morning session
     // would swallow the afternoon site's report otherwise).
     if (sess && sess.findings.length && text && START_RE.test(text) && !sess.pendingCaption) {
-        await say(env, chatId, `יש דוח פתוח לפרויקט "${sess.title}" עם ${sess.findings.length} ממצאים.\nכתבו "סיים" כדי לסגור אותו, או "בטל" כדי למחוק אותו: ואז נפתח את החדש.`);
+        await say(cfg, chatId, `יש דוח פתוח לפרויקט "${sess.title}" עם ${sess.findings.length} ממצאים.\nכתבו "סיים" כדי לסגור אותו, או "בטל" כדי למחוק אותו: ואז נפתח את החדש.`);
         return;
     }
 
@@ -286,7 +315,7 @@ async function handleUpdate(env, update) {
             sess = { title: 'פרויקט ללא שם', site: '', findings: [], startedAt: Date.now() };
         }
         if (sess.findings.length >= MAX_FINDINGS) {
-            await say(env, chatId, `הגעת ל-${MAX_FINDINGS} ממצאים, זה המקסימום לדוח אחד. כתבו "סיים" ואפשר לפתוח דוח נוסף.`);
+            await say(cfg, chatId, `הגעת ל-${MAX_FINDINGS} ממצאים, זה המקסימום לדוח אחד. כתבו "סיים" ואפשר לפתוח דוח נוסף.`);
             return;
         }
         const photo = pickPhoto(msg.photo);
@@ -300,9 +329,9 @@ async function handleUpdate(env, update) {
         sess.pendingCaption = !raw;
         await saveSession(env, chatId, sess);
         if (raw) {
-            await say(env, chatId, `נרשם ממצא ${sess.findings.length} ✓`);
+            await say(cfg, chatId, `נרשם ממצא ${sess.findings.length} ✓`);
         } else {
-            await say(env, chatId, `קיבלתי את התמונה (ממצא ${sess.findings.length}). באיזה מיקום ומה הליקוי? כתבו שורה אחת.`);
+            await say(cfg, chatId, `קיבלתי את התמונה (ממצא ${sess.findings.length}). באיזה מיקום ומה הליקוי? כתבו שורה אחת.`);
         }
         return;
     }
@@ -314,7 +343,7 @@ async function handleUpdate(env, update) {
             last.raw = text;
             sess.pendingCaption = false;
             await saveSession(env, chatId, sess);
-            await say(env, chatId, `נרשם ממצא ${sess.findings.length} ✓`);
+            await say(cfg, chatId, `נרשם ממצא ${sess.findings.length} ✓`);
             return;
         }
     }
@@ -323,35 +352,37 @@ async function handleUpdate(env, update) {
     if (!sess && text && START_RE.test(text)) {
         sess = { title: extractTitle(text), site: '', findings: [], startedAt: Date.now() };
         await saveSession(env, chatId, sess);
-        await say(env, chatId, `פותח דוח ליקויים לפרויקט "${sess.title}".\nשלחו תמונה של כל ליקוי עם כיתוב: מיקום - מה הליקוי. בסוף כתבו "סיים".`);
+        await say(cfg, chatId, `פותח דוח ליקויים לפרויקט "${sess.title}".\nשלחו תמונה של כל ליקוי עם כיתוב: מיקום - מה הליקוי. בסוף כתבו "סיים".`);
         return;
     }
 
     if (sess && text) {
-        await say(env, chatId, 'רשמתי. אפשר לשלוח תמונות ממצאים, או "סיים" כשמסיימים.');
+        await say(cfg, chatId, 'רשמתי. אפשר לשלוח תמונות ממצאים, או "סיים" כשמסיימים.');
         sess.findings.push({ raw: text, fileId: null });
         await saveSession(env, chatId, sess);
         return;
     }
 
-    await say(env, chatId, HELP_TEXT);
+    await say(cfg, chatId, HELP_TEXT);
 }
 
 export async function onRequestPost(context) {
     const { request, env } = context;
-    if (!env.SJ_DATA || !env.TELEGRAM_BOT_TOKEN) return json({ ok: true });
+    if (!env.SJ_DATA) return json({ ok: true });
+    const cfg = await loadConfig(env);
+    if (!cfg.botToken) return json({ ok: true });
     // The secret is MANDATORY, not recommended: without it any anonymous POST
     // would be processed as a genuine Telegram update (message relay + KV
     // writes + AI spend for free). No secret configured = webhook disabled.
-    if (!env.TELEGRAM_WEBHOOK_SECRET ||
-        request.headers.get('X-Telegram-Bot-Api-Secret-Token') !== env.TELEGRAM_WEBHOOK_SECRET) {
+    if (!cfg.secret ||
+        request.headers.get('X-Telegram-Bot-Api-Secret-Token') !== cfg.secret) {
         return json({ error: 'forbidden' }, 403);
     }
     if (!(await rateLimit(env, request, 'tg', 60))) return json({ ok: true });
     let update;
     try { update = await request.json(); } catch { return json({ ok: true }); }
     // Answer Telegram fast; do the work after the response.
-    context.waitUntil(handleUpdate(env, update).catch(() => {}));
+    context.waitUntil(handleUpdate(env, cfg, update).catch(() => {}));
     return json({ ok: true });
 }
 

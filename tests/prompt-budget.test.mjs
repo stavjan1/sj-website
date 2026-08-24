@@ -65,3 +65,60 @@ test('the חח"י call-out fee survives, because it is not a utility TABLE', () 
   const trimmed = trimPricingMap(DEFAULT_PRICING_MAP, 'התקנת גופי תאורה');
   assert.ok(trimmed.includes('~300 ₪'), 'the call-out fee was trimmed away with the tables');
 });
+
+// ── The catalogue index, ranked against the job ──────────────────────────────
+//
+// Stav's warning when this was proposed: "זה בעצם מועמד לפורענות, שיהיה חסר
+// הרבה דברים." He was right, and the first attempt proved it — a wiring mistake
+// meant the query never reached the ranker, so the block quietly shrank to 37%
+// by pure truncation while looking like it had worked. These tests exist mainly
+// to make that failure impossible to ship again.
+
+import { renderTaxonomyBlock } from '../functions/api/_materials.js';
+
+const fakeDb = (cats) => ({ items: cats.flatMap(([cat, n]) =>
+  Array.from({ length: n }, (_, i) => ({ cat, price: 10 + i }))) });
+
+const CATS = [
+  ['פיקוד ובקרה / מאמ"תים', 198],
+  ['כלי עבודה / כלי עבודה חשמליים', 158],
+  ['תאורה / גופי תאורה פנים / שקועי תקרה', 67],
+  ['תאורה / גופי תאורה חוץ', 40],
+  ['טעינה לרכב / עמדות טעינה', 12],
+  ['כבלי חשמל / כבלי פיקוד', 125],
+];
+
+test('the job the question is about comes first, not the biggest shelf', () => {
+  const out = renderTaxonomyBlock(fakeDb(CATS), 45, 'התקנת גופי תאורה בתקרת גבס');
+  const lines = out.split('\n').filter((l) => l.startsWith('•'));
+  assert.match(lines[0], /תאורה/, `a lighting job still opens with: ${lines[0]}`);
+});
+
+test('ranking really is driven by the question, not by the cut', () => {
+  // The bug that shipped for ten minutes: the query never arrived, the block
+  // shrank anyway, and two different jobs produced byte-identical output. If
+  // these two ever match again, the wiring is broken in exactly that way.
+  const light = renderTaxonomyBlock(fakeDb(CATS), 4, 'גופי תאורה');
+  const charger = renderTaxonomyBlock(fakeDb(CATS), 4, 'עמדת טעינה לרכב');
+  assert.notEqual(light, charger, 'two different jobs got an identical catalogue index');
+  assert.match(light.split('\n').filter((l) => l.startsWith('•'))[0], /תאורה/);
+  assert.match(charger.split('\n').filter((l) => l.startsWith('•'))[0], /טעינה/);
+});
+
+test('a job still gets the general shelves its own words never name', () => {
+  // Screws, terminals, conduit: nobody says them out loud, and a parts list
+  // without them is a parts list that sends somebody back to the shop.
+  const out = renderTaxonomyBlock(fakeDb(CATS), 6, 'גופי תאורה');
+  const lines = out.split('\n').filter((l) => l.startsWith('•'));
+  assert.ok(lines.length > 2, 'only the matching families survived');
+  assert.ok(lines.some((l) => !/תאורה/.test(l)), 'nothing but the matched families was kept');
+});
+
+test('no question means no filtering', () => {
+  // An unknown job should get everything, biggest first — the old behaviour,
+  // unchanged.
+  const all = renderTaxonomyBlock(fakeDb(CATS), 120);
+  const lines = all.split('\n').filter((l) => l.startsWith('•'));
+  assert.equal(lines.length, CATS.length);
+  assert.match(lines[0], /מאמ/, 'the no-query path stopped ranking by size');
+});

@@ -460,11 +460,11 @@ function setQuotaCharging(on) {
 // (offline / local testing) we fall back to sane defaults by login state.
 const TIER_LABELS = { guest: 'אורח', free: 'חינם', pro: 'Pro ⚡', business: 'עסקי', admin: 'מנהל מערכת' };
 const TIER_FALLBACK = {
-    guest:    { aiDaily: 100,  projects: 1,  quotesPerMonth: 0,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, pdfCredit: true },
-    free:     { aiDaily: 20,  projects: 3,  quotesPerMonth: 3,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, pdfCredit: true },
-    pro:      { aiDaily: 150, projects: -1, quotesPerMonth: -1, catalogItems: 1000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  pdfCredit: false },
-    business: { aiDaily: 300, projects: -1, quotesPerMonth: -1, catalogItems: 2000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  pdfCredit: false },
-    admin:    { aiDaily: -1,  projects: -1, quotesPerMonth: -1, catalogItems: 5000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  pdfCredit: false }
+    guest:    { aiDaily: 100,  projects: 1,  quotesPerMonth: 0,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true },
+    free:     { aiDaily: 20,  projects: 3,  quotesPerMonth: 3,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true },
+    pro:      { aiDaily: 150, projects: -1, quotesPerMonth: -1, catalogItems: 1000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  chatPhotos: true,   pdfCredit: false },
+    business: { aiDaily: 300, projects: -1, quotesPerMonth: -1, catalogItems: 2000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  chatPhotos: true,   pdfCredit: false },
+    admin:    { aiDaily: -1,  projects: -1, quotesPerMonth: -1, catalogItems: 5000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  chatPhotos: true,   pdfCredit: false }
 };
 let userTier = { tier: 'guest', limits: TIER_FALLBACK.guest, usage: { aiToday: 0, quotesThisMonth: 0 } };
 let selectedModelClass = 'basic'; // 'basic' | 'advanced' — the only model vocabulary the browser knows
@@ -512,6 +512,7 @@ async function refreshTierInfo() {
 
 // Reflect the plan everywhere the UI shows or hides something by plan.
 function applyTierGates() {
+    try { refreshChatPhotoGate(); } catch (e) {}
     // Model-class pills: lock "advanced" for plans without it.
     const advBtn = document.getElementById('model-class-advanced');
     const lockIco = document.getElementById('model-class-lock');
@@ -603,6 +604,7 @@ const UPGRADE_REASONS = {
     share:    'קישור אישי ללקוח · זמין במסלול Pro',
     ai:       'נגמרו בקשות ה-AI להיום במסלול שלך',
     advanced: 'המודל המתקדם ⚡ זמין במסלול Pro',
+    photos:   'תמונות מהשטח בצ\'אט · זמינות במסלול Pro',
     guestPdf: 'כדי להוריד PDF צריך להתחבר עם Google (חינם)',
     pdfQuota: 'הגעת למכסת ההצעות החודשית של המסלול החינמי'
 };
@@ -3003,6 +3005,7 @@ function createNewProject(opts) {
     loadProject(newProj.id);
     if (!describing) showToast(autoName ? 'פרויקט חדש נפתח, תאר את העבודה והשם ייקבע לבד' : `פרויקט "${name}" נוצר בהצלחה`);
     switchTab('wizard'); // Auto switch to pricing chat
+    coachMilestone('first-project', 1500);
 
     // Started from a description: hand it straight to the planning agent, so the
     // first thing you see is an answer rather than an empty box asking again.
@@ -11474,6 +11477,8 @@ function goToStage(stage) {
     // would be silently dropped.
     if (stageTransitionBusy) { stagePending = stage; return; }
 
+    if (stage === 'price') coachMilestone('first-priced', 1500);
+
     const from = document.getElementById('panel-create').classList.contains('active')
         ? 2 : STAGE_INDEX[activeChatMode] ?? 0;
     const to = STAGE_INDEX[stage];
@@ -12283,6 +12288,28 @@ let _nextUserMsgHidden = false;
 // Photos the user attached to the next chat message (site pictures the AI can
 // "see"). Compressed data: URLs, cleared once the message is sent.
 let pendingChatPhotos = [];
+
+// Site photos ride to the model as image input — the expensive half of the
+// conversation, and the reason this one is a paid capability. The control is
+// never hidden: it is greyed, and a tap explains what it is.
+function chatPhotoGate(e) {
+    if (tierAllows('chatPhotos')) return true;
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    showUpgradeModal(userTier.tier === 'guest' ? 'photos' : 'photos');
+    return false;
+}
+
+// Called wherever the tier is (re)applied, so the lock appears the moment the
+// plan is known and disappears the moment it is upgraded.
+function refreshChatPhotoGate() {
+    const btn = document.getElementById('btn-attach-photo');
+    if (!btn) return;
+    const allowed = tierAllows('chatPhotos');
+    btn.classList.toggle('is-locked', !allowed);
+    btn.title = allowed
+        ? 'צרף תמונה מהשטח · ה-AI יראה את העבודה'
+        : 'תמונות מהשטח · זמין במסלול Pro';
+}
 
 function onChatPhotoPicked(input) {
     const files = Array.from(input.files || []);
@@ -14541,6 +14568,9 @@ function saveToHistory(showToastFlag = true) {
     
     saveHistory();
     syncCurrentQuoteToProject();
+    // The quote is out of the app and on its way to a customer: the next move
+    // happens in the real world, and is tracked on the money board.
+    coachMilestone('first-quote-saved', 1400);
 }
 
 function loadQuoteFromHistory(id) {
@@ -15060,6 +15090,7 @@ function renderAdminAll(opts) {
         () => adminLoadPricingMap(),
         () => adminRefreshUserList(),
         () => window.renderAdminFunnel && window.renderAdminFunnel(),
+        () => renderAdminTelegram(),
         () => renderAdminFeedback(),
         () => setAdminTab(_adminTab),      // re-apply the chosen tab after a re-render
         () => adminRefreshStatus(),        // and the status lines, which read live token state

@@ -3990,7 +3990,6 @@ i[class^="fa-"], i[class*=" fa-"] {
     .pt-foot { flex-direction: column; align-items: stretch; }
     .ptf-actions .btn { flex: 1; justify-content: center; }
 }
-}
 .wi-rebuild { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); margin-block-end: var(--sp-3); }
 .wi-rebuild-note { font-size: var(--fs-xs); color: var(--text-3); }
 
@@ -4328,6 +4327,36 @@ i[class^="fa-"], i[class*=" fa-"] {
 .mk-table tr.is-low .mk-gap { color: var(--ok-text); }
 .mk-none { color: var(--text-3); font-weight: 400; font-size: var(--fs-xs); }
 
+/* ============================================================
+   Coach marks — the guide that points at the screen
+   ============================================================ */
+.coach { position: fixed; inset: 0; z-index: 100000; }
+.coach-hole {
+    position: absolute; border-radius: var(--r-md);
+    box-shadow: 0 0 0 9999px rgb(8 17 31 / 0.72);
+    outline: 2px solid var(--accent); outline-offset: 0;
+    transition: top var(--t-med), left var(--t-med), width var(--t-med), height var(--t-med);
+    pointer-events: none;
+}
+.coach.is-centred .coach-hole { display: none; }
+.coach.is-centred { background: rgb(8 17 31 / 0.72); }
+.coach-bubble {
+    position: absolute; width: 320px; max-width: calc(100vw - 24px);
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: var(--r-md);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+    padding: var(--sp-4);
+}
+.coach.is-centred .coach-bubble {
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+}
+.coach-title { display: block; font-size: var(--fs-lg); margin-block-end: var(--sp-1); }
+.coach-body { color: var(--text-2); font-size: var(--fs-sm); line-height: 1.6; }
+.coach-foot { display: flex; align-items: center; gap: var(--sp-3); margin-block-start: var(--sp-4); }
+.coach-skip { background: none; border: none; color: var(--text-3); font: inherit; font-size: var(--fs-sm); cursor: pointer; padding: var(--sp-1); }
+.coach-skip:hover { color: var(--text); }
+.coach-dots { margin-inline-start: auto; color: var(--text-3); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .coach-hole { transition: none; } }
 /* ── The route, drawn ────────────────────────────────────────────────────────
    A sketch, not a diagram: the strokes wobble (a displacement filter in the
    SVG itself) and the words are set in a marker face, because what this
@@ -4357,3 +4386,17 @@ i[class^="fa-"], i[class*=" fa-"] {
 .route-sketch .rs-heavy rect { stroke-dasharray: 6 4; }
 .route-notes { margin: 0; padding-inline-start: var(--sp-5, 20px); color: var(--text-2); font-size: var(--fs-xs); }
 .route-notes li { margin-block: 2px; }
+
+
+/* Locked chat photo button: present, greyed, and honest about why. */
+.chat-attach-btn { position: relative; }
+.chat-attach-btn.is-locked { opacity: 0.5; }
+.chat-attach-btn.is-locked:hover { opacity: 0.68; }
+.chat-attach-btn .attach-lock { display: none; }
+.chat-attach-btn.is-locked .attach-lock {
+    display: flex; align-items: center; justify-content: center;
+    position: absolute; inset-block-start: -4px; inset-inline-end: -4px;
+    width: 16px; height: 16px; border-radius: var(--r-pill);
+    background: var(--surface-2); color: var(--text-3);
+    font-size: 9px; border: 1px solid var(--border);
+}

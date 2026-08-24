@@ -28,25 +28,25 @@ export const TIER_DEFAULTS = {
     // still caps abuse, but the daily ceiling is what bounds a bad day. Easy to
     // walk back, and without a deploy: set `config:tiers` in KV.
     aiDaily: 100, projects: 1, quotesPerMonth: 0, catalogItems: 10,
-    reports: false, reminders: false, shareLink: false, advancedModel: false, pdfCredit: true,
+    reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true,
   },
   free: {
     // quotesPerMonth = distinct PDF exports allowed per month (monthly-renewing,
     // server-enforced per Google account; guests can't export at all).
     aiDaily: 20, projects: 3, quotesPerMonth: 3, catalogItems: 10,
-    reports: false, reminders: false, shareLink: false, advancedModel: false, pdfCredit: true,
+    reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true,
   },
   pro: {
     aiDaily: 150, projects: -1, quotesPerMonth: -1, catalogItems: 1000,
-    reports: true, reminders: true, shareLink: true, advancedModel: true, pdfCredit: false,
+    reports: true, reminders: true, shareLink: true, advancedModel: true, chatPhotos: true, pdfCredit: false,
   },
   business: {
     aiDaily: 300, projects: -1, quotesPerMonth: -1, catalogItems: 2000,
-    reports: true, reminders: true, shareLink: true, advancedModel: true, pdfCredit: false,
+    reports: true, reminders: true, shareLink: true, advancedModel: true, chatPhotos: true, pdfCredit: false,
   },
   admin: {
     aiDaily: -1, projects: -1, quotesPerMonth: -1, catalogItems: 5000,
-    reports: true, reminders: true, shareLink: true, advancedModel: true, pdfCredit: false,
+    reports: true, reminders: true, shareLink: true, advancedModel: true, chatPhotos: true, pdfCredit: false,
   },
 };
 

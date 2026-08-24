@@ -151,7 +151,11 @@ async function handleChat(context) {
   // turns don't get it — they get the item-level lookup below instead.
   if (kit) {
     try {
-      const taxonomy = await getTaxonomyBlock(request);
+      // Ranked against THIS job rather than by how big each family is. The old
+      // ordering opened a lighting job with "מאמ\u0022תים · 198 פריטים" and left the
+      // lighting shelves wherever they fell; this puts the shelves the job is
+      // actually shopping from at the top, and costs about half the block.
+      const taxonomy = await getTaxonomyBlock(request, 45, turnText);
       if (taxonomy) messages.push({ role: 'system', content: taxonomy });
     } catch { /* catalog is an enhancement, never a dependency */ }
   }
