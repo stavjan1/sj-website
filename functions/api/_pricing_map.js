@@ -127,6 +127,48 @@ export const DEFAULT_PRICING_MAP = `
 - קיימים נתונים מלאים גם להעברת מיקום חיבור, חיבור בפילר וחיבור בניין מגורים (לפי מספר יחידות), אם נשאל, אמור שזה תלוי-פרטים והפנה למחשבון חח"י או תן סדר גודל לפי ההיגיון של הטבלאות למעלה.
 `;
 
+// The free tier's real limit is TOKENS per day, not requests per day. Measured:
+// ~18,000 input tokens on a characterisation turn and ~11,000 on a pricing one,
+// because this map plus the checklists plus the catalogue lookup is 20-33KB of
+// Hebrew on every single call. Ninety-two questions spent roughly 1.7 million
+// tokens, which is why a "1,500 requests a day" allowance ran out after ninety.
+//
+// So the map is no longer sent whole to everyone. Two cuts, both conservative,
+// because a block wrongly withheld makes the answer worse and that costs more
+// than the tokens ever will:
+//
+//   · the חח"י fee tables (1.6KB) go only to turns that mention the utility,
+//     a connection change or a meter — nothing else can use them;
+//   · a turn with no work in it at all (a greeting, "תודה", "כן") gets no map,
+//     because there is nothing in it to price.
+//
+// Everything else still gets everything.
+
+const UTILITY_WORDS = /חח"?י|חברת החשמל|אגרה|אגרות|הגדלת חיבור|הגדלה של החיבור|מונה|פלומבה|תלת.?פאזי|חד.?פאזי|לוח פיצול|לוח משנה|ניתוק|חיבור חדש/;
+
+// A turn that cannot be about a job: short, no numbers, and nothing that names
+// work or material. Deliberately narrow — "כמה זה עולה" must NOT match.
+const TRIVIAL = /^(היי|שלום|הי|אהלן|בוקר טוב|ערב טוב|תודה|תודה רבה|סבבה|אוקיי|אוקי|ok|מגניב|יופי|כן|לא|בסדר|מעולה|הבנתי)[\s.!,?]*$/i;
+
+export function isTrivialTurn(text) {
+  const t = String(text || '').trim();
+  if (!t) return true;
+  if (/\d/.test(t)) return false;              // any number means a real detail
+  if (t.split(/\s+/).length > 4) return false; // a sentence is not a greeting
+  return TRIVIAL.test(t);
+}
+
+// The map, trimmed to what this turn can actually use.
+export function trimPricingMap(map, userText) {
+  const t = String(userText || '');
+  if (UTILITY_WORDS.test(t)) return map;
+  // Drop the utility-fee section only. Split on the heading so a future edit to
+  // the tables cannot leave half of them behind.
+  const parts = String(map).split(/\n(?=## )/);
+  const kept = parts.filter((p) => !/^## אגרות חברת החשמל/.test(p));
+  return kept.length === parts.length ? map : kept.join('\n');
+}
+
 export async function getPricingMap(env) {
   try {
     if (env.SJ_DATA) {
