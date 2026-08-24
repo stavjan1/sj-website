@@ -23,6 +23,7 @@ function load() {
     const ctx = createContext({
         specValues: (v) => String(v == null ? '' : v).split(' | ').filter(Boolean),
         escapeHtml: (x) => String(x).replace(/[<>&"]/g, ''),
+        heNum: (n) => String(n),
         Object, String, Number, Array, Math, JSON,
     });
     return runInContext(APP.slice(start, end) + '\n;({ routePlan, routeSketchSvg, routeKind })', ctx);
@@ -105,7 +106,7 @@ test('both layouts draw every segment and both ends', () => {
         const svg = routeSketchSvg(plan, opts);
         assert.equal((svg.match(/rs-seglbl/g) || []).length, 3);
         assert.equal((svg.match(/rs-endlbl/g) || []).length, 2);
-        assert.match(svg, /40 מטר/);
+        assert.match(svg, /אורך המסלול באפיון: 40 מ'/);
         assert.equal((svg.match(/rs-heavy/g) || []).length, 1);
         // The labels must sit OUTSIDE the wobbling group — a shaken label is
         // one nobody can read, and that was the first thing that went wrong.
@@ -132,4 +133,61 @@ test('the sketch is free for everyone; the printed work order is the PRO thing',
     // checking, not just answering.
     const draw = src.slice(src.indexOf('const ROUTE_PLANS'), src.indexOf('function openFieldWorkOrder'));
     assert.doesNotMatch(draw, /callAI|fetch\(|askListInChat|generate\(/, 'the drawing must cost nothing');
+});
+
+test('each leg carries its own metres and its own sentence', () => {
+    // "תעשה את האורכים לכל קטע" — and the annotation is the point of the
+    // drawing: "קידוח 30 עם צינור 25" belongs to leg 1, not to the run.
+    const { routePlan, routeSketchSvg } = load();
+    const p = charger({
+        route_type: ans('קידוח | חפירה בקרקע | תעלה גלויה'),
+        distance_m: ans('25 מטר'),
+    }, [{ name: 'כבל 5x10 N2XY', checked: true }]);
+    p.route = {
+        'קידוח': { m: 1, note: 'קידוח 30 עם צינור 25' },
+        'חפירה בקרקע': { m: 16 },
+        'תעלה גלויה': { m: 8, note: 'הרכבה בגובה 120' },
+    };
+    const plan = routePlan(p);
+    assert.deepEqual(plan.segments.map((s) => s.meters), [1, 16, 8]);
+    assert.equal(plan.segments[0].note, 'קידוח 30 עם צינור 25');
+    assert.equal(plan.measured, 25);
+    assert.equal(plan.declared, 25);
+    for (const opts of [undefined, { vertical: true }]) {
+        const svg = routeSketchSvg(plan, opts);
+        assert.match(svg, /קידוח 30 עם צינור 25/);
+        assert.match(svg, /הרכבה בגובה 120/);
+        assert.match(svg, /16 מ'/);
+        assert.match(svg, /סכום הקטעים: 25/);
+    }
+});
+
+test('when the legs and the measured run disagree, the drawing says so', () => {
+    const { routePlan, routeSketchSvg } = load();
+    const p = charger({ route_type: ans('קידוח | חפירה בקרקע'), distance_m: ans('40 מטר') });
+    p.route = { 'קידוח': { m: 1 }, 'חפירה בקרקע': { m: 12 } };
+    const svg = routeSketchSvg(routePlan(p));
+    assert.match(svg, /לא מסתדר/, 'a 27m gap between the two totals is worth a word');
+
+    // Within a metre it is the same number said twice, not a contradiction.
+    p.route = { 'קידוח': { m: 1 }, 'חפירה בקרקע': { m: 39 } };
+    assert.doesNotMatch(routeSketchSvg(routePlan(p)), /לא מסתדר/);
+});
+
+test('the drawing fits its own canvas', () => {
+    // Every box must sit inside the viewBox: one gap too few in the width and
+    // the last one — the destination — was cut off the left edge.
+    const { routePlan, routeSketchSvg } = load();
+    for (const n of [1, 2, 3, 4, 6]) {
+        const chips = Array.from({ length: n }, (_, i) => `קטע ${i}`).join(' | ');
+        const svg = routeSketchSvg(routePlan(charger({ route_type: ans(chips) })));
+        const vb = Number(svg.match(/viewBox="0 0 (\d+)/)[1]);
+        const xs = [...svg.matchAll(/<rect x="(-?[\d.]+)" y="[-\d.]+" width="([\d.]+)"/g)]
+            .map((m) => [Number(m[1]), Number(m[2])]);
+        assert.ok(xs.length >= n + 2, `${n} segments: expected ${n + 2} boxes, found ${xs.length}`);
+        for (const [x, w] of xs) {
+            assert.ok(x >= 0, `${n} segments: a box starts at ${x}, off the canvas`);
+            assert.ok(x + w <= vb, `${n} segments: a box ends at ${x + w}, past ${vb}`);
+        }
+    }
 });

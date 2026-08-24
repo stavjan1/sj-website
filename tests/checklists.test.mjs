@@ -44,9 +44,17 @@ test('every job type is present and keyed by its own jobType', () => {
 
 test('the pricing gate can always close, and is never the whole form', () => {
     for (const [key, list] of Object.entries(LISTS)) {
-        const critical = list.fields.filter((f) => f.critical).length;
-        assert.ok(critical >= 1, `${key}: no critical fields — the gate would never close`);
-        assert.ok(critical <= 6, `${key}: ${critical} critical fields — too much to answer before a price`);
+        // Two counts, because two of the mechanisms only apply sometimes.
+        // `showWhen` means the question is not even asked unless another answer
+        // calls for it, and `criticalUnless` means it stops blocking in a named
+        // case — so what a person actually faces before a price is the
+        // unconditional set. The total still gets a ceiling: a checklist where
+        // every second field can turn into a blocker is one nobody finishes.
+        const critical = list.fields.filter((f) => f.critical);
+        const always = critical.filter((f) => !f.showWhen && !f.criticalUnless).length;
+        assert.ok(critical.length >= 1, `${key}: no critical fields — the gate would never close`);
+        assert.ok(always <= 6, `${key}: ${always} always-critical fields — too much to answer before a price`);
+        assert.ok(critical.length <= 8, `${key}: ${critical.length} critical fields in total`);
         assert.ok(list.fields.length >= 8, `${key}: only ${list.fields.length} fields`);
         assert.ok(list.fields.length <= 15, `${key}: ${list.fields.length} fields — people abandon`);
     }

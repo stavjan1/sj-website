@@ -220,3 +220,72 @@ test('a fault call defaults to pricing the diagnosis, not the repair', () => {
     // repair price quoted before the finding is a number that will be wrong.
     assert.equal(DEFAULTS.fault.repair_scope, 'תלוי בממצא · אאשר טלפונית בשטח');
 });
+
+test('a panel swap opens on a hung standard panel, so what is left is its size', () => {
+    // Stav, 22/08: "תעשה שלהחלפת לוח הדיפולט זה לוח תלוי סטנדרטי אז מה שנשאר
+    // זה לשאול כמה מקום הלוח."
+    const { applyStandardDefaults } = load();
+    const p = proj('panel');
+    applyStandardDefaults(p);
+    assert.equal(p.spec.answers.mount.value, 'על הטיח (צמוד)');
+    assert.equal(p.spec.answers.panel_size_fit.value, '24 מקום');
+    // A hung panel does not care about the old opening, so it is not asked.
+    assert.equal(p.spec.answers.panel_niche, undefined);
+
+    // Choose a flush panel and the niche question appears, with its own default.
+    p.spec.answers.mount = { value: 'תחת הטיח (שקוע)', source: 'user', skipped: false };
+    applyStandardDefaults(p);
+    assert.equal(p.spec.answers.panel_niche.value, 'נכנס לפתח הקיים');
+
+    // And the size question is now about modules only.
+    const size = CHECKLISTS.panel.fields.find((f) => f.id === 'panel_size_fit');
+    assert.deepEqual(size.chips, ['12 מקום', '24 מקום', '36 מקום', '48 מקום ומעלה']);
+});
+
+test('chasing asks what the wall is, because block and concrete are different money', () => {
+    const { applyStandardDefaults, specCoverage } = load();
+    const chase = proj('points', {
+        work_scope_type: { value: 'הוספת נקודות חדשות', source: 'user', skipped: false },
+        install_visibility: { value: 'סמויה · חציבה וסגירה בקיר', source: 'user', skipped: false },
+    });
+    applyStandardDefaults(chase);
+    assert.ok(chase.spec.answers.wall_type, 'the wall must be asked when chasing');
+    delete chase.spec.answers.wall_type;
+    assert.equal(specCoverage(chase).ready, false, 'and it must block until answered');
+
+    // Surface trunking never touches the wall's insides.
+    const surface = proj('points', {
+        work_scope_type: { value: 'הוספת נקודות חדשות', source: 'user', skipped: false },
+        install_visibility: { value: 'גלויה · תעלה או פיטינג על הטיח', source: 'user', skipped: false },
+    });
+    applyStandardDefaults(surface);
+    assert.equal(surface.spec.answers.wall_type, undefined);
+    assert.equal(specCoverage(surface).ready, true);
+});
+
+test('a messy panel asks for mapping HOURS, because that is how it is billed', () => {
+    // "מיפוי זה גם ככה מתומחר רק לפי שעות" — so the checklist asks for hours
+    // instead of printing a warning nobody prices.
+    const { applyStandardDefaults } = load();
+    const messy = proj('inspection');
+    applyStandardDefaults(messy);          // circuit_mapping defaults to partial
+    assert.equal(messy.spec.answers.mapping_hours.value, '3 שעות');
+
+    const tidy = proj('inspection', { circuit_mapping: { value: 'מסומן ומסודר', source: 'user', skipped: false } });
+    applyStandardDefaults(tidy);
+    assert.equal(tidy.spec.answers.mapping_hours, undefined, 'a labelled panel needs no mapping hours');
+});
+
+test('answering a premise seeds the question it just made askable', () => {
+    // The niche question does not exist until the panel is flush; the moment it
+    // does, it should open on its standard like everything else rather than sit
+    // empty because the seeding already ran once.
+    const { applyStandardDefaults } = load();
+    const p = proj('panel');
+    applyStandardDefaults(p);
+    assert.equal(p.spec.answers.panel_niche, undefined);
+    p.spec.answers.mount = { value: 'תחת הטיח (שקוע)', source: 'user', skipped: false };
+    applyStandardDefaults(p);              // what setSpecAnswer now does for real
+    assert.equal(p.spec.answers.panel_niche.value, 'נכנס לפתח הקיים');
+    assert.equal(p.spec.answers.panel_niche.source, 'std');
+});

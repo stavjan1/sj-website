@@ -453,3 +453,27 @@ test('the model is switchable, testable, and never switches itself', () => {
     }
     assert.match(ai, /'gemini-3\.\d+-flash'/, 'the 3.x candidates are no longer selectable for testing');
 });
+
+test('every guide milestone the app fires actually exists in the guide', () => {
+    // A guide is optional; a ReferenceError in the middle of createNewProject is
+    // not. This shipped: sale/app.js called coachMilestone(), sale/coach.js
+    // defined coachHint(), and creating a project threw at the last line.
+    const app = read('sale/app.js');
+    const coach = read('sale/coach.js');
+
+    // Whatever name the app uses for the guide, the guide must expose it.
+    const called = [...app.matchAll(/window\.(coach\w+)\s*\(/g)].map((m) => m[1]);
+    for (const name of new Set(called)) {
+        assert.match(coach, new RegExp('window\\.' + name + '\\s*='), `sale/coach.js does not expose ${name}`);
+    }
+
+    // And every milestone id fired must be one the guide knows how to show.
+    const ids = [...app.matchAll(/coachSay\('([^']+)'/g)].map((m) => m[1]);
+    assert.ok(ids.length >= 3, 'the milestones vanished');
+    for (const id of ids) {
+        assert.ok(coach.includes(`'${id}'`), `coach.js has no hint for "${id}"`);
+    }
+
+    // The call site itself must be unable to throw.
+    assert.match(app, /function coachSay\(id, delay\) \{\s*try \{/);
+});

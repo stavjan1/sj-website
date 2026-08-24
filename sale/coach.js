@@ -209,7 +209,10 @@
     };
 
     // Fire a milestone hint. Safe to call from anywhere, any number of times.
-    window.coachHint = function coachHint(id, delay) {
+    // Exposed under both names: the app's three call sites say coachMilestone,
+    // and a guide whose name does not match its caller is not a guide, it is a
+    // ReferenceError in the middle of creating a project.
+    window.coachMilestone = window.coachHint = function coachMilestone(id, delay) {
         try {
             if (!HINTS[id] || seen(id) || isGuest()) return;
             // The tour comes first; a hint never interrupts it.

@@ -2935,6 +2935,18 @@ function fillWorkExample(btn) {
     input.focus();
 }
 
+// The onboarding guide lives in its own file and is entirely optional. It is
+// also, by definition, called at the exact moments that matter most — a project
+// being created, a price landing, a quote going out — so it must never be able
+// to take down the thing it is celebrating. A missing function, a renamed one,
+// a file that failed to load: all of them end here, silently.
+function coachSay(id, delay) {
+    try {
+        if (typeof window.coachMilestone === 'function') window.coachMilestone(id, delay);
+        else if (typeof window.coachHint === 'function') window.coachHint(id, delay);
+    } catch (e) { /* a hint is never worth an exception */ }
+}
+
 function createNewProject(opts) {
     opts = opts || {};
     const input = document.getElementById('new-project-name');
@@ -3005,7 +3017,7 @@ function createNewProject(opts) {
     loadProject(newProj.id);
     if (!describing) showToast(autoName ? 'פרויקט חדש נפתח, תאר את העבודה והשם ייקבע לבד' : `פרויקט "${name}" נוצר בהצלחה`);
     switchTab('wizard'); // Auto switch to pricing chat
-    coachMilestone('first-project', 1500);
+    coachSay('first-project', 1500);
 
     // Started from a description: hand it straight to the planning agent, so the
     // first thing you see is an answer rather than an empty box asking again.
@@ -10345,6 +10357,18 @@ function pendingStdFields(proj) {
 
 // "עברתי על הכל, זה נכון" — turns the remaining defaults into real answers, so
 // the tags clear and the quote stops printing them as assumptions.
+// The invitation's other half: for a Pro account it opens the picker in the
+// conversation (where the agent can actually see the photo); for everyone else
+// chatPhotoGate puts the upgrade screen up, which is where the plans live.
+function specPhotoInvite() {
+    if (typeof chatPhotoGate === 'function' && !chatPhotoGate(null)) return;
+    try { switchTab('wizard'); } catch (e) {}
+    try { setChatMode('plan'); } catch (e) {}
+    const input = document.querySelector('#btn-attach-photo input[type="file"]');
+    if (input) input.click();
+    else showToast('אפשר לצרף תמונה מכפתור המצלמה בשורת הכתיבה');
+}
+
 function confirmStandardDefaults() {
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (!proj) return;
@@ -10423,6 +10447,12 @@ function setSpecAnswer(fieldId, value, source) {
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (!proj) return;
     ensureSpec(proj).answers[fieldId] = { value, source: source || 'user', skipped: false };
+    // An answer can bring a question into existence — choosing a flush panel
+    // makes the niche question askable, choosing concealed points makes the wall
+    // material askable. Seed whatever just became applicable, so a conditional
+    // field opens on its standard like every other one. It only ever fills
+    // blanks, so re-running it costs nothing and overwrites nothing.
+    applyStandardDefaults(proj);
     specEditingField = null;   // the edit is made; let the card move on
     touchProject(proj);
     saveProjects();
@@ -10949,6 +10979,15 @@ function renderSpecCard(proj) {
     }).join('');
 
     const stdLeft = pendingStdFields(project).length;
+    // "אופציה מהירה יותר היא להעלות תמונה" (Stav, 22/08). A photo answers half
+    // the card — phases, main breaker size, free modules, the wall, the niche —
+    // so it is worth inviting rather than burying inside one question. Site
+    // photos are the paid capability (they ride to the model as image input),
+    // and the invitation says so before it is tapped rather than after.
+    const photoField = list.fields.find((f) => /photo/.test(f.id) && specFieldApplies(f, answers));
+    const photoDone = photoField && answers[photoField.id] && !answers[photoField.id].skipped
+        && String(answers[photoField.id].value || '').trim();
+    const photoPro = typeof tierAllows === 'function' ? tierAllows('chatPhotos') : true;
     const pct = cov.total ? Math.round((cov.answered / cov.total) * 100) : 0;
     const gateReady = cov.ready;
     const assumptionsNote = cov.assumptions.length
@@ -10962,6 +11001,14 @@ function renderSpecCard(proj) {
         <div class="spec-types" role="group" aria-label="סוג העבודה">${typeChips}</div>
         <div class="spec-bar" role="progressbar" aria-label="התקדמות האפיון"
             aria-valuenow="${cov.answered}" aria-valuemin="0" aria-valuemax="${cov.total}"><span style="width:${pct}%"></span></div>
+        ${photoField && !photoDone ? `<button type="button" class="spec-photo-invite${photoPro ? '' : ' is-pro'}" onclick="specPhotoInvite()">
+            <i class="fa-solid fa-camera" aria-hidden="true"></i>
+            <span class="spi-text"><b>אופציה מהירה יותר: להעלות תמונה</b>
+            <small>תמונה אחת של הלוח והקיר עונה על חצי מהשאלות כאן</small></span>
+            ${photoPro
+                ? '<i class="fa-solid fa-chevron-left spi-go" aria-hidden="true"></i>'
+                : '<span class="spi-pro"><i class="fa-solid fa-lock" aria-hidden="true"></i> Pro</span>'}
+        </button>` : ''}
         ${stdLeft ? `<div class="spec-reco">
             <p><b>${stdLeft} שדות ממולאים בברירת מחדל סטנדרטית</b>, כדי שאפשר יהיה לתמחר מיד.
             ההמלצה: לעבור עליהם ולוודא, שדה אחד שלא מתאים לעבודה הזאת מזיז את המחיר.
@@ -11036,6 +11083,31 @@ function routeMaterial(proj, re) {
     return hit ? String(hit.name).trim() : '';
 }
 
+// Per-segment detail, the thing that turns a shape into a work order: how many
+// metres this leg is, and the sentence that goes on it — "קידוח 30 עם צינור 25",
+// "הרכבה בגובה 120". Keyed by the chip's own text rather than by position, so
+// ticking another route option later does not shuffle numbers onto the wrong leg.
+function routeDetail(proj) {
+    if (!proj.route || typeof proj.route !== 'object') proj.route = {};
+    return proj.route;
+}
+
+function setRouteSegment(chip, field, value) {
+    const proj = projectsList.find((p) => p.id === activeProjectId);
+    if (!proj) return;
+    const all = routeDetail(proj);
+    const seg = all[chip] || (all[chip] = {});
+    if (field === 'm') {
+        const n = parseFloat(String(value).replace(',', '.'));
+        seg.m = Number.isFinite(n) && n > 0 ? n : '';
+    } else {
+        seg.note = String(value || '').slice(0, 60);
+    }
+    touchProject(proj);
+    saveProjects();
+    redrawRouteSketch();
+}
+
 function routePlan(proj) {
     if (!proj) return null;
     const type = (proj.spec && proj.spec.jobType) || 'generic';
@@ -11048,10 +11120,19 @@ function routePlan(proj) {
     };
 
     const stepsRaw = cfg.steps ? specValues(val(cfg.steps)) : [];
+    const detail = routeDetail(proj);
     const segments = (stepsRaw.length ? stepsRaw : ['']).map((chip) => {
         const k = routeKind(chip);
-        return { chip, label: k.label || 'מסלול', heavy: !!k.heavy };
+        const d = detail[chip] || {};
+        return {
+            chip,
+            label: k.label || 'מסלול',
+            heavy: !!k.heavy,
+            meters: Number(d.m) > 0 ? Number(d.m) : null,
+            note: String(d.note || '').trim(),
+        };
     });
+    const measured = segments.reduce((sum, x) => sum + (x.meters || 0), 0);
 
     const cable = routeMaterial(proj, /כבל|N2XY|NYY|XLPE|H07|כבלים/i);
     const conduit = routeMaterial(proj, /מריכף|מריכון|שרשור|צינור|כפיף|PG|תעלה/i);
@@ -11062,10 +11143,16 @@ function routePlan(proj) {
     const earth = val('earthing_system') || val('earthing') || val('earthing_rcd');
     if (earth) notes.push('הארקה: ' + earth);
 
+    // The total the card holds, and the total the segments add up to. Both are
+    // shown when they disagree, because that disagreement is usually the thing
+    // that was measured wrong.
+    const declared = parseFloat(String(val(cfg.length)).replace(/[^\d.]/g, ''));
     return {
         from: cfg.from,
         to: cfg.to,
         length: val(cfg.length),
+        declared: Number.isFinite(declared) ? declared : null,
+        measured: measured || null,
         segments,
         cable,
         conduit,
@@ -11084,8 +11171,16 @@ function routeSketchSvg(plan, opts) {
     // stacked down the page.
     if (opts && opts.vertical) return routeSketchSvgVertical(plan);
     const segs = plan.segments.slice(0, 6);
-    const boxW = 132, gap = 26, endW = 116, h = 210;
-    const width = endW * 2 + segs.length * boxW + (segs.length + 1) * gap;
+    // Every line that hangs under a box: the segment's own note first (it is
+    // about THIS leg), then what runs inside it.
+    const underLines = (s) => [s.note, plan.conduit, plan.cable].filter(Boolean);
+    const maxUnder = Math.max(1, ...segs.map((s) => underLines(s).length));
+    const boxW = 132, gap = 26, endW = 116;
+    const h = 150 + maxUnder * 17 + 26;
+    // Gaps: one before the first box, one before each segment, one before the
+    // end box. Counting one fewer cut the last box off the canvas by exactly a
+    // gap, which looked like a scroll and was arithmetic.
+    const width = endW * 2 + segs.length * boxW + (segs.length + 2) * gap;
     const midY = 96;
     // RTL: the start is on the right, so x is measured from the right edge.
     const rx = (x, w) => width - x - w;
@@ -11104,12 +11199,15 @@ function routeSketchSvg(plan, opts) {
         parts.push(`<line class="rs-line" x1="${rx(x, 0)}" y1="${midY}" x2="${rx(sx, 0)}" y2="${midY}"/>`);
         parts.push(`<g class="rs-seg${s.heavy ? ' rs-heavy' : ''}"><rect x="${rx(sx, boxW)}" y="${midY - 26}" width="${boxW}" height="52" rx="8"/></g>`);
         parts.push(`<text class="rs-seglbl" x="${rx(sx + boxW / 2, 0)}" y="${midY - 2}" text-anchor="middle">${escapeHtml(s.label)}</text>`);
-        parts.push(`<text class="rs-segnum" x="${rx(sx + boxW / 2, 0)}" y="${midY + 16}" text-anchor="middle">${i + 1}</text>`);
-        // What passes inside this segment, written under it like a note on paper.
-        const under = [plan.conduit, plan.cable].filter(Boolean);
+        parts.push(`<text class="rs-segnum" x="${rx(sx + boxW / 2, 0)}" y="${midY + 16}" text-anchor="middle">${
+            s.meters ? `${i + 1} · ${heNum(s.meters)} מ'` : `${i + 1}`}</text>`);
+        // What is true about this leg, written under it like a note on paper:
+        // its own annotation first, then what runs inside it.
+        const under = underLines(s);
         if (under.length) {
             under.forEach((t, j) => {
-                parts.push(`<text class="rs-note" x="${rx(sx + boxW / 2, 0)}" y="${midY + 46 + j * 17}" text-anchor="middle">${escapeHtml(t)}</text>`);
+                const own = j === 0 && s.note;
+                parts.push(`<text class="rs-note${own ? ' rs-own' : ''}" x="${rx(sx + boxW / 2, 0)}" y="${midY + 46 + j * 17}" text-anchor="middle">${escapeHtml(t)}</text>`);
             });
         } else {
             parts.push(`<text class="rs-note rs-missing" x="${rx(sx + boxW / 2, 0)}" y="${midY + 46}" text-anchor="middle">צינור וכבל · לא תומחרו עדיין</text>`);
@@ -11122,7 +11220,7 @@ function routeSketchSvg(plan, opts) {
     parts.push(`<g class="rs-end"><rect x="${rx(x, endW)}" y="${midY - 34}" width="${endW}" height="68" rx="8"/></g>`);
     parts.push(`<text class="rs-endlbl" x="${rx(x + endW / 2, 0)}" y="${midY + 5}" text-anchor="middle">${escapeHtml(plan.to)}</text>`);
 
-    const lengthText = plan.length ? `אורך המסלול בפועל: ${plan.length}` : 'אורך המסלול: לא נמדד עדיין';
+    const lengthText = routeLengthLine(plan);
     return `
 <svg class="route-sketch" viewBox="0 0 ${width} ${h}" style="direction:ltr" role="img"
      aria-label="שרטוט מסלול העבודה: ${escapeHtml(plan.from)} עד ${escapeHtml(plan.to)}">
@@ -11140,9 +11238,23 @@ function routeSketchSvg(plan, opts) {
 </svg>`;
 }
 
+// One sentence for the bottom of the drawing, and it says which number it is.
+function routeLengthLine(plan) {
+    const parts = [];
+    if (plan.declared) parts.push(`אורך המסלול באפיון: ${heNum(plan.declared)} מ'`);
+    if (plan.measured) parts.push(`סכום הקטעים: ${heNum(plan.measured)} מ'`);
+    if (!parts.length) return 'אורך המסלול: לא נמדד עדיין';
+    if (plan.declared && plan.measured && Math.abs(plan.declared - plan.measured) >= 1) {
+        return parts.join(' · ') + ' · לא מסתדר, שווה למדוד שוב';
+    }
+    return parts.join(' · ');
+}
+
 function routeSketchSvgVertical(plan) {
     const segs = plan.segments.slice(0, 6);
-    const W = 320, endH = 60, segH = 50, noteH = 36, gap = 22;
+    const underLines = (s) => [s.note, plan.conduit, plan.cable].filter(Boolean);
+    const maxUnder = Math.max(1, ...segs.map((s) => underLines(s).length));
+    const W = 320, endH = 60, segH = 50, noteH = 6 + maxUnder * 16, gap = 22;
     const h = endH + gap + segs.length * (segH + noteH + gap) + endH + 24;
     const cx = W / 2;
     const shapes = [];
@@ -11158,12 +11270,13 @@ function routeSketchSvgVertical(plan) {
         y += gap;
         shapes.push(`<g class="${s.heavy ? 'rs-heavy' : ''}"><rect x="${cx - 100}" y="${y}" width="200" height="${segH}" rx="8"/></g>`);
         labels.push(`<text class="rs-seglbl" x="${cx}" y="${y + 22}" text-anchor="middle">${escapeHtml(s.label)}</text>`);
-        labels.push(`<text class="rs-segnum" x="${cx}" y="${y + 40}" text-anchor="middle">${i + 1}</text>`);
+        labels.push(`<text class="rs-segnum" x="${cx}" y="${y + 40}" text-anchor="middle">${
+            s.meters ? `${i + 1} · ${heNum(s.meters)} מ'` : `${i + 1}`}</text>`);
         y += segH;
-        const under = [plan.conduit, plan.cable].filter(Boolean);
+        const under = underLines(s);
         if (under.length) {
             under.forEach((t, j) => labels.push(
-                `<text class="rs-note" x="${cx}" y="${y + 16 + j * 16}" text-anchor="middle">${escapeHtml(t)}</text>`));
+                `<text class="rs-note${j === 0 && s.note ? ' rs-own' : ''}" x="${cx}" y="${y + 16 + j * 16}" text-anchor="middle">${escapeHtml(t)}</text>`));
         } else {
             labels.push(`<text class="rs-note rs-missing" x="${cx}" y="${y + 16}" text-anchor="middle">צינור וכבל · לא תומחרו עדיין</text>`);
         }
@@ -11175,7 +11288,7 @@ function routeSketchSvgVertical(plan) {
     shapes.push(`<rect x="${cx - 110}" y="${y}" width="220" height="${endH}" rx="8"/>`);
     labels.push(`<text class="rs-endlbl" x="${cx}" y="${y + endH / 2 + 5}" text-anchor="middle">${escapeHtml(plan.to)}</text>`);
 
-    const lengthText = plan.length ? `אורך המסלול בפועל: ${plan.length}` : 'אורך המסלול: לא נמדד עדיין';
+    const lengthText = routeLengthLine(plan);
     return `
 <svg class="route-sketch route-sketch-v" viewBox="0 0 ${W} ${h}" style="direction:ltr" role="img"
      aria-label="שרטוט מסלול העבודה: ${escapeHtml(plan.from)} עד ${escapeHtml(plan.to)}">
@@ -11208,6 +11321,25 @@ function openRouteSketch() {
         <p class="input-help">הקטעים הם התשובות שסימנת באפיון, לפי הסדר. הצינור והכבל נקראים מהטבלה, כדי שהשרטוט לא יגיד משהו אחר מההצעה.</p>
         <div class="route-scroll">${routeSketchSvg(plan, { vertical: narrow })}</div>
         ${plan.assumed ? '<p class="input-help">לא סומנו קטעי מסלול באפיון, לכן מצויר קטע אחד כללי.</p>' : ''}
+        <div class="route-edit">
+            <div class="re-head">מטר והערה לכל קטע</div>
+            ${plan.segments.map((s, i) => `
+            <div class="re-row">
+                <span class="re-n">${i + 1}</span>
+                <span class="re-label">${escapeHtml(s.label)}</span>
+                <label class="re-m">
+                    <input type="number" min="0" step="0.5" inputmode="decimal" value="${s.meters || ''}"
+                        placeholder="0" aria-label="אורך הקטע במטרים"
+                        onchange="setRouteSegment('${escapeAttr(s.chip)}','m',this.value)">
+                    <span>מ'</span>
+                </label>
+                <input type="text" class="re-note" value="${escapeAttr(s.note)}" maxlength="60"
+                    placeholder="למשל: קידוח 30 עם צינור 25, הרכבה בגובה 120"
+                    aria-label="הערה לקטע"
+                    onchange="setRouteSegment('${escapeAttr(s.chip)}','note',this.value)">
+            </div>`).join('')}
+            <p class="input-help">מה שנכתב כאן נשמר על הפרויקט ומופיע על השרטוט ובפקודת העבודה.</p>
+        </div>
         ${plan.notes.length ? `<ul class="route-notes">${plan.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}</ul>` : ''}
         <div class="ck-dialog-actions">
             <button type="button" class="btn btn-secondary" onclick="openFieldWorkOrder()">פקודת עבודה מלאה${tierAllows('reports') ? '' : ' · PRO'}</button>
@@ -11215,6 +11347,17 @@ function openRouteSketch() {
         </div>`;
     document.body.appendChild(dlg);
     dlg.showModal();
+}
+
+// Redraw only the picture: the editor below it keeps its DOM, so the field he
+// is typing in does not lose focus mid-number.
+function redrawRouteSketch() {
+    const host = document.querySelector('#route-dlg .route-scroll');
+    if (!host) return;
+    const proj = projectsList.find((p) => p.id === activeProjectId);
+    const plan = routePlan(proj);
+    if (!plan) return;
+    host.innerHTML = routeSketchSvg(plan, { vertical: window.matchMedia('(max-width: 700px)').matches });
 }
 
 function openFieldWorkOrder() {
@@ -11280,6 +11423,7 @@ function openFieldWorkOrder() {
   .route-sketch .rs-endlbl{font-size:15px;font-weight:700}
   .route-sketch .rs-segnum{font-size:11px;fill:#777}
   .route-sketch .rs-note{font-size:12px;fill:#444}
+  .route-sketch .rs-own{fill:#111;font-weight:600}
   .route-sketch .rs-missing{fill:#999}
   .route-sketch .rs-len{font-size:12px;fill:#666}
   .route-sketch .rs-heavy rect{stroke-dasharray:6 4}
@@ -11477,7 +11621,7 @@ function goToStage(stage) {
     // would be silently dropped.
     if (stageTransitionBusy) { stagePending = stage; return; }
 
-    if (stage === 'price') coachMilestone('first-priced', 1500);
+    if (stage === 'price') coachSay('first-priced', 1500);
 
     const from = document.getElementById('panel-create').classList.contains('active')
         ? 2 : STAGE_INDEX[activeChatMode] ?? 0;
@@ -14570,7 +14714,7 @@ function saveToHistory(showToastFlag = true) {
     syncCurrentQuoteToProject();
     // The quote is out of the app and on its way to a customer: the next move
     // happens in the real world, and is tracked on the money board.
-    coachMilestone('first-quote-saved', 1400);
+    coachSay('first-quote-saved', 1400);
 }
 
 function loadQuoteFromHistory(id) {

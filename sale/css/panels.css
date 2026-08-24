@@ -4400,3 +4400,52 @@ i[class^="fa-"], i[class*=" fa-"] {
     background: var(--surface-2); color: var(--text-3);
     font-size: 9px; border: 1px solid var(--border);
 }
+
+/* The fast way through the card: one photo answers half of it. Styled as an
+   invitation rather than a warning — and when site photos are not on this
+   plan it says so on the face of it, instead of after the tap. */
+.spec-photo-invite {
+    display: flex; align-items: center; gap: var(--sp-3); width: 100%;
+    margin-block-end: var(--sp-3); padding: var(--sp-3);
+    background: var(--surface-2); border: 1px dashed var(--border);
+    border-radius: var(--r-sm); cursor: pointer; text-align: start;
+    color: var(--text); font-family: var(--font-ui);
+}
+.spec-photo-invite:hover { border-color: var(--accent); border-style: solid; }
+.spec-photo-invite > i:first-child { flex: none; font-size: 18px; color: var(--accent); }
+.spi-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.spi-text b { font-size: var(--fs-sm); font-weight: 700; }
+.spi-text small { color: var(--text-3); font-size: var(--fs-xs); }
+.spi-go { flex: none; color: var(--text-3); font-size: 13px; }
+.spi-text small { white-space: normal; }
+.spi-pro {
+    flex: none; display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: var(--r-pill);
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text-2); font: 700 11px/1 var(--font-ui);
+}
+.spi-pro i { font-size: 10px; }
+.spec-photo-invite.is-pro > i:first-child { color: var(--text-3); }
+
+/* The numbers that turn the shape into a work order: metres and one sentence
+   per leg, edited under the drawing they change. */
+.route-edit { margin-block-start: var(--sp-3); }
+.re-head { margin-block-end: var(--sp-2); color: var(--text-3); font: 700 11px/1.4 var(--font-ui); letter-spacing: .04em; }
+.re-row {
+    display: grid; grid-template-columns: 22px minmax(88px, 132px) 92px minmax(0, 1fr);
+    align-items: center; gap: var(--sp-2);
+    padding-block: 5px;
+}
+.re-n { color: var(--text-3); font: 700 var(--fs-xs) var(--font-ui); text-align: center; }
+.re-label { color: var(--text-2); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.re-m { display: flex; align-items: center; gap: 4px; color: var(--text-3); font-size: var(--fs-xs); }
+.route-edit .re-m input { width: 62px; min-height: 32px; text-align: center; }
+.route-edit .re-note { width: 100%; min-height: 32px; font-size: var(--fs-xs); }
+@media (max-width: 700px) {
+    .re-row { grid-template-columns: 22px 1fr 92px; grid-template-areas: "n l m" ". note note"; }
+    .re-n { grid-area: n; } .re-label { grid-area: l; } .re-m { grid-area: m; }
+    .route-edit .re-note { grid-area: note; }
+}
+/* A segment's own annotation is the sentence he wrote; the lines under it are
+   read off the table. The first one is his. */
+.route-sketch .rs-own { fill: var(--text); font-weight: 600; }
