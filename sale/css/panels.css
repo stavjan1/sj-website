@@ -4386,3 +4386,17 @@ i[class^="fa-"], i[class*=" fa-"] {
 .route-sketch .rs-heavy rect { stroke-dasharray: 6 4; }
 .route-notes { margin: 0; padding-inline-start: var(--sp-5, 20px); color: var(--text-2); font-size: var(--fs-xs); }
 .route-notes li { margin-block: 2px; }
+
+
+/* Locked chat photo button: present, greyed, and honest about why. */
+.chat-attach-btn { position: relative; }
+.chat-attach-btn.is-locked { opacity: 0.5; }
+.chat-attach-btn.is-locked:hover { opacity: 0.68; }
+.chat-attach-btn .attach-lock { display: none; }
+.chat-attach-btn.is-locked .attach-lock {
+    display: flex; align-items: center; justify-content: center;
+    position: absolute; inset-block-start: -4px; inset-inline-end: -4px;
+    width: 16px; height: 16px; border-radius: var(--r-pill);
+    background: var(--surface-2); color: var(--text-3);
+    font-size: 9px; border: 1px solid var(--border);
+}
