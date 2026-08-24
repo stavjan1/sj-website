@@ -60,24 +60,41 @@ export function identityTokens(name) {
 //     without this "פנל לד 60x60" matched a FRAME for converting a recessed
 //     panel, and "ברגים 4x40" matched a 4x40x200 busbar that merely mentions
 //     screws. Both contained every word asked for. Neither was the product.
-function totalMatch(item, needed, head) {
+function totalMatch(item, needed, heads) {
   if (!needed.length) return false;          // nothing asked → nothing proven
-  const nameOnly = item.hay;                 // name + attrs, normalised
   const justName = norm(item.name);
+  const nameToks = new Set(justName.split(' '));
 
-  // The head noun has to be the item's head noun, not merely a word appearing
-  // somewhere inside it. Hebrew puts the noun first, so position IS the test:
-  // "פס השוואה 4x40x200 כ-7 ברגים" contains "ברגים" and is a busbar;
-  // "מסגרת לבנה 60x60 להפיכת פנל שקוע" contains "פנל" and is a frame;
-  // "מתאם סיסטם 1 מודול להתקנה על פס דין" contains "פס" and is an adapter.
-  // All three passed a presence check and none of them is the product asked
-  // for. Requiring the head in the opening words rejects all three.
-  if (head) {
-    const opening = justName.split(' ').slice(0, 3).join(' ');
-    if (!opening.includes(head)) return false;
+  // 1 — the head noun has to BE the item's head noun, not a word appearing
+  // somewhere inside it. Hebrew puts it first, so position is the test:
+  //   "פס השוואה 4x40x200 כ-7 ברגים"       contains "ברגים" and is a busbar;
+  //   "מסגרת לבנה 60x60 להפיכת פנל שקוע"    contains "פנל"  and is a frame;
+  //   "אינטרלוק עהט פס דין IP66"            contains "פס"   and costs 616 ₪.
+  // Two words wide, because a catalogue name is usually the thing plus one
+  // qualifier ("פקט בקופסא", "צינור מרירון"), and either of the user's first
+  // two words may be the one that leads — the trade and the catalogue disagree
+  // about that ("מפסק פקט" vs "פקט בקופסא").
+  if (heads.length) {
+    const opening = justName.split(' ').slice(0, 2);
+    if (!heads.some((h) => opening.some((w) => w === h || w.endsWith(h)))) return false;
   }
-  return needed.every((w) => (/\d/.test(w) ? justName.includes(w)
-                                           : (item.toks.has(w) || nameOnly.includes(w))));
+
+  // 2 — and then EVERY word has to be there, heads included.
+  //
+  // This was relaxed once, to let "מפסק פקט 40A" find a product ARCA files as
+  // "פקט בקופסא". Coverage went from 36% to 50% and precision fell out the
+  // bottom: "מפסק פקט 40A" took a 298 ₪ moulded-case breaker whose only claim
+  // was "מפסק", and "מונה חשמל חד פאזי" took a THREE-phase meter. Five wrong
+  // prices bought six right ones. Put back, and it stays back — a missed price
+  // costs nothing and a wrong one costs a customer.
+  //
+  // Ratings go against the NAME, because matching one anywhere in the record
+  // let "נעל כבל 16" take a 10 ממ"ר lug on a size sitting in an attribute.
+  // Words are whole tokens, never substrings: "פקט" is inside "אימפקט", and
+  // the catalogue holds ninety-seven impact drivers.
+  return needed.every((w) => (
+    /\d/.test(w) ? justName.includes(w) : (nameToks.has(w) || item.toks.has(w))
+  ));
 }
 
 // The price, or nothing. Never a guess wearing a catalogue's clothes.
@@ -88,9 +105,12 @@ export function confidentMatch(db, requestedName, depth = 6) {
   // is often the second or third hit, sitting behind a bigger, better-scoring
   // cousin. Rejecting the top hit and stopping would throw away a real match.
   // The head noun: what the thing IS, before any of its measurements.
-  const head = needed.find((w) => !/\d/.test(w)) || '';
+  // Either of the first two words the user typed may be the head: the trade and
+  // the catalogue do not agree on which one leads. Stav writes "מפסק פקט 40A";
+  // ARCA files it as "פקט בקופסא 3X40A".
+  const heads = needed.filter((w) => !/\d/.test(w)).slice(0, 2);
   for (const it of searchMaterials(db, requestedName, depth)) {
-    if (totalMatch(it, needed, head)) {
+    if (totalMatch(it, needed, heads)) {
       return { sku: it.sku, name: it.name, price: it.price, unit: it.unit, cat: it.cat };
     }
   }

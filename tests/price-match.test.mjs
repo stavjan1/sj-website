@@ -83,3 +83,38 @@ test('ratings and sizes are always part of the identity', () => {
   assert.ok(t.includes('5x6'), 'the cross-section is not treated as identifying');
   assert.ok(!t.includes('מ'), 'a one-letter filler became identifying');
 });
+
+test('the head may be either of the first two words the user typed', () => {
+  // Stav writes "מפסק פקט 40A". ARCA files it as "פקט בקופסא 3X40A". Insisting
+  // on his first word alone rejected a product sitting right there in the
+  // catalogue — which is how a question of his ("בקטלוג של ארכה לא היה?")
+  // turned into a bug report.
+  const d = hydrate({ cats: ['x'], units: ['יחידה'], items: [
+    ['a', 'פקט בקופסא 4X32-35A ידית מנוף', 31.02, 0, 0, ''],
+    ['b', 'אינטרלוק עהט פס דין IP66 3X16', 616.53, 0, 0, ''],
+    ['c', 'מברגת אימפקט מקיטה 18V', 583.9, 0, 0, ''],
+  ] });
+  const pakat = confidentMatch(d, 'פקט 4x32');
+  assert.ok(pakat, 'the pakat was rejected because the catalogue leads with a different word');
+  assert.equal(pakat.price, 31.02);
+});
+
+test('a head found deep inside the name is not the head', () => {
+  // "אינטרלוק עהט פס דין" contains "פס" and is a 616 ₪ interlock, not a DIN
+  // rail. Widening the window to catch the pakat let this one straight in, so
+  // the window is two words: what the thing IS, and nothing after it.
+  const d = hydrate({ cats: ['x'], units: ['יחידה'], items: [
+    ['b', 'אינטרלוק עהט פס דין IP66 3X16', 616.53, 0, 0, ''],
+  ] });
+  assert.equal(confidentMatch(d, 'פס דין'), null, 'an interlock was priced as a DIN rail');
+});
+
+test('a substring is not a match — "פקט" is inside "אימפקט"', () => {
+  // The catalogue holds ninety-seven items matching /פקט/ and most of them are
+  // cordless impact drivers. A substring test hands an isolator query a power
+  // tool, at ten times the price.
+  const d = hydrate({ cats: ['x'], units: ['יחידה'], items: [
+    ['c', 'מברגת אימפקט מקיטה 18V DTD173Z', 583.9, 0, 0, ''],
+  ] });
+  assert.equal(confidentMatch(d, 'פקט 3x25'), null, 'an impact driver was priced as a pakat');
+});

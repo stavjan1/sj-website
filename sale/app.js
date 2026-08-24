@@ -12232,6 +12232,14 @@ function applyMaterialsFromResponse(activeProject, responseText) {
                 };
             });
             renderMaterialsChecklist(activeProject.materials);
+            // Second pass: the model named the products, the catalogue prices
+            // them. Until now the model priced them too, from memory — it wrote
+            // "כבל 5x6" at 28 ₪/מ' while the real price was 17.54.
+            //
+            // Deliberately after the list is already on screen. The list is what
+            // he asked for; the prices settle a moment later, and a lookup that
+            // takes a second must not hold up the thing he is waiting to read.
+            catalogPriceMaterials(activeProject);
         }
 
         // Fees: the inspector, utility charges, permits. Same trust-boundary
@@ -12271,6 +12279,58 @@ function applyMaterialsFromResponse(activeProject, responseText) {
     } catch (e) {
         console.error("Failed to parse JSON block from AI response", e);
     }
+}
+
+// Ask the catalogue what these actually cost.
+//
+// Stav's design, and the fix for the gap the evaluation notes recorded on 22.8:
+// the model chose the materials AFTER the catalogue lookup had already run, so
+// it priced its own choices from memory. Now it names them and the catalogue
+// answers.
+//
+// A price is only replaced when the match is certain — same head noun, and
+// every rating present in the product's own name. Measured on 40 real
+// bill-of-quantities lines: 15 priced, all 15 correct. Everything else keeps
+// the model's estimate and is shown as an estimate, which is the distinction
+// this whole product is built around. A missed price costs nothing; a wrong one
+// costs a customer's trust.
+async function catalogPriceMaterials(proj) {
+    const list = (proj && proj.materials) || [];
+    if (!list.length) return;
+    try {
+        const res = await fetch('/api/price-bom', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: list.map((m) => ({ name: m.name })) }),
+        });
+        if (!res.ok) return;
+        const d = await res.json();
+        const priced = Array.isArray(d.items) ? d.items : [];
+        if (!priced.length) return;
+
+        let changed = 0;
+        priced.forEach((row, i) => {
+            const m = proj.materials[i];
+            if (!m || !row || !row.matched) return;
+            m.price = Number(row.price) || m.price;
+            m.sku = row.sku || '';
+            m.fromCatalog = true;
+            // The catalogue's own name for it, kept beside his: they differ
+            // ("מפסק פקט 40A" is filed as "פקט בקופסא 3X40A"), and when a price
+            // looks wrong the first question is always which product it was.
+            m.catalogName = row.catalogName || '';
+            changed++;
+        });
+        if (!changed) return;
+        saveProjects();
+        renderMaterialsChecklist(proj.materials);
+        if (typeof pricingRefreshMaterials === 'function' && proj.pricing && !proj.pricing._matEdited) {
+            proj.pricing.materialsCost = projectMaterialsCost(proj);
+            saveProjects();
+            renderPricingEngine();
+        }
+        showToast(changed + ' מחירים עודכנו מהמחירון של ארכה');
+    } catch (e) { /* pricing help must never break the quote it is helping */ }
 }
 
 // Render the "אפיון הפרויקט" scope tags card.
