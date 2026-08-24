@@ -174,7 +174,7 @@ gating (server-side ADMIN_EMAIL on every admin endpoint), per-user KV keying
       words; nine tests pin the arithmetic (month-end clamping, leap year, RFC
       5545 escaping) and one asserts neither file has grown its own copy again.
 
-## The route, drawn (shipped 22/08/2026)
+## The route, drawn (shipped 22/08/2026, free for everyone)
 
 The idea that survived the removal of the auto-generated sketches, built as its
 own feature: **שרטוט המסלול**, a button on the pricing screen and a section at
@@ -184,6 +184,12 @@ the drawing can never disagree with the quote; digging and cutting are dashed.
 Hand-drawn on purpose (a displacement filter on the strokes, a marker face for
 the words — the text is not wobbled, because a drawing you cannot read is a
 decoration). Horizontal on a desk, stacked down the page on a phone.
+
+Stav asked whether to make it PRO "because of the tokens" — it costs none (it
+is built in the browser from answers already given and lines already priced), so
+it stays open to everyone; what got gated instead, at his go-ahead, is the
+**printed field work order**, which joins the field reports under `reports` in
+the tier table.
 
 Still open on this thread: per-segment *lengths* (today one total for the run)
 and heights ("הרכבה בגובה 120") — both need a place in the characterization to
@@ -244,6 +250,27 @@ say them, which is a checklist change, not a drawing change.
 **בוצע (21-22.8.2026):** סתיו אישר 7 ימים. מדף "טיוטות" מקופל בתחתית רשימת
 העבודות, עם המשך/מחיקה ומחיקה מרובה, והסוכן נותן שם לעבודה מהמשפט הראשון
 (`autoName`). לא נבנתה תיבת דואר שנייה למיין, בכוונה.
+
+## סבב תיקונים הנדסי של סתיו על ברירות המחדל (22.8.2026, ערב)
+
+עבר על הרשימה המלאה (הופקה כדף לסקירה) והחזיר ארבעה תיקונים, כולם יושמו:
+
+1. **לוח, החלפה ראש-בראש** — "אם מחליפים ראש בראש אז גודל החיבור לא רלוונטי
+   אלא כמות המודולים". נוסף מנגנון `criticalUnless` לשאלון (חובה, למעט כשתשובה
+   אחרת אומרת אחרת): `main_size` מפסיק לחסום תמחור בהחלפה על אותו חיבור,
+   ו-`panel_size_fit` הפך לחובה בכל עבודת לוח.
+2. **נקודות** — נוספה שאלה חדשה, `install_visibility` ("סמויה · חציבה, או
+   גלויה · תעלה על הטיח"), שנשאלת רק כשמוסיפים נקודות חדשות. ברירת מחדל: סמויה.
+3. **עמדת טעינה** — "ברור שאין צנרת ריקה, תמיד עמדת טעינה זה מחדש": ברירת
+   המחדל של `route_type` שונתה ל"תעלה גלויה על הקיר (עה"ט)".
+4. **תקלה** — ברירת המחדל של `repair_scope` היא "תלוי בממצא, אאשר טלפונית
+   בשטח", ולמפת התמחור נוסף כלל: לענות מיד במחיר קריאת האיתור כמספר אחד, ואז
+   לומר במפורש שהתיקון משתנה, עם שלוש התוצאות מהשטח (מכשיר שהלקוח מחליף ואין מה
+   לתקן / אביזר או נקודה / קו פגום לפי אורך).
+
+**פתוח:** ברירות המחדל של "בדיקה ודוח" (`documentation: אין שום תיעוד`,
+`circuit_mapping: סימון חלקי או שגוי`) — פסימיות בכוונה ומייקרות; מחכה להכרעה
+שלו. וגם המספר ~215 ₪ לקריאת איתור, שיושב במפה מסבב קודם וצריך אישור טריות.
 
 ## ברירות מחדל סטנדרטיות באפיון (22.8.2026)
 

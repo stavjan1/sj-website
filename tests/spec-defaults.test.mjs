@@ -173,3 +173,50 @@ test('a question whose premise does not hold is not answered by default either',
         }
     }
 });
+
+test('a straight panel swap is not blocked by the main breaker size', () => {
+    // Stav, 22/08: "אם מחליפים ראש בראש אז גודל החיבור לא רלוונטי אלא כמות
+    // המודולים." The question stays — it is worth knowing — but it stops being
+    // the thing that holds the gate shut, and the module count takes over.
+    const { applyStandardDefaults, specCoverage } = load();
+    const swap = proj('panel', { job_scope: { value: 'החלפת לוח קיים על אותו חיבור', source: 'user', skipped: false } });
+    applyStandardDefaults(swap);
+    delete swap.spec.answers.main_size;
+    assert.equal(specCoverage(swap).ready, true, 'a swap should price without it');
+
+    // On a supply upgrade it is exactly the number that decides the job.
+    const upgrade = proj('panel', { job_scope: { value: 'הגדלת חיבור או מעבר חד→תלת כולל לוח', source: 'user', skipped: false } });
+    applyStandardDefaults(upgrade);
+    delete upgrade.spec.answers.main_size;
+    const cov = specCoverage(upgrade);
+    assert.equal(cov.ready, false);
+    assert.ok(cov.missingCritical.some((f) => f.id === 'main_size'));
+
+    // And the module count now blocks on every panel job.
+    const modules = CHECKLISTS.panel.fields.find((f) => f.id === 'panel_size_fit');
+    assert.equal(modules.critical, true);
+});
+
+test('a new point is asked whether it is chased in or run on the wall', () => {
+    const { applyStandardDefaults } = load();
+    const adding = proj('points', { work_scope_type: { value: 'הוספת נקודות חדשות', source: 'user', skipped: false } });
+    applyStandardDefaults(adding);
+    assert.equal(adding.spec.answers.install_visibility.value, 'סמויה · חציבה וסגירה בקיר');
+
+    // Swapping a faceplate in an existing box has no such question.
+    const swapping = proj('points', { work_scope_type: { value: 'החלפת אביזר במקום קיים', source: 'user', skipped: false } });
+    applyStandardDefaults(swapping);
+    assert.equal(swapping.spec.answers.install_visibility, undefined);
+});
+
+test('a charger route starts as new work, because it always is', () => {
+    // Stav: "ברור שאין צנרת ריקה. תמיד עמדת טעינה זה מחדש."
+    assert.equal(DEFAULTS.charger.route_type, 'תעלה גלויה על הקיר (עה"ט)');
+    assert.doesNotMatch(DEFAULTS.charger.route_type, /צנרת ריקה|חוט משיכה/);
+});
+
+test('a fault call defaults to pricing the diagnosis, not the repair', () => {
+    // "לפעמים גוף תקול, לפעמים קו, לפעמים סתם מנורת שולחן שהלקוח זורק" — a
+    // repair price quoted before the finding is a number that will be wrong.
+    assert.equal(DEFAULTS.fault.repair_scope, 'תלוי בממצא · אאשר טלפונית בשטח');
+});

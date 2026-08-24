@@ -113,3 +113,23 @@ test('both layouts draw every segment and both ends', () => {
         assert.doesNotMatch(group, /<text/);
     }
 });
+
+test('the sketch is free for everyone; the printed work order is the PRO thing', () => {
+    // Stav asked whether the sketch should be PRO "because of the tokens" — it
+    // costs none, it is built in the browser from answers and priced lines. So
+    // it stays open, and the branded document for the crew is what is gated,
+    // with the field reports it belongs to.
+    const src = APP;
+    const sketch = src.slice(src.indexOf('function openRouteSketch'), src.indexOf('function routeSketchSvgVertical') > -1
+        ? src.indexOf('function openFieldWorkOrder') : src.length);
+    // The dialog may LABEL the work-order button "· PRO"; what it must never do
+    // is refuse to draw.
+    assert.doesNotMatch(sketch, /showUpgradeModal/, 'the sketch must not be gated');
+    const order = src.slice(src.indexOf('function openFieldWorkOrder'), src.indexOf('function openFieldWorkOrder') + 900);
+    assert.match(order, /tierAllows\('reports'\)/);
+    assert.match(order, /showUpgradeModal\('reports'\)/);
+    // And no AI call anywhere in the drawing path — that was the premise worth
+    // checking, not just answering.
+    const draw = src.slice(src.indexOf('const ROUTE_PLANS'), src.indexOf('function openFieldWorkOrder'));
+    assert.doesNotMatch(draw, /callAI|fetch\(|askListInChat|generate\(/, 'the drawing must cost nothing');
+});

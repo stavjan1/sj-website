@@ -10323,7 +10323,7 @@ function applyStandardDefaults(proj) {
         // standard for those is the honest one: not checked yet. It counts as
         // answered, it prints its authored assumption in the quote, and the card
         // still shows the question waiting for a real answer.
-        if (f.critical) {
+        if (specFieldCritical(f, spec.answers)) {
             spec.answers[f.id] = { value: '', source: 'std', skipped: true };
             filled++;
         }
@@ -10369,6 +10369,24 @@ function specFieldApplies(field, answers) {
     return Array.isArray(cond.in) ? cond.in.includes(a.value) : true;
 }
 
+// Whether a question BLOCKS pricing can itself depend on another answer.
+// Stav, 22/08: "אם מחליפים ראש בראש אז גודל החיבור לא רלוונטי אלא כמות
+// המודולים" — on a straight panel swap the main breaker size is a fact worth
+// having and not a fact worth waiting for, while the module count is what
+// prices the job. Declared on the field as `criticalUnless: {field, in:[...]}`
+// so the exception is checklist data, like showWhen, and not code.
+//
+// It only ever RELAXES: a field without the key, or whose premise answer is not
+// yet given, behaves exactly as its `critical` flag says.
+function specFieldCritical(field, answers) {
+    if (!field || !field.critical) return false;
+    const cond = field.criticalUnless;
+    if (!cond || !cond.field) return true;
+    const a = (answers || {})[cond.field];
+    if (!a || a.skipped || !a.value) return true;
+    return !(Array.isArray(cond.in) ? cond.in.includes(a.value) : true);
+}
+
 // Coverage state drives both the card's progress and the pricing gate.
 function specCoverage(proj) {
     const list = getChecklist(proj);
@@ -10379,7 +10397,7 @@ function specCoverage(proj) {
         const a = answers[f.id];
         return !!a && (a.skipped || (a.value !== '' && a.value != null));
     };
-    const critical = fields.filter(f => f.critical);
+    const critical = fields.filter(f => specFieldCritical(f, answers));
     const missingCritical = critical.filter(f => !isSet(f));
     return {
         total: fields.length,
@@ -10568,7 +10586,7 @@ function needsAssumption(field, answers) {
     // A default nobody confirmed is exactly what an assumption paragraph is
     // for. Only the criticals print, or a quote would open with fourteen of
     // them and the customer would read none.
-    if (a.source === 'std') return !!field.critical;
+    if (a.source === 'std') return specFieldCritical(field, answers);
     return a.skipped || isUnknownAnswer(a);
 }
 
@@ -10775,7 +10793,7 @@ let specOpenField = null;
 function nextSpecField(project, fields) {
     const answers = (project.spec && project.spec.answers) || {};
     const open = fields.filter(f => !answers[f.id]);
-    return (open.find(f => f.critical) || open[0] || null);
+    return (open.find(f => specFieldCritical(f, answers)) || open[0] || null);
 }
 
 // Which answered field the user deliberately opened to change. The card
@@ -10830,7 +10848,7 @@ function renderSpecCard(proj) {
     const applicable = list.fields.filter(f => specFieldApplies(f, answers));
 
     // Optional questions stay out of the way until the criticals are done.
-    const isDeferred = (f) => !f.critical && !answers[f.id];
+    const isDeferred = (f) => !specFieldCritical(f, answers) && !answers[f.id];
     const deferredCount = applicable.filter(isDeferred).length;
     const visibleFields = specShowAll ? applicable : applicable.filter(f => !isDeferred(f));
 
@@ -10873,11 +10891,12 @@ function renderSpecCard(proj) {
 
         // Unanswered and closed → one line saying so, tap to open.
         if (!isOpen) {
-            return `<button type="button" class="spec-row pending ${f.critical ? 'crit' : 'optional'}" data-field="${f.id}"
+            const mustNow = specFieldCritical(f, answers);
+            return `<button type="button" class="spec-row pending ${mustNow ? 'crit' : 'optional'}" data-field="${f.id}"
                     onclick="openSpecField('${f.id}')">
                 <i class="fa-regular fa-circle spec-dot" aria-hidden="true"></i>
                 <span class="spec-row-q">${escapeHtml(f.question)}</span>
-                ${f.critical ? '<span class="spec-crit-tag">חובה</span>' : ''}
+                ${mustNow ? '<span class="spec-crit-tag">חובה</span>' : ''}
             </button>`;
         }
 
@@ -10912,11 +10931,11 @@ function renderSpecCard(proj) {
                     onchange="setSpecAnswer('${f.id}', this.value.trim(), 'user')">`;
         }
 
-        return `<div class="spec-row expanded ${f.critical ? 'crit' : 'optional'}" data-field="${f.id}">
+        return `<div class="spec-row expanded ${specFieldCritical(f, answers) ? 'crit' : 'optional'}" data-field="${f.id}">
                 <div class="spec-q">
                     <i class="fa-regular fa-circle-dot spec-dot" aria-hidden="true"></i>
                     <span class="spec-q-text">${escapeHtml(f.question)}</span>
-                    ${f.critical ? '<span class="spec-crit-tag">חובה</span>' : ''}
+                    ${specFieldCritical(f, answers) ? '<span class="spec-crit-tag">חובה</span>' : ''}
                     <button type="button" class="spec-why" aria-expanded="false" aria-controls="specwhy-${f.id}"
                         aria-label="למה שואלים את זה" onclick="toggleSpecWhy(this,'${f.id}')"><i class="fa-solid fa-circle-info" aria-hidden="true"></i></button>
                 </div>
@@ -10957,7 +10976,7 @@ function renderSpecCard(proj) {
             </button>
             ${gateReady ? '' : `<p class="spec-gate-hint" id="spec-gate-hint">חסרים ${cov.missingCritical.length} שדות חובה</p>
             <button type="button" class="spec-force" onclick="priceThisProject(true)">דלג ותמחר עכשיו, הכל יירשם כהנחות</button>`}
-            ${cov.answered ? '<button type="button" class="spec-order" onclick="openFieldWorkOrder()"><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i> פקודת עבודה לשטח</button>' : ''}
+            ${cov.answered ? '<button type="button" class="spec-order" onclick="openFieldWorkOrder()"><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i> פקודת עבודה לשטח' + (tierAllows('reports') ? '' : ' · PRO') + '</button>' : ''}
         </div>`;
 
     try { updateSpecToggleCount(project); } catch (e) {}
@@ -11188,7 +11207,7 @@ function openRouteSketch() {
         ${plan.assumed ? '<p class="input-help">לא סומנו קטעי מסלול באפיון, לכן מצויר קטע אחד כללי.</p>' : ''}
         ${plan.notes.length ? `<ul class="route-notes">${plan.notes.map((n) => `<li>${escapeHtml(n)}</li>`).join('')}</ul>` : ''}
         <div class="ck-dialog-actions">
-            <button type="button" class="btn btn-secondary" onclick="openFieldWorkOrder()">פקודת עבודה מלאה</button>
+            <button type="button" class="btn btn-secondary" onclick="openFieldWorkOrder()">פקודת עבודה מלאה${tierAllows('reports') ? '' : ' · PRO'}</button>
             <button type="button" class="btn btn-secondary" onclick="document.getElementById('route-dlg').close()">סגירה</button>
         </div>`;
     document.body.appendChild(dlg);
@@ -11198,6 +11217,11 @@ function openRouteSketch() {
 function openFieldWorkOrder() {
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (!proj) return;
+    // A branded document for the crew, not for the customer: the same family as
+    // the field reports, and priced with them. The route sketch it opens from
+    // stays free for everyone — it costs nothing to produce and it is the thing
+    // worth showing someone.
+    if (!tierAllows('reports')) { showUpgradeModal('reports'); return; }
     const list = getChecklist(proj);
     const answers = (proj.spec && proj.spec.answers) || {};
     const biz = (appState.settings && appState.settings.businessDetails) || {};
@@ -11668,7 +11692,7 @@ function getPlanningSystemInstruction() {
     const known = applicable.filter(f => answers[f.id] && !answers[f.id].skipped && answers[f.id].value)
         .map(f => `• ${f.question} ${answers[f.id].value}`).join('\n');
     const open = applicable.filter(f => !answers[f.id])
-        .map(f => `• [${f.id}] ${f.question}${f.chips ? ', אפשרויות: ' + f.chips.join(' / ') : ''}${f.critical ? ' (חובה)' : ''}`).join('\n');
+        .map(f => `• [${f.id}] ${f.question}${f.chips ? ', אפשרויות: ' + f.chips.join(' / ') : ''}${specFieldCritical(f, answers) ? ' (חובה)' : ''}`).join('\n');
 
     return `אתה מאפיין עבודות מומחה עבור ${professionAiRole(profession)} בישראל. תפקידך הוא אפיון בלבד, לעולם אל תציין מחירים או עלויות (זה השלב הבא).
 המטרה שלך: לגלות את כל, אבל כל, מה שנדרש לעבודה הזאת. פריט שלא ברשימה = פריט שהמתקין ישכח לקנות; תנאי שטח שלא אופיין = הפסד כסף או נסיעה שנייה.
