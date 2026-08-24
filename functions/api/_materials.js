@@ -683,7 +683,19 @@ export function renderMaterialsBlock(db, hits, stats, forgotten = []) {
 //
 // Capped at the biggest categories on purpose: the long tail is 800 rows of
 // three-item corners, which costs tokens and teaches nothing.
-export function renderTaxonomyBlock(db, max = 120) {
+// The catalogue index: which families of equipment exist at all, and what each
+// costs. 120 lines, 12.5KB, and until now ranked by how BIG each family is —
+// which meant a lighting job opened with "מאמ\"תים · 198 פריטים" and the
+// lighting families sat wherever they happened to fall.
+//
+// Ranked by relevance to the job instead, and cut to what a job can use. This
+// started as a way to spend fewer tokens and turned out to be the better block:
+// the model gets the shelves it is actually shopping from, at the top, instead
+// of the warehouse inventory in size order.
+//
+// `query` is optional. Without it the old size ranking is used unchanged, which
+// is what an unknown job should get: everything, biggest first.
+export function renderTaxonomyBlock(db, max = 120, query = '') {
   if (!db.items.length) return '';
   const agg = new Map();
   for (const it of db.items) {
@@ -692,7 +704,7 @@ export function renderTaxonomyBlock(db, max = 120) {
     if (!a) { a = []; agg.set(it.cat, a); }
     a.push(it.price);
   }
-  const rows = [...agg.entries()]
+  let rows = [...agg.entries()]
     .map(([cat, prices]) => {
       prices.sort((x, y) => x - y);
       return {
@@ -703,8 +715,31 @@ export function renderTaxonomyBlock(db, max = 120) {
         max: prices[prices.length - 1],
       };
     })
-    .sort((a, b) => b.n - a.n)
-    .slice(0, max);
+    .sort((a, b) => b.n - a.n);
+
+  const q = new Set(norm(query).split(' ').filter((w) => w.length >= 2 && !STOP.has(w)));
+  // Expand through the same slang map the item search uses, or "מאז" in the
+  // question would never meet "חצי אוטומט" in the catalogue.
+  for (const w of [...q]) for (const syn of (SYNONYMS[w] || [])) q.add(syn);
+
+  if (q.size) {
+    const scored = rows.map((r) => {
+      const catTokens = new Set(norm(r.cat).split(' ').filter(Boolean));
+      let hits = 0;
+      for (const w of q) if (catTokens.has(w) || catTokens.has(fold(w))) hits++;
+      return { ...r, hits };
+    });
+    const matched = scored.filter((r) => r.hits > 0)
+      .sort((a, b) => (b.hits - a.hits) || (b.n - a.n));
+    // Matches first, then the biggest of the rest — a job always needs some
+    // general shelves (screws, terminals, conduit) that its own words never
+    // name, and dropping those is how a parts list comes back missing the
+    // things nobody thinks to say out loud.
+    const restCount = Math.max(0, max - matched.length);
+    const rest = scored.filter((r) => r.hits === 0).slice(0, restCount);
+    rows = [...matched, ...rest];
+  }
+  rows = rows.slice(0, max);
   if (!rows.length) return '';
 
   const lines = [
@@ -719,9 +754,9 @@ export function renderTaxonomyBlock(db, max = 120) {
   return lines.join('\n');
 }
 
-export async function getTaxonomyBlock(request, max = 120) {
+export async function getTaxonomyBlock(request, max = 120, query = '') {
   const db = await loadMaterials(request);
-  return renderTaxonomyBlock(db, max);
+  return renderTaxonomyBlock(db, max, query);
 }
 
 // One call for chat.js: text in, ready-to-send system block out.

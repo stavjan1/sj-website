@@ -44,7 +44,13 @@
                     <button type="button" class="coach-next btn btn-primary btn-sm">הבא</button>
                 </div>
             </div>`;
-        document.body.appendChild(wrap);
+        // NOT document.body: the app scales the body (applyDisplayZoomFix sets
+        // body.style.zoom, typically 0.75). A fixed overlay inside a zoomed body
+        // has its coordinates multiplied too, so a spotlight positioned from
+        // getBoundingClientRect — which reports post-zoom viewport pixels —
+        // lands short of its target. Hanging it off <html> keeps both in the
+        // same coordinate space.
+        document.documentElement.appendChild(wrap);
         return {
             wrap,
             hole: wrap.querySelector('.coach-hole'),
