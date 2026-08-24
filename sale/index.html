@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=374">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=375">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,11 +26,12 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=374">
-    <link rel="stylesheet" href="../assets/ui.css?v=374">
-    <link rel="stylesheet" href="css/shell.css?v=374">
-    <link rel="stylesheet" href="css/panels.css?v=374">
-    <link rel="stylesheet" href="css/pdf.css?v=374">
+    <link rel="stylesheet" href="../assets/tokens.css?v=375">
+    <link rel="stylesheet" href="../assets/ui.css?v=375">
+    <link rel="stylesheet" href="css/shell.css?v=375">
+    <link rel="stylesheet" href="css/panels.css?v=375">
+    <link rel="stylesheet" href="controlroom.css?v=375">
+    <link rel="stylesheet" href="css/pdf.css?v=375">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -1973,8 +1974,10 @@
                      questions at once, which is why none of them could be
                      found a second time. Grouped by the question they answer,
                      not by the order they happened to get built in. -->
-                <div class="spec-chips" id="admin-tabs" style="margin:4px 0 18px;" role="tablist">
-                    <button type="button" class="spec-chip active" data-tab="stats" onclick="setAdminTab('stats')">
+                <div class="spec-chips" id="admin-tabs" style="margin:4px 0 12px;" role="tablist">
+                    <button type="button" class="spec-chip active" data-tab="room" onclick="setAdminTab('room')">
+                        <i class="fa-solid fa-gauge-high" aria-hidden="true"></i> מסך מצב</button>
+                    <button type="button" class="spec-chip" data-tab="stats" onclick="setAdminTab('stats')">
                         <i class="fa-solid fa-chart-line" aria-hidden="true"></i> סטטיסטיקה</button>
                     <button type="button" class="spec-chip" data-tab="ai" onclick="setAdminTab('ai')">
                         <i class="fa-solid fa-microchip" aria-hidden="true"></i> מנוע ה-AI</button>
@@ -1982,6 +1985,105 @@
                         <i class="fa-solid fa-database" aria-hidden="true"></i> ידע ומאגרים</button>
                     <button type="button" class="spec-chip" data-tab="users" onclick="setAdminTab('users')">
                         <i class="fa-solid fa-users" aria-hidden="true"></i> משתמשים ומערכת</button>
+                </div>
+
+                <!-- The control room. One screen, nothing scrolls, and every number that
+                     could change a decision is in view at once — the four tabs below hold
+                     the detail behind each tile. Every tile paints the moment its own
+                     request lands, so a slow endpoint delays its own square and nothing
+                     else, and a tile that fails says so inside its own frame. -->
+                <div class="ctlroom" data-admin-tab="room" id="admin-room">
+                    <div class="cr-bar">
+                        <div class="cr-brand">
+                            <span class="cr-dot live" id="cr-health-dot"></span>
+                            <b>חדר בקרה</b>
+                            <span class="cr-sub" id="cr-health-text">טוען…</span>
+                        </div>
+                        <div class="cr-actions">
+                            <span class="cr-clock" id="cr-clock">—</span>
+                            <select id="cr-range" class="cr-select" onchange="renderControlRoom(true)" aria-label="טווח הנתונים">
+                                <option value="7">7 ימים</option>
+                                <option value="30" selected>30 יום</option>
+                                <option value="90">90 יום</option>
+                            </select>
+                            <button type="button" class="cr-btn" onclick="renderControlRoom(true)" title="רענון" aria-label="רענון">
+                                <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="cr-grid">
+                        <div class="cr-kpis" id="cr-kpis"></div>
+                            <div class="cr-tile cr-t-traffic">
+                                <div class="cr-head">
+                                    <h3 class="cr-title"><i class="fa-solid fa-chart-area" aria-hidden="true"></i> תנועה · מי נכנס</h3>
+                                    <span class="cr-meta" id="cr-traffic-meta"></span>
+                                    <button type="button" class="cr-more" onclick="setAdminTab('stats')">פירוט</button>
+                                </div>
+                                <div class="cr-body" id="cr-traffic">
+                                    <div class="cr-skel"></div><div class="cr-skel" style="inline-size:70%"></div><div class="cr-skel" style="inline-size:40%"></div>
+                                </div>
+                            </div>
+                            <div class="cr-tile cr-t-funnel">
+                                <div class="cr-head">
+                                    <h3 class="cr-title"><i class="fa-solid fa-filter" aria-hidden="true"></i> משפך · ממי יוצא לקוח</h3>
+                                    <span class="cr-meta" id="cr-funnel-meta"></span>
+                                    <button type="button" class="cr-more" onclick="setAdminTab('stats')">פירוט</button>
+                                </div>
+                                <div class="cr-body" id="cr-funnel">
+                                    <div class="cr-skel"></div><div class="cr-skel" style="inline-size:70%"></div><div class="cr-skel" style="inline-size:40%"></div>
+                                </div>
+                            </div>
+                            <div class="cr-tile cr-t-ai">
+                                <div class="cr-head">
+                                    <h3 class="cr-title"><i class="fa-solid fa-microchip" aria-hidden="true"></i> מנועי AI · לחץ על המפתחות</h3>
+                                    <span class="cr-meta" id="cr-ai-meta"></span>
+                                    <button type="button" class="cr-more" onclick="setAdminTab('ai')">פירוט</button>
+                                </div>
+                                <div class="cr-body" id="cr-ai">
+                                    <div class="cr-skel"></div><div class="cr-skel" style="inline-size:70%"></div><div class="cr-skel" style="inline-size:40%"></div>
+                                </div>
+                            </div>
+                            <div class="cr-tile cr-t-quality">
+                                <div class="cr-head">
+                                    <h3 class="cr-title"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i> דיוק התמחור</h3>
+                                    <span class="cr-meta" id="cr-quality-meta"></span>
+                                    <button type="button" class="cr-more" onclick="setAdminTab('ai')">פירוט</button>
+                                </div>
+                                <div class="cr-body" id="cr-quality">
+                                    <div class="cr-skel"></div><div class="cr-skel" style="inline-size:70%"></div><div class="cr-skel" style="inline-size:40%"></div>
+                                </div>
+                            </div>
+                            <div class="cr-tile cr-t-users">
+                                <div class="cr-head">
+                                    <h3 class="cr-title"><i class="fa-solid fa-users" aria-hidden="true"></i> משתמשים · פעילות אחרונה</h3>
+                                    <span class="cr-meta" id="cr-users-meta"></span>
+                                    <button type="button" class="cr-more" onclick="setAdminTab('users')">פירוט</button>
+                                </div>
+                                <div class="cr-body" id="cr-users">
+                                    <div class="cr-skel"></div><div class="cr-skel" style="inline-size:70%"></div><div class="cr-skel" style="inline-size:40%"></div>
+                                </div>
+                            </div>
+                            <div class="cr-tile cr-t-feed">
+                                <div class="cr-head">
+                                    <h3 class="cr-title"><i class="fa-solid fa-bolt" aria-hidden="true"></i> יומן אירועים</h3>
+                                    <span class="cr-meta" id="cr-feed-meta"></span>
+                                    <button type="button" class="cr-more" onclick="setAdminTab('stats')">פירוט</button>
+                                </div>
+                                <div class="cr-body" id="cr-feed">
+                                    <div class="cr-skel"></div><div class="cr-skel" style="inline-size:70%"></div><div class="cr-skel" style="inline-size:40%"></div>
+                                </div>
+                            </div>
+                            <div class="cr-tile cr-t-health">
+                                <div class="cr-head">
+                                    <h3 class="cr-title"><i class="fa-solid fa-heart-pulse" aria-hidden="true"></i> בריאות המערכת</h3>
+                                    <span class="cr-meta" id="cr-health-meta"></span>
+                                    <button type="button" class="cr-more" onclick="setAdminTab('users')">פירוט</button>
+                                </div>
+                                <div class="cr-body" id="cr-health">
+                                    <div class="cr-skel"></div><div class="cr-skel" style="inline-size:70%"></div><div class="cr-skel" style="inline-size:40%"></div>
+                                </div>
+                            </div>
+                    </div>
                 </div>
 
                 <!-- Usage funnel: who signs up, who talks, who produces quotes -->
@@ -2509,20 +2611,20 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/checkups-core.js?v=374"></script>
-    <script src="/assets/listcards.js?v=374"></script>
+    <script src="/assets/checkups-core.js?v=375"></script>
+    <script src="/assets/listcards.js?v=375"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=374"></script>
-    <script src="app.js?v=374"></script>
+    <script src="coverage.js?v=375"></script>
+    <script src="app.js?v=375"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=374"></script>
+    <script src="finance.js?v=375"></script>
     <!-- The guide that points at the screen (first-run tour + milestone hints) -->
-    <script src="coach.js?v=374"></script>
+    <script src="coach.js?v=375"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=374" defer></script>
-    <script src="/track.js?v=374" defer></script>
+    <script src="../assistant.js?v=375" defer></script>
+    <script src="/track.js?v=375" defer></script>
 </body>
 </html>

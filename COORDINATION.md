@@ -166,3 +166,17 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
   in `privacy.html`. Session A had already swept some of these into its own
   commits while they were in progress — no harm done, but noting it: the
   in-flight files of the other session are not safe to `git add -A`.
+- 2026-08-24 — Session B built the admin control room (Stav: "כאילו אני בחדר
+  בקרה וצריך הכל מולי", one screen, no scrolling). NEW file `sale/controlroom.css`
+  — deliberately NOT under `sale/css/**`, which is Session A's; a 300-line sheet
+  had no business landing in a file the other session is sweeping. SHARED files,
+  minimal diffs:
+  * `sale/index.html` — one new tab chip, one new `#admin-room` block, one
+    stylesheet link. No existing card moved.
+  * `sale/app.js` — one new block of `cr*` / `renderControlRoom` functions next
+    to the other admin renderers, plus four surgical lines: the admin tab
+    default, the room's enter/leave in `setAdminTab`, one release line at the
+    top of `switchTab`, and one job in `renderAdminAll`.
+  * `sale/sw.js` — cache name bump + the new sheet precached.
+  * `tests/css-integrity.test.mjs` — the new sheet added to the guarded list.
+  Session A's CSS files were not touched.

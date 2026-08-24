@@ -2268,6 +2268,14 @@ function setMoneyView(view) {
 // How many clients are due, the number on the "שירות תקופתי" view.
 
 function switchTab(tabId, opts) {
+    // The control room locks the shell's scroll while it is on screen, and a
+    // lock that outlives its screen is a page that will not scroll for reasons
+    // nobody can see. Leaving the admin panel by any route releases it.
+    if (tabId !== 'admin') {
+        document.body.classList.remove('cr-lock');
+        try { crStopClock(); } catch (e) {}
+    }
+
     // Old names, new homes. Every existing caller keeps working.
     let subView = null;
     if (tabId === 'archive') { tabId = 'clients'; subView = 'list'; }
@@ -6329,10 +6337,10 @@ function renderAdminAuthStatus() {
 // data-admin-tab, so a new card picks its own home instead of needing a list
 // here kept in step by hand. The recovery strip and the day's headline numbers
 // stay above the tabs: they are true whichever question is being asked.
-let _adminTab = 'stats';
+let _adminTab = 'room';
 
 function setAdminTab(tab) {
-    _adminTab = tab || 'stats';
+    _adminTab = tab || 'room';
     document.querySelectorAll('#admin-tabs .spec-chip').forEach((b) => {
         const on = b.dataset.tab === _adminTab;
         b.classList.toggle('active', on);
@@ -6344,10 +6352,20 @@ function setAdminTab(tab) {
     // Some of these cards are one column of a two-column grid, and a grid whose
     // children are all hidden still reserves its gap and its margin. Collapse
     // the wrappers that have nothing left to show.
-    document.querySelectorAll('#panel-admin .section-grid, #panel-admin .admin-grid').forEach((g) => {
+    document.querySelectorAll('#panel-admin .section-grid, #panel-admin .admin-grid, #panel-admin .settings-grid').forEach((g) => {
         const cards = [...g.querySelectorAll('[data-admin-tab]')];
         if (cards.length) g.hidden = cards.every((c) => c.hidden);
     });
+
+    // The room is a screen, not a card. It takes over the panel's height (the
+    // shell scrolls by default and the whole point is that this one does not),
+    // hides the page header whose title it already carries, and drops the
+    // headline strip it duplicates. Leaving it puts all three back.
+    const inRoom = _adminTab === 'room';
+    document.body.classList.toggle('cr-lock', inRoom);
+    const strip = document.getElementById('admin-overview');
+    if (strip) strip.hidden = inRoom;
+    if (inRoom) renderControlRoom(); else crStopClock();
 }
 
 // ---- Admin: was the price right? ------------------------------------------
@@ -6648,6 +6666,435 @@ function renderAdminOverview(d) {
             aiToday >= 90 ? 'hot' : aiToday >= 70 ? 'warm' : '')}
         ${tile('השיא שנמדד', rec ? rec.pct + '%' : '—', rec ? escapeHtml(formatHebrewDate(rec.date)) : 'עוד לא נמדד')}
         ${tile('ימים מעל 70%', heNum(over70), `מתוך ${heNum(pr.daysMeasured || 0)} ימים שנמדדו`)}`;
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  THE CONTROL ROOM
+// ══════════════════════════════════════════════════════════════════════════
+// Thirteen cards down a long scroll is a filing cabinet, not a dashboard: by
+// the time you reach the AI keys you no longer remember what traffic said, and
+// nothing can be compared with anything. This is the opposite bet — one screen
+// that never scrolls, every number that can change a decision in view at once,
+// and the four deep tabs kept one click away for when a tile raises a question.
+//
+// Five endpoints feed it, and each tile paints the moment ITS OWN request
+// lands (allSettled, not one await for all five), so a slow endpoint delays its
+// own square and nothing else. A tile that fails says so inside its own frame
+// while the rest of the room stays live — the failure of one number is not the
+// failure of the room.
+
+let _crCache = {};            // last good payload per source, so a partial room still paints
+let _crErr = {};              // per-source failure, shown inside the tile that lost its data
+let _crAt = 0;                // when the room last refreshed
+let _crBusy = false;
+let _crClockTimer = null;
+
+const CR_TILES = ['traffic', 'funnel', 'ai', 'quality', 'users', 'feed', 'health'];
+
+function crEl(id) { return document.getElementById(id); }
+function crSet(id, html) { const el = crEl(id); if (el) el.innerHTML = html; }
+function crMeta(id, text) { const el = crEl('cr-' + id + '-meta'); if (el) el.textContent = text || ''; }
+function crNum(n) { return Number(n || 0).toLocaleString('he-IL'); }
+
+// A change worth reacting to, or silence. Two percent either way is weather.
+function crDelta(pct) {
+    if (pct === null || pct === undefined || !isFinite(pct)) return '';
+    const r = Math.round(pct);
+    const cls = r > 2 ? 'up' : r < -2 ? 'down' : 'flat';
+    return `<span class="cr-delta ${cls}">${r > 0 ? '+' : ''}${r}%</span>`;
+}
+
+// "היום" beats a date the reader has to subtract from today in his head.
+function crWhen(ts) {
+    if (!ts) return '—';
+    const d = Math.floor((Date.now() - new Date(ts).getTime()) / 86400000);
+    if (d <= 0) return 'היום';
+    if (d === 1) return 'אתמול';
+    if (d < 7) return `לפני ${d} ימים`;
+    if (d < 30) return `לפני ${Math.floor(d / 7)} שבועות`;
+    return new Date(ts).toLocaleDateString('he-IL');
+}
+
+// ---- the chart, hand-rolled ------------------------------------------------
+// A charting library for two shapes would outweigh the entire admin panel, and
+// this one has to survive being 260px wide on one screen and 700 on the next —
+// hence viewBox coordinates and preserveAspectRatio="none" everywhere.
+function crAreaChart(points, opts) {
+    opts = opts || {};
+    const w = 600, h = 160, padT = 10, padB = 18;
+    const n = points.length;
+    if (!n) return '<p class="cr-empty">אין נתונים בטווח.</p>';
+    const vals = points.map((p) => Number(p.v) || 0);
+    const max = Math.max(1, ...vals);
+    const gid = 'cr-grad-' + (opts.id || 'a');
+    const X = (i) => (n > 1 ? (i / (n - 1)) * w : w / 2);
+    const Y = (v) => padT + (1 - v / max) * (h - padT - padB);
+    const pts = points.map((p, i) => `${X(i).toFixed(1)},${Y(p.v).toFixed(1)}`);
+    const grid = [0, 0.5, 1].map((f) => {
+        const y = (padT + f * (h - padT - padB)).toFixed(1);
+        return `<line x1="0" x2="${w}" y1="${y}" y2="${y}" stroke="rgb(255 255 255 / 0.07)" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+    }).join('');
+    const last = points[n - 1];
+    return `<svg class="cr-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img"
+                 aria-label="${escapeHtml(opts.label || 'מגמה')}">
+        <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${opts.color || '#6ABF3C'}" stop-opacity="0.42"/>
+            <stop offset="100%" stop-color="${opts.color || '#6ABF3C'}" stop-opacity="0"/>
+        </linearGradient></defs>
+        ${grid}
+        <path d="M0,${h - padB} L${pts.join(' L')} L${w},${h - padB} Z" fill="url(#${gid})"/>
+        <polyline points="${pts.join(' ')}" fill="none" stroke="${opts.color || '#6ABF3C'}"
+                  stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+        <circle cx="${X(n - 1).toFixed(1)}" cy="${Y(last.v).toFixed(1)}" r="3.5" fill="${opts.color || '#6ABF3C'}"/>
+    </svg>`;
+}
+
+// The bar behind every ratio in the room: same shape for a funnel step, an AI
+// key against its ceiling, and a verdict share.
+function crBar(label, value, pct, tone, note) {
+    return `<div class="cr-bar-row">
+        <span class="cr-bar-k">${escapeHtml(label)}</span>
+        <span class="cr-bar-v">${value}</span>
+        <span class="cr-bar-track"><i class="cr-bar-fill${tone ? ' ' + tone : ''}" style="inline-size:${Math.max(0, Math.min(100, pct))}%"></i></span>
+        ${note ? `<span class="cr-drop">${note}</span>` : ''}
+    </div>`;
+}
+
+// ---- the four headline numbers --------------------------------------------
+function crPaintKpis() {
+    const box = crEl('cr-kpis');
+    if (!box) return;
+    const a = _crCache.analytics, f = _crCache.funnel, s = _crCache.stats;
+    const sum = (a && a.summary) || {};
+    const per = TRAFFIC_SITES.map((t) => ({ label: t.label, n: (((sum[t.key] || {}).today || {}).visitors) || 0 }));
+    const today = per.reduce((x, y) => x + y.n, 0);
+    // One delta for the strip: the biggest site's, because summing percentages
+    // of different bases produces a number that means nothing.
+    const lead = TRAFFIC_SITES.map((t) => (sum[t.key] || {}).today).filter(Boolean)
+        .sort((x, y) => (y.visitors || 0) - (x.visitors || 0))[0];
+
+    // The visitors line behind the first tile: every site, summed per day.
+    let spark = '';
+    if (a && a.sites) {
+        const byDay = new Map();
+        Object.values(a.sites).forEach((site) => (site.series || []).forEach((p) => {
+            byDay.set(p.date, (byDay.get(p.date) || 0) + (p.visitors || 0));
+        }));
+        const pts = [...byDay.entries()].sort().map(([date, v]) => ({ date, v }));
+        if (pts.length > 1) spark = `<div class="cr-kpi-spark">${crAreaChart(pts, { id: 'kpi', color: '#6ABF3C' })}</div>`;
+    }
+
+    const pr = ((a || {}).ai || {}).pressure || {};
+    const aiPct = pr.today ? pr.today.pct : null;
+    const aiTone = aiPct === null ? '' : aiPct >= 90 ? 'bad' : aiPct >= 70 ? 'warn' : 'ok';
+
+    const active = f ? f.funnel.activeLast7d : null;
+    const signed = f ? f.funnel.signedUp : null;
+
+    const tile = (tone, k, v, sub, extra) => `
+        <div class="cr-kpi${tone ? ' ' + tone : ''}">
+            <span class="cr-kpi-k">${k}</span>
+            <span class="cr-kpi-v">${v}</span>
+            <span class="cr-kpi-s">${sub}</span>
+            ${extra || ''}
+        </div>`;
+
+    box.innerHTML =
+        tile('', 'כניסות היום', `${crNum(today)} ${lead ? crDelta(lead.delta) : ''}`,
+            per.map((x) => `${escapeHtml(x.label)} ${crNum(x.n)}`).join(' · '), spark) +
+        tile(active === null ? '' : active > 0 ? 'ok' : 'warn', 'פעילים השבוע',
+            active === null ? '<small>טוען…</small>' : crNum(active),
+            signed === null ? '' : `מתוך ${crNum(signed)} רשומים`) +
+        tile('', 'הצעות החודש', s ? crNum(s.thisMonth) : '<small>טוען…</small>',
+            s ? `${crNum(s.total)} מאז ההתחלה` : '') +
+        tile(aiTone, 'ניצול AI היום', aiPct === null ? '—' : aiPct + '%',
+            aiPct === null ? 'לא הוגדרה תקרה יומית' : `${crNum(pr.today.used)} מתוך ${crNum(pr.today.cap)} בקשות`);
+}
+
+// ---- traffic ---------------------------------------------------------------
+function crPaintTraffic() {
+    const a = _crCache.analytics;
+    if (!a) return;
+    const byDay = new Map();
+    Object.values(a.sites || {}).forEach((site) => (site.series || []).forEach((p) => {
+        byDay.set(p.date, (byDay.get(p.date) || 0) + (p.views || 0));
+    }));
+    const pts = [...byDay.entries()].sort().map(([date, v]) => ({ date, v }));
+    const total = pts.reduce((x, p) => x + p.v, 0);
+    const peak = pts.reduce((best, p) => (!best || p.v > best.v ? p : best), null);
+    const colors = { site: '#6BA8F5', zerem: '#6ABF3C', app: '#FCD34D' };
+    const legend = TRAFFIC_SITES.map((t) => {
+        const d = (a.sites || {})[t.key] || {};
+        return `<span class="cr-leg" style="color:${colors[t.key] || '#A8BAD4'}">
+            <i></i>${escapeHtml(t.label)} <b>${crNum(d.uniques || 0)}</b></span>`;
+    }).join('');
+    crMeta('traffic', `${a.days} ימים · ${crNum(total)} צפיות`);
+    crSet('cr-traffic', crAreaChart(pts, { id: 'traffic', color: '#6ABF3C', label: 'צפיות ליום' }) +
+        `<div class="cr-legend">${legend}</div>` +
+        `<p class="cr-note">${peak ? `שיא בטווח: ${crNum(peak.v)} צפיות ב-${escapeHtml(formatHebrewDate(peak.date))}.` : ''}
+         מבקרים נספרים פעם ביום, כמו מונה כניסות בקניון.</p>`);
+}
+
+// ---- the funnel ------------------------------------------------------------
+function crPaintFunnel() {
+    const f = _crCache.funnel && _crCache.funnel.funnel;
+    if (!f) return;
+    const steps = [
+        ['נרשמו', f.signedUp],
+        ['פתחו פרויקט', f.openedProject],
+        ['דיברו עם ה-AI', f.talkedToAI],
+        ['הפיקו הצעה', f.producedQuote],
+    ];
+    const top = Math.max(1, f.signedUp);
+    const rows = steps.map(([label, v], i) => {
+        // The drop between two steps is the whole point of a funnel: the number
+        // that leaks out is the one worth a product decision.
+        const prev = i ? steps[i - 1][1] : null;
+        const drop = prev ? Math.round(100 * (1 - v / Math.max(1, prev))) : 0;
+        const note = i && prev ? `נשרו ${drop}% מהשלב הקודם` : '';
+        return crBar(label, crNum(v), (v / top) * 100, i === 3 ? '' : 'mute', note);
+    }).join('');
+    crMeta('funnel', `${crNum(f.producedQuote)} מתוך ${crNum(f.signedUp)}`);
+    crSet('cr-funnel', `<div class="cr-bars">${rows}</div>
+        <p class="cr-note">נעצרו אחרי הודעה־שתיים: <b>${crNum(f.oneMessageOnly)}</b> ·
+        ייצאו PDF החודש: <b>${crNum(f.pdfThisMonth)}</b>${f.anonVisitors ? ` · אורחים: <b>${crNum(f.anonVisitors)}</b>` : ''}</p>`);
+}
+
+// ---- the AI pools ----------------------------------------------------------
+function crPaintAi() {
+    const ai = (_crCache.analytics || {}).ai;
+    if (!ai) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const dayOf = (e) => e.date || (e.at ? String(e.at).slice(0, 10) : '');
+    const failedToday = (ai.events || []).filter((e) => dayOf(e) === today && (e.outcome === 'quota' || e.outcome === 'fail'));
+    const rows = (ai.pools || []).map((label) => {
+        const t = (ai.today || {})[label] || {};
+        const used = t.used || 0;
+        const cap = t.cap;
+        const pct = cap ? Math.min(100, Math.round((used / cap) * 100)) : (used ? 100 : 0);
+        const tone = t.exhausted ? 'bad' : cap && pct >= 70 ? 'warn' : cap ? '' : 'mute';
+        const value = cap ? `${pct}% <small style="opacity:.6">(${crNum(used)})</small>` : crNum(used);
+        return { used, cap, name: AI_POOL_LABELS[label] || label, html: crBar(AI_POOL_LABELS[label] || label, value, pct, tone,
+            t.exhausted ? 'נגמרה המכסה היום' : cap ? `תקרה ${crNum(cap)}` : 'לא הוגדרה תקרה') };
+    });
+    // Keys that did nothing today are one line, not five: a bar at zero teaches
+    // nothing and pushes the key that IS working out of view.
+    rows.sort((a, b) => b.used - a.used);
+    const idle = rows.filter((r) => !r.used && !r.cap);
+    const shown = rows.filter((r) => r.used || r.cap);
+    const verdict = failedToday.length
+        ? `<p class="cr-note"><span class="cr-badge warn">${failedToday.length === 1 ? 'אירוע כשל/מכסה אחד היום' : failedToday.length + ' אירועי כשל/מכסה היום'}</span></p>`
+        : '<p class="cr-note"><span class="cr-badge ok">כל הבקשות היום נענו על המפתח הראשון</span></p>';
+    crMeta('ai', `${crNum(ai.pressure && ai.pressure.exhaustedDays || 0)} ימי מכסה בטווח`);
+    crSet('cr-ai', verdict + `<div class="cr-bars">${shown.map((r) => r.html).join('')}</div>` +
+        (idle.length ? `<p class="cr-note">${idle.length} ספקים ללא תנועה היום: ${idle.map((r) => escapeHtml(r.name)).join(' · ')}</p>` : ''));
+}
+
+// ---- was the price right ---------------------------------------------------
+function crPaintQuality() {
+    const d = _crCache.feedback;
+    if (!d) return;
+    const total = d.total || 0;
+    if (!total) {
+        crSet('cr-quality', '<p class="cr-empty">עוד לא ניתן משוב. מתחת לכל תמחור בצ\'אט יש שורה אחת: בול / קצת גבוה / קצת נמוך / ממש לא.</p>');
+        return;
+    }
+    const mix = { spot_on: 0, bit_high: 0, bit_low: 0, way_off: 0 };
+    (d.entries || []).forEach((e) => { if (mix[e.verdict] !== undefined) mix[e.verdict]++; });
+    const counted = Object.values(mix).reduce((a, b) => a + b, 0) || 1;
+    const onTarget = Math.round((mix.spot_on / counted) * 100);
+    // Rates, not counts: three complaints out of five is an emergency and three
+    // out of three hundred is noise, and a bare count cannot tell them apart.
+    const drifting = Object.entries(d.rates || {})
+        .filter(([, r]) => r.total >= 4 && Math.abs(r.bias) > 0.4)
+        .sort((a, b) => Math.abs(b[1].bias) - Math.abs(a[1].bias)).slice(0, 3);
+    const tone = onTarget >= 70 ? '' : onTarget >= 50 ? 'warn' : 'bad';
+    crMeta('quality', `${crNum(total)} משובים`);
+    crSet('cr-quality', `
+        <div class="cr-big"><span class="${tone === 'bad' ? 'cr-row-v bad' : tone === 'warn' ? 'cr-row-v warn' : ''}">${onTarget}%</span><small>נענו "בול"</small></div>
+        <div class="cr-bars" style="margin-block-start:10px;">
+            ${crBar('קצת גבוה', crNum(mix.bit_high), (mix.bit_high / counted) * 100, 'warn')}
+            ${crBar('קצת נמוך', crNum(mix.bit_low), (mix.bit_low / counted) * 100, 'warn')}
+            ${crBar('ממש לא', crNum(mix.way_off), (mix.way_off / counted) * 100, 'bad')}
+        </div>
+        ${drifting.length ? `<p class="cr-note">סוגי עבודה שסוטים: ${drifting.map(([job, r]) =>
+            `<b>${escapeHtml(JOB_TYPE_LABELS[job] || job)}</b> (${r.bias < 0 ? 'גבוה מדי' : 'נמוך מדי'})`).join(' · ')}</p>`
+        : '<p class="cr-note">אין סוג עבודה עם הטיה מובהקת. ✓</p>'}`);
+}
+
+// ---- who is actually here --------------------------------------------------
+function crPaintUsers() {
+    const d = _crCache.funnel;
+    if (!d) return;
+    const all = (d.users || []).slice().sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
+    const users = all.slice(0, 14);
+    if (!users.length) { crSet('cr-users', '<p class="cr-empty">אין עדיין משתמשים רשומים.</p>'); return; }
+    crMeta('users', `${crNum((d.users || []).length)} רשומים`);
+    crSet('cr-users', `<div class="cr-list">${users.map((u) => `
+        <div class="cr-row">
+            <span class="cr-row-k">${escapeHtml(u.email)}${u.anon ? ' <span class="cr-sub-k">(אורח)</span>' : ''}</span>
+            <span class="cr-sub-k">${crNum(u.quotes)} הצעות · ${crNum(u.chatMsgs)} הודעות</span>
+            <span class="cr-row-v">${escapeHtml(crWhen(u.lastUpdated))}</span>
+        </div>`).join('')}</div>
+        ${all.length > users.length ? `<p class="cr-note">ועוד ${crNum(all.length - users.length)} משתמשים —
+            <button type="button" class="cr-more" onclick="setAdminTab('users')">הרשימה המלאה</button></p>` : ''}`);
+}
+
+// ---- what happened ---------------------------------------------------------
+// Three logs that were three separate cards, read as one column in time order:
+// what changed this week, which key went quiet, and what a human said about a
+// price. They are the same story from three angles.
+function crPaintFeed() {
+    const a = _crCache.analytics || {};
+    const fb = _crCache.feedback || {};
+    const items = [];
+    (a.insights || []).forEach((s) => items.push({ tone: 'ok', when: 'השבוע', text: s }));
+    ((a.ai || {}).events || []).slice(0, 8).forEach((e) => items.push({
+        tone: e.outcome === 'quota' ? 'warn' : 'bad',
+        when: e.at ? new Date(e.at).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : (e.date || ''),
+        text: `${AI_POOL_LABELS[e.label] || e.label} — ${e.outcome === 'quota' ? 'נגמרה המכסה' : 'שגיאה' + (e.status ? ' ' + e.status : '')}`,
+    }));
+    (fb.entries || []).slice(0, 6).forEach((e) => items.push({
+        tone: e.verdict === 'way_off' ? 'bad' : e.verdict === 'spot_on' ? 'ok' : 'warn',
+        when: crWhen(e.at),
+        text: `${e.by || 'אורח'} · ${JOB_TYPE_LABELS[e.jobType] || 'עבודה'} — ${VERDICT_LABELS[e.verdict] || e.verdict}`,
+    }));
+    crMeta('feed', items.length ? `${items.length} רשומות` : '');
+    crSet('cr-feed', items.length
+        ? `<div class="cr-feed">${items.slice(0, 24).map((i) => `
+            <div class="cr-feed-item">
+                <span class="cr-dot ${i.tone}"></span>
+                <span class="cr-feed-when">${escapeHtml(i.when)}</span>
+                <span class="cr-feed-text">${escapeHtml(i.text)}</span>
+            </div>`).join('')}</div>`
+        : '<p class="cr-empty">שקט. אין אירועים בטווח.</p>');
+}
+
+// ---- is anything broken ----------------------------------------------------
+// The rows here are the questions asked at 2am, in the order they get asked.
+function crPaintHealth() {
+    const a = _crCache.analytics || {};
+    const ai = a.ai || {};
+    const tg = _crCache.telegram;
+    const st = _crCache.stats;
+    const today = new Date().toISOString().slice(0, 10);
+    const dayOf = (e) => e.date || (e.at ? String(e.at).slice(0, 10) : '');
+    const fullFail = (ai.events || []).some((e) => dayOf(e) === today && e.label === 'all');
+    const exhausted = Object.entries(ai.today || {}).filter(([, t]) => t.exhausted).map(([k]) => AI_POOL_LABELS[k] || k);
+    const live = Object.entries(ai.today || {}).filter(([, t]) => !t.exhausted).length;
+    const poolN = (ai.pools || []).length;
+
+    const row = (k, v, tone, sub) => `<div class="cr-row">
+        <span class="cr-row-k">${k}${sub ? ` <span class="cr-sub-k">${sub}</span>` : ''}</span>
+        <span class="cr-row-v ${tone || ''}">${v}</span></div>`;
+
+    const rows = [
+        row('מנועי AI', poolN ? `${live}/${poolN} זמינים` : '—', fullFail ? 'bad' : exhausted.length ? 'warn' : 'ok',
+            exhausted.length ? 'נגמרו: ' + escapeHtml(exhausted.join(', ')) : ''),
+        row('כשל מלא היום', fullFail ? 'כן' : 'לא', fullFail ? 'bad' : 'ok'),
+        row('בוט דוחות ליקויים', tg ? (tg.configured ? 'מחובר' : 'לא מוגדר') : '…',
+            tg ? (tg.configured ? 'ok' : 'warn') : '',
+            tg && tg.configured && tg.botName ? escapeHtml(tg.botName) : ''),
+        row('סטטיסטיקה למשתמשים', st ? (st.live ? 'מוצגת' : 'נאספת בשקט') : '…', st && st.live ? 'ok' : ''),
+        row('סנכרון Google', _tokenIsFresh() ? 'פעיל' : 'פג', _tokenIsFresh() ? 'ok' : 'warn'),
+        row('אחסון KV', _crCache.analytics ? 'עונה' : 'לא נבדק', _crCache.analytics ? 'ok' : 'warn'),
+    ].join('');
+
+    // The model that actually served, which is not always the one configured:
+    // a fallback down the chain quietly serves a different one.
+    const modelTotals = {};
+    Object.values(ai.totals || {}).forEach((t) => Object.entries(t.models || {})
+        .forEach(([m, n]) => { modelTotals[m] = (modelTotals[m] || 0) + n; }));
+    const topModel = Object.entries(modelTotals).sort((x, y) => y[1] - x[1])[0];
+
+    crSet('cr-health', `<div class="cr-list">${rows}</div>
+        ${topModel ? `<p class="cr-note">המודל שעשה את רוב העבודה בטווח: <b>${escapeHtml(topModel[0])}</b>
+            (${crNum(topModel[1])} בקשות).</p>` : ''}`);
+
+    // The one dot at the top of the room, from everything above it.
+    const errs = Object.keys(_crErr).length;
+    if (fullFail) crHealth('bad', 'כשל AI מלא היום — הבוט לא מקבל תשובות');
+    else if (exhausted.length) crHealth('warn', 'מפתח שנגמר היום: ' + exhausted.join(', '));
+    else if (errs) crHealth('warn', `${errs} מקורות לא נטענו — ${Object.keys(_crErr).join(', ')}`);
+    else if (tg && !tg.configured) crHealth('warn', 'הכל תקין · בוט הליקויים עוד לא חובר');
+    else if (_crCache.analytics) crHealth('ok', 'כל המערכות תקינות · עודכן ' + new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }));
+}
+
+function crHealth(tone, text) {
+    const dot = crEl('cr-health-dot');
+    const txt = crEl('cr-health-text');
+    if (dot) dot.className = 'cr-dot live ' + tone;
+    if (txt) txt.textContent = text;
+}
+
+// A clock in a control room is not decoration: it is how you know the screen in
+// front of you is live and not a frozen tab from this morning.
+function crStartClock() {
+    if (_crClockTimer) return;
+    const tick = () => {
+        const el = crEl('cr-clock');
+        if (!el) return;
+        el.textContent = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    };
+    tick();
+    _crClockTimer = setInterval(tick, 1000);
+}
+function crStopClock() {
+    if (_crClockTimer) { clearInterval(_crClockTimer); _crClockTimer = null; }
+}
+
+// The failure of one number is not the failure of the room: the tile that lost
+// its data says so, in its own frame, and everything else stays live.
+function crFail(tiles, e) {
+    const msg = (e && e.code === 'NO_TOKEN')
+        ? 'ההתחברות לגוגל פגה. לחץ "רענון" אחרי התחברות מחדש.'
+        : 'לא נטען: ' + escapeHtml((e && e.message) || 'שגיאה');
+    tiles.forEach((t) => crSet('cr-' + t, `<p class="cr-err">${msg}</p>`));
+}
+
+async function renderControlRoom(force) {
+    if (!isAdmin()) return;
+    if (!crEl('admin-room')) return;
+    if (_crBusy) return;
+    if (!force && _crAt && Date.now() - _crAt < 45000) { crStartClock(); return; }
+    _crBusy = true;
+    _crErr = {};
+    crStartClock();
+    crHealth('', 'אוסף נתונים…');
+
+    const days = (crEl('cr-range') || {}).value || '30';
+    const get = async (url) => {
+        const res = await adminRes(url);
+        const d = await res.json();
+        if (!res.ok) { const err = new Error((d.error && d.error.message) || res.status); err.code = (d.error || {}).code; throw err; }
+        return d;
+    };
+
+    // name, url, which tiles it feeds, and what to repaint when it lands.
+    const sources = [
+        ['analytics', `/api/analytics?admin=1&summary=1&days=${encodeURIComponent(days)}`, ['traffic', 'ai', 'feed'],
+            () => { crPaintTraffic(); crPaintAi(); crPaintFeed(); }],
+        ['funnel', '/api/funnel', ['funnel', 'users'], () => { crPaintFunnel(); crPaintUsers(); }],
+        ['feedback', '/api/feedback', ['quality'], () => { crPaintQuality(); crPaintFeed(); }],
+        ['stats', '/api/stats?admin=1', [], () => {}],
+        ['telegram', '/api/telegram-setup', [], () => {}],
+    ];
+
+    await Promise.allSettled(sources.map(async ([name, url, tiles, paint]) => {
+        try {
+            _crCache[name] = await get(url);
+            delete _crErr[name];
+            paint();
+        } catch (e) {
+            _crErr[name] = (e && e.message) || 'שגיאה';
+            if (tiles.length) crFail(tiles, e);
+        }
+        crPaintKpis();
+        crPaintHealth();
+    }));
+
+    _crAt = Date.now();
+    _crBusy = false;
 }
 
 function adminTrafficHtml(d) {
@@ -15362,6 +15809,7 @@ function renderAdminAll(opts) {
     }
     const jobs = [
         () => renderAdminAuthStatus(),
+        () => renderControlRoom(true),   // the one screen, first
         () => renderAdminTraffic(),          // pulls clarity + AI + models with it
         () => renderAdminStats(),
         () => adminLoadPricingMap(),
