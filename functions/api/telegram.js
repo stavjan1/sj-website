@@ -53,6 +53,8 @@ const HELP_TEXT = [
     '2. במהלך הסיור שולחים תמונה של כל ליקוי, ובכיתוב שלה שורה אחת: מיקום - מה הליקוי',
     '3. בסוף כותבים: סיים',
     '',
+    'תוך כדי: "בטל אחרון" מוחק ממצא שגוי, "כמה" מראה מה נרשם עד עכשיו.',
+    '',
     'הבוט מסדר הכל לדוח מוכן: עם קישור לצפייה ולהדפסה, וכפתור ייבוא למערכת.',
     'לביטול באמצע: בטל',
 ].join('\n');
@@ -143,6 +145,9 @@ function extractTitle(text) {
 
 const START_RE = /דו"?ח\s*ליקויים|פרויקט|התחל/;
 const FINISH_RE = /^\s*(סיים|סיום|לסיים|גמרנו|זהו|\/done)\s*[.!]?\s*$/;
+// A bad photo happens on every walk, and the answer cannot be "start over".
+const UNDO_RE = /^\s*(בטל אחרון|מחק אחרון|אחרון|\/undo)\s*[.!]?\s*$/;
+const STATUS_RE = /^\s*(כמה|סטטוס|מה יש|\/status)\s*[.!?]?\s*$/;
 const CANCEL_RE = /^\s*(בטל|ביטול|\/cancel)\s*[.!]?\s*$/;
 
 // One cheap AI call at the end tidies all raw captions into clean rows.
@@ -280,6 +285,26 @@ async function handleUpdate(env, cfg, update) {
         return;
     }
 
+    if (UNDO_RE.test(text)) {
+        if (!sess || !sess.findings.length) {
+            await say(cfg, chatId, 'אין ממצא למחוק.');
+            return;
+        }
+        const gone = sess.findings.pop();
+        sess.pendingCaption = false;
+        await saveSession(env, chatId, sess);
+        const what = (gone && gone.raw) ? `"${String(gone.raw).slice(0, 40)}"` : 'הממצא האחרון';
+        await say(cfg, chatId, `${what} נמחק. נשארו ${sess.findings.length} ממצאים.`);
+        return;
+    }
+
+    if (STATUS_RE.test(text)) {
+        if (!sess) { await say(cfg, chatId, 'אין דוח פתוח. כותבים: פרויקט X, דוח ליקויים'); return; }
+        const lines = sess.findings.map((f, i) => `${i + 1}. ${String(f.raw || '(ללא תיאור)').slice(0, 60)}`);
+        await say(cfg, chatId, `דוח "${sess.title}" · ${sess.findings.length} ממצאים:\n` + (lines.join('\n') || '(עדיין ריק)'));
+        return;
+    }
+
     if (CANCEL_RE.test(text)) {
         if (sess) await env.SJ_DATA.delete(sessKey(chatId));
         await say(cfg, chatId, sess ? 'בוטל. אפשר להתחיל דוח חדש מתי שרוצים.' : 'אין דוח פתוח כרגע.');
@@ -329,7 +354,7 @@ async function handleUpdate(env, cfg, update) {
         sess.pendingCaption = !raw;
         await saveSession(env, chatId, sess);
         if (raw) {
-            await say(cfg, chatId, `נרשם ממצא ${sess.findings.length} ✓`);
+            await say(cfg, chatId, `נרשם ממצא ${sess.findings.length} ✓  ·  טעות? "בטל אחרון"`);
         } else {
             await say(cfg, chatId, `קיבלתי את התמונה (ממצא ${sess.findings.length}). באיזה מיקום ומה הליקוי? כתבו שורה אחת.`);
         }
@@ -343,7 +368,7 @@ async function handleUpdate(env, cfg, update) {
             last.raw = text;
             sess.pendingCaption = false;
             await saveSession(env, chatId, sess);
-            await say(cfg, chatId, `נרשם ממצא ${sess.findings.length} ✓`);
+            await say(cfg, chatId, `נרשם ממצא ${sess.findings.length} ✓  ·  טעות? "בטל אחרון"`);
             return;
         }
     }
