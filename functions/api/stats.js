@@ -9,7 +9,8 @@
 // Display is OFF until the admin flips config:statsLive — the pipe collects
 // silently from day one so there's real data by the time it goes live.
 //
-//   POST /api/stats            { profession, jobType, labor, quoteId, named? } → record (rate-limited)
+//   POST /api/stats            { profession, jobType, labor, quoteId, named?, items? } → record (rate-limited)
+//   GET  /api/stats?market=1&prof= → per-ITEM market prices (median per line item)
 //   GET  /api/stats?job=&prof= → public benchmark for one bucket (only when live)
 //   GET  /api/stats?admin=1    → admin: full aggregate dashboard + live flag
 //   POST /api/stats            { setLive: true|false }  (admin) → toggle display
@@ -20,6 +21,16 @@ const MIN_SAMPLES = 5;        // never show an average built on fewer than this
 const SAMPLES_CAP = 1000;     // rolling window kept per bucket
 const LABOR_MIN = 50;         // sanity bounds — ignore obvious junk/typos
 const LABOR_MAX = 100000;
+// Per-item collection: the same privacy rule as labor — a line's NAME and its
+// price, nothing else. Buckets are capped hard because the key is built from
+// user text: an unbounded name space would mean unbounded KV keys.
+const ITEM_SAMPLES_CAP = 400;   // rolling samples kept per item name
+const ITEM_NAME_MAX = 60;
+const ITEM_PRICE_MIN = 1;
+const ITEM_PRICE_MAX = 200000;
+const ITEMS_PER_QUOTE = 40;     // ignore the tail of an absurdly long quote
+const ITEM_BUCKETS_CAP = 4000;  // safety ceiling on distinct item names per profession
+
 const JOB_TYPES = ['panel', 'points', 'charger', 'solar', 'inspection', 'fault', 'infra', 'other'];
 // Closed list, mirroring PROFESSIONS in sale/app.js. This write path is PUBLIC,
 // and the bucket key is built from it — accepting free text meant an attacker
@@ -34,6 +45,20 @@ const PROFESSIONS = [
 function normProfession(v) {
   const p = String(v || 'general').toLowerCase().slice(0, 30);
   return PROFESSIONS.includes(p) ? p : 'general';
+}
+
+// One item name → one bucket. Normalised so "נקודת מאור" and "נקודת  מאור "
+// land in the same place, and so the key can never carry KV-hostile characters.
+function normItemName(v) {
+  return String(v || '')
+    .replace(/[\u0000-\u001f]/g, ' ')
+    .replace(/["'`|:]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, ITEM_NAME_MAX);
+}
+function itemKey(prof, name) {
+  return `stats:items:${normProfession(prof)}:${normItemName(name)}`;
 }
 
 function bucketKey(prof, job) {
@@ -90,6 +115,33 @@ export async function onRequestPost(context) {
   if (arr.length > SAMPLES_CAP) arr = arr.slice(arr.length - SAMPLES_CAP);
   await env.SJ_DATA.put(key, JSON.stringify(arr));
 
+  // Line items: what the quote actually charged per component. Written in the
+  // background so a slow write never delays the export, and deduped by the same
+  // quoteId gate above (a re-export contributes nothing twice).
+  if (Array.isArray(body.items) && body.items.length) {
+    context.waitUntil((async () => {
+      const seen = new Set();
+      for (const raw of body.items.slice(0, ITEMS_PER_QUOTE)) {
+        const name = normItemName(raw && raw.name);
+        const price = Math.round(Number(raw && raw.price));
+        if (name.length < 2 || seen.has(name)) continue;
+        if (!Number.isFinite(price) || price < ITEM_PRICE_MIN || price > ITEM_PRICE_MAX) continue;
+        seen.add(name);
+        const k = itemKey(prof, name);
+        let list = [];
+        try { list = JSON.parse((await env.SJ_DATA.get(k)) || '[]'); } catch { list = []; }
+        if (!list.length) {
+          // A brand-new bucket: only allow it while the profession is under its ceiling.
+          const existing = await env.SJ_DATA.list({ prefix: `stats:items:${prof}:`, limit: ITEM_BUCKETS_CAP });
+          if (existing.keys.length >= ITEM_BUCKETS_CAP) continue;
+        }
+        list.push({ p: price, t: Date.now(), u: raw && raw.unit ? String(raw.unit).slice(0, 12) : null });
+        if (list.length > ITEM_SAMPLES_CAP) list = list.slice(list.length - ITEM_SAMPLES_CAP);
+        await env.SJ_DATA.put(k, JSON.stringify(list));
+      }
+    })());
+  }
+
   // Global usage counters (pride/insight — aggregate, no PII).
   context.waitUntil((async () => {
     for (const k of ['stats:count:total', `stats:count:${monthKey()}`]) {
@@ -126,6 +178,43 @@ export async function onRequestGet(context) {
       minSamples: MIN_SAMPLES,
       buckets,
     });
+  }
+
+  // The market list: every item name this profession has priced, with its
+  // median and sample count. Admin sees it always; everyone else only once the
+  // display flag is live (same rule as the labor benchmark).
+  if (url.searchParams.get('market')) {
+    const liveFlag = (await env.SJ_DATA.get('config:statsLive')) === '1';
+    let isAdmin = false;
+    if (!liveFlag) {
+      const gate = await adminGate(request);
+      isAdmin = gate.ok;
+      if (!isAdmin) return jsonResponse({ live: false, items: [] });
+    }
+    const prof = normProfession(url.searchParams.get('prof'));
+    const list = await env.SJ_DATA.list({ prefix: `stats:items:${prof}:`, limit: 1000 });
+    const names = list.keys.map(k => k.name);
+    const items = [];
+    // Read in parallel chunks: one KV get per name would serialise 1000 round trips.
+    for (let i = 0; i < names.length; i += 25) {
+      const chunk = names.slice(i, i + 25);
+      const got = await Promise.all(chunk.map(n => env.SJ_DATA.get(n).catch(() => null)));
+      chunk.forEach((n, j) => {
+        let arr = [];
+        try { arr = JSON.parse(got[j] || '[]'); } catch { arr = []; }
+        if (!arr.length) return;
+        const sum = summarize(arr);
+        const units = arr.map(x => x.u).filter(Boolean);
+        items.push({
+          name: n.slice(`stats:items:${prof}:`.length),
+          count: sum.count, median: sum.median, low: sum.low, high: sum.high,
+          unit: units.length ? units[units.length - 1] : null,
+          lastAt: arr[arr.length - 1].t || null,
+        });
+      });
+    }
+    items.sort((a, b) => b.count - a.count);
+    return jsonResponse({ live: true, minSamples: MIN_SAMPLES, prof, items });
   }
 
   // Public benchmark for one bucket — only when the admin has gone live.
