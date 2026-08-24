@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=361">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=368">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,11 +26,11 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=361">
-    <link rel="stylesheet" href="../assets/ui.css?v=361">
-    <link rel="stylesheet" href="css/shell.css?v=361">
-    <link rel="stylesheet" href="css/panels.css?v=361">
-    <link rel="stylesheet" href="css/pdf.css?v=361">
+    <link rel="stylesheet" href="../assets/tokens.css?v=368">
+    <link rel="stylesheet" href="../assets/ui.css?v=368">
+    <link rel="stylesheet" href="css/shell.css?v=368">
+    <link rel="stylesheet" href="css/panels.css?v=368">
+    <link rel="stylesheet" href="css/pdf.css?v=368">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -262,9 +262,17 @@
                 </div>
 
                 <div class="subtabs" role="tablist" aria-label="תצוגת כסף" id="money-subtabs">
-                    <button type="button" class="subtab active" data-sub="docs" role="tab" aria-selected="true" onclick="setMoneyView('docs')">חשבוניות וקבלות</button>
+                    <button type="button" class="subtab active" data-sub="board" role="tab" aria-selected="true" onclick="setMoneyView('board')">לוח הכסף</button>
+                    <button type="button" class="subtab" data-sub="docs" role="tab" aria-selected="false" onclick="setMoneyView('docs')">חשבוניות וקבלות</button>
                 </div>
-                <div id="money-view-docs">
+                <!-- The money board: every project as a card in the column that says
+                     where its money is. Drag a card, or use the button on it. -->
+                <div id="money-view-board">
+                    <div class="pipe-summary" id="pipeline-summary"></div>
+                    <div class="pipe-controls" id="pipeline-controls"></div>
+                    <div class="pipe-board" id="pipeline-board"></div>
+                </div>
+                <div id="money-view-docs" hidden>
                 <div id="acct-root"><!-- populated by renderAccounting() --></div>
             </div>
             </section>
@@ -1676,7 +1684,36 @@
                     <p class="input-help" id="system-catalog-note" style="display:none;margin-top:6px;"></p>
                 </div>
 
-                <div class="settings-grid">
+                <div class="subtabs" role="tablist" aria-label="תצוגת מאגר" id="catalog-subtabs">
+                    <button type="button" class="subtab active" data-sub="mine" role="tab" aria-selected="true" onclick="setCatalogView('mine')">המאגר שלי</button>
+                    <button type="button" class="subtab" data-sub="market" role="tab" aria-selected="false" onclick="setCatalogView('market')">מחירון השוק</button>
+                </div>
+
+                <!-- Market prices: every line item the trade has priced through
+                     ZEREM, next to what YOU charge for it. Anonymous, aggregate. -->
+                <div id="catalog-view-market" hidden>
+                    <div class="section-card">
+                        <div class="card-header flex-header">
+                            <h3><i class="fa-solid fa-scale-balanced text-accent"></i> מחירון השוק · מה גובים אחרים</h3>
+                            <div class="market-sorts" id="market-sorts">
+                                <button type="button" class="chip on" data-msort="gap">הפער הגדול ביותר</button>
+                                <button type="button" class="chip" data-msort="uses">הכי בשימוש</button>
+                                <button type="button" class="chip" data-msort="price">המחיר הגבוה</button>
+                                <button type="button" class="chip" data-msort="name">לפי שם</button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="market-toolbar">
+                                <input type="search" id="market-search" class="input" placeholder="חיפוש סעיף…" oninput="renderMarketPrices()">
+                                <label class="market-only-mine"><input type="checkbox" id="market-only-mine" onchange="renderMarketPrices()"> רק סעיפים שיש לי במאגר</label>
+                                <button type="button" class="btn btn-secondary btn-small" onclick="renderMarketPrices(true)"><i class="fa-solid fa-rotate"></i> רענון</button>
+                            </div>
+                            <div id="market-list"><p class="input-help">טוען…</p></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-grid" id="catalog-view-mine">
                     <!-- manual add + share -->
                     <div style="display:flex;flex-direction:column;gap:20px;">
                         <!-- The catalog that ships with the app: ~7,400 real items with real
@@ -2456,17 +2493,17 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/listcards.js?v=361"></script>
+    <script src="/assets/listcards.js?v=368"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=361"></script>
-    <script src="app.js?v=361"></script>
+    <script src="coverage.js?v=368"></script>
+    <script src="app.js?v=368"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=361"></script>
+    <script src="finance.js?v=368"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=361" defer></script>
-    <script src="/track.js?v=361" defer></script>
+    <script src="../assistant.js?v=368" defer></script>
+    <script src="/track.js?v=368" defer></script>
 </body>
 </html>

@@ -297,6 +297,28 @@ function md(s){
   return h;
 }
 
+// A name this browser made up about itself, so "how many different people
+// tried this" has an answer that survives a reload.
+//
+// Random, local, and about nothing: no IP, no fingerprint, no account. Clearing
+// the browser erases it and this visitor is simply new again, which is the
+// correct behaviour and not a bug to be worked around. It is sent only while
+// nobody is signed in — the moment there is a Google account, the account is
+// the identity and this has no job.
+const ANON_KEY = 'zerem_anon_id';
+function anonId(){
+  try{
+    let v = localStorage.getItem(ANON_KEY);
+    if (!/^[a-z0-9]{12,32}$/.test(v || '')){
+      const b = new Uint8Array(12);
+      crypto.getRandomValues(b);
+      v = Array.from(b, x => x.toString(16).padStart(2,'0')).join('');
+      localStorage.setItem(ANON_KEY, v);
+    }
+    return v;
+  }catch(e){ return ''; }   // private mode, storage disabled — count nothing
+}
+
 // Read an OpenAI-style SSE stream, calling onProgress(fullText) as it grows.
 // The same shape the full app has used for months (sale/app.js).
 async function consumeSSE(response, onProgress){
@@ -583,6 +605,9 @@ async function send(text, opts){
   try{
     const headers = {'Content-Type':'application/json'};
     if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+    // Only while signed out. With a Google account there is already a real
+    // identity, and sending a second one would be pointless as well as worse.
+    else { const a = anonId(); if (a) headers['X-Zerem-Anon'] = a; }
     const res = await fetch('/api/chat', {
       method:'POST', headers,
       body: JSON.stringify({ modelClass:'basic', stream:true, max_tokens: opts.lists ? 2000 : 1200, thinkingBudget:0,
@@ -851,6 +876,6 @@ setTimeout(maybeShowNoSave, 500);
 
 input.focus();
 </script>
-    <script src="/track.js?v=361" defer></script>
+    <script src="/track.js?v=368" defer></script>
 </body>
 </html>

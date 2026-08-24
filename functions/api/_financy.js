@@ -90,14 +90,18 @@ export async function financySync(fz, rec) {
     const connections = await listAll(fz, '/connections?status=ACTIVE');
     const accountsRaw = await listAll(fz, '/data/accounts?includeDuplicates=0');
     const now = Date.now();
-    const wanted = accountsRaw.filter(a => ['CHECKING', 'CARD'].includes(String(a.accountType || '').toUpperCase()));
+    // Everything Financy knows: checking, cards, savings, loans (securities too,
+    // shown as a balance). The dashboard decides what counts as cash.
+    const KINDS = { CHECKING: 'bank', CARD: 'card', SAVINGS: 'savings', LOAN: 'loan', SECURITY: 'securities', SECURITIES: 'securities' };
+    const wanted = accountsRaw.filter(a => KINDS[String(a.accountType || '').toUpperCase()]);
 
     rec.accounts = rec.accounts || [];
     rec.entries = rec.entries || [];
     const keep = rec.accounts.filter(a => a.source !== 'financy');
     const synced = wanted.map(acc => {
         const id = String(acc.id);
-        const isCard = String(acc.accountType).toUpperCase() === 'CARD';
+        const kind = KINDS[String(acc.accountType).toUpperCase()];
+        const isCard = kind === 'card';
         const prev = rec.accounts.find(a => a.source === 'financy' && a.externalId === id) || {};
         const parsed = acc.parsedAccount || {};
         // cards: what accrued since the last billing (the charge that is coming);
@@ -112,7 +116,7 @@ export async function financySync(fz, rec) {
             source: 'financy',
             name: String(acc.accountName || acc.providerId || 'חשבון').slice(0, 60),
             institution: mapInstitution(acc.providerId),
-            kind: isCard ? 'card' : 'bank',
+            kind,
             mask: String(parsed.number || acc.accountNumber || '').replace(/\D/g, '').slice(-4),
             balance,
             currency: acc.currency || 'ILS',

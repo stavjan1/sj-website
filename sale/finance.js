@@ -143,6 +143,8 @@
     }
     const accounts = () => (fin.accounts || []);
     const isCard = (a) => a.kind === 'card';
+    const isCash = (a) => !a.kind || a.kind === 'bank';   // what "מזומן זמין" counts
+    const KIND_LABEL = { bank: 'יתרה', card: 'חיוב קרוב', savings: 'חיסכון', loan: 'הלוואה', securities: 'ניירות ערך' };
     function selectedAccounts() {
         const s = settings();
         const all = accounts();
@@ -206,7 +208,7 @@
     function buildCurve() {
         const s = settings();
         const now = today();
-        const cashNow = selectedAccounts().filter(a => !isCard(a)).reduce((t, a) => t + (Number(a.balance) || 0), 0);
+        const cashNow = selectedAccounts().filter(isCash).reduce((t, a) => t + (Number(a.balance) || 0), 0);
         const yearStart = new Date(s.viewYear, 0, 1, 12);
         const from = (s.viewYear === now.getFullYear()) ? (now - yearStart > 120 * 864e5 ? new Date(now - 120 * 864e5) : yearStart) : yearStart;
         const pastEnd = (s.viewYear === now.getFullYear()) ? now : new Date(s.viewYear, 11, 31, 12);
@@ -282,8 +284,8 @@
             const amt = Number(a.balance) || 0;
             return `<button type="button" class="fin-acc ${on ? 'on' : ''} ${isCard(a) ? 'card' : ''}" data-acc-pick="${esc(a.id)}" title="${on ? 'מוצג' : 'לחץ להצגה'}">
                 <span class="bank-badge" style="--bank:${b.color}">${esc(b.mark)}</span>
-                <span class="fin-acc-text"><b>${esc(a.name || b.label)}</b><small>${esc(isCard(a) ? 'חיוב קרוב' : 'יתרה')}${a.mask ? ' · ' + esc(a.mask) : ''}</small></span>
-                <span class="fin-acc-amt num ${isCard(a) ? 'status-danger' : ''}">${fmtILS(isCard(a) ? -Math.abs(amt) : amt)}</span>
+                <span class="fin-acc-text"><b>${esc(a.name || b.label)}</b><small>${esc(KIND_LABEL[a.kind] || 'יתרה')}${a.mask ? ' · ' + esc(a.mask) : ''}</small></span>
+                <span class="fin-acc-amt num ${isCard(a) || a.kind === 'loan' ? 'status-danger' : ''}">${fmtILS(isCard(a) || a.kind === 'loan' ? -Math.abs(amt) : amt)}</span>
                 <span class="fin-acc-check" aria-hidden="true">${on ? '✓' : ''}</span>
             </button>`;
         }).join('')}</div>`;
@@ -573,7 +575,7 @@
 
         <div class="fin-cards">
             <div class="card"><div class="fin-kpi-label">מזומן זמין עכשיו</div><div class="fin-kpi num">${fmtILS(cashNow)}</div>
-                <div class="fin-kpi-sub">${selectedAccounts().filter(a => !isCard(a)).length} חשבונות${selectedAccounts().some(isCard) ? ' · אשראי נפרד' : ''}</div></div>
+                <div class="fin-kpi-sub">${selectedAccounts().filter(isCash).length} חשבונות עו"ש${selectedAccounts().some(isCard) ? ' · אשראי נפרד' : ''}${selectedAccounts().some(a => a.kind === 'savings') ? ' · חיסכון לא נספר' : ''}</div></div>
             <div class="card"><div class="fin-kpi-label">מחזור אחרון שנסגר ← (${closed.end.getDate()}.${closed.end.getMonth() + 1})</div><div class="fin-kpi num ${closedNet >= 0 ? 'status-ok' : 'status-danger'}">${fmtILS(closedNet)}</div>
                 <div class="fin-kpi-sub">נטו ${esc(closed.label)}</div></div>
             <div class="card"><div class="fin-kpi-label">ממתין לתשלום מלקוחות</div><div class="fin-kpi num status-ok">${fmtILS(openSum)}</div>
@@ -616,7 +618,7 @@
                     <div id="fin-accounts">${accounts().map(a => `
                         <div class="fin-form-row" data-acc="${esc(a.id)}">
                             <select class="input" data-f="institution" aria-label="בנק">${Object.keys(BANKS).map(k => `<option value="${k}" ${(a.institution || 'other') === k ? 'selected' : ''}>${esc(BANKS[k].label)}</option>`).join('')}</select>
-                            <select class="input" data-f="kind" aria-label="סוג"><option value="bank" ${a.kind !== 'card' ? 'selected' : ''}>עו"ש</option><option value="card" ${a.kind === 'card' ? 'selected' : ''}>אשראי</option></select>
+                            <select class="input" data-f="kind" aria-label="סוג">${[['bank', 'עו"ש'], ['card', 'אשראי'], ['savings', 'חיסכון'], ['loan', 'הלוואה']].map(([k, l]) => `<option value="${k}" ${(a.kind || 'bank') === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
                             <input class="input" type="text" value="${esc(a.name || '')}" data-f="name" placeholder="שם">
                             <input class="input num" type="number" value="${Number(a.balance) || 0}" data-f="balance" placeholder="${a.kind === 'card' ? 'חיוב קרוב' : 'יתרה'}">
                             <button class="fin-x" data-delacc="${esc(a.id)}" title="מחיקה">×</button>
@@ -770,12 +772,13 @@
                     פעילים בשבוע האחרון: <b class="num">${f.activeLast7d}</b> ·
                     נעצרו אחרי הודעה-שתיים: <b class="num">${f.oneMessageOnly}</b> ·
                     ייצאו PDF החודש: <b class="num">${f.pdfThisMonth}</b>${f.capped ? ' · (מוצגים 200 הראשונים)' : ''}
+                    ${f.anonVisitors ? `<br>אורחים שלא התחברו: <b class="num">${f.anonVisitors}</b> · <b class="num">${f.anonMsgs}</b> שאלות${f.anonCapped ? ' (חלקי)' : ''}` : ''}
                 </p>
                 <details class="fin-details"><summary>פירוט לפי משתמש (${data.users.length})</summary>
                     <div class="table-scroll"><table class="fin-table">
                         <thead><tr><th>משתמש</th><th>פרויקטים</th><th>הודעות צ'אט</th><th>הצעות</th><th>מאגר</th><th>פעילות אחרונה</th></tr></thead>
                         <tbody>${data.users.map(u => `
-                            <tr><td>${esc(u.email)}</td><td class="num">${u.projects}</td><td class="num">${u.chatMsgs}</td>
+                            <tr><td>${esc(u.email)}${u.anon ? ' <span class="fin-muted">(אורח)</span>' : ''}</td><td class="num">${u.projects}</td><td class="num">${u.chatMsgs}</td>
                             <td class="num">${u.quotes}</td><td class="num">${u.catalogItems}</td>
                             <td>${u.lastUpdated ? new Date(u.lastUpdated).toLocaleDateString('he-IL') : '—'}</td></tr>`).join('')}
                         </tbody>

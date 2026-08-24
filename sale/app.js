@@ -2235,7 +2235,8 @@ function moneyEnabled() { return isAdmin(); }
 
 function setMoneyView(view) {
     const docs = document.getElementById('money-view-docs');
-    // Cash flow moved out to its own PRO tab; כסף is documents only now.
+    const board = document.getElementById('money-view-board');
+    // Cash flow moved out to its own PRO tab; כסף is the board + documents.
     const flow = document.getElementById('money-view-flow');
     if (!docs) return;
     const soon = document.getElementById('money-soon');
@@ -2244,20 +2245,22 @@ function setMoneyView(view) {
         if (soon) soon.hidden = false;
         if (subtabs) subtabs.hidden = true;
         docs.hidden = true;
+        if (board) board.hidden = true;
         if (flow) flow.hidden = true;
         return;
     }
     if (soon) soon.hidden = true;
     if (subtabs) subtabs.hidden = false;
-    const onFlow = false; // flow lives in the PRO tab
-    docs.hidden = onFlow;
+    const onBoard = view !== 'docs';   // the board is where כסף opens
+    docs.hidden = onBoard;
+    if (board) board.hidden = !onBoard;
     if (flow) flow.hidden = true;
     document.querySelectorAll('#panel-money .subtab').forEach((b) => {
-        const on = b.dataset.sub === (onFlow ? 'flow' : 'docs');
+        const on = b.dataset.sub === (onBoard ? 'board' : 'docs');
         b.classList.toggle('active', on);
         b.setAttribute('aria-selected', String(on));
     });
-    try { onFlow ? (window.renderFinance && window.renderFinance()) : renderAccounting(); } catch (e) {}
+    try { onBoard ? renderStatistics() : renderAccounting(); } catch (e) {}
 }
 
 // How many clients are due, the number on the "שירות תקופתי" view.
@@ -2268,6 +2271,7 @@ function switchTab(tabId, opts) {
     if (tabId === 'archive') { tabId = 'clients'; subView = 'list'; }
     else if (tabId === 'checkups') { tabId = 'projects'; subView = 'maint'; }
     else if (tabId === 'accounting') { tabId = 'money'; subView = 'docs'; }
+    else if (tabId === 'statistics') { tabId = 'money'; subView = 'board'; }
     else if (tabId === 'finance') { tabId = 'pro'; }
 
     // Pipeline is a view of the work list; leaving it re-marks the toggle.
@@ -2345,7 +2349,9 @@ function switchTab(tabId, opts) {
             scheduleReportPreview();
         }
     }
-    if (tabId === 'catalog') {
+    if (tabId === 'catalog' && catalogView === 'market') {
+        setCatalogView('market');
+    } else if (tabId === 'catalog') {
         renderPriceCatalog();
         try { renderSupplierDb(); } catch (e) {}
     }
@@ -2365,7 +2371,7 @@ function switchTab(tabId, opts) {
         setProjectsTab(subView === 'maint' ? 'maint' : 'all');
     }
     if (tabId === 'money') {
-        setMoneyView(subView || 'docs');
+        setMoneyView(subView || 'board');
     }
     if (tabId === 'pro') {
         try { window.renderFinance && window.renderFinance(); } catch (e) {}
@@ -3270,6 +3276,7 @@ function openAccountingForProject(projectId, docType) {
     acctSection = 'create';
     acctVatBasis = 'exclude';
     switchTab('money');
+    setMoneyView('docs');   // switchTab opens on the board; this screen wants documents
     setTimeout(() => {
         const dt = document.getElementById('acct-doctype');
         if (dt && docType) dt.value = docType;
@@ -3642,6 +3649,23 @@ function persistSettings() {
 // The column names are the stage names from the rest of the app, a project
 // cannot be called one thing on its row and another in the pipeline. The two
 // off-palette hexes were V2 leftovers.
+// Two ways to read the same board: card per project, or one card per client
+// with all their open money in it (one collection call instead of three).
+let pipeGroupByClient = false;
+let pipeMonth = 'all';          // 'all' | 'YYYY-MM'
+
+function projectClientName(p) {
+    return ((p.quoteData && p.quoteData.clientName) || p.clientName || '').trim() || 'ללא לקוח';
+}
+function projectMonthKey(p) {
+    const t = p.statusChangedAt || (p.created ? new Date(p.created).getTime() : 0);
+    if (!t) return '';
+    const d = new Date(t);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+function setPipeGroup(on) { pipeGroupByClient = !!on; renderStatistics(); }
+function setPipeMonth(v) { pipeMonth = v || 'all'; renderStatistics(); }
+
 const PIPELINE_COLS = [
     { key: 'planning', label: 'אפיון ותמחור', icon: 'fa-compass-drafting', accent: 'var(--text-3)' },
     { key: 'quote',    label: 'הצעת מחיר',    icon: 'fa-file-invoice-dollar', accent: 'var(--accent)' },
@@ -3663,6 +3687,33 @@ function projectAmount(p) {
     return Number(qd.finalPrice || qd.total || 0) || 0;
 }
 
+// One card per client in a column: their total, and how many jobs make it up.
+function clientCardsHtml(items, stage) {
+    const nis = (n) => '₪' + Math.round(n).toLocaleString('he-IL');
+    const byClient = {};
+    items.forEach(p => {
+        const k = projectClientName(p);
+        (byClient[k] = byClient[k] || []).push(p);
+    });
+    return Object.keys(byClient).sort((a2, b2) => {
+        const sa = byClient[a2].reduce((s, p) => s + projectAmount(p), 0);
+        const sb = byClient[b2].reduce((s, p) => s + projectAmount(p), 0);
+        return sb - sa;
+    }).map(name => {
+        const list = byClient[name];
+        const sum = list.reduce((s, p) => s + projectAmount(p), 0);
+        const oldest = Math.max(...list.map(p => projectIdleDays(p)));
+        return `<div class="pipe-card is-client" onclick="loadProject('${list[0].id}')" title="${escapeHtml(list.map(p => p.name).join(' · '))}">
+            <div class="pipe-card-name">${escapeHtml(name)}</div>
+            <div class="pipe-card-foot">
+                <span class="pipe-card-amt">${sum ? nis(sum) : '—'}</span>
+                <span class="pipe-client-n">${list.length} עבודות</span>
+            </div>
+            ${(stage === 'awaiting' && oldest >= 7) ? `<div class="pipe-card-age">הוותיק ממתין ${oldest} ימים</div>` : ''}
+        </div>`;
+    }).join('');
+}
+
 function renderStatistics() {
     const board = document.getElementById('pipeline-board');
     if (!board) return;
@@ -3673,25 +3724,33 @@ function renderStatistics() {
     // and never reached a price is not in flight, and counting it in the first
     // column made the funnel look busier than the work actually is.
     (projectsList || []).filter(p => !isStaleDraft(p))
+        .filter(p => pipeMonth === 'all' || projectMonthKey(p) === pipeMonth)
         .forEach(p => { (cols[projectPipelineStage(p)] || cols.planning).push(p); });
 
     board.innerHTML = PIPELINE_COLS.map(c => {
         const items = cols[c.key];
         const sum = items.reduce((s, p) => s + projectAmount(p), 0);
-        const cards = items.length ? items.map(p => {
+        const cards = items.length ? (pipeGroupByClient ? clientCardsHtml(items, c.key) : items.map(p => {
             const amt = projectAmount(p);
             let adv = '';
-            if (c.key === 'executed') adv = `<button class="pipe-adv" onclick="pipelineAdvance('${p.id}','awaiting',event)" title="חשבונית נשלחה: העבר לממתין לתשלום">חשבונית <i class="fa-solid fa-arrow-left"></i></button>`;
+            if (c.key === 'quote') adv = `<button class="pipe-adv" onclick="pipelineAdvance('${p.id}','executed',event)" title="העבודה בוצעה">בוצע <i class="fa-solid fa-arrow-left"></i></button>`;
+            else if (c.key === 'executed') adv = `<button class="pipe-adv" onclick="pipelineAdvance('${p.id}','awaiting',event)" title="חשבונית נשלחה: העבר לממתין לתשלום">חשבונית <i class="fa-solid fa-arrow-left"></i></button>`;
             else if (c.key === 'awaiting') adv = `<button class="pipe-adv" onclick="pipelineAdvance('${p.id}','paid',event)" title="התקבל תשלום: סמן שולם">שולם <i class="fa-solid fa-arrow-left"></i></button>`;
-            return `<div class="pipe-card" onclick="loadProject('${p.id}')" title="פתח את הפרויקט">
+            // Paid, and no receipt issued for it yet: the next thing you owe the
+            // customer is a receipt, so the card offers to produce one.
+            else if (c.key === 'paid' && !projectHasReceipt(p)) adv = `<button class="pipe-adv is-receipt" onclick="pipelineIssueReceipt('${p.id}',event)" title="הפק קבלה ללקוח"><i class="fa-solid fa-receipt"></i> צור קבלה</button>`;
+            const days = projectIdleDays(p);
+            return `<div class="pipe-card" draggable="true" data-pid="${p.id}" data-stage="${c.key}"
+                onclick="loadProject('${p.id}')" title="פתח את הפרויקט · אפשר לגרור לעמודה אחרת">
                 <div class="pipe-card-name">${escapeHtml(p.name)}</div>
                 <div class="pipe-card-foot">
                     <span class="pipe-card-amt">${amt ? nis(amt) : '—'}</span>
                     ${adv}
                 </div>
+                ${(c.key === 'awaiting' && days >= 7) ? `<div class="pipe-card-age">ממתין ${days} ימים</div>` : ''}
             </div>`;
-        }).join('') : `<div class="pipe-empty">—</div>`;
-        return `<div class="pipe-col" style="--pipe-accent:${c.accent}">
+        }).join('')) : `<div class="pipe-empty">—</div>`;
+        return `<div class="pipe-col" data-stage="${c.key}" style="--pipe-accent:${c.accent}">
             <div class="pipe-col-head">
                 <span class="pipe-col-title"><i class="fa-solid ${c.icon}"></i> ${c.label}</span>
                 <span class="pipe-col-count">${items.length}</span>
@@ -3705,24 +3764,94 @@ function renderStatistics() {
     const totalValue = (projectsList || []).reduce((s, p) => s + projectAmount(p), 0);
     const paidValue = cols.paid.reduce((s, p) => s + projectAmount(p), 0);
     const openValue = totalValue - paidValue;
+    // Controls: group by client, and which month the board is showing.
+    const ctl = document.getElementById('pipeline-controls');
+    if (ctl) {
+        const months = Array.from(new Set((projectsList || []).map(projectMonthKey).filter(Boolean))).sort().reverse().slice(0, 18);
+        const label = (k) => new Date(k + '-01T12:00:00').toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
+        ctl.innerHTML = `
+            <button type="button" class="chip ${pipeGroupByClient ? 'on' : ''}" onclick="setPipeGroup(${!pipeGroupByClient})">
+                <i class="fa-solid fa-users"></i> לפי לקוח</button>
+            <span class="pipe-ctl-sep"></span>
+            <button type="button" class="chip ${pipeMonth === 'all' ? 'on' : ''}" onclick="setPipeMonth('all')">כל הזמן</button>
+            ${months.map(m => `<button type="button" class="chip ${pipeMonth === m ? 'on' : ''}" onclick="setPipeMonth('${m}')">${label(m)}</button>`).join('')}`;
+    }
+
+    wirePipelineDnD(board);
+
+    // Waiting longer than 30 days since the status changed = late money.
+    const lateValue = cols.awaiting.filter(p => projectIdleDays(p) >= 30).reduce((s2, p) => s2 + projectAmount(p), 0);
     const head = document.getElementById('pipeline-summary');
     if (head) head.innerHTML = `
         <div class="pipe-stat"><span class="pipe-stat-num">${totalCount}</span><span class="pipe-stat-lbl">פרויקטים</span></div>
         <div class="pipe-stat"><span class="pipe-stat-num">${nis(totalValue)}</span><span class="pipe-stat-lbl">שווי צבר כולל</span></div>
         <div class="pipe-stat"><span class="pipe-stat-num" style="color:var(--warn-text)">${nis(openValue)}</span><span class="pipe-stat-lbl">פתוח (טרם שולם)</span></div>
-        <div class="pipe-stat"><span class="pipe-stat-num" style="color:var(--ok-text)">${nis(paidValue)}</span><span class="pipe-stat-lbl">שולם</span></div>`;
+        <div class="pipe-stat"><span class="pipe-stat-num" style="color:var(--ok-text)">${nis(paidValue)}</span><span class="pipe-stat-lbl">שולם</span></div>
+        ${lateValue ? `<div class="pipe-stat"><span class="pipe-stat-num" style="color:var(--danger)">${nis(lateValue)}</span><span class="pipe-stat-lbl">מאחר מעל 30 יום</span></div>` : ''}`;
 }
+
+// One place decides what a column MEANS for a project, so a drag and a button
+// end in exactly the same state.
+const PIPE_STATE = {
+    planning: { status: 'טיוטה', awaiting: false, toast: 'הוחזר לאפיון' },
+    quote:    { status: 'נשלח',  awaiting: false, toast: 'סומן: הצעת מחיר נשלחה' },
+    executed: { status: 'הושלם', awaiting: false, toast: 'סומן כבוצע' },
+    awaiting: { status: 'הושלם', awaiting: true,  toast: 'הועבר לממתין לתשלום' },
+    paid:     { status: 'שולם',  awaiting: false, toast: 'סומן כשולם' },
+};
 
 function pipelineAdvance(projectId, to, e) {
     if (e) e.stopPropagation();
     const p = projectsList.find(x => x.id === projectId);
-    if (!p) return;
-    if (to === 'awaiting') { p.status = 'הושלם'; p.awaitingPayment = true; }
-    else if (to === 'paid') { p.status = 'שולם'; p.awaitingPayment = false; }
+    const target = PIPE_STATE[to];
+    if (!p || !target) return;
+    if (projectPipelineStage(p) === to) return;
+    p.status = target.status;
+    p.awaitingPayment = target.awaiting;
     p.statusChangedAt = Date.now();
     saveProjects();
     renderStatistics();
-    showToast(to === 'paid' ? 'סומן כשולם' : 'הועבר לממתין לתשלום');
+    filterProjectsList();
+    showToast(target.toast);
+    // Money that just arrived wants a receipt — offer it on the spot.
+    if (to === 'paid' && !projectHasReceipt(p)) {
+        setTimeout(() => showToast('אפשר להפיק קבלה ללקוח מהכרטיס בלוח'), 1200);
+    }
+}
+
+// A receipt already exists for this project?
+function projectHasReceipt(p) {
+    return (invoicesList || []).some(d => d.projectId === p.id && sbIsPaidType(d.docType) && d.status !== 'error');
+}
+
+// "צור קבלה": the document screen, prefilled from the project, on Receipt.
+function pipelineIssueReceipt(projectId, e) {
+    if (e) e.stopPropagation();
+    openAccountingForProject(projectId, 'Receipt');
+}
+
+// Drag and drop: pick a card up, drop it in the column where its money is.
+function wirePipelineDnD(board) {
+    if (!board) return;
+    let dragId = null;
+    board.querySelectorAll('.pipe-card').forEach(card => {
+        card.addEventListener('dragstart', (ev) => {
+            dragId = card.dataset.pid;
+            card.classList.add('is-dragging');
+            try { ev.dataTransfer.setData('text/plain', dragId); ev.dataTransfer.effectAllowed = 'move'; } catch (e) {}
+        });
+        card.addEventListener('dragend', () => { dragId = null; card.classList.remove('is-dragging'); board.querySelectorAll('.pipe-col').forEach(c => c.classList.remove('is-over')); });
+    });
+    board.querySelectorAll('.pipe-col').forEach(col => {
+        col.addEventListener('dragover', (ev) => { ev.preventDefault(); try { ev.dataTransfer.dropEffect = 'move'; } catch (e) {} col.classList.add('is-over'); });
+        col.addEventListener('dragleave', () => col.classList.remove('is-over'));
+        col.addEventListener('drop', (ev) => {
+            ev.preventDefault();
+            col.classList.remove('is-over');
+            const id = dragId || (ev.dataTransfer && ev.dataTransfer.getData('text/plain'));
+            if (id) pipelineAdvance(id, col.dataset.stage);
+        });
+    });
 }
 
 // ==========================================================================
@@ -6100,7 +6229,13 @@ function recordQuoteStat() {
             profession: (appState.settings && appState.settings.profession) || 'general',
             jobType: classifyJobType(subject + ' ' + ((proj && (proj.scope || []).join(' ')) || '')),
             labor: Math.round(labor),
-            quoteId: (proj && proj.id) || (appState.currentQuote && appState.currentQuote.id) || ''
+            quoteId: (proj && proj.id) || (appState.currentQuote && appState.currentQuote.id) || '',
+            // The components themselves: a name and what it was charged. Same
+            // privacy rule as the labor number — nothing about the customer.
+            items: ((proj && proj.materials) || []).map(m => ({
+                name: (m && m.name) || '',
+                price: Number(m && m.price) || 0,   // per unit, as the row holds it
+            })).filter(x => x.name && x.price > 0),
         };
         if (mode === 'named') {
             payload.named = (appState.settings.businessDetails && appState.settings.businessDetails.name) || '';
@@ -8157,6 +8292,129 @@ function importCatalogFromFile(input) {
         _applyCatalogImport(parseCatalogImportText(text));
         input.value = '';
     }, 'קובץ המחירון');
+}
+
+// ==========================================================================
+// Market prices: what the trade charges for each line item, next to what you
+// charge. Fed by the anonymous per-item samples every PDF export contributes
+// (stats:items:<profession>:<name> in KV) — names and prices only, never a
+// customer. Sorting is the whole point: the gap column is where money hides.
+// ==========================================================================
+let marketData = null;          // { items:[{name, count, median, low, high}] }
+let marketSort = 'gap';
+let catalogView = 'mine';
+
+function setCatalogView(view) {
+    catalogView = view === 'market' ? 'market' : 'mine';
+    const mine = document.getElementById('catalog-view-mine');
+    const market = document.getElementById('catalog-view-market');
+    if (mine) mine.hidden = catalogView === 'market';
+    if (market) market.hidden = catalogView !== 'market';
+    document.querySelectorAll('#catalog-subtabs .subtab').forEach(b => {
+        const on = b.dataset.sub === catalogView;
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-selected', String(on));
+    });
+    if (catalogView === 'market') renderMarketPrices();
+}
+
+// My price for an item name, from the personal catalog (system catalog is
+// merged into priceCatalog on boot, so this is "what I would quote").
+function myPriceFor(name) {
+    const n = String(name || '').trim().toLowerCase();
+    if (!n) return null;
+    const exact = (priceCatalog || []).find(c => String(c.name || '').trim().toLowerCase() === n);
+    if (exact) return Number(exact.price) || null;
+    const loose = (priceCatalog || []).find(c => {
+        const cn = String(c.name || '').trim().toLowerCase();
+        return cn && (cn.includes(n) || n.includes(cn));
+    });
+    return loose ? (Number(loose.price) || null) : null;
+}
+
+async function renderMarketPrices(force) {
+    const box = document.getElementById('market-list');
+    if (!box) return;
+    if (force) marketData = null;
+    if (!marketData) {
+        box.innerHTML = '<p class="input-help">טוען…</p>';
+        try {
+            const prof = (appState.settings && appState.settings.profession) || 'general';
+            const headers = {};
+            if (googleAccessToken && !isGuestUser()) headers['Authorization'] = 'Bearer ' + googleAccessToken;
+            const res = await fetch('/api/stats?market=1&prof=' + encodeURIComponent(prof), { headers });
+            marketData = await res.json();
+        } catch (e) { marketData = { items: [] }; }
+    }
+    const items = (marketData && marketData.items) || [];
+    if (!items.length) {
+        box.innerHTML = `<div class="catalog-empty">עדיין אין מספיק נתוני שוק בתחום שלך.<br>
+            <span class="input-help">כל הצעת מחיר שמופקת מהמערכת מוסיפה מחירי סעיפים אנונימיים למאגר הזה, וככל שיהיו יותר, ההשוואה כאן תהיה שווה יותר.</span></div>`;
+        return;
+    }
+    const q = (document.getElementById('market-search')?.value || '').trim().toLowerCase();
+    const onlyMine = !!document.getElementById('market-only-mine')?.checked;
+    const rows = items.map(it => {
+        const mine = myPriceFor(it.name);
+        const gap = (mine != null && it.median) ? mine - it.median : null;
+        const gapPct = (gap != null && it.median) ? Math.round((gap / it.median) * 100) : null;
+        return { ...it, mine, gap, gapPct };
+    }).filter(r => (!q || r.name.toLowerCase().includes(q)) && (!onlyMine || r.mine != null));
+
+    rows.sort((x, y) => {
+        if (marketSort === 'uses') return y.count - x.count;
+        if (marketSort === 'price') return y.median - x.median;
+        if (marketSort === 'name') return x.name.localeCompare(y.name, 'he');
+        // gap: the biggest distance from the market, in percent, first — items
+        // with no personal price fall to the bottom (nothing to compare).
+        const gx = x.gapPct == null ? -Infinity : Math.abs(x.gapPct);
+        const gy = y.gapPct == null ? -Infinity : Math.abs(y.gapPct);
+        return gy - gx;
+    });
+
+    const nis = (n) => '₪' + Math.round(n).toLocaleString('he-IL');
+    const body = rows.slice(0, 300).map(r => {
+        const cls = r.gap == null ? '' : r.gap > 0 ? 'is-high' : r.gap < 0 ? 'is-low' : '';
+        const gapTxt = r.gap == null ? '<span class="mk-none">אין לי מחיר</span>'
+            : `${r.gap > 0 ? '+' : ''}${nis(r.gap)} <small>(${r.gapPct > 0 ? '+' : ''}${r.gapPct}%)</small>`;
+        return `<tr class="${cls}">
+            <td class="mk-name">${escapeHtml(r.name)}</td>
+            <td class="num">${r.mine != null ? nis(r.mine) : '—'}</td>
+            <td class="num">${nis(r.median)}<small class="mk-range">${nis(r.low)}–${nis(r.high)}</small></td>
+            <td class="num mk-gap">${gapTxt}</td>
+            <td class="num">${r.count}</td>
+            <td>${r.mine == null ? `<button class="btn btn-secondary btn-small" onclick="marketAdoptPrice('${escapeHtml(r.name).replace(/'/g, "\\'")}', ${Math.round(r.median)})">הוסף למאגר</button>` : ''}</td>
+        </tr>`;
+    }).join('');
+
+    const above = rows.filter(r => r.gap != null && r.gap > 0).length;
+    const below = rows.filter(r => r.gap != null && r.gap < 0).length;
+    box.innerHTML = `
+        <div class="market-summary">
+            <span>${rows.length} סעיפים</span>
+            <span class="is-high">${above} מעל השוק</span>
+            <span class="is-low">${below} מתחת לשוק</span>
+            <span class="input-help">חציון על בסיס ${marketData.minSamples || 5}+ דגימות אנונימיות</span>
+        </div>
+        <div class="table-scroll">
+        <table class="mk-table">
+            <thead><tr><th>סעיף</th><th>המחיר שלי</th><th>חציון בשוק</th><th>הפער</th><th>דגימות</th><th></th></tr></thead>
+            <tbody>${body}</tbody>
+        </table>
+        </div>`;
+    document.querySelectorAll('#market-sorts .chip').forEach(b => {
+        b.classList.toggle('on', b.dataset.msort === marketSort);
+        b.onclick = () => { marketSort = b.dataset.msort; renderMarketPrices(); };
+    });
+}
+
+// One click to take a market price into your own catalog.
+function marketAdoptPrice(name, price) {
+    if (!name || !(price > 0)) return;
+    priceCatalog.push({ name: String(name).slice(0, 120), price: Math.round(price), unit: 'יח\u0027' });
+    savePriceCatalog();
+    renderMarketPrices();
+    showToast(`"${name}" נוסף למאגר לפי מחיר השוק`);
 }
 
 function renderPriceCatalog() {

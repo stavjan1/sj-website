@@ -159,3 +159,10 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
   setAdminTab, feedback attribution, two comment fixes). Server-side:
   `functions/api/analytics.js` (KV read volume) and `functions/api/feedback.js`
   (records the verified email). No CSS.
+- 2026-08-23 — Session B: anonymous-visitor counting (Stav chose option ב:
+  a stable number per guest). New file `functions/api/_anon.js`; small additions
+  to `functions/api/chat.js` (one waitUntil), `functions/api/funnel.js` (anon
+  rows), `sale/finance.js` (one summary line + a guest marker), and one clause
+  in `privacy.html`. Session A had already swept some of these into its own
+  commits while they were in progress — no harm done, but noting it: the
+  in-flight files of the other session are not safe to `git add -A`.

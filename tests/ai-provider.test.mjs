@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import { readFileSync } from 'node:fs';
 
-import { toGemini, supportsThinkingOff, PROVIDERS, modelScore } from '../functions/api/_ai.js';
+import { toGemini, supportsThinkingOff, PROVIDERS, modelScore, generate } from '../functions/api/_ai.js';
 import { MODEL_CLASS } from '../functions/api/_tiers.js';
 
 const RETIRED = [/gemini-1\.5/, /gemini-2\.0/, /gemini-2\.5-flash\b/];
@@ -216,4 +216,34 @@ test('a provider known to be finished for the day is not asked again', () => {
   assert.match(src, /order\.length > 1 && order\.includes\('gemini'\)/,
     'skipping Gemini could leave no provider at all');
   assert.match(src, /if \(without\.length\) order = without;/, 'the fallback could be emptied');
+});
+
+test('a spent daily quota answers in Hebrew instead of taking the endpoint down', async () => {
+  // Live on 2026-08-22: every AI call on the site returned sixteen bytes of
+  // Cloudflare English ("error code: 502"), and /ask/ told a stranger the
+  // engine was broken. It was not — Google had simply said "quota" for the day.
+  // The 429 branch read the error body to learn which limit it was, and on a
+  // deployment with a single provider that same response was then handed to
+  // normalize(), which read it again. A Response body can only be read once, so
+  // the second read threw, the throw escaped the Pages Function, and the edge
+  // served its own 502.
+  const quota = JSON.stringify({
+    error: {
+      code: 429, status: 'RESOURCE_EXHAUSTED', message: 'You exceeded your current quota',
+      details: [{ '@type': 'type.googleapis.com/google.rpc.QuotaFailure',
+        violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel' }] }],
+    },
+  });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(quota, { status: 429 });
+  try {
+    // One key, so there is nothing to fall back to — the shape that crashed.
+    const res = await generate({ GEMINI_API_KEY: 'x' },
+      { provider: 'gemini', messages: [{ role: 'user', content: 'שלום' }] });
+    assert.equal(res.status, 429);
+    const body = await res.json();
+    assert.match(body.error.message, /[֐-׿]/, 'the customer gets an English error from Google');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
