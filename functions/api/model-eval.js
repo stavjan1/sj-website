@@ -18,6 +18,8 @@
 import { adminGate, jsonResponse, loadModelClass, MODEL_CLASS } from './_tiers.js';
 import { PROVIDERS, keyFor, generate } from './_ai.js';
 import { MODEL_TRAPS, scoreTrap } from './_model_traps.js';
+import { getPricingMap } from './_pricing_map.js';
+import { renderQuoteChecklist } from './_materials.js';
 
 // A model id's generation, for "is there something newer": gemini-3.6-flash → 3.6.
 function genOf(id) {
@@ -95,12 +97,25 @@ export async function onRequestPost(context) {
     let answer = '';
     let error = null;
     try {
-      // Same path a customer's question takes — including the server guard and
-      // the pricing map — so a pass means something about the real product.
+      // The SAME prompt a customer's question is answered with. The comment
+      // here used to claim that and the code did not do it: only the trap text
+      // was sent, so this measured the bare model's own knowledge while
+      // production answers with the pricing map attached.
+      //
+      // The difference is not academic. Stav asked why a model kept failing the
+      // 6×4 cable trap when the rules are written down — and they are, in the
+      // pricing map: "חד-פאזי = 3 גידים; תלת-פאזי = 5 גידים. כבלים עם 6 גידים
+      // ומעלה = פיקוד בלבד". Asked through /api/chat, the same model catches
+      // that trap cleanly. Asked here, it failed. The scores were real and they
+      // were about something nobody is shipping.
       const res = await generate(env, {
         provider: 'gemini',
         model,
-        messages: [{ role: 'user', content: trap.prompt }],
+        messages: [
+          { role: 'system', content: await getPricingMap(env) },
+          { role: 'system', content: renderQuoteChecklist() },
+          { role: 'user', content: trap.prompt },
+        ],
         temperature: 0.3,
         max_tokens: 700,
         thinkingBudget: 0,

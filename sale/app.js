@@ -6387,6 +6387,8 @@ async function renderAdminFeedback() {
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
         box.innerHTML = adminFeedbackHtml(d);
+        const who = document.getElementById('admin-contrib-body');
+        if (who) who.innerHTML = adminContributorsHtml(d.contributors);
     } catch (e) {
         box.innerHTML = adminErrorHtml(e);
     }
@@ -6434,6 +6436,58 @@ function adminFeedbackHtml(d) {
         </table>
         ${recent ? `<h5 class="tcol-title"><i class="fa-solid fa-comment"></i> מי אמר מה</h5>
                    <ul class="tlist">${recent}</ul>` : ''}`;
+}
+
+// ---- Admin: who is helping price-check, and whose help counts ---------------
+//
+// The screen Stav asked for once the bonus scheme existed: "תאפיין לי כמובן את
+// מי שעונה במסך נפרד ומי שנזהה שעונה שטויות".
+//
+// Kept apart from the rates card on purpose. That one is about prices; this one
+// is about people, and mixing them would let a handful of noisy contributors
+// look like a pricing problem.
+//
+// "נספר" is the only judgement shown, and it is shown only here. The
+// contributor himself never sees it — he is told "תודה, זה הכל לבינתיים" and
+// keeps every bonus he earned. Telling somebody he has been graded unreliable
+// buys nothing and teaches him what to fake next time.
+function adminContributorsHtml(rows) {
+    if (!rows || !rows.length) {
+        return `<p class="input-help" style="margin:0;">עוד אף אחד לא ענה על שאלת "המחיר נכון?".</p>`;
+    }
+    const counted = rows.filter((r) => r.counted);
+    const answers = rows.reduce((s, r) => s + r.answers, 0);
+    const usable = counted.reduce((s, r) => s + r.answers, 0);
+
+    const body = rows.slice(0, 40).map((r) => {
+        const who = r.id.includes('@') ? r.id : 'אורח ' + r.id.slice(0, 6);
+        // Why a row is not counted, in one word, because "trust 0.15" tells
+        // nobody anything.
+        const why = !r.counted
+            ? (r.gold !== null && r.gold < 50 ? 'נכשל בבקרה'
+               : r.fastPct > 50 ? 'עונה מהר מדי'
+               : r.contradictions >= 2 ? 'סותר את עצמו' : 'לא עקבי')
+            : '';
+        return `<tr>
+            <td dir="ltr" style="text-align:start;">${escapeHtml(who)}</td>
+            <td>${r.answers}</td>
+            <td>${r.gold === null ? '—' : r.gold + '%'}</td>
+            <td>${r.fastPct}%</td>
+            <td>${r.counted
+                ? '<span style="color:var(--ok-text);">נספר</span>'
+                : `<span style="color:var(--warn-text);">לא נספר · ${escapeHtml(why)}</span>`}</td>
+        </tr>`;
+    }).join('');
+
+    return `<p style="margin:0;font-size:0.95rem;">
+            <b>${rows.length}</b> אנשים ענו · <b>${answers}</b> תשובות, מתוכן <b>${usable}</b> נספרות.</p>
+        <p class="input-help" style="margin:0;">"בקרה" = עבודות שאתה כבר תמחרת וידוע מה נכון בהן.
+            מי שנכשל בהן שוב ושוב, או עונה מהר מכדי לקרוא, מפסיק להישקל: הוא ממשיך לקבל את הבונוסים
+            שהרוויח ולא מקבל הודעה על כך.</p>
+        <table class="admin-stats-tbl">
+            <thead><tr><th>מי</th><th>תשובות</th><th>בקרה</th><th>מהיר מדי</th><th>מצב</th></tr></thead>
+            <tbody>${body}</tbody>
+        </table>`;
 }
 
 // ---- Admin: aggregate stats dashboard (no PII) ----
@@ -13262,6 +13316,9 @@ function priceFeedbackEl(proj, index) {
     const raw = (msg.parts && msg.parts[0] && msg.parts[0].text) || '';
     if (!/laborPriceEstimate|₪/.test(raw)) return null;
 
+    // Stamped when the question is put on screen, so the server can tell a
+    // judgement from a tap. Nobody reads a job and forms a view in three seconds.
+    _pfShownAt = Date.now();
     const el = _pfBox(index);
     el.innerHTML = `<span style="color:var(--text-2);">המחיר הזה נראה לך נכון?</span>`
         + PRICE_VERDICTS.map((v) => `<button type="button" style="${PF_CHIP}"
@@ -13320,6 +13377,11 @@ function _pfMarkSent(proj, index) {
 
 // Telemetry, therefore best-effort and silent. A feedback widget that can show
 // the user an error is a feedback widget that costs more than it returns.
+// When the strip appeared, so the server can tell a judgement from a tap.
+// Three seconds is not a threshold anybody fails by accident: nobody reads a
+// job description and forms a view about its price in less.
+let _pfShownAt = 0;
+
 function postPriceFeedback(proj, verdict, note) {
     try {
         // The token rides along when there is one, so the server can attribute
@@ -13330,6 +13392,7 @@ function postPriceFeedback(proj, verdict, note) {
         // still perfectly usable.
         const headers = { 'Content-Type': 'application/json' };
         if (googleAccessToken) headers.Authorization = 'Bearer ' + googleAccessToken;
+        else { const a = typeof anonId === 'function' ? anonId() : ''; if (a) headers['X-Zerem-Anon'] = a; }
         fetch('/api/feedback', {
             method: 'POST',
             headers,
@@ -13338,10 +13401,23 @@ function postPriceFeedback(proj, verdict, note) {
                 price: Math.round(Number(proj.laborPrice) || 0),
                 jobType: (proj.spec && proj.spec.jobType) || 'generic',
                 quoteId: String(proj.id || '').slice(0, 60),
+                thinkMs: _pfShownAt ? Date.now() - _pfShownAt : null,
                 note,
             }),
-        }).catch(() => {});
+        }).then((r) => r.ok ? r.json() : null)
+          .then((d) => { if (d && d.bonus) showBonusEarned(d); })
+          .catch(() => {});
     } catch (e) { /* never let telemetry reach the user */ }
+}
+
+// What he actually gets told. Never how he was judged: a contributor whose
+// answers have stopped counting sees "תודה, זה הכל לבינתיים" and keeps every
+// bonus he earned — which is true, and is all he needs to know.
+function showBonusEarned(d) {
+    if (typeof showToast !== 'function') return;
+    if (d.done) { showToast('תודה, זה הכל לבינתיים :)'); return; }
+    showToast('תודה! ' + d.bonus + ' שאלות בונוס נוספו לך' +
+              (d.cap ? ' (' + d.bonusToday + '/' + d.cap + ' היום)' : ''));
 }
 
 // ── Voice dictation ──────────────────────────────────────────────────────────

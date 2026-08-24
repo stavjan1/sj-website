@@ -16,7 +16,9 @@
 //   POST /api/feedback   { verdict, price, jobType?, quoteId?, note? }
 //   GET  /api/feedback   (admin) → recent verdicts + rates per job type
 
-import { adminGate, rateLimit, verifyGoogleEmail, bearerToken } from './_tiers.js';
+import { adminGate, rateLimit, verifyGoogleEmail, bearerToken, dayKey } from './_tiers.js';
+import { recordContribution, listContributors } from './_contrib.js';
+import { cleanAnonId } from './_anon.js';
 
 const VERDICTS = {
   way_off:  { he: 'ממש לא',              alert: true,  weight: -2 },
@@ -85,7 +87,29 @@ async function submit({ request, env }) {
 
   if (VERDICTS[verdict].alert) await alertAdmin(env, entry);
 
-  return json({ ok: true });
+  // Bonus questions for helping, if this person asked to help. Identified by
+  // the same anonymous id the funnel uses, or by the account when signed in —
+  // never by anything new, and never by IP.
+  const who = by || cleanAnonId(request.headers.get('X-Zerem-Anon'));
+  if (!who) return json({ ok: true });
+
+  const credit = await recordContribution(env, who, {
+    verdict,
+    ms: Number(body.thinkMs) || null,
+    gold: !!body.gold,
+    goldCorrect: !!body.goldCorrect,
+  }, dayKey());
+
+  // What comes back says what he earned and nothing about how he was judged.
+  // "תודה, זה הכל לבינתיים" is what a muted contributor sees, and it is true:
+  // there is nothing more for him to do today.
+  return json({
+    ok: true,
+    bonus: credit.bonus,
+    bonusToday: credit.bonusToday,
+    cap: credit.cap,
+    done: credit.muted || credit.bonus === 0,
+  });
 }
 
 // Only "ממש לא" reaches Stav in the moment, and it goes to Telegram rather than
@@ -145,7 +169,16 @@ async function report({ request, env }) {
     b.wrongRate = Number((b.way_off / b.total).toFixed(2));
   }
 
-  return json({ total: entries.length, rates: byJob, entries: entries.slice(0, 50) });
+  // Who is helping, and whose help is worth counting. Kept out of the rates
+  // above on purpose: the rates are about prices, this is about people.
+  const contributors = await listContributors(env);
+
+  return json({
+    total: entries.length,
+    rates: byJob,
+    entries: entries.slice(0, 50),
+    contributors,
+  });
 }
 
 function cors() {
