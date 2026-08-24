@@ -14,7 +14,7 @@
 
 import { generate, recordAiUse } from './_ai.js';
 import { noteAnonVisit } from './_anon.js';
-import { getPricingMap } from './_pricing_map.js';
+import { getPricingMap, trimPricingMap, isTrivialTurn } from './_pricing_map.js';
 import { getKitBlock } from './_electrical_kit.js';
 import { getMaterialsBlock, getTaxonomyBlock, renderQuoteChecklist } from './_materials.js';
 import { renderPanelSizerBlock } from './_panel_sizer.js';
@@ -128,8 +128,15 @@ async function handleChat(context) {
   // without a deploy. Appended as a system block so every pricing chat (guest
   // /ask/ and the in-app engine) conditions on infrastructure factors instead
   // of quoting flat numbers.
-  const pricingMap = await getPricingMap(env);
-  const messages = [...body.messages, { role: 'system', content: pricingMap }];
+  // Trimmed to what this turn can use. The free tier's real ceiling is tokens
+  // per day, not requests per day, and this block is the one thing that went
+  // out on every single call — including "שלום", which cannot use a word of it.
+  const turnText = lastUserText(body.messages);
+  const fullMap = await getPricingMap(env);
+  const pricingMap = isTrivialTurn(turnText) ? '' : trimPricingMap(fullMap, turnText);
+  const messages = pricingMap
+    ? [...body.messages, { role: 'system', content: pricingMap }]
+    : [...body.messages];
 
   // Characterization stage only: the equipment kit for this job family, so the
   // product list comes back complete down to the glands and the labels. Sent
