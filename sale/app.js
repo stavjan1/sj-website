@@ -6365,7 +6365,7 @@ function setAdminTab(tab) {
     document.body.classList.toggle('cr-lock', inRoom);
     const strip = document.getElementById('admin-overview');
     if (strip) strip.hidden = inRoom;
-    if (inRoom) renderControlRoom(); else crStopClock();
+    if (inRoom) { renderControlRoom(); crStartAuto(); } else crStopClock();
 }
 
 // ---- Admin: was the price right? ------------------------------------------
@@ -6742,6 +6742,7 @@ let _crErr = {};              // per-source failure, shown inside the tile that 
 let _crAt = 0;                // when the room last refreshed
 let _crBusy = false;
 let _crClockTimer = null;
+let _crAutoTimer = null;
 
 const CR_TILES = ['traffic', 'funnel', 'ai', 'quality', 'users', 'feed', 'health'];
 
@@ -6936,9 +6937,15 @@ function crPaintAi() {
     rows.sort((a, b) => b.used - a.used);
     const idle = rows.filter((r) => !r.used && !r.cap);
     const shown = rows.filter((r) => r.used || r.cap);
+    // "Everything was served by the first key" and "nobody asked for anything"
+    // are the same green if you do not separate them, and only one of them is
+    // good news.
+    const askedToday = rows.some((r) => r.used > 0);
     const verdict = failedToday.length
         ? `<p class="cr-note"><span class="cr-badge warn">${failedToday.length === 1 ? 'אירוע כשל/מכסה אחד היום' : failedToday.length + ' אירועי כשל/מכסה היום'}</span></p>`
-        : '<p class="cr-note"><span class="cr-badge ok">כל הבקשות היום נענו על המפתח הראשון</span></p>';
+        : askedToday
+            ? '<p class="cr-note"><span class="cr-badge ok">כל הבקשות היום נענו על המפתח הראשון</span></p>'
+            : '<p class="cr-note"><span class="cr-badge">אין תנועה ל-AI היום</span></p>';
     crMeta('ai', `${crNum(ai.pressure && ai.pressure.exhaustedDays || 0)} ימי מכסה בטווח`);
     crSet('cr-ai', verdict + `<div class="cr-bars">${shown.map((r) => r.html).join('')}</div>` +
         (idle.length ? `<p class="cr-note">${idle.length} ספקים ללא תנועה היום: ${idle.map((r) => escapeHtml(r.name)).join(' · ')}</p>` : ''));
@@ -7095,6 +7102,21 @@ function crStartClock() {
 }
 function crStopClock() {
     if (_crClockTimer) { clearInterval(_crClockTimer); _crClockTimer = null; }
+    if (_crAutoTimer) { clearInterval(_crAutoTimer); _crAutoTimer = null; }
+}
+
+// A control room that only updates when you press a button is a photograph of
+// a control room. It refreshes itself every five minutes — not every thirty
+// seconds, because one refresh is a few dozen KV reads and the free tier is a
+// real ceiling — and only while the tab is actually being looked at, so a
+// forgotten window does not spend the quota all night.
+function crStartAuto() {
+    if (_crAutoTimer) return;
+    _crAutoTimer = setInterval(() => {
+        if (document.visibilityState !== 'visible') return;
+        if (!document.body.classList.contains('cr-lock')) return;
+        renderControlRoom(true);
+    }, 5 * 60 * 1000);
 }
 
 // The failure of one number is not the failure of the room: the tile that lost

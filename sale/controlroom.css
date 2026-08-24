@@ -93,6 +93,28 @@
 .cr-btn:focus-visible, .cr-select:focus-visible { outline: 2px solid var(--cr-green); outline-offset: 2px; }
 .cr-select option { background: #0F1E35; color: #EAF1FB; }
 
+/* panels.css styles every <select> inside a content panel and wins on
+   specificity — including the ink colour, which in the LIGHT theme is
+   near-black, and a chevron drawn for a light background. On this dark ground
+   that select was dark-on-dark. Scoped one level deeper so the room's own
+   values hold in both themes, with a chevron of its own. */
+.ctlroom .cr-select,
+.ctlroom .cr-btn {
+    color: var(--cr-ink);
+    /* and the fill, for the same reason: --surface is white in the light theme,
+       which would leave the room's light ink on a white pill. */
+    background-color: rgb(255 255 255 / 0.06);
+    border-color: var(--cr-line);
+}
+.ctlroom .cr-select {
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23A8BAD4' stroke-width='1.6' stroke-linecap='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: left 9px center;
+    background-size: 10px 7px;
+    padding-inline-start: 26px;
+}
+
 /* ---------- the grid ---------- */
 .cr-grid {
     flex: 1 1 auto; min-block-size: 0;
