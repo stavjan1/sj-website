@@ -15085,6 +15085,79 @@ function _clearTokenRefusal() {
 // Response-shaped sibling of adminFetch, for the call sites that read the
 // response themselves. Same contract: a live token before the call, and one
 // silent refresh + retry if the hour lapsed mid-session.
+// ── The defect-report bot: connect it without leaving the app ──────────────
+// BotFather gives a token; everything after that (webhook, secret, pairing the
+// owner's own chat) happens server-side, so nothing here needs a redeploy.
+async function renderAdminTelegram() {
+    const box = document.getElementById('admin-telegram-body');
+    if (!box) return;
+    let d;
+    try {
+        const res = await adminRes('/api/telegram-setup');
+        d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || 'שגיאה');
+    } catch (e) {
+        box.innerHTML = (e.code === 'NO_TOKEN') ? adminAuthHtml() : `<p class="input-help">שגיאה: ${escapeHtml(e.message || String(e))}</p>`;
+        return;
+    }
+    const steps = `
+        <ol class="tg-steps">
+            <li>בטלגרם, מחפשים <b>@BotFather</b> ושולחים <code dir="ltr">/newbot</code>.</li>
+            <li>נותנים שם, ומקבלים טוקן שנראה כך: <code dir="ltr">1234567890:AA...</code></li>
+            <li>מדביקים אותו כאן, והשאר קורה לבד.</li>
+        </ol>`;
+    if (!d.configured) {
+        box.innerHTML = `${steps}
+            <div class="tg-row">
+                <input type="password" id="tg-token" class="input" dir="ltr" autocomplete="off" placeholder="הטוקן מ-BotFather">
+                <button class="btn btn-accent" onclick="adminTelegramSave(this)">חבר את הבוט</button>
+            </div>`;
+        return;
+    }
+    const chats = (d.allowed || []).map(id => `<span class="tg-chat">${escapeHtml(String(id))}
+        <button class="tg-x" title="הסרה" onclick="adminTelegramAction('forget', this, '${escapeHtml(String(id))}')">×</button></span>`).join('') ||
+        '<span class="input-help">עוד לא חובר אף צ\'אט.</span>';
+    box.innerHTML = `
+        <p class="tg-status"><span class="status-ok">מחובר</span>${d.botName ? ' · ' + escapeHtml(d.botName) : ''}${d.fromEnv ? ' · מוגדר במשתני הסביבה' : ''}</p>
+        <div class="tg-row">
+            <button class="btn ${d.openToFirst ? 'btn-secondary' : 'btn-accent'}" onclick="adminTelegramAction('pair', this)">
+                ${d.openToFirst ? 'ממתין להודעה מהטלפון…' : 'חבר את הטלפון שלי'}</button>
+            <button class="btn btn-secondary" onclick="renderAdminTelegram()">רענון</button>
+            <button class="btn btn-secondary" onclick="adminTelegramAction('disconnect', this)">ניתוק</button>
+        </div>
+        <p class="input-help" style="margin-top:8px;">צ'אטים מאושרים: ${chats}</p>
+        <p class="input-help">בבוט: "פרויקט X, דוח ליקויים" ← תמונה + שורה לכל ליקוי ← "סיים". תוך כדי: "בטל אחרון", "כמה".</p>`;
+}
+
+async function adminTelegramSave(btn) {
+    const el = document.getElementById('tg-token');
+    const token = (el && el.value || '').trim();
+    if (!token) { showToast('מדביקים כאן את הטוקן מ-BotFather', 'error'); return; }
+    await adminTelegramPost({ action: 'save', token }, btn);
+}
+function adminTelegramAction(action, btn, chatId) {
+    if (action === 'disconnect' && !confirm('לנתק את הבוט? הדוחות שכבר נוצרו יישארו.')) return;
+    return adminTelegramPost({ action, chatId }, btn);
+}
+async function adminTelegramPost(payload, btn) {
+    const label = btn && btn.textContent;
+    if (btn) { btn.disabled = true; btn.textContent = 'רגע…'; }
+    try {
+        const res = await adminRes('/api/telegram-setup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || 'נכשל');
+        showToast(d.message || 'בוצע');
+    } catch (e) {
+        showToast(e.code === 'NO_TOKEN' ? 'ההתחברות פגה, התחבר מחדש' : (e.message || 'נכשל'), 'error');
+        if (btn) { btn.disabled = false; btn.textContent = label; }
+    }
+    renderAdminTelegram();
+}
+
 async function adminRes(url, opts) {
     opts = opts || {};
     let token = await ensureGoogleToken();
