@@ -3003,6 +3003,7 @@ function createNewProject(opts) {
     loadProject(newProj.id);
     if (!describing) showToast(autoName ? 'פרויקט חדש נפתח, תאר את העבודה והשם ייקבע לבד' : `פרויקט "${name}" נוצר בהצלחה`);
     switchTab('wizard'); // Auto switch to pricing chat
+    coachMilestone('first-project', 1500);
 
     // Started from a description: hand it straight to the planning agent, so the
     // first thing you see is an answer rather than an empty box asking again.
@@ -11450,6 +11451,8 @@ function goToStage(stage) {
     // would be silently dropped.
     if (stageTransitionBusy) { stagePending = stage; return; }
 
+    if (stage === 'price') coachMilestone('first-priced', 1500);
+
     const from = document.getElementById('panel-create').classList.contains('active')
         ? 2 : STAGE_INDEX[activeChatMode] ?? 0;
     const to = STAGE_INDEX[stage];
@@ -14517,6 +14520,9 @@ function saveToHistory(showToastFlag = true) {
     
     saveHistory();
     syncCurrentQuoteToProject();
+    // The quote is out of the app and on its way to a customer: the next move
+    // happens in the real world, and is tracked on the money board.
+    coachMilestone('first-quote-saved', 1400);
 }
 
 function loadQuoteFromHistory(id) {
@@ -15036,6 +15042,7 @@ function renderAdminAll(opts) {
         () => adminLoadPricingMap(),
         () => adminRefreshUserList(),
         () => window.renderAdminFunnel && window.renderAdminFunnel(),
+        () => renderAdminTelegram(),
         () => renderAdminFeedback(),
         () => setAdminTab(_adminTab),      // re-apply the chosen tab after a re-render
         () => adminRefreshStatus(),        // and the status lines, which read live token state

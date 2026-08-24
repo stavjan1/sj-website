@@ -22,6 +22,7 @@ const SHELL = [
   '/sale/index.html',
   '/sale/app.js',
   '/sale/finance.js',
+  '/sale/coach.js',
   '/sale/coverage.js',
   '/sale/css/shell.css',
   '/sale/css/panels.css',

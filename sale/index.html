@@ -1981,6 +1981,13 @@
                 </div>
 
                 <!-- Usage funnel: who signs up, who talks, who produces quotes -->
+                <!-- The defect-report bot, turned on from here: paste the BotFather
+                     token and the server registers the webhook itself. -->
+                <div class="section-card" data-admin-tab="stats" id="admin-telegram-card" style="margin-bottom:16px;">
+                    <div class="card-header"><h3><i class="fa-brands fa-telegram" aria-hidden="true"></i> בוט דוחות הליקויים</h3></div>
+                    <div class="card-body" id="admin-telegram-body"><p class="input-help">טוען…</p></div>
+                </div>
+
                 <div class="section-card" data-admin-tab="stats" id="admin-funnel-card">
                     <div class="card-header"><h3>משפך שימוש · מי באמת משתמש</h3></div>
                     <div class="card-body" id="admin-funnel-body">
@@ -2507,6 +2514,8 @@
     <script src="app.js?v=369"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
     <script src="finance.js?v=369"></script>
+    <!-- The guide that points at the screen (first-run tour + milestone hints) -->
+    <script src="coach.js?v=369"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
     <script src="../assistant.js?v=369" defer></script>
