@@ -2347,6 +2347,7 @@ function switchTab(tabId, opts) {
     }
     if (tabId === 'catalog') {
         renderPriceCatalog();
+        try { renderSupplierDb(); } catch (e) {}
     }
     if (tabId === 'business') {
         try { renderQuoteDefaults(); } catch (e) {}
@@ -7961,6 +7962,93 @@ function addScrapedToCatalog() {
     showToast(`${added} פריטים נוספו למאגר`);
 }
 
+// ── The built-in supplier catalog, inside the price-book screen ──────────────
+// Same endpoint the picker uses, but here the destination is his own catalog:
+// search, see what it costs at trade, take the ones he actually buys. That is
+// how a personal price list gets built without typing 7,000 lines.
+let _supdb = { q: '', items: [], loading: false, error: '', meta: null };
+let _supdbTimer = null;
+
+function supdbOnSearch() {
+    clearTimeout(_supdbTimer);
+    _supdbTimer = setTimeout(supdbSearch, 320);
+}
+
+async function supdbSearch() {
+    const q = ((document.getElementById('supdb-q') || {}).value || '').trim();
+    if (q.length < 2) { _supdb = { q: '', items: [], loading: false, error: '', meta: null }; renderSupplierDb(); return; }
+    _supdb = { q, items: [], loading: true, error: '', meta: _supdb.meta };
+    renderSupplierDb();
+    try {
+        const res = await fetch('/api/materials?limit=30&q=' + encodeURIComponent(q));
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error((data.error && data.error.message) || 'שגיאת שרת');
+        if (((document.getElementById('supdb-q') || {}).value || '').trim() !== q) return;
+        _supdb = { q, items: Array.isArray(data.items) ? data.items : [], loading: false, error: '', meta: data.meta || null };
+    } catch (e) {
+        _supdb = { q, items: [], loading: false, error: 'מאגר הספק לא זמין כרגע. נסה שוב בעוד רגע.', meta: null };
+    }
+    renderSupplierDb();
+}
+
+function renderSupplierDb() {
+    const box = document.getElementById('supdb-list');
+    if (!box) return;
+    const disc = tradeDiscount();
+    const d = document.getElementById('supdb-disc');
+    if (d && String(disc) !== d.value) d.value = disc;
+
+    if (_supdb.loading) { box.innerHTML = '<div class="catalog-empty">מחפש…</div>'; return; }
+    if (_supdb.error) { box.innerHTML = `<div class="catalog-empty">${escapeHtml(_supdb.error)}</div>`; return; }
+    if (!_supdb.q) { box.innerHTML = '<div class="catalog-empty">כתוב מה מחפשים.</div>'; return; }
+    if (!_supdb.items.length) { box.innerHTML = '<div class="catalog-empty">לא נמצא פריט תואם.</div>'; return; }
+
+    const supplier = (_supdb.meta && _supdb.meta.supplier && _supdb.meta.supplier.name) || 'ספק';
+    box.innerHTML = `
+        <p class="input-help">מחירי ${escapeHtml(supplier)}, קמעונאי לפני מע"מ${disc ? `. נשמר אצלך פחות ${disc}% הנחת סוחר` : '. אם אתה קונה בהנחת סוחר, כתוב את האחוז למעלה'}.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-block-end:8px;">
+            <button type="button" class="btn btn-secondary btn-small" onclick="supdbAddAll()">
+                <i class="fa-solid fa-layer-group"></i> הוסף את כל ${_supdb.items.length} התוצאות
+            </button>
+        </div>
+        ${_supdb.items.map((it, i) => {
+            const retail = Number(it.price) || 0;
+            const saved = tradePrice(retail);
+            const have = (priceCatalog || []).some((x) => String(x.name || '').toLowerCase() === String(it.name || '').toLowerCase());
+            return `
+            <div class="catalog-row">
+                <span class="cr-name">${escapeHtml(it.name || '')}${it.sku ? `<small class="cp-sku">מק"ט ${escapeHtml(String(it.sku))}</small>` : ''}</span>
+                <span class="cr-price">${heNum(saved)} ₪${it.unit ? ' / ' + escapeHtml(it.unit) : ''}${
+                    disc ? `<small class="cp-was">קמעונאי ${heNum(retail)}</small>` : ''}</span>
+                <button type="button" class="btn ${have ? 'btn-secondary' : 'btn-success'} btn-small" onclick="supdbAdd(${i})">
+                    <i class="fa-solid ${have ? 'fa-rotate' : 'fa-plus'}"></i> ${have ? 'עדכן' : 'הוסף'}
+                </button>
+            </div>`;
+        }).join('')}`;
+}
+
+function supdbAdd(i) {
+    const it = _supdb.items[i];
+    if (!it) return;
+    if (!upsertCatalogItem({ name: it.name, price: tradePrice(it.price), unit: it.unit || '' })) return;
+    savePriceCatalog();
+    renderPriceCatalog();
+    renderSupplierDb();
+    showToast(`${it.name} נשמר במאגר שלך`);
+}
+
+function supdbAddAll() {
+    let added = 0;
+    (_supdb.items || []).forEach((it) => {
+        if (upsertCatalogItem({ name: it.name, price: tradePrice(it.price), unit: it.unit || '' })) added++;
+    });
+    if (!added) return;
+    savePriceCatalog();
+    renderPriceCatalog();
+    renderSupplierDb();
+    showToast(`${added} פריטים נשמרו במאגר שלך`);
+}
+
 function addManualCatalogItem() {
     const name = (document.getElementById('cat-manual-name').value || '').trim();
     const price = parseFloat(document.getElementById('cat-manual-price').value);
@@ -13028,9 +13116,46 @@ function copyListText() {
 }
 
 // ---- add from the catalog ----
+// ── The supplier catalog behind the picker ───────────────────────────────────
+// 7,364 real items with real prices ship with the app (data/materials, ARCA's
+// catalog, read through /api/materials). Until now only the pricing agent could
+// see them: the picker searched his own saved prices and said "המאגר ריק" to
+// everyone who had not filled one in yet. A table is only as good as the list
+// behind it, so the picker searches both — his own prices first, because a
+// price he typed beats any catalog, then the supplier's.
+//
+// Two things the supplier's numbers are NOT, both stated on screen rather than
+// hidden in a doc: they are before VAT, and they are retail. An electrician
+// buys at a trade discount, so the picker carries that percentage, remembers
+// it, and shows what it does to the number before anything is added.
+let _cpSupplier = { q: '', items: [], loading: false, error: '', meta: null };
+let _cpTimer = null;
+
+function tradeDiscount() {
+    const v = Number((appState.settings || {}).tradeDiscount);
+    return Number.isFinite(v) ? Math.min(60, Math.max(0, v)) : 0;
+}
+
+function setTradeDiscount(value) {
+    const v = Math.min(60, Math.max(0, Number(value) || 0));
+    appState.settings = appState.settings || {};
+    appState.settings.tradeDiscount = v;
+    persistSettings();
+    renderCatalogPicker();
+}
+
+// What a retail line actually costs him, given the discount he told us about.
+function tradePrice(retail) {
+    const p = Number(retail) || 0;
+    const d = tradeDiscount();
+    if (!d) return p;
+    return Math.round(p * (1 - d / 100) * 100) / 100;
+}
+
 function openCatalogPicker() {
     const old = document.getElementById('cat-picker');
     if (old) old.remove();
+    _cpSupplier = { q: '', items: [], loading: false, error: '', meta: null };
     const dlg = document.createElement('dialog');
     dlg.id = 'cat-picker';
     dlg.className = 'ck-dialog';
@@ -13038,8 +13163,14 @@ function openCatalogPicker() {
         <h3>הוספה מהמאגר</h3>
         <div class="search-bar">
             <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-            <input type="text" id="cat-picker-q" placeholder="חיפוש פריט…" oninput="renderCatalogPicker()">
+            <input type="text" id="cat-picker-q" placeholder="חיפוש פריט, למשל: כבל 5x6" oninput="cpOnSearch()">
         </div>
+        <label class="cp-disc">
+            <span>הנחת סוחר על מחירי הספק</span>
+            <input type="number" id="cp-disc" min="0" max="60" step="1" value="${tradeDiscount()}"
+                   onchange="setTradeDiscount(this.value)">
+            <span>%</span>
+        </label>
         <div class="cp-list" id="cat-picker-list"></div>
         <div class="ck-dialog-actions">
             <button type="button" class="btn btn-secondary" onclick="document.getElementById('cat-picker').close()">סגירה</button>
@@ -13051,26 +13182,112 @@ function openCatalogPicker() {
     if (q) q.focus();
 }
 
+function cpOnSearch() {
+    renderCatalogPicker();
+    clearTimeout(_cpTimer);
+    // Typed queries are short and the endpoint is rate-limited; one request per
+    // pause, not one per keystroke.
+    _cpTimer = setTimeout(cpSearchSupplier, 320);
+}
+
+async function cpSearchSupplier() {
+    const el = document.getElementById('cat-picker-q');
+    const q = ((el && el.value) || '').trim();
+    if (q.length < 2) {
+        _cpSupplier = { q: '', items: [], loading: false, error: '', meta: null };
+        renderCatalogPicker();
+        return;
+    }
+    if (q === _cpSupplier.q && _cpSupplier.items.length) return;
+    _cpSupplier = { q, items: [], loading: true, error: '', meta: _cpSupplier.meta };
+    renderCatalogPicker();
+    try {
+        const res = await fetch('/api/materials?limit=24&q=' + encodeURIComponent(q));
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error((data.error && data.error.message) || 'שגיאת שרת');
+        // A slower answer to an older query must not overwrite a newer one.
+        if (((document.getElementById('cat-picker-q') || {}).value || '').trim() !== q) return;
+        _cpSupplier = { q, items: Array.isArray(data.items) ? data.items : [], loading: false, error: '', meta: data.meta || null };
+    } catch (e) {
+        _cpSupplier = { q, items: [], loading: false, error: 'מאגר הספקים לא זמין כרגע', meta: null };
+    }
+    renderCatalogPicker();
+}
+
 function renderCatalogPicker() {
     const box = document.getElementById('cat-picker-list');
     if (!box) return;
     const q = (document.getElementById('cat-picker-q') || {}).value || '';
     const needle = q.trim().toLowerCase();
-    const items = (priceCatalog || []).filter((it) => !needle || String(it.name || '').toLowerCase().includes(needle));
-    if (!items.length) {
-        box.innerHTML = (priceCatalog || []).length
-            ? '<p class="input-help">לא נמצא פריט תואם.</p>'
-            : '<p class="input-help">המאגר ריק. אפשר למלא אותו בלשונית "מאגר מחירים", מקובץ או מדף ספק.</p>';
+    const mine = (priceCatalog || []).filter((it) => !needle || String(it.name || '').toLowerCase().includes(needle));
+
+    const mineHtml = mine.length ? `
+        <div class="cp-group">המחירים שלי</div>
+        ${mine.slice(0, 40).map((it) => {
+            const idx = (priceCatalog || []).indexOf(it);
+            return `
+            <button type="button" class="cp-row" onclick="ptAddFromCatalog(${idx})">
+                <span class="cp-name">${escapeHtml(it.name || '')}</span>
+                <span class="cp-price">${heNum(Number(it.price) || 0)} ₪${it.unit ? ' / ' + escapeHtml(it.unit) : ''}</span>
+            </button>`;
+        }).join('')}` : '';
+
+    const disc = tradeDiscount();
+    let supHtml = '';
+    if (_cpSupplier.loading) {
+        supHtml = '<div class="cp-group">מאגר הספק</div><p class="input-help">מחפש…</p>';
+    } else if (_cpSupplier.error) {
+        supHtml = `<div class="cp-group">מאגר הספק</div><p class="input-help">${escapeHtml(_cpSupplier.error)}</p>`;
+    } else if (_cpSupplier.items.length) {
+        const supplier = (_cpSupplier.meta && _cpSupplier.meta.supplier && _cpSupplier.meta.supplier.name) || 'ספק';
+        supHtml = `
+        <div class="cp-group">מאגר ${escapeHtml(supplier)} · מחיר קמעונאי לפני מע"מ${disc ? `, פחות ${disc}% הנחת סוחר` : ''}</div>
+        ${_cpSupplier.items.map((it, i) => {
+            const retail = Number(it.price) || 0;
+            const mineP = tradePrice(retail);
+            return `
+            <button type="button" class="cp-row cp-sup" onclick="ptAddFromSupplier(${i})">
+                <span class="cp-name">${escapeHtml(it.name || '')}${it.sku ? `<small class="cp-sku">מק"ט ${escapeHtml(String(it.sku))}</small>` : ''}</span>
+                <span class="cp-price">${heNum(mineP)} ₪${it.unit ? ' / ' + escapeHtml(it.unit) : ''}${
+                    disc ? `<small class="cp-was">קמעונאי ${heNum(retail)}</small>` : ''}</span>
+            </button>`;
+        }).join('')}`;
+    }
+
+    if (!mineHtml && !supHtml) {
+        box.innerHTML = needle.length >= 2
+            ? '<p class="input-help">לא נמצא פריט תואם, לא אצלך ולא אצל הספק.</p>'
+            : '<p class="input-help">כתוב מה מחפשים. החיפוש רץ גם על המחירים שלך וגם על מאגר הספק.</p>';
         return;
     }
-    box.innerHTML = items.slice(0, 60).map((it) => {
-        const idx = (priceCatalog || []).indexOf(it);
-        return `
-        <button type="button" class="cp-row" onclick="ptAddFromCatalog(${idx})">
-            <span class="cp-name">${escapeHtml(it.name || '')}</span>
-            <span class="cp-price">${heNum(Number(it.price) || 0)} ₪${it.unit ? ' / ' + escapeHtml(it.unit) : ''}</span>
-        </button>`;
-    }).join('');
+    box.innerHTML = mineHtml + supHtml;
+}
+
+// Adding a supplier line. The retail price is what the catalog says, so it is
+// the "מוצע"; what he pays is the discounted one, so it is "המחיר שלי" — unless
+// he has already typed a price for this item, in which case that wins, which is
+// the whole point of the price book.
+function ptAddFromSupplier(i) {
+    const it = _cpSupplier.items[i];
+    const proj = _ptProj();
+    if (!it || !proj) return;
+    const retail = Number(it.price) || 0;
+    const remembered = priceBookGet(it.name);
+    const details = [it.sku ? `מק"ט ${it.sku}` : '', it.unit ? `יחידה: ${it.unit}` : '']
+        .filter(Boolean).join(' · ');
+    proj.materials = proj.materials || [];
+    proj.materials.push({
+        name: it.name,
+        details,
+        qty: 1,
+        unit: MATERIAL_UNITS.includes(it.unit) ? it.unit : undefined,
+        price: remembered === null ? tradePrice(retail) : remembered,
+        suggested: retail,
+        checked: true,
+        source: 'supplier',
+    });
+    _ptSave(proj);
+    showToast(`${it.name} נוסף`);
 }
 
 function ptAddFromCatalog(idx) {

@@ -4268,3 +4268,28 @@ i[class^="fa-"], i[class*=" fa-"] {
 .bk-form h4 { font-size: var(--fs-md); margin: 0 0 var(--sp-2); }
 .bk-detail { margin-block-start: var(--sp-3); }
 .bk-detail h4 { margin: 0 0 var(--sp-2); font-size: var(--fs-md); }
+
+/* ── The picker searches two catalogs ────────────────────────────────────────
+   His own prices first, then the supplier's 7,364 items. Each group says which
+   it is, and the supplier's rows say plainly what their number is: retail,
+   before VAT, less whatever trade discount he told us he gets. */
+.cp-group {
+    margin-block: var(--sp-3) var(--sp-1); padding-inline: var(--sp-3);
+    font: 700 10px/1.4 var(--font-ui); color: var(--text-3);
+    letter-spacing: .04em;
+}
+.cp-list > .cp-group:first-child { margin-block-start: 0; }
+.cp-disc {
+    display: flex; align-items: center; gap: var(--sp-2);
+    margin-block-start: var(--sp-3); color: var(--text-3); font-size: var(--fs-xs);
+}
+/* Sized by id: the panel-wide input rule stretches anything it does not
+   explicitly exclude, and a percentage box the width of a dialog reads as the
+   search field's twin. */
+#cp-disc, #supdb-disc { width: 84px; min-height: 32px; text-align: center; flex: none; }
+.cp-disc { flex-wrap: wrap; }
+/* Both live inside two different row shapes (the picker's and the catalog
+   list's), so they are styled by their own class rather than by a parent. */
+.cp-sku, .cp-was { display: block; color: var(--text-3); font-size: 10px; font-weight: 500; }
+.cp-was { text-align: start; }
+.cp-row.cp-sup .cp-name { white-space: normal; }
