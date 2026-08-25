@@ -1,0 +1,70 @@
+/* ============================================================
+   PERIODIC SERVICE — the bulk-calendar dialog.
+   ------------------------------------------------------------
+   Its own file for the same reason sale/controlroom.css is:
+   sale/css/** belongs to the parallel session under
+   COORDINATION.md, and a handful of rules for one dialog has no
+   business landing in a file somebody else is mid-sweep on.
+
+   Deliberately small. The due strip on the work list reuses the
+   follow-up card's classes as they are — same shape, green
+   instead of amber — so the only thing that needed styling here
+   is what the dialog adds: two named lists and a progress line.
+   ============================================================ */
+
+#pdue-bulk .pdue-sum {
+    margin: 0 0 var(--sp-2);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    color: var(--text);
+}
+#pdue-bulk .pdue-sum b { font-variant-numeric: tabular-nums; }
+/* The two verdicts of a run that half-worked. */
+#pdue-bulk .pdue-ok { color: var(--ok-text); }
+#pdue-bulk .pdue-fail { color: var(--warn-text); }
+
+#pdue-bulk .pdue-list {
+    list-style: none;
+    margin: 0 0 var(--sp-3);
+    padding: 0;
+    max-block-size: 40vh;
+    overflow-y: auto;
+}
+#pdue-bulk .pdue-list li {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    padding: 6px 0;
+    border-block-end: 1px solid var(--border);
+    font-size: var(--fs-xs);
+}
+#pdue-bulk .pdue-list li:last-child { border-block-end: 0; }
+#pdue-bulk .pdue-li-name {
+    color: var(--text);
+    font-weight: 600;
+    /* A long client name must not push the date off the edge. */
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#pdue-bulk .pdue-li-when {
+    color: var(--text-3);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+/* The reason a row did not make it wraps, because "may have been created
+   anyway, worth checking" is the whole message and truncating it is worse
+   than a second line. */
+#pdue-bulk .pdue-li-why {
+    color: var(--warn-text);
+    text-align: end;
+}
+#pdue-bulk .pdue-note {
+    margin: 0 0 var(--sp-2);
+    font-size: var(--fs-xs);
+    color: var(--text-3);
+    line-height: 1.6;
+}
+#pdue-progress { font-variant-numeric: tabular-nums; }

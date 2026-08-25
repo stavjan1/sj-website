@@ -137,8 +137,13 @@ gating (server-side ADMIN_EMAIL on every admin endpoint), per-user KV keying
 - [x] Periodic-service v2 (Stav-approved 04/08): email field + mailto draft button,
       "reminders to send" strip (28-day window, one-click WhatsApp/email), and
       client→quote handoff button that opens a prefilled project.
-- [ ] Periodic-service v3: bulk "add ALL to calendar"; surface due checkups on the
-      projects dashboard too.
+- [x] Periodic-service v3 (25/08/2026): bulk "add ALL to calendar" (one consent,
+      one storage write, a report that names what went in and what did not), and
+      a due strip on the work list itself — silent on a day with nothing due.
+      "הכל" deliberately means *inside its reminder window AND not already in the
+      calendar*: re-pushing a record that carries an event id is how a calendar
+      ends up with two of every visit, and next year's visit in it today is noise.
+      Refreshing a date that changed stays the per-row button's job.
 - [x] The shipped supplier catalog reaches the USER, not only the agent
       (22/08/2026): the "הוספה מהמאגר" picker searches his own prices first and
       then /api/materials (7,364 ARCA items), with a remembered trade-discount

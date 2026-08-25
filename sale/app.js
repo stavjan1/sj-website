@@ -545,6 +545,7 @@ function applyTierGates() {
 
     applyReportsLock();
     try { renderFollowupReminders(); } catch (e) {}
+    try { renderMaintDueStrip(); } catch (e) {}
 }
 
 // The credit line free/guest PDFs carry (Pro+ export a clean sheet). Used both
@@ -3402,6 +3403,7 @@ function filterProjectsList() {
     renderProjectsList(filtered);
     updateMetricsDashboard();
     renderFollowupReminders();
+    try { renderMaintDueStrip(); } catch (e) {}
     try { updateMaintCount(); } catch (e) {}
 }
 
@@ -4642,6 +4644,71 @@ function openProjectFromReminder(projectId, e) {
     showToast('הפרויקט נטען · אפשר לעדכן סטטוס בכרטיס');
 }
 
+// The periodic service, on the screen he opens every morning.
+//
+// It lived one sub-view away, which meant remembering to go and look — and the
+// whole point of the feature is that he does not have to remember. Same
+// arithmetic as the reminder bell (getReminderItems), same card the follow-up
+// strip uses, so it needs no stylesheet of its own; green instead of amber,
+// because these are not late answers, they are work waiting to be booked.
+//
+// Silent when nothing is due. A dashboard element that is always there stops
+// being read, and then the one day it matters it is furniture.
+function renderMaintDueStrip() {
+    const box = document.getElementById('maint-due-strip');
+    if (!box) return;
+    const items = getReminderItems().filter((i) => i.kind !== 'followup');
+    if (!items.length) { box.innerHTML = ''; return; }
+
+    const shown = items.slice(0, 4);
+    const queued = pdueQueue().length;
+    const rows = shown.map((it) => {
+        const id = escapeHtml(String(it.id));
+        const isMaint = it.kind === 'maintenance';
+        // Already in the calendar → no calendar button. He still needs to call
+        // the client, but the strip must never invite a second event.
+        const booked = pdueBooked(it);
+        const open = isMaint
+            ? `openProjectFromReminder('${id}', event)`
+            : `ckOpenEditor('${id}')`;
+        return `<div class="followup-row">
+            <div class="fu-info">
+                <a class="fu-name" onclick="${open}" title="פתח">${escapeHtml(it.name)}</a>
+                <span class="fu-days">${escapeHtml(it.why)}${booked ? ' · ביומן ✓' : ''}</span>
+            </div>
+            <div class="fu-actions">
+                ${it.phone ? `<button class="btn btn-success btn-small" onclick="${isMaint ? `maintWhatsApp('${id}')` : `ckWhatsapp('${id}')`}" title="שלח הודעה ללקוח"><i class="fa-brands fa-whatsapp"></i></button>` : ''}
+                ${booked ? '' : `<button class="btn btn-secondary btn-small" onclick="${isMaint ? `maintToGoogle('${id}')` : `ckSyncCalendar('${id}')`}" title="קבע ביומן"><i class="fa-regular fa-calendar-plus"></i></button>`}
+                <button class="btn btn-secondary btn-small" onclick="${isMaint ? `maintMarkDone('${id}')` : `ckMarkDone('${id}')`}" title="בוצע · קובע את המועד הבא">✓ בוצע</button>
+            </div>
+        </div>`;
+    }).join('');
+
+    box.innerHTML = `<div class="followup-card" style="border-color:color-mix(in srgb, var(--accent) 45%, transparent);">
+        <div class="fu-title" style="color:var(--accent);">
+            <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+            ${items.length === 1 ? 'לקוח אחד מחכה לשירות תקופתי' : heNum(items.length) + ' לקוחות מחכים לשירות תקופתי'} · עבודה חוזרת שכבר יש לך
+            ${queued >= 2 ? `<button class="btn btn-secondary btn-small" style="margin-inline-start:auto;" onclick="pdueBulkOpen()" title="קובע ביומן את כל מה שקרוב ועדיין לא נקבע"><i class="fa-regular fa-calendar-plus"></i> הוסף הכל ליומן</button>` : ''}
+        </div>
+        ${rows}
+        ${items.length > shown.length ? `<div class="followup-row">
+            <a class="fu-name" onclick="setProjectsTab('maint')">עוד ${heNum(items.length - shown.length)} · לרשימה המלאה</a>
+        </div>` : ''}
+    </div>`;
+}
+
+// Is this one already in a calendar? Two record shapes, one question.
+function pdueBooked(it) {
+    try {
+        if (it.kind === 'maintenance') {
+            const p = (projectsList || []).find((x) => x.id === it.id);
+            return !!(p && p.maintenance && ((p.maintenance.eventIds || []).length || p.maintenance.eventId));
+        }
+        const c = (typeof ckClients !== 'undefined' ? ckClients : []).find((x) => x.id === it.id);
+        return !!(c && c.eventId);
+    } catch (e) { return false; }
+}
+
 function renderFollowupReminders() {
     // The bell is refreshed from here on purpose, before the early return: the
     // strip only exists on the projects dashboard, but the count has to be
@@ -5108,14 +5175,45 @@ async function maintToGoogle(projectId) {
     try { token = await ckEnsureCalToken(); }
     catch { showToast('נדרש אישור גישה ליומן, מוריד קובץ במקום'); maintToIcs(projectId); return; }
 
-    const months = proj.maintenance && proj.maintenance.once ? 0 : ((proj.maintenance && proj.maintenance.months) || 12);
+    const res = await maintPushToGoogle(proj, token);
+    const blocks = res.blocks || [];
+    if (res.ok) {
+        saveProjects();
+        filterProjectsList();
+        showToast(blocks.length === 1
+            ? 'נקבע ביומן: ' + ckFmtDate(blocks[0].date) + ' · ' + blocks[0].title
+            : 'נקבעו ' + blocks.length + ' פגישות ביומן, הראשונה ב-' + ckFmtDate(blocks[0].date));
+        return;
+    }
+    if (res.reason === 'noblocks') { showToast('לא נבחרו תזכורות לפרויקט הזה', 'error'); return; }
+    if (res.reason === 'auth') {
+        // Whatever did get in is recorded, so the retry replaces it instead of
+        // adding a second copy.
+        saveProjects();
+        showToast('ההרשאה ליומן פגה · לחץ שוב על היומן', 'error');
+        return;
+    }
+    saveProjects();
+    showToast('הוספה ליומן נכשלה · מוריד קובץ במקום', 'error');
+    maintToIcs(projectId);
+}
+
+// The calendar half of the button above, with not one word of UI in it: the
+// bulk runner has to push twenty of these behind ONE consent and ONE report,
+// and a function that raises its own toast cannot be called twenty times.
+//
+// The write-back lives in a `finally` deliberately. Before this, a 401 arriving
+// on the second of three blocks returned early and left the first event sitting
+// in the calendar with its id recorded nowhere — so the next attempt created a
+// second copy, and nothing could ever find the first one to delete it.
+async function maintPushToGoogle(proj, token) {
+    const created = [];
     const blocks = maintBlocks(proj);
-    if (!blocks.length) { showToast('לא נבחרו תזכורות לפרויקט הזה', 'error'); return; }
+    if (!blocks.length) return { ok: false, reason: 'noblocks', blocks: blocks, ids: created };
+    const months = proj.maintenance && proj.maintenance.once ? 0 : ((proj.maintenance && proj.maintenance.months) || 12);
     const base = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
     const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
     const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone) || 'Asia/Jerusalem';
-    const created = [];
-
     try {
         // Replace any series made earlier, so re-adding never doubles the calendar.
         await maintDeleteGoogleEvents(proj, token);
@@ -5133,24 +5231,20 @@ async function maintToGoogle(projectId) {
             const r = await fetch(base, { method: 'POST', headers, body });
             if (r.status === 401 || r.status === 403) {
                 localStorage.removeItem(CK_CAL_TOKEN_KEY);
-                showToast('ההרשאה ליומן פגה · לחץ שוב על היומן', 'error');
-                return;
+                return { ok: false, reason: 'auth', blocks: blocks, ids: created };
             }
             const ev = await r.json();
-            if (!r.ok || !ev.id) throw new Error('calendar-error');
+            if (!r.ok || !ev.id) return { ok: false, reason: 'error', blocks: blocks, ids: created };
             created.push(ev.id);
         }
-
-        proj.maintenance.eventIds = created;
-        proj.maintenance.eventId = created[0] || null;
-        saveProjects();
-        filterProjectsList();
-        showToast(blocks.length === 1
-            ? 'נקבע ביומן: ' + ckFmtDate(blocks[0].date) + ' · ' + blocks[0].title
-            : 'נקבעו ' + blocks.length + ' פגישות ביומן, הראשונה ב-' + ckFmtDate(blocks[0].date));
+        return { ok: true, reason: '', blocks: blocks, ids: created };
     } catch (e) {
-        showToast('הוספה ליומן נכשלה · מוריד קובץ במקום', 'error');
-        maintToIcs(projectId);
+        return { ok: false, reason: 'error', blocks: blocks, ids: created };
+    } finally {
+        if (created.length) {
+            proj.maintenance.eventIds = created;
+            proj.maintenance.eventId = created[0];
+        }
     }
 }
 
@@ -5184,14 +5278,30 @@ function maintToIcs(projectId) {
     closeMaintCalPicker();
     const proj = projectsList.find((p) => p.id === projectId);
     if (!proj || !maintNextDue(proj)) return;
-    const months = proj.maintenance && proj.maintenance.once ? 0 : ((proj.maintenance && proj.maintenance.months) || 12);
     const blocks = maintBlocks(proj);
     if (!blocks.length) { showToast('לא נבחרו תזכורות לפרויקט הזה', 'error'); return; }
+    const ics = SJ_CK.icsWrap(maintIcsVevent(proj), 'Maintenance');
+    if (!ics) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+    a.download = 'maintenance-' + String(proj.name || 'client').replace(/[^\w֐-׿-]+/g, '_') + '.ics';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast(blocks.length === 1
+        ? 'הקובץ ירד · פגישה ב-' + ckFmtDate(blocks[0].date)
+        : 'הקובץ ירד, ' + blocks.length + ' פגישות, הראשונה ב-' + ckFmtDate(blocks[0].date));
+}
+
+// The events of one maintenance project as VEVENT lines, ready to be wrapped
+// alone or alongside twenty others. Floating local time (no Z) on purpose:
+// 09:00 stays 09:00 wherever the phone happens to be.
+function maintIcsVevent(proj) {
+    const blocks = maintBlocks(proj);
+    if (!blocks.length) return [];
+    const months = proj.maintenance && proj.maintenance.once ? 0 : ((proj.maintenance && proj.maintenance.months) || 12);
     const desc = ckIcsText(maintEventBody(proj));
     const stampNow = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z';
-
-    // Floating local time (no Z): 09:00 stays 09:00 wherever the phone is.
-    const events = blocks.flatMap((b, i) => {
+    return blocks.flatMap((b, i) => {
         const d = b.date.replace(/-/g, '');
         const summary = ckIcsText(b.title);
         return [
@@ -5208,21 +5318,6 @@ function maintToIcs(projectId) {
             'END:VEVENT',
         ];
     });
-
-    const ics = [
-        'BEGIN:VCALENDAR', 'VERSION:2.0',
-        'PRODID:-//SJ Electrical Engineering//Maintenance//HE',
-        ...events,
-        'END:VCALENDAR',
-    ].join('\r\n');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
-    a.download = 'maintenance-' + String(proj.name || 'client').replace(/[^\w֐-׿-]+/g, '_') + '.ics';
-    a.click();
-    URL.revokeObjectURL(a.href);
-    showToast(blocks.length === 1
-        ? 'הקובץ ירד · פגישה ב-' + ckFmtDate(blocks[0].date)
-        : 'הקובץ ירד, ' + blocks.length + ' פגישות, הראשונה ב-' + ckFmtDate(blocks[0].date));
 }
 
 // ---- arriving from the reminder ----------------------------------------
@@ -5305,6 +5400,7 @@ function setMaintenanceLeads(id) {
     persistSettings();
     renderMaintenanceSetting();
     try { renderFollowupReminders(); } catch (e) {}
+    try { renderMaintDueStrip(); } catch (e) {}
     showToast('תזכורות התחזוקה: ' + preset.label + ' לפני המועד');
 }
 
@@ -17882,6 +17978,22 @@ async function ckSyncCalendar(id) {
     try { token = await ckEnsureCalToken(); }
     catch { showToast('נדרש אישור גישה ליומן Google', 'error'); return; }
 
+    const res = await ckPushToGoogle(c, token);
+    if (res.ok) {
+        ckPersist();
+        ckRender();
+        showToast('תזכורת חוזרת נקבעה ביומן Google (' + ckFmtDate(ckNextDue(c)) + ')');
+        return;
+    }
+    if (res.reason === 'auth') { showToast('ההרשאה ליומן פגה · לחץ שוב על כפתור היומן', 'error'); return; }
+    showToast('הוספת התזכורת ליומן נכשלה, נסה שוב', 'error');
+}
+
+// The same upsert without the UI around it, so the bulk runner can call it in a
+// loop. Patches the existing event when there is one and falls back to creating
+// it when the user deleted it by hand — which is what keeps a repeat run from
+// leaving two of the same visit in the calendar.
+async function ckPushToGoogle(c, token) {
     const base = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
     const body = JSON.stringify(ckEventBody(c));
     const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
@@ -17894,18 +18006,15 @@ async function ckSyncCalendar(id) {
         if (!res) res = await fetch(base, { method: 'POST', headers, body });
         if (res.status === 401 || res.status === 403) {
             localStorage.removeItem(CK_CAL_TOKEN_KEY);
-            showToast('ההרשאה ליומן פגה · לחץ שוב על כפתור היומן', 'error');
-            return;
+            return { ok: false, reason: 'auth', eventId: null };
         }
         const ev = await res.json();
-        if (!res.ok || !ev.id) throw new Error('calendar-error');
+        if (!res.ok || !ev.id) return { ok: false, reason: 'error', eventId: null };
         c.eventId = ev.id;
         c.updatedAt = Date.now();
-        ckPersist();
-        ckRender();
-        showToast('תזכורת חוזרת נקבעה ביומן Google (' + ckFmtDate(ckNextDue(c)) + ')');
-    } catch {
-        showToast('הוספת התזכורת ליומן נכשלה, נסה שוב', 'error');
+        return { ok: true, reason: '', eventId: ev.id };
+    } catch (e) {
+        return { ok: false, reason: 'error', eventId: null };
     }
 }
 
@@ -17927,6 +18036,204 @@ function ckDownloadIcs(id) {
     a.click();
     URL.revokeObjectURL(a.href);
     showToast('באייפון: פתח את הקובץ והוא ייכנס ליומן עם התראות');
+}
+
+// ── "הוסף הכל ליומן" — the periodic service, in one pass ──────────────────
+//
+// Two lists feed one queue: maintenance that lives on a project, and the older
+// standalone client list. To the person holding the phone they are the same
+// job, so the button treats them as one.
+//
+// What "everything" deliberately means: what is inside its reminder window AND
+// is not in the calendar yet. Next year's visit in the calendar today turns the
+// calendar into noise, and re-pushing a record that already carries an event id
+// is exactly how you end up with two of everything. Refreshing a date that
+// changed stays the job of the per-row button, on purpose.
+
+let _pdueCancel = false;
+
+function pdueQueue() {
+    const out = [];
+    try {
+        (projectsList || []).forEach((p) => {
+            if (!projectRepeats(p) || !maintIsDue(p)) return;
+            if (((p.maintenance || {}).eventIds || []).length) return;   // already in the calendar
+            const blocks = maintBlocks(p);
+            if (!blocks.length) return;
+            out.push({ kind: 'maintenance', id: p.id, name: p.name || 'תחזוקה', due: maintNextDue(p), events: blocks.length });
+        });
+    } catch (e) { /* projects not loaded yet */ }
+    try {
+        ckEnsureLocal();
+        ckDueSoonClients().forEach((c) => {
+            if (c.eventId) return;
+            out.push({ kind: 'checkup', id: c.id, name: c.name || 'לקוח', due: ckNextDue(c), events: 1 });
+        });
+    } catch (e) { /* checkups not available */ }
+    return out.sort((a, b) => String(a.due).localeCompare(String(b.due)));
+}
+
+function pdueReasonText(reason) {
+    return reason === 'auth' ? 'ההרשאה ליומן פגה'
+        : reason === 'skipped' ? 'לא נוסה, ההרשאה פגה לפני כן'
+        : reason === 'cancelled' ? 'בוטל'
+        : reason === 'missing' ? 'הרשומה כבר לא קיימת'
+        : reason === 'noblocks' ? 'לא נבחרו תזכורות'
+        // A failure on the way back from Google is not proof that nothing was
+        // created there, and telling him it failed would send him to press it
+        // again and book the visit twice.
+        : 'שגיאה מול היומן · ייתכן שכן נוצר, שווה לבדוק';
+}
+
+function pdueBulkOpen() {
+    const list = pdueQueue();
+    if (!list.length) { showToast('אין מה להוסיף · כל מה שקרוב כבר ביומן'); return; }
+    const dlg = document.getElementById('pdue-bulk');
+    const body = document.getElementById('pdue-bulk-body');
+    const foot = document.getElementById('pdue-bulk-foot');
+    if (!dlg || !body || !foot) return;
+    const events = list.reduce((n, x) => n + x.events, 0);
+    const prog = document.getElementById('pdue-progress');
+    if (prog) { prog.hidden = true; prog.textContent = ''; }
+    // The count of EVENTS, not of jobs: a job with two early warnings puts two
+    // things in the calendar, and that is the number worth agreeing to.
+    body.innerHTML = `
+        <p class="pdue-sum">${heNum(list.length)} עבודות ← <b>${heNum(events)}</b> אירועים ביומן</p>
+        <ul class="pdue-list">${list.map((x) => `
+            <li><span class="pdue-li-name">${escapeHtml(x.name)}</span>
+                <span class="pdue-li-when">${escapeHtml(ckFmtDate(x.due))}${x.events > 1 ? ' · ' + x.events + ' תזכורות' : ''}</span></li>`).join('')}
+        </ul>
+        <p class="pdue-note">מה שכבר יושב ביומן לא נוגעים בו. עבודה שהמועד שלה רחוק תיכנס כשתתקרב.</p>`;
+    foot.innerHTML = `
+        <button type="button" class="btn btn-secondary" onclick="pdueClose()">ביטול</button>
+        <button type="button" class="btn btn-accent" onclick="pdueStart()"><i class="fa-regular fa-calendar-plus"></i> הוסף ${heNum(events)} ליומן</button>`;
+    if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
+}
+
+function pdueClose() {
+    const dlg = document.getElementById('pdue-bulk');
+    if (!dlg) return;
+    if (typeof dlg.close === 'function') dlg.close(); else dlg.removeAttribute('open');
+}
+
+function pdueCancel() { _pdueCancel = true; }
+
+function pdueStart() { return pdueRun(pdueQueue()); }
+
+function pdueProgress(done, total, name) {
+    const el = document.getElementById('pdue-progress');
+    if (!el) return;
+    el.hidden = false;
+    el.textContent = `מוסיף ${done} מתוך ${total} · ${name}`;
+}
+
+async function pdueRun(list) {
+    _pdueCancel = false;
+    if (!list || !list.length) return;
+    const events = list.reduce((n, x) => n + (x.events || 1), 0);
+    // A number this size is almost always a mistake, and it is not recoverable
+    // by pressing undo — there is no undo for ninety calendar events.
+    if (events > 100) { showToast('יותר מ-100 אירועים בבת אחת · עדיף לחלק לכמה פעמים', 'error'); return; }
+    if (events > 25 && !confirm('זה ייצור ' + events + ' אירועים ביומן שלך. להמשיך?')) return;
+    if (isGuestUser()) { showToast('בלי חשבון Google — מוריד קובץ אחד עם הכל'); return pdueBulkIcs(list); }
+
+    // ONE consent for the whole run. Google's popup flow only survives inside
+    // the click that opened it, so a token minted in the middle of a loop is a
+    // popup the browser blocks and a run that dies halfway with no explanation.
+    let token;
+    try { token = await ckEnsureCalToken(); }
+    catch { showToast('אין הרשאה ליומן · מוריד קובץ אחד עם הכל'); return pdueBulkIcs(list); }
+
+    const foot = document.getElementById('pdue-bulk-foot');
+    if (foot) foot.innerHTML = '<button type="button" class="btn btn-secondary" onclick="pdueCancel()">עצור</button>';
+
+    const results = [];
+    for (let i = 0; i < list.length; i++) {
+        const item = list[i];
+        if (_pdueCancel) { results.push({ item: item, ok: false, reason: 'cancelled' }); continue; }
+        pdueProgress(i + 1, list.length, item.name);
+        let r;
+        if (item.kind === 'maintenance') {
+            const proj = (projectsList || []).find((p) => p.id === item.id);
+            r = proj ? await maintPushToGoogle(proj, token) : { ok: false, reason: 'missing' };
+        } else {
+            const c = (typeof ckClients !== 'undefined' ? ckClients : []).find((x) => x.id === item.id);
+            r = c ? await ckPushToGoogle(c, token) : { ok: false, reason: 'missing' };
+        }
+        results.push({ item: item, ok: !!r.ok, reason: r.reason || '' });
+        if (r.reason === 'auth') {
+            // The hour lapsed mid-run. Everything after this was never tried,
+            // and saying "failed" about work that never happened is a lie he
+            // would act on.
+            for (let j = i + 1; j < list.length; j++) results.push({ item: list[j], ok: false, reason: 'skipped' });
+            break;
+        }
+    }
+
+    // One write for the whole run. Persisting per item would hit KV's
+    // one-write-per-second ceiling and spend the daily budget on a single click.
+    try { ckPersist(); } catch (e) {}
+    try { saveProjects(); } catch (e) {}
+    try { filterProjectsList(); } catch (e) {}
+    try { renderMaintDueStrip(); } catch (e) {}
+    pdueRenderResult(results);
+}
+
+function pdueRenderResult(results) {
+    const body = document.getElementById('pdue-bulk-body');
+    const foot = document.getElementById('pdue-bulk-foot');
+    const prog = document.getElementById('pdue-progress');
+    if (prog) prog.hidden = true;
+    const ok = results.filter((r) => r.ok);
+    const bad = results.filter((r) => !r.ok);
+    if (body) {
+        body.innerHTML = `
+            ${ok.length ? `<p class="pdue-sum pdue-ok">נוספו ליומן (${heNum(ok.length)})</p>
+                <ul class="pdue-list">${ok.map((r) => `<li><span class="pdue-li-name">${escapeHtml(r.item.name)}</span>
+                    <span class="pdue-li-when">${escapeHtml(ckFmtDate(r.item.due))}</span></li>`).join('')}</ul>` : ''}
+            ${bad.length ? `<p class="pdue-sum pdue-fail">לא נוספו (${heNum(bad.length)})</p>
+                <ul class="pdue-list">${bad.map((r) => `<li><span class="pdue-li-name">${escapeHtml(r.item.name)}</span>
+                    <span class="pdue-li-why">${escapeHtml(pdueReasonText(r.reason))}</span></li>`).join('')}</ul>` : ''}`;
+    }
+    if (foot) {
+        // Retry offers only the ones that were never tried or plainly failed —
+        // never the ones that may already be sitting in the calendar.
+        const retry = bad.filter((r) => r.reason === 'skipped' || r.reason === 'cancelled' || r.reason === 'auth').map((r) => r.item);
+        foot.innerHTML = `
+            ${retry.length ? `<button type="button" class="btn btn-secondary" onclick="pdueRetry()">נסה שוב את ${heNum(retry.length)} שלא נוסו</button>` : ''}
+            <button type="button" class="btn btn-accent" onclick="pdueClose()">סגור</button>`;
+        _pdueRetry = retry;
+    }
+    if (ok.length && !bad.length) showToast('נוספו ' + ok.length + ' ליומן');
+}
+
+let _pdueRetry = [];
+function pdueRetry() { return pdueRun(_pdueRetry.slice()); }
+
+// No Google account, or consent refused: the whole queue as ONE calendar file,
+// which every phone can open. Two event shapes live in it (all-day recurring
+// checkups and 09:00 maintenance blocks) — valid, and the file says "Periodic"
+// rather than pretending to be one of them.
+function pdueBulkIcs(list) {
+    const parts = [];
+    (list || []).forEach((item) => {
+        if (item.kind === 'maintenance') {
+            const proj = (projectsList || []).find((p) => p.id === item.id);
+            if (proj) parts.push(maintIcsVevent(proj));
+        } else {
+            const c = (typeof ckClients !== 'undefined' ? ckClients : []).find((x) => x.id === item.id);
+            if (c) parts.push(SJ_CK.icsVevent(c));
+        }
+    });
+    const ics = SJ_CK.icsWrap(parts, 'Periodic');
+    if (!ics) { showToast('אין מה לייצא', 'error'); return; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+    a.download = 'periodic-service.ics';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    pdueClose();
+    showToast('ירד קובץ אחד עם ' + (list || []).length + ' תזכורות · פותחים אותו והיומן קולט הכל');
 }
 
 // ---------- WhatsApp ----------

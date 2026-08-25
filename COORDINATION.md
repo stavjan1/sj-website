@@ -197,4 +197,23 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
   `.aip-fill.hot` which the renderer emits and panels.css never defined (a pool
   at 100%% of its cap drew in the accent green), and the `.tg-*` / `.aim-*`
   families, which had no rule in any loaded stylesheet.
+- 2026-08-25 — Session B: periodic-service v3 (the last open item on that
+  feature) — "הוסף הכל ליומן" plus a due strip on the work list. NEW files:
+  `sale/periodic.css` (one dialog's worth of rules; NOT under sale/css/**, same
+  reasoning as controlroom.css) and `tests/checkups-bulk.test.mjs`. SHARED files,
+  minimal diffs:
+  * `sale/app.js` — three existing writers split into a token-taking core plus
+    their UX wrapper (`maintPushToGoogle`, `ckPushToGoogle`, `maintIcsVevent`),
+    a new bulk block next to the checkup functions, and `renderMaintDueStrip`
+    next to `renderFollowupReminders`. Two call sites added. Nothing reordered.
+  * `sale/index.html` — one strip div, one button in `.maint-actions`, one
+    dialog after `#maint-dialog`, one stylesheet link.
+  * `assets/checkups-core.js` — `icsFile` split into `icsVevent` + `icsWrap`
+    (byte-identical single-file output, guarded by the existing tests) so a bulk
+    export is ONE calendar file rather than several concatenated headers.
+  * `sale/sw.js`, `tests/css-integrity.test.mjs` — the new sheet registered.
+  Fixed on the way: `maintToGoogle` could create calendar events and return
+  before recording their ids (a 401 mid-series), so the next attempt booked the
+  visit a second time and nothing could find the first. The write-back is in a
+  `finally` now, and a test pins it.
 

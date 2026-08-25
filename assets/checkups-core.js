@@ -119,18 +119,17 @@
         };
     }
 
-    // The same appointment as a file, for a phone that is not signed into
-    // Google. Returns null when no date has been set.
-    function icsFile(c) {
+    // One appointment, as the lines of a VEVENT. Split out of icsFile so a bulk
+    // export can put many of them inside ONE calendar file: concatenating whole
+    // icsFile outputs would produce a file with several BEGIN:VCALENDAR headers,
+    // which is not a calendar at all. Returns null when no date has been set.
+    function icsVevent(c) {
         const due = nextDue(c);
         if (!due) return null;
         const dt = due.replace(/-/g, '');
         const summary = icsText((c.type || 'בדיקה תקופתית') + ', ' + c.name);
         const desc = icsText([c.phone ? 'טלפון: ' + c.phone : '', c.notes || ''].filter(Boolean).join('\n'));
         return [
-            'BEGIN:VCALENDAR',
-            'VERSION:2.0',
-            'PRODID:-//SJ Electrical Engineering//Checkups//HE',
             'BEGIN:VEVENT',
             'UID:' + c.id + '@sj-eng.co.il',
             'DTSTAMP:' + dt + 'T000000Z',
@@ -143,8 +142,27 @@
             'BEGIN:VALARM', 'TRIGGER:-P28D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
             'BEGIN:VALARM', 'TRIGGER:-P7D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
             'END:VEVENT',
-            'END:VCALENDAR',
-        ].filter(Boolean).join('\r\n');
+        ].filter(Boolean);
+    }
+
+    // One or many VEVENTs, wrapped as a calendar. `product` names the feature
+    // that produced the file, because a support question a year from now is
+    // easier to answer when the file itself says which button made it.
+    function icsWrap(vevents, product) {
+        const lines = [].concat.apply([], (vevents || []).filter(Boolean));
+        if (!lines.length) return null;
+        return [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//SJ Electrical Engineering//' + (product || 'Checkups') + '//HE',
+        ].concat(lines, ['END:VCALENDAR']).filter(Boolean).join('\r\n');
+    }
+
+    // The same appointment as a file, for a phone that is not signed into
+    // Google. Returns null when no date has been set.
+    function icsFile(c) {
+        const v = icsVevent(c);
+        return v ? icsWrap([v], 'Checkups') : null;
     }
 
     root.SJ_CK = {
@@ -152,5 +170,6 @@
         nextDue: nextDue, daysUntil: daysUntil, fmtDate: fmtDate,
         intervalLabel: intervalLabel, statusOf: statusOf, rrule: rrule,
         icsText: icsText, eventBody: eventBody, icsFile: icsFile,
+        icsVevent: icsVevent, icsWrap: icsWrap,
     };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -1,0 +1,139 @@
+// "Add everything to the calendar" is one click that writes to somebody else's
+// system dozens of times, and every way it can go wrong is expensive: a second
+// consent popup halfway through is blocked by the browser and kills the run, a
+// per-item save spends the whole day's KV write budget on one press, and an
+// event created without its id recorded is an event nobody can ever delete —
+// which is how a calendar ends up with two of every visit.
+//
+// None of that is visible in a diff. These are source-level guards: they read
+// the shipped code and fail when a future refactor quietly removes one of the
+// rules that keep the feature safe.
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { createContext, runInContext } from 'node:vm';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const read = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
+const APP = read('sale', 'app.js');
+const HTML = read('sale', 'index.html');
+
+// The body of one function, by brace counting from its declaration.
+function fn(src, name) {
+    const i = src.search(new RegExp('(async\\s+)?function\\s+' + name + '\\s*\\('));
+    assert.ok(i >= 0, `${name} is not defined any more`);
+    const open = src.indexOf('{', i);
+    let depth = 0;
+    for (let j = open; j < src.length; j++) {
+        if (src[j] === '{') depth++;
+        else if (src[j] === '}' && --depth === 0) return src.slice(i, j + 1);
+    }
+    throw new Error(`${name} never closes`);
+}
+
+test('the bulk run asks for consent once, before the loop', () => {
+    // Google's popup flow only survives inside the click that opened it. A
+    // token minted mid-loop is a blocked popup and a run that dies halfway
+    // through with no explanation.
+    const body = fn(APP, 'pdueRun');
+    const mints = body.match(/ckEnsureCalToken/g) || [];
+    assert.equal(mints.length, 1, 'exactly one consent per run');
+    assert.ok(body.indexOf('ckEnsureCalToken') < body.indexOf('for ('),
+        'the token is minted before the loop, not inside it');
+});
+
+test('the bulk run writes to storage once, not once per item', () => {
+    // KV allows one write per second per key, on a 1,000/day free tier. A save
+    // per item turns one press into a rate-limit and an empty budget.
+    const body = fn(APP, 'pdueRun');
+    assert.equal((body.match(/ckPersist\(\)/g) || []).length, 1);
+    assert.doesNotMatch(body, /ckCloudSave\(/, 'the cloud save is debounced, never called per item');
+    assert.equal((body.match(/saveProjects\(\)/g) || []).length, 1);
+});
+
+test('every event created is recorded, even when the run dies mid-series', () => {
+    // The anti-double-booking guard. Without the finally, a 401 on the second
+    // of three blocks left the first event in the calendar with its id nowhere,
+    // so the retry created a second copy and nothing could find the first.
+    const body = fn(APP, 'maintPushToGoogle');
+    assert.match(body, /finally\s*{[\s\S]*eventIds/, 'the ids are written back in a finally');
+    assert.ok(body.indexOf('finally') > body.indexOf('return { ok: false'),
+        'the finally comes after the early returns it exists to cover');
+});
+
+test('an expired token stops the run instead of burning the rest of the queue', () => {
+    const body = fn(APP, 'pdueRun');
+    assert.match(body, /'auth'[\s\S]{0,400}break/, "the loop breaks on the first 'auth'");
+    assert.match(body, /reason: 'skipped'/, 'and what was never tried says so, rather than "failed"');
+});
+
+test('the queue never re-pushes something that is already in the calendar', () => {
+    const body = fn(APP, 'pdueQueue');
+    assert.match(body, /eventIds \|\| \[\]\)\.length\) return/, 'maintenance already booked is skipped');
+    assert.match(body, /if \(c\.eventId\) return/, 'a checkup already booked is skipped');
+});
+
+test('the due strip is silent when nothing is due, and is not sold as Pro', () => {
+    const body = fn(APP, 'renderMaintDueStrip');
+    assert.match(body, /items\.length[\s\S]{0,80}innerHTML = ''/, 'empty means empty, not an empty card');
+    assert.doesNotMatch(body, /tierAllows/, 'periodic service was never a paid feature');
+    // Ids reach the DOM inside quoted onclick attributes, so they are escaped
+    // once at the top and the raw value never travels. Checking the call sites
+    // one by one would be a regex that lies; checking that the raw id cannot
+    // appear at all is a rule that holds however the markup is rearranged.
+    assert.match(body, /const id = escapeHtml\(String\(it\.id\)\)/, 'the id is escaped once, at the top');
+    assert.doesNotMatch(body, /\$\{it\.id\}/, 'and the raw id never reaches the markup');
+    assert.doesNotMatch(body, /\$\{p\.id\}|\$\{c\.id\}/, 'nor any other raw record id');
+});
+
+test('there is exactly one thing in the codebase that builds a calendar file', () => {
+    // Two ICS builders that can disagree is a file Apple Calendar refuses to
+    // open, found by a customer.
+    assert.equal((APP.match(/BEGIN:VCALENDAR/g) || []).length, 1,
+        'sale/app.js does not hand-roll a second calendar wrapper');
+    assert.match(fn(APP, 'maintToIcs'), /SJ_CK\.icsWrap/);
+    assert.match(fn(APP, 'pdueBulkIcs'), /SJ_CK\.icsWrap/);
+});
+
+test('many appointments come out as ONE calendar file', () => {
+    const ctx = createContext({ Date, String, Number, Math, Array, Object });
+    runInContext(read('assets', 'checkups-core.js'), ctx);
+    const CK = runInContext('SJ_CK', ctx);
+    const a = { id: 'a', name: 'דירה', months: 12, last: '2026-01-10' };
+    const b = { id: 'b', name: 'משרד', months: 6, last: '2026-02-10' };
+    const one = CK.icsWrap([CK.icsVevent(a)], 'Checkups');
+    const many = CK.icsWrap([CK.icsVevent(a), CK.icsVevent(b)], 'Periodic');
+
+    assert.equal((many.match(/BEGIN:VCALENDAR/g) || []).length, 1, 'one calendar…');
+    assert.equal((many.match(/BEGIN:VEVENT/g) || []).length, 2, '…holding both visits');
+    assert.match(many, /PRODID:.*\/\/Periodic\/\/HE/, 'the file says which button made it');
+    assert.equal(one, CK.icsFile(a), 'the single-appointment file is unchanged by the split');
+    assert.equal(CK.icsWrap([]), null, 'nothing to export is null, not an empty calendar');
+    assert.equal(CK.icsWrap([null]), null);
+    assert.equal(CK.icsVevent({ id: 'z' }), null, 'no date, no event');
+});
+
+test('the strip sits above the list it belongs to, and its dialog exists', () => {
+    const strip = HTML.indexOf('id="maint-due-strip"');
+    const followups = HTML.indexOf('id="followup-reminders"');
+    const cats = HTML.indexOf('id="projects-cats"');
+    assert.ok(strip > 0, 'the strip has a home in the markup');
+    assert.ok(followups < strip && strip < cats,
+        'between the follow-up strip and the category bar — outside the scrolling list');
+    assert.match(HTML, /id="pdue-bulk"/, 'the bulk dialog exists');
+    assert.match(HTML, /id="pdue-bulk-body"/);
+    assert.match(HTML, /id="pdue-bulk-foot"/);
+    assert.match(HTML, /periodic\.css\?v=\d+/, 'and its stylesheet is linked');
+});
+
+test('a run that half-worked reports both halves by name', () => {
+    const body = fn(APP, 'pdueRenderResult');
+    assert.match(body, /נוספו ליומן/);
+    assert.match(body, /לא נוספו/);
+    // A network failure on the way back is not proof that nothing was created,
+    // and "failed" would send him to press it again and book the visit twice.
+    assert.match(fn(APP, 'pdueReasonText'), /ייתכן שכן נוצר/);
+});
