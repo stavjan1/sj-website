@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=377">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=378">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,12 +26,12 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=377">
-    <link rel="stylesheet" href="../assets/ui.css?v=377">
-    <link rel="stylesheet" href="css/shell.css?v=377">
-    <link rel="stylesheet" href="css/panels.css?v=377">
-    <link rel="stylesheet" href="controlroom.css?v=377">
-    <link rel="stylesheet" href="css/pdf.css?v=377">
+    <link rel="stylesheet" href="../assets/tokens.css?v=378">
+    <link rel="stylesheet" href="../assets/ui.css?v=378">
+    <link rel="stylesheet" href="css/shell.css?v=378">
+    <link rel="stylesheet" href="css/panels.css?v=378">
+    <link rel="stylesheet" href="controlroom.css?v=378">
+    <link rel="stylesheet" href="css/pdf.css?v=378">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -2104,7 +2104,7 @@
                 <!-- Traffic + Clarity friction signals, site vs. זרם side by side -->
                 <div class="section-card" data-admin-tab="stats" style="border-color:rgba(240,192,64,0.25);margin-bottom:20px;">
                     <div class="card-header flex-header">
-                        <h3><i class="fa-solid fa-chart-line" style="color:#f0c040;"></i> כמה נכנסו · תנועה ומפת חום</h3>
+                        <h3><i class="fa-solid fa-chart-line" style="color:var(--warn-text);"></i> כמה נכנסו · תנועה ומפת חום</h3>
                         <div style="display:flex;gap:8px;align-items:center;">
                             <select id="admin-traffic-days" class="model-select-input" onchange="renderAdminTraffic()"
                                     aria-label="טווח לפירוט המלא (ארבעת המספרים הגדולים תמיד יום/שבוע/חודש/שנה)" style="min-width:110px;">
@@ -2125,7 +2125,7 @@
                 <!-- AI pools: what each key served today, and which one went quiet -->
                 <div class="section-card" data-admin-tab="ai" style="border-color:rgba(240,192,64,0.25);margin-bottom:20px;">
                     <div class="card-header flex-header">
-                        <h3><i class="fa-solid fa-microchip" style="color:#f0c040;"></i> מנועי ה-AI · ניצול מפתחות</h3>
+                        <h3><i class="fa-solid fa-microchip" style="color:var(--warn-text);"></i> מנועי ה-AI · ניצול מפתחות</h3>
                         <button class="btn btn-secondary btn-small" onclick="renderAdminAi()"><i class="fa-solid fa-rotate"></i> רענן</button>
                     </div>
                     <div class="card-body" style="display:flex;flex-direction:column;gap:16px;">
@@ -2137,7 +2137,7 @@
                 <!-- Which model serves customers, and whether a newer one passes -->
                 <div class="section-card" data-admin-tab="ai" style="border-color:rgba(240,192,64,0.25);margin-bottom:20px;">
                     <div class="card-header flex-header">
-                        <h3><i class="fa-solid fa-flask" style="color:#f0c040;"></i> המודל שמשרת לקוחות</h3>
+                        <h3><i class="fa-solid fa-flask" style="color:var(--warn-text);"></i> המודל שמשרת לקוחות</h3>
                         <button class="btn btn-secondary btn-small" onclick="renderAdminModels()"><i class="fa-solid fa-rotate"></i> בדוק מה חדש</button>
                     </div>
                     <div class="card-body" style="display:flex;flex-direction:column;gap:16px;">
@@ -2152,7 +2152,7 @@
                      this is the only one that measures whether it was RIGHT. -->
                 <div class="section-card" data-admin-tab="ai" style="border-color:rgba(240,192,64,0.25);margin-bottom:20px;">
                     <div class="card-header flex-header">
-                        <h3><i class="fa-solid fa-scale-balanced" style="color:#f0c040;"></i> האם המחירים נכונים</h3>
+                        <h3><i class="fa-solid fa-scale-balanced" style="color:var(--warn-text);"></i> האם המחירים נכונים</h3>
                         <button class="btn btn-secondary btn-small" onclick="renderAdminFeedback()"><i class="fa-solid fa-rotate"></i> רענן</button>
                     </div>
                     <div class="card-body" style="display:flex;flex-direction:column;gap:16px;">
@@ -2166,7 +2166,7 @@
                      prices, this one is about people. -->
                 <div class="section-card" data-admin-tab="ai" style="border-color:rgba(240,192,64,0.25);margin-bottom:20px;">
                     <div class="card-header flex-header">
-                        <h3><i class="fa-solid fa-handshake-angle" style="color:#f0c040;"></i> מי עוזר לתמחר</h3>
+                        <h3><i class="fa-solid fa-handshake-angle" style="color:var(--warn-text);"></i> מי עוזר לתמחר</h3>
                         <button class="btn btn-secondary btn-small" onclick="renderAdminFeedback()"><i class="fa-solid fa-rotate"></i> רענן</button>
                     </div>
                     <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
@@ -2177,7 +2177,7 @@
                         <!-- Clarity analytics token — feeds the automated site-analyst routine -->
                         <div class="section-card" data-admin-tab="stats" style="border-color:rgba(240,192,64,0.25);">
                             <div class="card-header">
-                                <h3><i class="fa-solid fa-chart-line" style="color:#f0c040;"></i> חיבור Clarity (אנליטיקס)</h3>
+                                <h3><i class="fa-solid fa-chart-line" style="color:var(--warn-text);"></i> חיבור Clarity (אנליטיקס)</h3>
                             </div>
                             <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
                                 <p class="input-help" style="margin:0;line-height:1.7;">
@@ -2198,12 +2198,12 @@
                 <!-- Pricing benchmark stats — aggregate only, zero client PII -->
                 <div class="section-card" data-admin-tab="stats" style="border-color:rgba(240,192,64,0.25);margin-bottom:20px;">
                     <div class="card-header flex-header">
-                        <h3><i class="fa-solid fa-chart-column" style="color:#f0c040;"></i> ניהול סטטיסטיקות תמחור</h3>
+                        <h3><i class="fa-solid fa-chart-column" style="color:var(--warn-text);"></i> ניהול סטטיסטיקות תמחור</h3>
                         <button class="btn btn-secondary btn-small" onclick="renderAdminStats()"><i class="fa-solid fa-rotate"></i> רענן</button>
                     </div>
                     <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
                         <p class="input-help" style="margin:0;">נתונים מצרפיים בלבד (מחיר עבודה לפי סוג עבודה), ללא שום פרטי לקוח. התצוגה למשתמשים כבויה עד שתדליק, כדי שיצטברו מספיק נתונים.</p>
-                        <div class="admin-stats-kpis" id="admin-stats-kpis"></div>
+                        <div class="admin-stats-kpis tkpis" id="admin-stats-kpis"></div>
                         <div class="admin-stats-live">
                             <label class="toggle-line">
                                 <input type="checkbox" id="admin-stats-live-toggle" onchange="adminSetStatsLive(this.checked)">
@@ -2220,7 +2220,7 @@
                     <div style="display:flex;flex-direction:column;gap:20px;">
                         <div class="section-card" data-admin-tab="ai" style="border-color:rgba(240,192,64,0.25);">
                             <div class="card-header">
-                                <h3><i class="fa-solid fa-key" style="color:#f0c040;"></i> מפתחות AI (בשרת)</h3>
+                                <h3><i class="fa-solid fa-key" style="color:var(--warn-text);"></i> מפתחות AI (בשרת)</h3>
                             </div>
                             <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
                                 <p class="input-help" style="line-height:1.7;margin:0;">
@@ -2232,7 +2232,7 @@
                                     <li><code>GEMINI_API_KEY_PAID</code>, למנויי Pro/עסקי (מודל מתקדם, בידוד עלויות)</li>
                                 </ul>
                                 <p class="input-help" style="margin:0;border-top:1px solid var(--border-color);padding-top:8px;">
-                                    <i class="fa-solid fa-circle-info" style="color:#f0c040;"></i>
+                                    <i class="fa-solid fa-circle-info" style="color:var(--warn-text);"></i>
                                     אחרי הוספת/שינוי מפתח בשרת, צריך דיפלוי חדש כדי שייכנס לתוקף.
                                 </p>
                             </div>
@@ -2242,7 +2242,7 @@
                         <!-- Tier management: assign plans to users by email (no payments yet) -->
                         <div class="section-card" data-admin-tab="users" style="border-color:rgba(240,192,64,0.25);">
                             <div class="card-header">
-                                <h3><i class="fa-solid fa-user-tag" style="color:#f0c040;"></i> ניהול מסלולים</h3>
+                                <h3><i class="fa-solid fa-user-tag" style="color:var(--warn-text);"></i> ניהול מסלולים</h3>
                             </div>
                             <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
                                 <p class="input-help" style="margin:0;">
@@ -2277,7 +2277,7 @@
                         <!-- System catalog workspace: upload → analyze → everyone's catalog -->
                         <div class="section-card" data-admin-tab="content" style="border-color:rgba(240,192,64,0.25);">
                             <div class="card-header">
-                                <h3><i class="fa-solid fa-database" style="color:#f0c040;"></i> ניהול מאגרים · המאגר של כולם</h3>
+                                <h3><i class="fa-solid fa-database" style="color:var(--warn-text);"></i> ניהול מאגרים · המאגר של כולם</h3>
                             </div>
                             <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
 
@@ -2296,7 +2296,7 @@
 
                                 <div class="syscat-step">
                                     <div class="syscat-step-title"><span class="syscat-step-n">2</span> ניתוח וסידור</div>
-                                    <div id="admin-cat-diff-note" class="input-help" style="display:none;color:#f0c040;"></div>
+                                    <div id="admin-cat-diff-note" class="input-help" style="display:none;color:var(--warn-text);"></div>
                                     <button class="btn btn-secondary" onclick="adminAnalyzeCatalog()" title="מאחד וריאציות זניחות (וו פתוח/סגור), שומר וריאציות הנדסיות (לוח 12/18/24), מסיר זבל">
                                         <i class="fa-solid fa-wand-magic-sparkles"></i> נתח את המאגר
                                     </button>
@@ -2321,7 +2321,7 @@
                         <!-- Field pricing knowledge map (the DB behind every pricing chat) -->
                         <div class="section-card" data-admin-tab="content" style="border-color:rgba(240,192,64,0.25);">
                             <div class="card-header">
-                                <h3><i class="fa-solid fa-map" style="color:#f0c040;"></i> מפת התמחור (DB)</h3>
+                                <h3><i class="fa-solid fa-map" style="color:var(--warn-text);"></i> מפת התמחור (DB)</h3>
                             </div>
                             <div class="card-body">
                                 <p class="input-help" style="margin-top:0;">הידע שמוזרק לכל צ'אט תמחור (גם /ask/): תרחישים, נוסחאות שטח, מלכודות היקף. שמירה נכנסת לתוקף מיד, בלי דיפלוי.</p>
@@ -2341,7 +2341,7 @@
                     <div style="display:flex;flex-direction:column;gap:20px;">
                         <div class="section-card" data-admin-tab="users" style="border-color:rgba(240,192,64,0.25);">
                             <div class="card-header">
-                                <h3><i class="fa-solid fa-users" style="color:#f0c040;"></i> משתמשי המערכת</h3>
+                                <h3><i class="fa-solid fa-users" style="color:var(--warn-text);"></i> משתמשי המערכת</h3>
                             </div>
                             <div class="card-body">
                                 <div id="admin-users-list" style="display:flex;flex-direction:column;gap:8px;">
@@ -2355,7 +2355,7 @@
 
                         <div class="section-card" data-admin-tab="users" style="border-color:rgba(240,192,64,0.25);">
                             <div class="card-header">
-                                <h3><i class="fa-solid fa-circle-info" style="color:#f0c040;"></i> מצב מערכת</h3>
+                                <h3><i class="fa-solid fa-circle-info" style="color:var(--warn-text);"></i> מצב מערכת</h3>
                             </div>
                             <div class="card-body" style="display:flex;flex-direction:column;gap:8px;font-size:0.88rem;">
                                 <div>מפתח ראשי: <span id="admin-status-key" style="color:var(--color-success);">—</span></div>
@@ -2624,20 +2624,20 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/checkups-core.js?v=377"></script>
-    <script src="/assets/listcards.js?v=377"></script>
+    <script src="/assets/checkups-core.js?v=378"></script>
+    <script src="/assets/listcards.js?v=378"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=377"></script>
-    <script src="app.js?v=377"></script>
+    <script src="coverage.js?v=378"></script>
+    <script src="app.js?v=378"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=377"></script>
+    <script src="finance.js?v=378"></script>
     <!-- The guide that points at the screen (first-run tour + milestone hints) -->
-    <script src="coach.js?v=377"></script>
+    <script src="coach.js?v=378"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=377" defer></script>
-    <script src="/track.js?v=377" defer></script>
+    <script src="../assistant.js?v=378" defer></script>
+    <script src="/track.js?v=378" defer></script>
 </body>
 </html>

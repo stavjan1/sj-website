@@ -180,3 +180,21 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
   * `sale/sw.js` — cache name bump + the new sheet precached.
   * `tests/css-integrity.test.mjs` — the new sheet added to the guarded list.
   Session A's CSS files were not touched.
+- 2026-08-25 — Session B: the deep admin cards joined the control room. The
+  whole change is in `sale/controlroom.css` (mine) — one declaration block that
+  re-points the design tokens on `#panel-admin`, so every rule in panels.css and
+  every inline `style=""` the renderers emit repaints itself. Session A's files
+  were NOT touched, and no `!important` was needed except the two that fight an
+  existing `!important` / an inline `display:flex`. SHARED files:
+  * `sale/index.html` — two surgical edits: `#admin-stats-kpis` gained the
+    `tkpis` class (its `.ask/.asv/.asl` children were rendering unstyled because
+    panels.css only defines them under `.tkpis`), and the 15 remaining literal
+    `#f0c040` inside the admin panel became `var(--warn-text)`. Plus the routine
+    `?v=377 → 378` bump and the SW cache name.
+  Three real bugs fixed on the way, all inside the admin panel: the empty
+  `.settings-grid` column (the two wrapper divs carry no `data-admin-tab`, so
+  `setAdminTab` could never hide them — `display: contents` dissolves them),
+  `.aip-fill.hot` which the renderer emits and panels.css never defined (a pool
+  at 100%% of its cap drew in the accent green), and the `.tg-*` / `.aim-*`
+  families, which had no rule in any loaded stylesheet.
+

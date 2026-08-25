@@ -314,7 +314,10 @@ body.cr-lock #admin-room { flex: 1 1 auto; min-block-size: 0; }
     .cr-t-users   { grid-column: span 6; }
     .cr-t-feed    { grid-column: span 6; }
     .cr-t-health  { grid-column: span 6; }
-    .cr-grid { grid-template-rows: auto repeat(3, minmax(0, 1fr)); }
+    /* Seven tiles two-up is four rows, not three. Declaring three left the
+       fourth to an implicit auto row, which is exactly how a screen that
+       promises never to scroll starts scrolling. */
+    .cr-grid { grid-template-rows: auto repeat(4, minmax(0, 1fr)); }
 }
 @media (max-width: 1100px) {
     .cr-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -329,4 +332,282 @@ body.cr-lock #admin-room { flex: 1 1 auto; min-block-size: 0; }
     .cr-kpis { grid-column: 1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .cr-tile { grid-column: 1; min-block-size: 220px; }
     .cr-body { overflow: visible; }
+}
+
+/* ============================================================
+   THE DEEP CARDS — the four tabs behind the room.
+   ------------------------------------------------------------
+   One chip away from the control room the product used to
+   change: white paper, navy accent, the leftover gold. Same
+   panel, same numbers, two design languages a click apart.
+
+   Almost nothing below is a redesign. panels.css already draws
+   these cards correctly — it draws them out of a dozen tokens
+   whose VALUES were chosen for a white page. So the section
+   starts with one declaration block: those tokens, given the
+   room's values, on #panel-admin. var() resolves against the
+   element being painted, so every rule in panels.css repaints
+   itself — and so does every inline style="" the renderers
+   emit, which is why aiVerdictHtml's background:var(--surface-2),
+   the sparkline's stroke="var(--color-accent)" and the
+   el.style.color = 'var(--color-success)' writes in
+   adminRefreshStatus all land right with no change to app.js.
+
+   Dark in BOTH themes, like the room, and for the same reason:
+   this panel is one person reading dense numbers, and a light
+   admin behind a dark room means every tab click flashes the
+   screen white and back.
+   ============================================================ */
+
+#panel-admin {
+    /* The room's palette, restated here so the cards and the tiles are lit by
+       one lamp. .ctlroom re-declares the same values on itself so that block
+       still reads alone; nothing fights, they are identical. */
+    --cr-ink: #EAF1FB;
+    --cr-ink-2: #A8BAD4;
+    --cr-ink-3: #7C93B2;
+    --cr-ground: #060E1A;
+    --cr-tile: rgb(255 255 255 / 0.035);
+    --cr-tile-2: rgb(255 255 255 / 0.015);
+    --cr-line: rgb(255 255 255 / 0.09);
+    --cr-line-soft: rgb(255 255 255 / 0.05);
+    --cr-green: #6ABF3C;
+    --cr-amber: #FCD34D;
+    --cr-red: #F87171;
+    --cr-blue: #6BA8F5;
+
+    /* --- the bridge --- Surfaces are white at a percent rather than opaque
+       navies: a card, a well inside it and an input inside that then stack
+       into a legible order on their own, instead of three hand-mixed hexes
+       that drift apart the first time one is edited. */
+    --bg: var(--cr-ground);
+    --surface: rgb(255 255 255 / 0.045);
+    --surface-2: rgb(255 255 255 / 0.085);
+    --text: var(--cr-ink);
+    --text-2: var(--cr-ink-2);
+    --text-3: var(--cr-ink-3);
+    --border: var(--cr-line);
+    --border-strong: rgb(255 255 255 / 0.18);
+
+    /* Green is both the accent and the OK here, exactly as in the room: the
+       sign's green is what "fine" looks like in this product, and a second
+       green would only be a second thing to remember. The light theme's navy
+       accent measures about 1.5:1 on this ground — it was not a colour here,
+       it was a hole. */
+    --accent: var(--cr-green);
+    --accent-strong: #86D95B;
+    --accent-soft: rgb(106 191 60 / 0.12);
+    --on-accent: #08111F;
+    --ok-text: var(--cr-green);
+    --danger: var(--cr-red);
+    --warn-text: var(--cr-amber);
+
+    /* panels.css keeps a legacy bridge (--color-success and friends) declared
+       on :root, where its var()s were already substituted against the light
+       palette — so redefining --text-3 alone can never reach --text-muted.
+       These six are the aliases the admin markup and renderers actually reach
+       for. Anything that turns up dark-on-dark later belongs in this list. */
+    --text-secondary: var(--cr-ink-2);
+    --text-muted: var(--cr-ink-3);
+    --border-color: var(--cr-line);
+    --color-accent: var(--cr-green);
+    --color-success: var(--cr-green);
+    --color-danger: var(--cr-red);
+
+    /* The ground the cards are mounted on. One glow at the far corner,
+       opposite the room's own, so the room still reads as an object on it. */
+    background:
+        radial-gradient(1200px 420px at 18% -10%, rgb(107 168 245 / 0.06), transparent 62%),
+        linear-gradient(180deg, #0A1526 0%, var(--cr-ground) 560px);
+    border-radius: 18px;
+    padding: 12px;
+    /* Earns its line: this is what turns the native select chevron, the
+       dropdown popup, the scrollbars, the checkboxes and the text caret dark.
+       Those are drawn by the browser and no stylesheet can reach them. */
+    color-scheme: dark;
+}
+
+/* The page furniture inside the slab, which was sized for a page. */
+#panel-admin > .section-header { margin-block-end: var(--sp-3); }
+
+/* A deep card IS a room tile, one size up: same 14px radius, same 155deg wash,
+   same single inset highlight, no drop shadow and no hover lift. The border
+   needs no rule of its own — panels.css already forces border-color to
+   var(--border) with an !important, and that token is now the room hairline. */
+#panel-admin .section-card {
+    border-radius: 14px;
+    background: linear-gradient(155deg, var(--cr-tile), var(--cr-tile-2));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+#panel-admin .card-header { border-block-end-color: var(--cr-line-soft); }
+#panel-admin .card-header h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+}
+/* panels.css pins these icons to --warn-text with an !important of its own, to
+   kill the old gold. Amber is the warning colour in this panel now, and twelve
+   permanent warnings is not a header. */
+#panel-admin .card-header h3 i { color: var(--cr-green) !important; font-size: 0.85em; }
+
+/* The tab bar reads as instrument switches rather than answer chips — it is
+   the same .spec-chip class the wizard uses, hence the #admin-tabs scope. */
+#panel-admin #admin-tabs .spec-chip {
+    border-radius: var(--r-sm);
+    border-color: var(--cr-line);
+    background: rgb(255 255 255 / 0.04);
+    color: var(--cr-ink-2);
+    font-weight: 600;
+}
+#panel-admin #admin-tabs .spec-chip:hover { background: rgb(255 255 255 / 0.09); color: var(--cr-ink); }
+#panel-admin #admin-tabs .spec-chip.active {
+    background: rgb(106 191 60 / 0.14);
+    border-color: rgb(106 191 60 / 0.45);
+    color: var(--cr-ink);
+}
+#panel-admin #admin-tabs .spec-chip.active i { color: var(--cr-green); }
+
+/* The two column wrappers inside .settings-grid carry no id, no class and no
+   data-admin-tab, so setAdminTab can never hide them: on "ידע ומאגרים" the
+   right column stayed an empty half while its two cards stacked in the left.
+   display:contents dissolves the wrappers, so the cards become grid items in
+   their own right and only the visible ones take a cell. The !important
+   outranks their inline display:flex — the alternative was two HTML edits to
+   fix a layout bug. */
+#panel-admin .settings-grid > div { display: contents !important; }
+
+/* ---------- numbers ---------- */
+/* Everything a refresh can change is set in the display face with tabular
+   figures, so a number that grows does not shove the one beside it. */
+#panel-admin .asv,
+#panel-admin .ak-num,
+#panel-admin .vk-num,
+#panel-admin .aip-pct,
+#panel-admin .aim-pct,
+#panel-admin .fin-funnel-row b,
+#panel-admin td {
+    font-variant-numeric: tabular-nums;
+}
+#panel-admin .asv,
+#panel-admin .ak-num,
+#panel-admin .vk-num {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+}
+#panel-admin .vkpi,
+#panel-admin .tkpis .ask,
+#panel-admin .aov-tile {
+    border-radius: 12px;
+    border-color: var(--cr-line);
+    background: linear-gradient(155deg, var(--cr-tile), var(--cr-tile-2));
+}
+
+/* ---------- bars ---------- */
+/* One fill recipe for every ratio in the panel, the same one the room's
+   .cr-bar-fill uses, so a funnel bar here and a funnel bar there are the same
+   object. The .hot state existed in the renderer and never in the stylesheet:
+   a pool at 100% of its ceiling has been drawing in the colour that means
+   "fine" this whole time. */
+#panel-admin .ff-bar,
+#panel-admin .aip-bar { background: rgb(255 255 255 / 0.07); }
+#panel-admin .ff-bar i,
+#panel-admin .aip-fill,
+#panel-admin .vbar-fill { background: linear-gradient(90deg, var(--cr-green), #9BE06B); }
+#panel-admin .aip-fill.warm { background: linear-gradient(90deg, #E0A93A, var(--cr-amber)); }
+#panel-admin .aip-fill.hot  { background: linear-gradient(90deg, #D8564F, var(--cr-red)); }
+#panel-admin .tspark polyline { stroke: var(--cr-green); }
+
+/* ---------- tables and lists ---------- */
+/* A full grid of hairlines is the one thing the room never draws, and it is
+   exactly what makes a table read as a spreadsheet. Horizontal rules only,
+   and a header row that is a quiet well rather than a band of colour. */
+#panel-admin .fin-table th,
+#panel-admin .fin-table td,
+#panel-admin .admin-stats-tbl th,
+#panel-admin .admin-stats-tbl td {
+    border-inline: 0;
+    border-block-end: 1px solid var(--cr-line-soft);
+}
+#panel-admin .fin-table thead th,
+#panel-admin .admin-stats-tbl thead th {
+    background: rgb(255 255 255 / 0.05);
+    color: var(--cr-ink-2);
+    font-weight: 600;
+}
+#panel-admin .fin-table tbody tr:last-child td,
+#panel-admin .admin-stats-tbl tbody tr:last-child td { border-block-end: 0; }
+#panel-admin .tlist li { border-block-end-color: var(--cr-line-soft); }
+#panel-admin .au-proj { border-block-end-color: var(--cr-line-soft); }
+#panel-admin .admin-user-body { border-block-start: 1px solid var(--cr-line-soft); }
+/* Wide tables scroll inside their own frame, with the room's thin scrollbar
+   instead of the platform's. */
+#panel-admin .table-scroll { scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 0.16) transparent; }
+#panel-admin .table-scroll::-webkit-scrollbar { inline-size: 6px; block-size: 6px; }
+#panel-admin .table-scroll::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.16); border-radius: 99px; }
+
+/* ---------- controls ---------- */
+/* .btn-secondary is transparent by default, which reads as a button on paper
+   and as a hole on this ground — the same two values as the room's .cr-btn, so
+   the refresh on a tile and the refresh on the card behind it are one button. */
+#panel-admin .btn-secondary { background: rgb(255 255 255 / 0.06); }
+#panel-admin .btn-secondary:hover { background: rgb(255 255 255 / 0.12); border-color: rgb(255 255 255 / 0.20); }
+#panel-admin code {
+    padding: 1px 5px; border-radius: 5px;
+    background: rgb(0 0 0 / 0.28); color: var(--cr-ink-2);
+    font-size: 0.92em;
+}
+/* The model-trap excerpt is a bare <pre>: UA monospace, no wrapping, and one
+   long model answer used to push the card wider than the panel. */
+#panel-admin pre {
+    margin: 6px 0 0; padding: 8px 10px;
+    border-radius: var(--r-sm);
+    background: rgb(0 0 0 / 0.25);
+    font-size: var(--fs-xs); line-height: 1.5;
+    white-space: pre-wrap; overflow-x: auto;
+}
+
+/* ---------- two families that never had a rule ----------
+   .tg-* and .aim-* appear in no stylesheet the app loads, so the Telegram card
+   rendered as a browser-default <ol> with a naked × and the AI card's model
+   share as loose text. This is not a restyle, it is their first styling. */
+#panel-admin .tg-steps {
+    margin: 0 0 12px; padding-inline-start: 20px;
+    font-size: var(--fs-xs); color: var(--text-2); line-height: 1.9;
+}
+#panel-admin .tg-steps li::marker { color: var(--cr-ink-3); }
+#panel-admin .tg-status { margin: 0 0 10px; font-size: var(--fs-sm); }
+#panel-admin .tg-status .status-ok { color: var(--cr-green); font-weight: 700; }
+#panel-admin .tg-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+#panel-admin .tg-row .input { flex: 1 1 220px; min-inline-size: 0; }
+/* An approved chat is a badge with a way out, on the room's .cr-badge formula. */
+#panel-admin .tg-chat {
+    display: inline-flex; align-items: center; gap: 4px;
+    margin-inline-end: 6px; padding: 2px 4px 2px 8px;
+    border: 1px solid var(--cr-line-soft); border-radius: 99px;
+    background: rgb(255 255 255 / 0.07);
+    font-size: var(--fs-xs); font-variant-numeric: tabular-nums;
+    direction: ltr;
+}
+#panel-admin .tg-x {
+    background: none; border: 0; padding: 0 3px; cursor: pointer;
+    color: var(--text-3); font-size: 1rem; line-height: 1;
+}
+#panel-admin .tg-x:hover { color: var(--cr-red); }
+
+#panel-admin .aim-row {
+    display: grid; grid-template-columns: 1fr 90px auto;
+    align-items: center; gap: 8px; padding: 5px 0;
+    border-block-end: 1px solid var(--cr-line-soft);
+    font-size: var(--fs-xs);
+}
+#panel-admin .aim-row:last-child { border-block-end: 0; }
+#panel-admin .aim-name {
+    color: var(--text-2); direction: ltr; text-align: start;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#panel-admin .aim-pct { font-weight: 700; white-space: nowrap; }
+
+/* On a phone the panel is a column of cards and the slab padding is a waste of
+   the only thing in short supply. */
+@media (max-width: 860px) {
+    #panel-admin { padding: 8px; border-radius: 14px; }
 }
