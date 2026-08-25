@@ -1,13 +1,13 @@
 {
   "ok": true,
-  "fetchedAt": 1786717200000,
+  "fetchedAt": 1787636123084,
   "cached": false,
   "data": [
     {
       "metricName": "DeadClickCount",
       "information": [
         {
-          "sessionsCount": "5",
+          "sessionsCount": "0",
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
           "pagesViews": "0",
@@ -19,7 +19,7 @@
       "metricName": "ExcessiveScroll",
       "information": [
         {
-          "sessionsCount": "5",
+          "sessionsCount": "0",
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
           "pagesViews": "0",
@@ -31,7 +31,7 @@
       "metricName": "RageClickCount",
       "information": [
         {
-          "sessionsCount": "5",
+          "sessionsCount": "0",
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
           "pagesViews": "0",
@@ -43,7 +43,7 @@
       "metricName": "QuickbackClick",
       "information": [
         {
-          "sessionsCount": "5",
+          "sessionsCount": "0",
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
           "pagesViews": "0",
@@ -55,7 +55,7 @@
       "metricName": "ScriptErrorCount",
       "information": [
         {
-          "sessionsCount": "5",
+          "sessionsCount": "0",
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
           "pagesViews": "0",
@@ -67,7 +67,7 @@
       "metricName": "ErrorClickCount",
       "information": [
         {
-          "sessionsCount": "5",
+          "sessionsCount": "0",
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
           "pagesViews": "0",
@@ -79,7 +79,7 @@
       "metricName": "ScrollDepth",
       "information": [
         {
-          "averageScrollDepth": 8.41
+          "averageScrollDepth": null
         }
       ]
     },
@@ -87,10 +87,10 @@
       "metricName": "Traffic",
       "information": [
         {
-          "totalSessionCount": "5",
+          "totalSessionCount": "0",
           "totalBotSessionCount": "0",
-          "distinctUserCount": "1",
-          "pagesPerSessionPercentage": 4.4
+          "distinctUserCount": "0",
+          "pagesPerSessionPercentage": null
         }
       ]
     },
@@ -98,77 +98,38 @@
       "metricName": "EngagementTime",
       "information": [
         {
-          "totalTime": "573",
-          "activeTime": "0"
+          "totalTime": null,
+          "activeTime": null
         }
       ]
     },
     {
       "metricName": "Browser",
-      "information": [
-        {
-          "name": "Other",
-          "sessionsCount": "5"
-        }
-      ]
+      "information": []
     },
     {
       "metricName": "Device",
-      "information": [
-        {
-          "name": "PC",
-          "sessionsCount": "5"
-        }
-      ]
+      "information": []
     },
     {
       "metricName": "OS",
-      "information": [
-        {
-          "name": "Windows",
-          "sessionsCount": "5"
-        }
-      ]
+      "information": []
     },
     {
       "metricName": "Country",
-      "information": [
-        {
-          "name": "Israel",
-          "sessionsCount": "5"
-        }
-      ]
+      "information": []
     },
     {
       "metricName": "PageTitle",
-      "information": [
-        {
-          "name": "SJ הנדסת חשמל | תכנון, ייעוץ ושרטוט מערכות חשמל",
-          "sessionsCount": "5"
-        },
-        {
-          "name": "כמה עולה עבודת חשמל? מדריך מחירים 2026 | SJ הנדסת חשמל",
-          "sessionsCount": "1"
-        }
-      ]
+      "information": []
     },
     {
       "metricName": "ReferrerUrl",
-      "information": [
-        {
-          "name": null,
-          "sessionsCount": "5"
-        }
-      ]
+      "information": []
     },
     {
       "metricName": "PopularPages",
-      "information": [
-        {
-          "url": "https://Electron",
-          "visitsCount": "5"
-        }
-      ]
+      "information": []
     }
   ]
 }
