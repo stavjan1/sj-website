@@ -19,6 +19,7 @@ const SHEETS = [
   'sale/css/pdf.css',
   'sale/controlroom.css',
   'sale/periodic.css',
+  'sale/nextstep.css',
 ];
 
 // Braces inside comments and strings are text, not structure.

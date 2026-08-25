@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 const read = (f) => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
 
 // Everything the app page loads, in load order.
-const SCRIPTS = ['sale/app.js', 'sale/finance.js', 'sale/coach.js', 'assets/listcards.js'];
+const SCRIPTS = ['sale/app.js', 'sale/finance.js', 'sale/coach.js', 'sale/nextstep.js', 'assets/listcards.js'];
 const MARKUP = 'sale/index.html';
 
 function declaredGlobals(src) {

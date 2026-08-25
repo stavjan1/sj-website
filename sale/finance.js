@@ -757,6 +757,8 @@
                 ['נרשמו', f.signedUp],
                 ['פתחו פרויקט', f.openedProject],
                 ['דיברו עם ה-AI', f.talkedToAI],
+                ['הגיעו לתמחור', f.reachedPricing],
+                ['הגיעו להצעה', f.reachedDraft],
                 ['הפיקו הצעה', f.producedQuote],
             ];
             const maxV = Math.max(f.signedUp, 1);
@@ -771,7 +773,7 @@
                 <p class="fin-muted" style="margin-block-start:8px;">
                     פעילים בשבוע האחרון: <b class="num">${f.activeLast7d}</b> ·
                     נעצרו אחרי הודעה-שתיים: <b class="num">${f.oneMessageOnly}</b> ·
-                    ייצאו PDF החודש: <b class="num">${f.pdfThisMonth}</b>${f.capped ? ' · (מוצגים 200 הראשונים)' : ''}
+                    ייצאו PDF החודש: <b class="num">${f.pdfThisMonth}</b>${f.capped ? ' · (חלקי · נקראו 40 חשבונות)' : ''}
                     ${f.anonVisitors ? `<br>אורחים שלא התחברו: <b class="num">${f.anonVisitors}</b> · <b class="num">${f.anonMsgs}</b> שאלות${f.anonCapped ? ' (חלקי)' : ''}` : ''}
                 </p>
                 <details class="fin-details"><summary>פירוט לפי משתמש (${data.users.length})</summary>

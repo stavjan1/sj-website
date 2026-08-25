@@ -216,4 +216,29 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
   before recording their ids (a 401 mid-series), so the next attempt booked the
   visit a second time and nothing could find the first. The write-back is in a
   `finally` now, and a test pins it.
+- 2026-08-25 — Session B: the "מה עכשיו?" next-step cards (BACKLOG item, spec
+  §5ב). Ownership was settled with all three sessions first: the 2-day session
+  is on an /ask/ 502 fix, the 51-minute session is scoping a possible additive
+  fourth stage, and the 31-minute session rewrote the planning prompt (the
+  button stays, its MEANING changed) — none of them touch the stage machine.
+  NEW files: `sale/nextstep.js`, `sale/nextstep.css`, `tests/next-step.test.mjs`.
+  SHARED files, minimal diffs:
+  * `sale/index.html` — two empty divs (`#next-step-wizard`, `#next-step-draft`),
+    one stylesheet link, one script tag.
+  * `sale/app.js` — three one-line render hooks (saveProjects, switchTab,
+    setChatMode), a new `markQuoteOut()` with four call sites, and two fixes:
+    `updatePriceActionBar` now reads `pricingTotals(proj).total` instead of
+    grepping the agent's prose for "סה\"כ", and `ptToQuote` no longer counts the
+    seeded 0 ₪ placeholder as work the user wrote.
+  * `sale/coach.js` — three milestone hints handed over to the cards (one was
+    literally titled "מה עכשיו?"), plus `window.coachBusy()`; the tour stays.
+  * `functions/api/funnel.js` + `sale/finance.js` — the measurement half: handoff
+    and hidden turns no longer count as conversation, and two new steps
+    (reachedPricing / reachedDraft) show where on the cliff people let go.
+  * `tests/site.test.mjs` — the milestone guard now requires the guide OR the
+    cards to answer those moments, instead of three coachSay calls.
+  Design rule worth keeping: every card is the exact complement of a gate that
+  already exists, and every predicate reads persisted state — never the DOM,
+  never "is that button on screen". Renaming or removing "תמחר פרויקט זה"
+  changes copy in nextstep.js and nothing else.
 

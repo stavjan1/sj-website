@@ -224,7 +224,13 @@ say them, which is a checklist change, not a drawing change.
 - Refresh PRODUCT_OVERVIEW.md to describe the V3 shell (one rail, more-drawer, finance panel, funnel card).
 - Visual QA pass on sale/css/panels.css (written against markup, not yet eyeballed screen-by-screen).
 - "תזכיר לי" natural-language calendar reminders from project cards (spec §5ג) — the maint-dialog + calendar plumbing exists; the free-text entry point still to build.
-- Onboarding "מה עכשיו?" next-step hint cards after each stage (spec §5ב) — partial today (plan/price action bars), formalize per stage.
+- [x] Onboarding "מה עכשיו?" next-step cards (25/08/2026) — four cards, each the
+  complement of a gate that already exists, so a card and an action bar can never
+  be on screen together: characterisation still open, pricing that returned no
+  numbers, a quote sitting at 0 ₪, and a quote that left while its status still
+  says "טיוטה". Predicates read state only, so the buttons can be renamed freely.
+  Shipped with the measurement half (reachedPricing / reachedDraft in the funnel,
+  and handoff turns no longer counted as conversation).
 
 ## סדר בצ'אטים / בעבודות (בקשה של סתיו, 21.8.2026)
 

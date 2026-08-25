@@ -469,7 +469,19 @@ test('every guide milestone the app fires actually exists in the guide', () => {
 
     // And every milestone id fired must be one the guide knows how to show.
     const ids = [...app.matchAll(/coachSay\('([^']+)'/g)].map((m) => m[1]);
-    assert.ok(ids.length >= 3, 'the milestones vanished');
+    for (const id of ids) {
+        assert.match(coach, new RegExp("'" + id + "'"), `the guide has no hint called ${id}`);
+    }
+
+    // This used to demand three milestones. Three of them — the first project,
+    // the first price, the first quote — moved to the next-step cards on
+    // 25/08/2026, which answer the same moments from the project's own state
+    // instead of a once-ever flag, and so can still help someone on his fifth
+    // project. What must never happen is BOTH mechanisms losing them, which
+    // would leave those moments with nothing on screen saying what to do next.
+    const cards = read('sale/nextstep.js');
+    assert.ok(ids.length >= 3 || /NEXT_STEP_CARDS\s*=/.test(cards),
+        'nothing answers "what now" any more — not the guide and not the cards');
     for (const id of ids) {
         assert.ok(coach.includes(`'${id}'`), `coach.js has no hint for "${id}"`);
     }

@@ -185,22 +185,14 @@
     };
 
     // ── "what now?" hints, one per milestone, first time only ───────────────
+    //
+    // Three of these used to live here — first-project, first-priced and
+    // first-quote-saved — and one of them was even titled "מה עכשיו?". They now
+    // belong to sale/nextstep.js, which answers the same three moments from the
+    // project's own state instead of from a one-time flag, and can therefore
+    // still help someone on his fifth project who got stuck. Two guides
+    // spotlighting the same button on the same moment is not twice the help.
     const HINTS = {
-        'first-project': {
-            el: '#chat-user-input',
-            title: 'מה עכשיו?',
-            text: 'ספר לי על העבודה בשפה שלך. כשהאפיון ייסגר, כפתור התמחור ייפתח לבד.',
-        },
-        'first-priced': {
-            el: '#tab-create',
-            title: 'המחיר מוכן',
-            text: 'עוברים לעורך ההצעה, מסדרים את הסעיפים, ומורידים PDF ממותג או שולחים בוואטסאפ.',
-        },
-        'first-quote-saved': {
-            el: '#tab-money',
-            title: 'ההצעה יצאה ללקוח',
-            text: 'עכשיו זה עניין של העולם האמיתי: כשהוא יאשר, גררו את הכרטיס ב"כסף" ל"בוצע", ומשם ל"שולם".',
-        },
         'first-paid': {
             el: () => document.querySelector('.pipe-col[data-stage="paid"] .pipe-adv.is-receipt'),
             title: 'הכסף נכנס',
@@ -224,4 +216,8 @@
     // Settings offers the tour again — a guide you cannot replay is a guide you
     // resent skipping.
     window.coachReplayTour = function coachReplayTour() { window.coachStartTour(true); };
+
+    // The next-step card asks before it paints: while a spotlight is on screen,
+    // a card appearing underneath it is two voices at once.
+    window.coachBusy = function coachBusy() { return !!active; };
 })();

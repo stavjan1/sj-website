@@ -2399,6 +2399,7 @@ function switchTab(tabId, opts) {
     }
     // Refresh the in-project rail's active step (desktop stage nav).
     updateProjectRail();
+    try { window.renderNextStep && window.renderNextStep(); } catch (e) {}
 }
 
 // ==========================================================================
@@ -2666,6 +2667,11 @@ function saveProjects() {
     safeLocalSet(getStorageKey('sj_trash_projects'), JSON.stringify(trashedProjectsList));
     safeLocalSet(getStorageKey('sj_db_last_updated'), Date.now().toString());
     scheduleCloudSync();
+    // The next-step card reads state, and this is where state lands. It
+    // coalesces itself to one paint per frame, so the hot save path pays for a
+    // boolean; it can never throw upward, because a hint that breaks saving
+    // would be far worse than no hint.
+    try { window.renderNextStep && window.renderNextStep(); } catch (e) {}
 }
 
 // Recoverable safety snapshots of the current local data, taken right before
@@ -3030,7 +3036,6 @@ function createNewProject(opts) {
     loadProject(newProj.id);
     if (!describing) showToast(autoName ? 'פרויקט חדש נפתח, תאר את העבודה והשם ייקבע לבד' : `פרויקט "${name}" נוצר בהצלחה`);
     switchTab('wizard'); // Auto switch to pricing chat
-    coachSay('first-project', 1500);
 
     // Started from a description: hand it straight to the planning agent, so the
     // first thing you see is an answer rather than an empty box asking again.
@@ -10726,6 +10731,7 @@ async function shareQuoteLink() {
         const link = `${location.origin}/q/?t=${data.token}`;
         proj.shareLink = link; // kept on the project, the archive seed
         proj.shareToken = data.token;   // so the app can ask later whether it was approved
+        markQuoteOut();
         saveProjects();
         try {
             await navigator.clipboard.writeText(link);
@@ -12183,6 +12189,7 @@ function setChatMode(mode, projOverride) {
     updatePriceActionBar(proj);
     updateSpecStrip(proj);
     updateStageHint(proj);
+    try { window.renderNextStep && window.renderNextStep(); } catch (e) {}
 }
 
 // ── Moving between the three stages ──────────────────────────────────────────
@@ -12251,7 +12258,6 @@ function goToStage(stage) {
     // would be silently dropped.
     if (stageTransitionBusy) { stagePending = stage; return; }
 
-    if (stage === 'price') coachSay('first-priced', 1500);
 
     const from = document.getElementById('panel-create').classList.contains('active')
         ? 2 : STAGE_INDEX[activeChatMode] ?? 0;
@@ -12334,8 +12340,11 @@ function _lastModelText(history) {
 function updatePriceActionBar(proj) {
     const bar = document.getElementById('price-action-bar');
     if (!bar) return;
-    const lastText = _lastModelText(proj && proj.chatHistory);
-    const priced = /סה[\S]?כ/.test(lastText) && /\d/.test(lastText);
+    // Was: a regex hunting for "סה\"כ" and a digit in the agent's last message.
+    // Prose is not state — the same answer worded differently hid the bar on a
+    // finished pricing, and a chatty answer with no numbers behind it showed the
+    // bar on an empty table. The table is the fact.
+    const priced = pricingTotals(proj).total > 0;
     const show = activeChatMode === 'price'
         && proj && getProjectStage(proj) === 'pricing'
         && (proj.chatHistory || []).some(m => m.role === 'user')
@@ -14461,7 +14470,11 @@ function ptToQuote() {
     }
     // Anything already written in the editor is his, so it is never replaced
     // without asking.
-    const existing = ((proj.quoteData || {}).items || []).filter((x) => x && (x.title || x.description));
+    // The empty placeholder a new quote is born with is not something he wrote,
+    // and treating it as such made "build from the table" open a confirm box
+    // asking permission to replace nothing.
+    const existing = ((proj.quoteData || {}).items || [])
+        .filter((x) => x && (x.title || x.description) && Number(x.price) > 0);
     if (existing.length && !confirm(`בהצעה כבר יש ${existing.length} סעיפים. להחליף אותם במה שבטבלה?`)) return;
 
     const totals = pricingTotals(proj);
@@ -15285,6 +15298,18 @@ async function checkPdfExportAllowed() {
     }
 }
 
+// The one fact nothing in the app records today: the quote left. Every status
+// after this point is written by hand, so without this stamp there is no way to
+// tell a quote that was sent and forgotten from one that was never sent.
+function markQuoteOut() {
+    try {
+        const proj = (projectsList || []).find((p) => p.id === activeProjectId);
+        if (!proj || proj.quoteOutAt) return;
+        proj.quoteOutAt = Date.now();
+        saveProjects();
+    } catch (e) {}
+}
+
 async function downloadPDF() {
     // Export gate: guests must sign in (free); free tier has a monthly cap.
     const gate = await checkPdfExportAllowed();
@@ -15316,6 +15341,7 @@ async function downloadPDF() {
     if (typeof html2pdf === 'undefined') {
         showToast('מנוע ה-PDF לא נטען, נפתח חלון הדפסה (בחר "שמירה כ-PDF").', 'error');
         saveToHistory(false);
+        markQuoteOut();
         setTimeout(() => window.print(), 300);
         return;
     }
@@ -15349,6 +15375,7 @@ async function downloadPDF() {
             restoreSheet();
             showToast('קובץ PDF הורד בהצלחה');
             saveToHistory(false);
+            markQuoteOut();
             recordQuoteStat(); // anonymous labor-price benchmark (silent)
         })
         .catch(err => {
@@ -15437,6 +15464,7 @@ function shareWhatsApp() {
     const encodedMsg = encodeURIComponent(msg);
     
     window.open(`https://api.whatsapp.com/send?text=${encodedMsg}`, '_blank');
+    markQuoteOut();
 }
 
 function saveToHistory(showToastFlag = true) {
@@ -15472,7 +15500,6 @@ function saveToHistory(showToastFlag = true) {
     syncCurrentQuoteToProject();
     // The quote is out of the app and on its way to a customer: the next move
     // happens in the real world, and is tracked on the money board.
-    coachSay('first-quote-saved', 1400);
 }
 
 function loadQuoteFromHistory(id) {

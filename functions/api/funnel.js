@@ -36,13 +36,26 @@ export async function onRequestGet(context) {
         const history = Array.isArray(blob.history) ? blob.history : [];
         // Count only what the USER typed — every project is seeded with one
         // model greeting per chat, which would inflate the funnel to 100%.
-        const userMsgs = (arr) => Array.isArray(arr) ? arr.filter(m => m && m.role === 'user').length : 0;
-        let chatMsgs = 0, planned = 0;
+        // A handoff turn is the app pressing a button on the user's behalf, and
+        // a hidden turn is a prompt he never saw. Counting either as
+        // "conversation" makes every drop-off number look better than it is —
+        // which is the one thing this screen exists not to do.
+        const userMsgs = (arr) => Array.isArray(arr)
+            ? arr.filter(m => m && m.role === 'user' && !m.handoff && !m.hidden).length : 0;
+        // How far the work itself got, which is the question the funnel's user
+        // counts cannot answer: a person can have ten projects and none of them
+        // past the first conversation.
+        const stageOf = (p) => p.stage
+            || ((p.chatHistory || []).some(m => m && m.role === 'user') ? 'pricing' : 'planning');
+        let chatMsgs = 0, planned = 0, atPricing = 0, atDraft = 0;
         projects.forEach(p => {
             const plan = userMsgs(p.planChatHistory);
             const price = userMsgs(p.chatHistory);
             chatMsgs += plan + price;
             if (plan > 0) planned++;
+            const st = stageOf(p);
+            if (st === 'pricing' || st === 'draft') atPricing++;
+            if (st === 'draft') atDraft++;
         });
         users.push({
             email,
@@ -50,6 +63,8 @@ export async function onRequestGet(context) {
             lastUpdated: blob.lastUpdated || null,
             projects: projects.length,
             projectsPlanned: planned,
+            projectsPricing: atPricing,
+            projectsDraft: atDraft,
             chatMsgs,
             quotes: history.length,
             catalogItems: Array.isArray(blob.catalog) ? blob.catalog.length : 0,
@@ -83,6 +98,11 @@ export async function onRequestGet(context) {
         signedUp: users.length,
         openedProject: users.filter(u => u.projects > 0).length,
         talkedToAI: users.filter(u => u.chatMsgs > 0).length,
+        // The two steps between "talked" and "produced a quote", which were
+        // invisible: the funnel showed a cliff and no way to see where on it
+        // people let go.
+        reachedPricing: users.filter(u => (u.projectsPricing || 0) > 0).length,
+        reachedDraft: users.filter(u => (u.projectsDraft || 0) > 0).length,
         producedQuote: users.filter(u => u.quotes > 0).length,
         pdfThisMonth,
         activeLast7d: users.filter(u => u.lastUpdated && (Date.now() - u.lastUpdated) < 7 * 864e5).length,
