@@ -63,7 +63,18 @@
    presses on purpose. */
 .ns-mute { margin-inline-start: auto; }
 
+/* On a phone the card and the conversation share one height budget, and the
+   conversation is the product. Measured at 320×693: the first version stood
+   248px tall against a 287px message log — a hint the size of the thing it
+   interrupts. The title carries the point, so the elaboration is what gives. */
 @media (max-width: 480px) {
     .next-step { margin-inline: var(--sp-2); padding: var(--sp-2) var(--sp-3); }
+    .ns-btns { margin-block-start: var(--sp-2); }
     .ns-mute { margin-inline-start: 0; }
+    .ns-body {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
 }

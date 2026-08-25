@@ -84,12 +84,12 @@
                 var miss = call('specCoverage', p).missingCritical;
                 // A checklist field carries its human text in `question`; the id
                 // is a database key and putting it on screen tells him nothing.
-                var names = miss.slice(0, 3)
+                var names = miss.slice(0, 2)
                     .map(function (f) { return String(f.question || f.label || '').replace(/\s*\?\s*$/, ''); })
                     .filter(Boolean);
-                return 'מה שקיבלת עד עכשיו הוא אומדן לפי הנחות מקובלות. '
-                    + (names.length ? 'מה שחסר: ' + esc(names.join(' · ')) + '. ' : '')
-                    + 'ברגע שהשדות הקריטיים סגורים אפשר לעבור לפירוט מלא לפי סעיפים — שעות עבודה, חומרים לפי כמות, ומה לא כלול.';
+                return names.length
+                    ? 'מה שיש עכשיו הוא אומדן. חסר: ' + esc(names.join(' · ')) + ' — ואז אפשר לפירוט מלא לפי סעיפים.'
+                    : 'מה שיש עכשיו הוא אומדן. עוד כמה שדות קריטיים, ואפשר לעבור לפירוט מלא לפי סעיפים.';
             },
             actions: function () {
                 return [
@@ -114,8 +114,7 @@
             },
             title: function () { return 'התמחור לא החזיר מספרים'; },
             body: function () {
-                return 'בטבלת התמחור אין עדיין שעות ולא חומרים, ולכן ההצעה תיבנה ריקה. '
-                    + 'אפשר לבקש מהסוכן פירוט, או להכניס שורה אחת ביד בטבלה — ומשם ההצעה כבר יודעת לבנות את עצמה.';
+                return 'הטבלה ריקה — בלי שעות ובלי חומרים ההצעה תיבנה על 0 ₪.';
             },
             actions: function () {
                 return [
@@ -140,8 +139,7 @@
             title: function () { return 'ההצעה עדיין על 0 ₪'; },
             body: function (p) {
                 var t = call('pricingTotals', p);
-                return 'בטבלת התמחור יש ' + num(Math.round(t.total)) + ' ₪ — חומרים, שעות ותוספות. '
-                    + '"בנה מהטבלה" מעתיק משם את הסעיפים והמחירים לתוך ההצעה. בלי זה ה-PDF ייצא ריק.';
+                return 'בטבלת התמחור יש ' + num(Math.round(t.total)) + ' ₪. בלחיצה אחת הם הופכים לסעיפים בהצעה.';
             },
             actions: function () {
                 return [
@@ -163,8 +161,7 @@
             },
             title: function () { return 'סמן "נשלח" — וזה יחזור אליך לבד'; },
             body: function () {
-                return 'ההצעה יצאה, והסטטוס עדיין "טיוטה". ברגע שהיא מסומנת "נשלח" היא נכנסת ללוח הכסף, '
-                    + 'ואם הלקוח לא ענה תוך כמה ימים תקבל תזכורת עם הודעת מעקב מוכנה לשליחה.';
+                return 'ההצעה יצאה והסטטוס עדיין "טיוטה". סימון "נשלח" מפעיל את תזכורת המעקב אם הלקוח לא יענה.';
             },
             actions: function () {
                 return [
@@ -216,7 +213,9 @@
         return '<div class="ns-title">' + esc(card.title(proj)) + '</div>'
             + '<div class="ns-body">' + card.body(proj) + '</div>'
             + '<div class="ns-btns">' + actions
-            + '<button type="button" class="ns-mute" onclick="muteNextSteps()" title="לא להציג יותר צעדים הבאים">אל תציג לי צעדים הבאים</button>'
+            // Short on purpose: on a 320px phone this label alone was costing a
+            // whole button row, and a row here is a row taken from the chat.
+            + '<button type="button" class="ns-mute" onclick="muteNextSteps()" title="לא להציג יותר צעדים הבאים">לא להציג יותר</button>'
             + '</div>';
     }
 
