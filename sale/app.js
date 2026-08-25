@@ -1115,7 +1115,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (vatSel) vatSel.addEventListener('change', () => rememberQuotePref('vatType', vatSel.value));
         markActivePdfTemplate(); // highlight the saved design template pill
         setProjectsView(localStorage.getItem('sj_projects_view') || 'list'); // restore list/grid choice
-        switchTab('home'); // the way in is the question, not the list
         setTimeout(showWelcomeOnboarding, 900); // first-run walkthrough (once)
         setTimeout(checkAskHandoff, 1100); // continue a job from the /ask/ quick-chat
     }
@@ -1476,7 +1475,12 @@ function initUserSession() {
     checkGoogleSession();
 
     document.getElementById('form-quote-date').value = getTodayDateString();
-    switchTab('projects');
+    // The way in is the question, not the list. This runs for EVERY entry —
+    // guest, fresh Google sign-in, reload — and only the reload path used to
+    // get the correction to 'home' afterwards, so a phone that entered as a
+    // guest landed on the project list and had to find the chat itself
+    // (Stav, 25/08: "זה נפתח בדיפולט על הפרויקטים ולא עם הצ'אט").
+    switchTab('home');
     updateUserProfileUI();
     updateGuestUpgradeUI();
     setupQuotePreviewFit();

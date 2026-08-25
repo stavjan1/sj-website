@@ -4449,3 +4449,78 @@ i[class^="fa-"], i[class*=" fa-"] {
 /* A segment's own annotation is the sentence he wrote; the lines under it are
    read off the table. The first one is his. */
 .route-sketch .rs-own { fill: var(--text); font-weight: 600; }
+
+/* ============================================================================
+   PHONE: THE CONVERSATION IS THE SCREEN
+   Stav, 25/08: "הצ'אט חתוך. לא רואים בכלל את הטקסט, הוא בתוך מסגרת כזאת
+   במקום להיות על כל המסך."
+   Measured at 320×693 before this block: 141px of header chrome above the
+   panel, 88px of dead air between the chat card and the bottom bar, a 116px
+   toolbar (two stacked rows) and a 103px invitation to price — which left
+   32px for the conversation itself, so the messages were invisible and the
+   composer was clipped off the bottom of the card.
+   Nothing here removes a control. It stops five pieces of chrome from each
+   claiming a full row of a 320px phone.
+   ============================================================================ */
+@media (max-width: 860px) {
+    /* 1. Back + bell: one thin line, not a padded band with margins. */
+    .ctx-bar { padding-block: var(--sp-1); margin-block-end: 0; }
+    .ctx-back { min-height: 30px; padding: 0 var(--sp-2); }
+    .ctx-bell { width: 30px; height: 30px; }
+    .ctx-bell svg { width: 17px; height: 17px; }
+
+    /* 2. Project name, status and client on one line. */
+    #project-banner { padding-block: var(--sp-1); gap: var(--sp-2); font-size: var(--fs-xs); }
+    #project-banner .banner-client select { max-width: 96px; }
+
+    /* 3. The bottom bar is reserved once, by .main-content. The panel's own
+          reserve on top of it was pure dead air above the composer. */
+    #panel-wizard.active,
+    #panel-wizard.active.hide-estimate { padding-block: var(--sp-2) 0; }
+
+    /* 4. Toolbar: still two rows, because at 320px the pills and the card
+          button cannot share one — but rows that are 30px tall instead of
+          48px, and a daily meter reduced to the only part of it anyone reads
+          on a phone: the number. Squeezing all three onto one scrolling row
+          was tried and is worse — the meter collapsed to zero width and was
+          clipped, which is the same bug in a new place. */
+    .chat-toolbar {
+        flex-wrap: wrap;
+        align-items: center;
+        row-gap: 4px;
+        padding: 4px var(--sp-2);
+    }
+    .chat-toolbar .model-quota-bar { flex: 1 1 100%; align-items: center; gap: var(--sp-2); }
+    .chat-toolbar .model-class-btn { min-height: 30px; padding: 0 var(--sp-2); }
+    .chat-toolbar #btn-toggle-estimate { flex: none; min-height: 30px; padding: 0 var(--sp-3); white-space: nowrap; }
+    /* The meter is status, not an action: on a phone it says "1 מתוך 100" and
+       nothing else. The bar and its two captions cost 45px of conversation. */
+    .chat-toolbar #quota-ring { flex: none; margin-inline-start: auto; }
+    .chat-toolbar #quota-ring .qm-track,
+    .chat-toolbar #quota-ring .qm-note,
+    .chat-toolbar #quota-ring .qm-label { display: none; }
+    .chat-toolbar #quota-ring .qm-count { white-space: nowrap; font-size: var(--fs-xs); }
+
+    /* 5. The invitation to price is a line, not a card. */
+    .spec-strip { margin: var(--sp-1) var(--sp-2) 0; padding: var(--sp-1) var(--sp-3); }
+    .plan-action-bar, .price-action-bar {
+        flex-wrap: nowrap;
+        margin: var(--sp-1) var(--sp-2) 0;
+        padding: var(--sp-1) var(--sp-2);
+    }
+    .plan-action-bar .pab-btns .btn,
+    .price-action-bar .pab-btns .btn { min-height: 34px; padding: 0 var(--sp-3); font-size: var(--fs-xs); }
+
+    /* 6. Everything left over is the conversation, and it keeps a readable
+          window: if the chrome ever grows past its share the card scrolls
+          instead of clipping the composer off the bottom, which is the
+          failure this whole block exists to end. */
+    #panel-wizard.hide-estimate .chat-container { overflow-y: auto; }
+    #panel-wizard.hide-estimate .chat-messages { min-height: 30vh; }
+    /* With the card open the two stack and the page scrolls, which is fine —
+       but the chat was stretching to 950px first, so the card started a
+       screen and a half down. It keeps a screen's worth and no more. */
+    #panel-wizard.active:not(.hide-estimate) .chat-container { flex: none; height: auto; max-height: 68vh; }
+    .chat-input-area { padding: var(--sp-2); }
+    .chat-input-area textarea { min-height: 40px; height: 40px; }
+}
