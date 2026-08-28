@@ -27,6 +27,15 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
 ## Hard rules
 1. **Never `git commit -a` and never `git add -A`.** Always list explicit paths.
    The other session's half-finished edits live in the same working tree.
+1b. **Explicit paths are not enough — check the hunks.** Naming a file stages
+   everything in it, including whatever another session left in that same file
+   minutes ago. This bit twice in one day: an `_ai.js` fix swept into a Financy
+   commit, and the site's Google-reviews block (a star rating, a review count and
+   four named customers' words) swept into an app.js refactor and deployed under
+   a message that never mentioned it. Before every commit, run
+   `git diff --cached --stat` and read it; if a file you did not author is in the
+   list, `git restore --staged` it or stage by hunk with `git add -p`. The rule is
+   not "name the files", it is **know what is in the commit**.
 2. Never `git checkout -- <path>`, `git stash`, or `git reset --hard`. Ever.
 3. Never `npm install`/dependency changes without saying so here first.
 4. If you must edit a shared file, do it in one short-lived edit and commit it
