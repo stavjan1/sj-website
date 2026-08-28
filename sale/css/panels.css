@@ -4818,3 +4818,50 @@ body.convo-open { overflow: hidden; }
 /* The list of threads gives up its share of the panel once the destinations
    are under it — both scroll, and neither is allowed to starve the other. */
 @media (max-width: 768px) { .convo-list { min-height: 22vh; } }
+
+/* ============================================================================
+   THE TOP STRIP IS THE APP BAR NOW
+   With the bottom rail gone, this row is the only chrome a phone has, so it is
+   never allowed to remove itself and it holds the three things navigation
+   needs: the menu, the way back, and the bell. Stav, 28/08: "איפה הכפתור עם
+   כל הפנקציות כמו הגדרות וכל שאר הדברים?" — it was inside a bar that hid
+   itself on every screen with a heading, which is every screen but the chat.
+   ============================================================================ */
+@media (max-width: 768px) {
+    /* Never empty, never hidden — placeBackButton no longer empties it here,
+       and this makes sure a stale class from a resize cannot either. */
+    .ctx-bar.is-empty { display: flex; }
+    .ctx-bar {
+        position: sticky; inset-block-start: 0; z-index: 12;
+        gap: var(--sp-1);
+        background: var(--bg);
+        border-block-end: 1px solid var(--border);
+    }
+    /* The menu is the first thing on the row, where a thumb reaches it. */
+    .convo-open-btn { order: -1; }
+    /* The bell goes to the far end; everything between them is spare room. */
+    .ctx-bar .ctx-bell { margin-inline-start: auto; }
+    /* Back is a chevron on a phone: the word cost a third of the row and the
+       arrow already says it. */
+    .ctx-bar .ctx-back span { display: none; }
+    .ctx-bar .ctx-back { min-height: 34px; width: 34px; padding: 0; justify-content: center; }
+
+    /* The greeting gets its line back. These moved the two controls on top of
+       the words when they rode in the title, and on the home screen the title
+       is a two-line greeting with a logo in it. */
+    .home-main .ctx-bell, .home-main .ctx-back { position: static; }
+    .home-hi.has-ctx-btns { padding-inline: 0; }
+}
+
+/* The last row of a scrolling screen was ending flush with the bottom of the
+   layout viewport, and on iOS Safari the browser's own toolbar sits over that
+   line — so "ממשיכים" had its last entry sliced in half. The shell is sized in
+   dvh, which is supposed to account for the toolbar, but it does not while the
+   bar is animating in, and a list has no reason to be flush with anything.
+   The chat is excluded on purpose: its composer is height-managed and reaching
+   the bottom is the point. */
+@media (max-width: 768px) {
+    .content-panel:not(#panel-wizard) {
+        padding-block-end: calc(var(--sp-8) + env(safe-area-inset-bottom, 0px));
+    }
+}
