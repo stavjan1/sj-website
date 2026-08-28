@@ -4418,21 +4418,30 @@ function promoteAskToJob(id) {
     showToast('נפתח כעבודה · השיחה נשמרה כמו שהיא');
 }
 
-// "שיחה חדשה" — the button a chat product must have. The app had no way to
-// start a thread that was not a project, so there was nothing to put on one.
+// "שיחה חדשה" and בית were two screens for one moment.
+// Stav, 28/08: "שיחה חדשה ובית זה אותו דבר אבל כפתורים שונים ומסכים
+// שונים. צריך להחליט על עיצוב." He is right: both mean "start something",
+// and they looked nothing alike — one a greeting with a box, four examples and
+// your recent threads, the other a bare composer under an empty log.
+//
+// Decided: the home screen IS the new conversation, because it is the better of
+// the two. It says who you are, asks the one question the product exists to
+// answer, and offers examples to someone who does not know what to type. An
+// empty chat offers none of that and was only ever a blank page with a cursor.
+// Claude's own "New" does exactly this — the same screen, every time.
 function startNewConversation() {
     activeProjectId = null;
     try { localStorage.removeItem(getStorageKey('sj_active_project_id')); } catch (e) {}
     try { updateActiveProjectBanner(null); } catch (e) {}
     document.body.classList.remove('in-project');
-    switchTab('wizard');
-    const log = document.getElementById('chat-messages-log');
-    if (log) log.innerHTML = '';
     const chip = document.getElementById('ask-promote-chip');
     if (chip) chip.hidden = true;
-    const input = document.getElementById('chat-user-input');
-    if (input) { input.value = ''; input.focus(); }
+    const log = document.getElementById('chat-messages-log');
+    if (log) log.innerHTML = '';
+    switchTab('home');
+    setTimeout(() => document.getElementById('home-input')?.focus(), 60);
     try { closeConversationsDrawer(); } catch (e) {}
+    try { refreshConversationsColumn(); } catch (e) {}
 }
 
 // ============================================================================
@@ -4484,6 +4493,24 @@ function refreshConversationsColumn() {
     if (!isWideLayout()) return;
     try { renderConversationsList(); renderDrawerDestinations(); } catch (e) {}
 }
+
+// The column used to stay on screen by out-ranking its own `hidden` attribute
+// from CSS, which is the trap this whole sweep is about — an element that says
+// it is hidden and is not. It drops the attribute instead: hidden means hidden,
+// everywhere, with no exceptions to remember.
+function syncConversationsLayout() {
+    const d = document.getElementById('convo-drawer');
+    if (!d) return;
+    if (isWideLayout()) {
+        d.hidden = false;
+        d.classList.remove('open');
+        document.body.classList.remove('convo-open');
+        refreshConversationsColumn();
+    } else if (!d.classList.contains('open')) {
+        d.hidden = true;
+    }
+}
+window.addEventListener('resize', () => { clearTimeout(window._convoLayoutT); window._convoLayoutT = setTimeout(syncConversationsLayout, 150); });
 
 function toggleConversationsDrawer() {
     // Nothing to open or close when it is a column.
@@ -4595,6 +4622,10 @@ function renderDrawerDestinations() {
     const btns = [...document.querySelectorAll('.sidebar .nav-btn')].filter((b) => {
         if (b.hidden) return false;                                   // admin, until it is not
         if (b.classList.contains('proj-tab') && !inProject) return false;  // stages need a project
+        // בית and "שיחה חדשה" now open the same screen, and the button
+        // that starts a conversation is already the first thing in this panel.
+        // Listing both was the duplication Stav pointed at, drawn twice.
+        if (b.id === 'tab-home') return false;
         return true;
     });
 

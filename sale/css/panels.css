@@ -5260,7 +5260,6 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
         min-width: 264px;
         z-index: auto;
     }
-    .convo-drawer[hidden] { display: block; }      /* the column does not hide */
     .convo-scrim { display: none; }
     .convo-panel {
         position: static;
@@ -5321,3 +5320,21 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
     .picker-dialog .ck-dialog-actions { flex-direction: column-reverse; gap: var(--sp-2); }
     .picker-dialog .ck-dialog-actions .btn { width: 100%; min-height: 46px; }
 }
+
+
+/* ============================================================================
+   HIDDEN MEANS HIDDEN
+   `hidden` is an attribute, so the browser enforces it with [hidden]{display:none}
+   at the very bottom of the cascade — which ANY single class rule out-ranks. This
+   codebase has 169 single-class display rules, so 169 elements would stay on
+   screen after being told to go away, and the code that hid them would look
+   correct while doing nothing.
+   It bit twice that we know of: the admin control room stayed on all four tabs
+   because .ctlroom{display:flex} beat setAdminTab's card.hidden = true (Stav,
+   28/08: "הלמעלה זה אותו אותו דבר בארבעת המסכים"), and nextstep.css carries a
+   comment about hitting the same wall and working around it locally.
+   One line ends the whole class of bug. The only element that ever relied on
+   overriding this — the conversation column on a wide screen — now drops the
+   attribute instead of contradicting it.
+   ============================================================================ */
+[hidden] { display: none !important; }

@@ -81,3 +81,40 @@ test('the legacy sheet is still not loaded, so nobody styles against it', () => 
     assert.ok(!/href="[^"]*sale\/styles\.css/.test(HTML) && !/href="styles\.css/.test(HTML),
         'sale/index.html now loads the legacy sheet — the scan above must include it');
 });
+
+test('hidden means hidden, with no rule allowed to out-rank it', () => {
+    // `hidden` is enforced by [hidden]{display:none} at the very bottom of the
+    // cascade, so ANY single-class display rule beats it — and this codebase has
+    // 169 of those. That is how the admin control room stayed on screen across
+    // all four tabs while the code that hid it looked perfectly correct.
+    assert.match(CSS, /\[hidden\]\s*\{\s*display:\s*none\s*!important/,
+        'the global [hidden] guard is gone — 169 class rules can hide-proof an element again');
+    // And nothing may go back to contradicting it. Comments are stripped first
+    // (several of these rules carry a note explaining the trap, and the word
+    // "display" inside a note is not a declaration), and the value is CAPTURED
+    // rather than checked with a lookahead — `\s*(?!none)` lets the whitespace
+    // backtrack to zero and then reads " none" as "not none", which is how the
+    // first version of this test failed on sixteen perfectly correct rules.
+    const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    const overrides = [];
+    for (const [, sel, body] of bare.matchAll(/([^{}]*\[hidden\][^{}]*)\{([^}]*)\}/g)) {
+        for (const [, value] of body.matchAll(/display\s*:\s*([a-zA-Z-]+)/g)) {
+            if (value !== 'none') overrides.push(sel.trim().replace(/\s+/g, ' ') + ' → ' + value);
+        }
+    }
+    assert.deepEqual(overrides, [],
+        'these rules make a hidden element visible again');
+});
+
+test('starting work is one screen, not two', () => {
+    // בית and "שיחה חדשה" were two designs for one moment. The home screen won:
+    // it greets, asks the product's question, and offers examples. An empty chat
+    // offered a cursor.
+    const i = APP.indexOf('function startNewConversation(');
+    const body = APP.slice(i, APP.indexOf('\n}', i));
+    assert.match(body, /switchTab\('home'\)/, 'a new conversation opens the home screen');
+    assert.match(body, /home-input/, 'with the cursor in the box');
+    // And the drawer must not list a destination that its own top button already is.
+    assert.match(APP, /if \(b\.id === 'tab-home'\) return false;/,
+        'בית is filtered out of the destinations, since "שיחה חדשה" is right above them');
+});

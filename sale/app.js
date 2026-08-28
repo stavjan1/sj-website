@@ -1497,7 +1497,7 @@ function initUserSession() {
     // guest landed on the project list and had to find the chat itself
     // (Stav, 25/08: "זה נפתח בדיפולט על הפרויקטים ולא עם הצ'אט").
     switchTab('home');
-    try { refreshConversationsColumn(); } catch (e) {}   // the wide-screen thread column
+    try { syncConversationsLayout(); } catch (e) {}   // the wide-screen thread column
     updateUserProfileUI();
     updateGuestUpgradeUI();
     setupQuotePreviewFit();
