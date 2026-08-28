@@ -5173,3 +5173,37 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
     .confirm-dialog .ck-dlg-actions { flex-direction: column-reverse; gap: var(--sp-2); }
     .confirm-dialog .ck-dlg-actions .btn { width: 100%; min-height: 46px; }
 }
+
+/* ============================================================================
+   THE MONEY BOARD, ON A PHONE
+   Rendered for real by stubbing the owner flag, since כסף is hidden from every
+   account but the one that owns the system — which is why nobody had looked at
+   it on a phone. Measured at 390×844: four summary cards stacked full width for
+   296px before the board even starts, and a five-column kanban that an earlier
+   rule flattened to one column per row, so the whole thing ran past 1,090px.
+   Same treatment as everywhere else: the numbers are a glance, the board is one
+   column per screen that you swipe. This block is after the ≤980px rule that
+   set grid-template-columns:1fr, so it wins.
+   ============================================================================ */
+@media (max-width: 768px) {
+    .pipeline-summary { grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
+    .pipe-stat { padding: var(--sp-2); min-height: 0; }
+    .pipe-stat-num { font-size: var(--fs-lg); }
+    .pipe-stat-lbl { font-size: 10px; }
+
+    .pipeline-board {
+        display: flex; flex-wrap: nowrap;
+        grid-template-columns: none;
+        overflow-x: auto; scroll-snap-type: x mandatory;
+        gap: var(--sp-2); scrollbar-width: none;
+    }
+    .pipeline-board::-webkit-scrollbar { display: none; }
+    .pipe-col { flex: 0 0 82%; scroll-snap-align: start; }
+    .pipe-col-body { max-height: 44vh; }
+    /* An empty board should not hold a screen open. */
+    .pipeline-board:empty { display: none; }
+
+    .pipeline-controls { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .pipeline-controls::-webkit-scrollbar { display: none; }
+    .pipeline-controls > * { flex: none; }
+}
