@@ -68,3 +68,15 @@
     line-height: 1.6;
 }
 #pdue-progress { font-variant-numeric: tabular-nums; }
+
+/* The date fallback inside the "תזכיר לי" dialog — shown only when the sentence
+   had no date the parser was sure about. */
+#remind-dialog .pdue-when {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-block: var(--sp-2);
+}
+#remind-dialog .pdue-when .input { flex: 1 1 130px; min-inline-size: 0; }
+

@@ -37,8 +37,12 @@ pricing chat pulls people in → full ZEREM (projects, quotes, invoicing) retain
 - [x] **Quick ⇄ full toggle both ways**: segmented switch in /ask/, "⚡ מצב מהיר" pill in the app
       topnav, no-signup chat link on the lock screen. v5.28, SW shell v59, cache headers set.
 - [x] App chat renders [[רשימות]] with the same shared cards (instead of stripping).
-- [ ] Next on this thread: let the app's planning agent EMIT [[רשימות]] too (button in project
-      chat) — kept out of this round so the pricing agent's JSON protocol stays untouched.
+- [x] ~~Let the planning agent EMIT [[רשימות]] too~~ — **already true, closed
+      25/08/2026 without code.** The list renderer is in the shared chat history
+      renderer and handles both threads, and the two buttons that ask for the
+      lists sit on the pricing bar. Since the planning prompt was rewritten to
+      answer with a price and no unsolicited BOM, asking the planning agent for a
+      shopping list would produce one that no pricing table stands behind.
 
 ## Future vision (recorded verbatim, 31/07)
 - [ ] **Field simulation button**: a button that generates a simulation of how the job looks in
@@ -86,9 +90,12 @@ Fixed & pushed:
       alone said "clean" while `api.web3forms.com` was still missing from
       connect-src — the runtime test is what caught it. Repeatable:
       `scripts/security/` (see its README). Run after adding any 3rd-party call.
-- [ ] 🟢 /api/stats dedup key `stats:seen:<quoteId>` is a global namespace, so a
-      crafted id can suppress someone else's sample. Anonymous aggregate data
-      only, display still off — low impact, worth namespacing when stats go live.
+- [x] 🟢 /api/stats dedup key namespaced (25/08/2026): it is now
+      `stats:seen:<senderHash>:<quoteId>`, where the hash is the same address the
+      rate limiter counts, through SHA-256 and truncated. While it was global,
+      claiming an id in advance let anyone have somebody else's sample dropped as
+      a duplicate. Guarded by tests/stats-privacy.test.mjs, which also pins that
+      the scope is a hash and never a raw address.
 - [ ] 🟢 Run Strix against the LIVE site from a machine with network access (it
       catches deploy/config issues a code audit cannot). Needs Docker + an LLM key.
 
@@ -225,7 +232,15 @@ say them, which is a checklist change, not a drawing change.
 - WhatsApp bot variant of the Telegram defect-report bot (Meta API is paid — deferred).
 - Refresh PRODUCT_OVERVIEW.md to describe the V3 shell (one rail, more-drawer, finance panel, funnel card).
 - Visual QA pass on sale/css/panels.css (written against markup, not yet eyeballed screen-by-screen).
-- "תזכיר לי" natural-language calendar reminders from project cards (spec §5ג) — the maint-dialog + calendar plumbing exists; the free-text entry point still to build.
+- [x] "תזכיר לי" natural-language calendar reminders from project cards (spec §5ג,
+  25/08/2026): a clock button on every project card opens one text field —
+  "מחר בבוקר להתקשר לדני" — parsed locally (no model call, no network) into a
+  date, an hour and a subject. Understands מחר / מחרתיים / בעוד N ימים־שבועות־
+  חודשים־שעות / ביום ראשון / ב-15/9 / בשעה 14 / בבוקר־בצהריים־בערב, counts in
+  Hebrew words as well as digits, and when it does NOT understand it says so and
+  shows a date field rather than booking a guess. 10 cases pinned in
+  tests/remind-parser.test.mjs. Both reminder buttons now share one calendar
+  path, and the last hand-rolled VCALENDAR in sale/app.js is gone.
 - [x] Onboarding "מה עכשיו?" next-step cards (25/08/2026) — four cards, each the
   complement of a gate that already exists, so a card and an action bar can never
   be on screen together: characterisation still open, pricing that returned no

@@ -66,6 +66,19 @@ function bucketKey(prof, job) {
   return `stats:samples:${normProfession(prof)}:${p}`;
 }
 
+// Who sent this, as far as an endpoint with no accounts can tell: the same
+// address the rate limiter counts, through SHA-256 and truncated. Enough to
+// keep two senders apart, not enough to be an address.
+async function senderScope(request) {
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('sj-stats:' + ip));
+    return [...new Uint8Array(buf)].slice(0, 8).map((b) => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return 'anon';   // no subtle crypto → one shared scope, which is where we were
+  }
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
   if (!env.SJ_DATA) return jsonResponse({ ok: false, skipped: 'no-kv' }, 200);
@@ -96,9 +109,18 @@ export async function onRequestPost(context) {
   const job = JOB_TYPES.includes(body.jobType) ? body.jobType : 'other';
 
   // Dedup: count a quote once (re-exports/edits don't re-inflate the stats).
+  //
+  // Scoped to the sender, not global. The quote id is chosen by the caller on an
+  // endpoint that requires no account, so a global key let anyone claim any id
+  // in advance and have the real submission silently dropped as a duplicate —
+  // a way to suppress somebody else's sample without touching their data. The
+  // scope is the same identity the rate limiter already uses, hashed, because
+  // this pipeline is anonymous on purpose and storing raw addresses beside
+  // pricing samples would quietly stop it being so.
   const quoteId = String(body.quoteId || '').slice(0, 60);
   if (quoteId) {
-    const seenKey = `stats:seen:${quoteId}`;
+    const who = await senderScope(request);
+    const seenKey = `stats:seen:${who}:${quoteId}`;
     if (await env.SJ_DATA.get(seenKey)) return jsonResponse({ ok: true, deduped: true });
     context.waitUntil(env.SJ_DATA.put(seenKey, '1', { expirationTtl: 60 * 60 * 24 * 400 }));
   }

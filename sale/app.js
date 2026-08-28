@@ -5658,20 +5658,30 @@ async function followupRemindMe(projectId, e) {
     const proj = projectsList.find((p) => p.id === projectId);
     if (!proj) return;
     const when = _followupWhen();
+    const ok = await pushReminderEvent(proj, when, _followupTitle(proj), _followupDesc(proj));
+    if (ok === true) showToast('תזכורת נקבעה ביומן למחר ב-9:00');
+}
 
+// One reminder in the calendar, whatever asked for it: the follow-up button
+// picks tomorrow at nine, the typed one picks whatever the sentence said. Both
+// PATCH the project's existing event rather than adding a second — pressing
+// "remind me" twice should move the reminder, not clone it.
+//
+// Returns true when the calendar took it, 'ics' when a file was downloaded
+// instead (guest, no consent, or a failure), false when nothing worked.
+async function pushReminderEvent(proj, when, title, desc) {
     let token = null;
     if (!isGuestUser()) {
         try { token = await ckEnsureCalToken(); } catch (err) { token = null; }
     }
-    if (!token) { _followupIcs(proj, when); return; }
+    if (!token) { _followupIcs(proj, when, title); return 'ics'; }
 
     const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone) || 'Asia/Jerusalem';
-    const dt = _localDateTime(when);
     const end = new Date(when.getTime() + 30 * 60000);
     const body = JSON.stringify({
-        summary: _followupTitle(proj),
-        description: _followupDesc(proj),
-        start: { dateTime: dt, timeZone: tz },
+        summary: title,
+        description: desc,
+        start: { dateTime: _localDateTime(when), timeZone: tz },
         end: { dateTime: _localDateTime(end), timeZone: tz },
         reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 0 }] }
     });
@@ -5687,28 +5697,30 @@ async function followupRemindMe(projectId, e) {
         if (res.status === 401 || res.status === 403) {
             localStorage.removeItem(CK_CAL_TOKEN_KEY);
             showToast('ההרשאה ליומן פגה · לחץ שוב על כפתור היומן', 'error');
-            return;
+            return false;
         }
         const ev = await res.json();
         if (!res.ok || !ev.id) throw new Error('calendar-error');
         proj.followupEventId = ev.id;
         saveProjects();
-        showToast('תזכורת נקבעה ביומן למחר ב-9:00');
+        return true;
     } catch (err) {
         // Never leave the click with nothing to show for it.
-        _followupIcs(proj, when);
+        _followupIcs(proj, when, title);
+        return 'ics';
     }
 }
 
-function _followupIcs(proj, when) {
+function _followupIcs(proj, when, title) {
     const p = (n) => String(n).padStart(2, '0');
     const stamp = (d) => d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate()) +
         'T' + p(d.getUTCHours()) + p(d.getUTCMinutes()) + '00Z';
     const end = new Date(when.getTime() + 30 * 60000);
-    const summary = ckIcsText(_followupTitle(proj));
-    const ics = [
-        'BEGIN:VCALENDAR', 'VERSION:2.0',
-        'PRODID:-//SJ Electrical Engineering//Followup//HE',
+    const summary = ckIcsText(title || _followupTitle(proj));
+    // Through the one wrapper in assets/checkups-core.js: a second hand-rolled
+    // VCALENDAR in the codebase is a second thing that can disagree with the
+    // first about what a calendar file looks like.
+    const ics = SJ_CK.icsWrap([[
         'BEGIN:VEVENT',
         'UID:fu-' + proj.id + '@sj-eng.co.il',
         'DTSTAMP:' + stamp(new Date()),
@@ -5717,14 +5729,216 @@ function _followupIcs(proj, when) {
         'SUMMARY:' + summary,
         'DESCRIPTION:' + ckIcsText(_followupDesc(proj)),
         'BEGIN:VALARM', 'TRIGGER:PT0M', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
-        'END:VEVENT', 'END:VCALENDAR',
-    ].join('\r\n');
+        'END:VEVENT',
+    ]], 'Followup');
+    if (!ics) return;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
     a.download = 'followup-' + String(proj.name || 'client').replace(/[^\w֐-׿-]+/g, '_') + '.ics';
     a.click();
     URL.revokeObjectURL(a.href);
     showToast('קובץ תזכורת ירד · פתח אותו והוא ייכנס ליומן שלך');
+}
+
+// ---- "תזכיר לי" — the reminder you type instead of configure ---------------
+//
+// The calendar plumbing has been here since the follow-up strip: a reminder is
+// an event with a title, a time and an ICS fallback for a phone with no Google
+// account. What was missing was the way in. A dialog with a date picker, an
+// hour picker and a subject field is four decisions for something a person
+// already said in one sentence — "תזכיר לי מחר בבוקר להתקשר לדני".
+//
+// So the sentence IS the interface. The parser below is deliberately small and
+// deterministic: no model call, no network, no waiting. It understands the ways
+// a working day is actually spoken about in Hebrew, and when it does not
+// understand, it says so and shows a date field rather than guessing — a
+// reminder that quietly lands on the wrong day is worse than no reminder.
+
+const HE_WEEKDAYS = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+
+// Hebrew counts to ten in words far more often than in digits for small numbers.
+const HE_NUMBERS = {
+    'אחד': 1, 'אחת': 1, 'שני': 2, 'שתי': 2, 'שניים': 2, 'שתיים': 2, 'שלוש': 3, 'שלושה': 3,
+    'ארבע': 4, 'ארבעה': 4, 'חמש': 5, 'חמישה': 5, 'שש': 6, 'שישה': 6, 'שבע': 7, 'שבעה': 7,
+    'שמונה': 8, 'תשע': 9, 'תשעה': 9, 'עשר': 10, 'עשרה': 10,
+};
+
+function _heCount(word) {
+    if (!word) return null;
+    if (/^\d+$/.test(word)) return parseInt(word, 10);
+    return HE_NUMBERS[word] || null;
+}
+
+// Returns { at: Date, what: string } — or null when the sentence carries no
+// time at all, which the caller turns into a date field rather than a guess.
+function parseHebrewWhen(text, now) {
+    const src = String(text || '').trim();
+    if (!src) return null;
+    const base = now ? new Date(now) : new Date();
+    let rest = src.replace(/^\s*תזכיר(?:י)?\s+לי\s*/, '').trim();
+    let at = null;
+    let hadDate = false;
+
+    const take = (re) => {
+        const m = re.exec(rest);
+        if (m) rest = (rest.slice(0, m.index) + ' ' + rest.slice(m.index + m[0].length)).replace(/\s+/g, ' ').trim();
+        return m;
+    };
+    const day = (n) => { const d = new Date(base); d.setDate(d.getDate() + n); d.setHours(9, 0, 0, 0); return d; };
+
+    // ── the day ──
+    let m;
+    if ((m = take(/מחרתיים/))) { at = day(2); hadDate = true; }
+    // Not /\bמחר\b/: in JavaScript a word boundary is defined by [A-Za-z0-9_],
+    // so a Hebrew word has boundaries nowhere and that pattern matches nothing
+    // at all. The word is fenced by hand instead — and "מחרתיים" is taken
+    // first above, so it cannot be eaten here.
+    else if ((m = take(/(?:^|[^א-ת])מחר(?![א-ת])/))) { at = day(1); hadDate = true; }
+    else if ((m = take(/היום/))) { at = day(0); hadDate = true; }
+    // "בעוד שבועיים", "בעוד 3 ימים", "עוד חודש"
+    else if ((m = take(/(?:בעוד|עוד)\s+(\d+|[֐-׿]+)?\s*(ימים|יום|שבועות|שבועיים|שבוע|חודשים|חודשיים|חודש|שעות|שעה|שעתיים)/))) {
+        const word = m[1] || '';
+        const unit = m[2];
+        let n = _heCount(word);
+        if (unit === 'שבועיים') n = 2;
+        else if (unit === 'חודשיים') n = 2;
+        else if (unit === 'שעתיים') n = 2;
+        else if (n === null) n = 1;
+        const d = new Date(base);
+        if (unit === 'שעה' || unit === 'שעות' || unit === 'שעתיים') {
+            d.setHours(d.getHours() + n, d.getMinutes(), 0, 0);
+            at = d;
+            hadDate = true;
+            // An hour from now is a time, not a day — the 09:00 default below
+            // must not overwrite it.
+            return _finish(at, rest, src, true);
+        }
+        if (unit === 'שבוע' || unit === 'שבועות' || unit === 'שבועיים') d.setDate(d.getDate() + n * 7);
+        else if (unit === 'חודש' || unit === 'חודשים' || unit === 'חודשיים') d.setMonth(d.getMonth() + n);
+        else d.setDate(d.getDate() + n);
+        d.setHours(9, 0, 0, 0);
+        at = d;
+        hadDate = true;
+    }
+    // "ביום ראשון" — the next one, and a week ahead when today already is it
+    else if ((m = take(new RegExp('ב?יום\\s+(' + HE_WEEKDAYS.join('|') + ')')))) {
+        const want = HE_WEEKDAYS.indexOf(m[1]);
+        const d = new Date(base);
+        let delta = (want - d.getDay() + 7) % 7;
+        if (delta === 0) delta = 7;
+        d.setDate(d.getDate() + delta);
+        d.setHours(9, 0, 0, 0);
+        at = d;
+        hadDate = true;
+    }
+    // "ב-15/9", "15.9.2026", "ב 3/11"
+    else if ((m = take(/ב?[-\s]?(\d{1,2})[./](\d{1,2})(?:[./](\d{2,4}))?/))) {
+        const dd = parseInt(m[1], 10), mm = parseInt(m[2], 10);
+        let yy = m[3] ? parseInt(m[3], 10) : base.getFullYear();
+        if (yy < 100) yy += 2000;
+        const d = new Date(yy, mm - 1, dd, 9, 0, 0, 0);
+        // A date already past, written without a year, means next year.
+        if (!m[3] && d < base) d.setFullYear(d.getFullYear() + 1);
+        if (!isNaN(d.getTime())) { at = d; hadDate = true; }
+    }
+
+    if (!hadDate) return null;
+
+    // ── the hour, if he said one ──
+    const t = take(/(?:בשעה|ב)[-\s]?(\d{1,2})(?::(\d{2}))?\b/);
+    if (t) {
+        at.setHours(parseInt(t[1], 10), t[2] ? parseInt(t[2], 10) : 0, 0, 0);
+    } else if (take(/בבוקר/)) at.setHours(9, 0, 0, 0);
+    else if (take(/בצהריים/)) at.setHours(12, 0, 0, 0);
+    else if (take(/אחה"?צ|אחר\s*הצהריים/)) at.setHours(15, 0, 0, 0);
+    else if (take(/בערב/)) at.setHours(18, 0, 0, 0);
+
+    return _finish(at, rest, src, false);
+}
+
+function _finish(at, rest, src, keepRest) {
+    // No stripping of a leading ל: in "מחר להתקשר לדני" that lamed is half the
+    // verb, and removing it turns an infinitive into an order — "התקשר לדני",
+    // which is not how he wrote it and not how it should read back to him.
+    let what = String(rest || '').replace(/^\s*תזכיר\s+לי\s*/, '').replace(/\s+/g, ' ').trim();
+    // Leftovers like "ב" or "-" are not a subject.
+    if (what.length < 2) what = '';
+    return { at: at, what: what, said: src };
+}
+
+// The dialog: one field, and an honest fallback when the sentence had no date
+// in it at all.
+function openRemindDialog(projectId, e) {
+    if (e) e.stopPropagation();
+    const proj = projectsList.find((p) => p.id === projectId);
+    if (!proj) return;
+    _remindFor = projectId;
+    const dlg = document.getElementById('remind-dialog');
+    if (!dlg) return;
+    const input = document.getElementById('remind-text');
+    if (input) { input.value = ''; input.placeholder = 'למשל: מחר בבוקר להתקשר ל' + (projectClient(proj) || {}).name || 'לקוח'; }
+    const note = document.getElementById('remind-note');
+    if (note) { note.textContent = 'על ' + (proj.name || 'העבודה') + ' · נכנס ליומן Google, ובלי חשבון יורד כקובץ.'; }
+    const fb = document.getElementById('remind-fallback');
+    if (fb) fb.hidden = true;
+    if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
+    setTimeout(() => { try { input.focus(); } catch (err) {} }, 50);
+}
+
+function closeRemindDialog() {
+    const dlg = document.getElementById('remind-dialog');
+    if (!dlg) return;
+    if (typeof dlg.close === 'function') dlg.close(); else dlg.removeAttribute('open');
+}
+
+let _remindFor = null;
+
+async function remindMeSubmit() {
+    const proj = projectsList.find((p) => p.id === _remindFor);
+    if (!proj) return;
+    const text = (document.getElementById('remind-text') || {}).value || '';
+    const parsed = parseHebrewWhen(text);
+    if (!parsed) {
+        // Not understood → ask for the date outright rather than book a guess.
+        const fb = document.getElementById('remind-fallback');
+        if (fb) {
+            fb.hidden = false;
+            const d = document.getElementById('remind-date');
+            if (d && !d.value) {
+                const t = new Date(); t.setDate(t.getDate() + 1);
+                d.value = t.toISOString().slice(0, 10);
+            }
+        }
+        showToast('לא זיהיתי מתי · בחר תאריך למטה, או כתוב "מחר בבוקר"', 'error');
+        return;
+    }
+    await remindMeBook(proj, parsed.at, parsed.what);
+}
+
+async function remindMeFromDate() {
+    const proj = projectsList.find((p) => p.id === _remindFor);
+    if (!proj) return;
+    const d = (document.getElementById('remind-date') || {}).value;
+    const h = (document.getElementById('remind-hour') || {}).value || '09:00';
+    if (!d) { showToast('בחר תאריך', 'error'); return; }
+    const at = new Date(d + 'T' + h + ':00');
+    if (isNaN(at.getTime())) { showToast('תאריך לא תקין', 'error'); return; }
+    const what = ((document.getElementById('remind-text') || {}).value || '').trim();
+    await remindMeBook(proj, at, what);
+}
+
+// One reminder, through the same upsert the follow-up button uses — so a second
+// "remind me" on the same project moves the event instead of adding a twin.
+async function remindMeBook(proj, at, what) {
+    const title = what ? what + ' · ' + (proj.name || '') : _followupTitle(proj);
+    closeRemindDialog();
+    const ok = await pushReminderEvent(proj, at, title, _followupDesc(proj));
+    if (ok === 'ics') { showToast('ירד קובץ יומן · פתח אותו והתזכורת תיכנס'); return; }
+    if (!ok) { showToast('קביעת התזכורת נכשלה, נסה שוב', 'error'); return; }
+    proj.reminderAt = at.getTime();
+    saveProjects();
+    filterProjectsList();
+    showToast('נקבעה תזכורת ל-' + at.toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }));
 }
 
 function renderProjectsList(list) {
@@ -5828,6 +6042,9 @@ function renderProjectsList(list) {
                 <span class="project-status-badge status-badge-${status}"
                       onclick="cycleProjectStatus('${p.id}', event)"
                       title="לחץ לשינוי סטטוס">${status}</span>
+                <button class="btn btn-secondary btn-small" onclick="openRemindDialog('${p.id}', event)" title="תזכיר לי · בשפה חופשית" aria-label="תזכיר לי">
+                    <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                </button>
                 <button class="btn btn-danger btn-small" onclick="deleteProject('${p.id}', event)" title="העברה לסל המיחזור" aria-label="העברה לסל המיחזור">
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                 </button>

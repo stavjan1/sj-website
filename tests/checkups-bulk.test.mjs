@@ -93,8 +93,11 @@ test('the due strip is silent when nothing is due, and is not sold as Pro', () =
 test('there is exactly one thing in the codebase that builds a calendar file', () => {
     // Two ICS builders that can disagree is a file Apple Calendar refuses to
     // open, found by a customer.
-    assert.equal((APP.match(/BEGIN:VCALENDAR/g) || []).length, 1,
-        'sale/app.js does not hand-roll a second calendar wrapper');
+    // Was 1: the follow-up reminder hand-rolled its own VCALENDAR. It goes
+    // through the same wrapper as everything else now, so the right number of
+    // calendar builders outside the core is zero.
+    assert.equal((APP.match(/BEGIN:VCALENDAR/g) || []).length, 0,
+        'sale/app.js does not hand-roll a calendar wrapper at all');
     assert.match(fn(APP, 'maintToIcs'), /SJ_CK\.icsWrap/);
     assert.match(fn(APP, 'pdueBulkIcs'), /SJ_CK\.icsWrap/);
 });
