@@ -10,10 +10,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readApp } from './_app-source.mjs';
 import { createContext, runInContext } from 'node:vm';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const APP = readFileSync(join(ROOT, 'sale', 'app.js'), 'utf8');
+const APP = readApp();
 const FEEDBACK = readFileSync(join(ROOT, 'functions', 'api', 'feedback.js'), 'utf8');
 
 // priceFeedbackEl builds a DOM node, so it gets the smallest document that

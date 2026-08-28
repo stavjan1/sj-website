@@ -12,10 +12,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readApp } from './_app-source.mjs';
 import { createContext, runInContext } from 'node:vm';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const APP = readFileSync(join(ROOT, 'sale', 'app.js'), 'utf8').replace(/\r\n/g, '\n');
+const APP = readApp().replace(/\r\n/g, '\n');
 
 function load(opts = {}) {
     const start = APP.indexOf('let _cpSupplier');

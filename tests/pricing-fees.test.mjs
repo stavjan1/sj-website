@@ -14,9 +14,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readApp } from './_app-source.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const APP = readFileSync(join(ROOT, 'sale', 'app.js'), 'utf8');
+const APP = readApp();
 
 test('the agent is told the fees slot exists', () => {
   // If the contract does not name it, the model never emits it and every test

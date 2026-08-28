@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readApp } from './_app-source.mjs';
 import { createContext, runInContext } from 'node:vm';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -90,7 +91,7 @@ test('the calendar event says where it came from, in the caller\'s words', () =>
 });
 
 test('both screens delegate — no second copy of the arithmetic', () => {
-    const sale = readFileSync(join(ROOT, 'sale', 'app.js'), 'utf8');
+    const sale = readApp();
     const checkups = readFileSync(join(ROOT, 'checkups', 'app.js'), 'utf8');
     // Scoped to the periodic-service functions: the app has other calendar
     // exports (the maintenance series, a follow-up reminder) that are different

@@ -13,10 +13,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readApp } from './_app-source.mjs';
 import { createContext, runInContext } from 'node:vm';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const APP = readFileSync(join(ROOT, 'sale', 'app.js'), 'utf8');
+const APP = readApp();
 const HTML = readFileSync(join(ROOT, 'sale', 'index.html'), 'utf8');
 
 // One function's source, ending at its own closing brace rather than at an

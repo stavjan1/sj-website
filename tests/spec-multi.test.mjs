@@ -11,10 +11,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readApp } from './_app-source.mjs';
 import { createContext, runInContext } from 'node:vm';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const APP = readFileSync(join(ROOT, 'sale', 'app.js'), 'utf8');
+const APP = readApp();
 const COVERAGE_SRC = readFileSync(join(ROOT, 'sale', 'coverage.js'), 'utf8');
 // Cut the checklists object specifically: the file also declares the standard
 // defaults after it, so "from the first = to the last ;" now spans both.

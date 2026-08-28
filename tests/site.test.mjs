@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readApp } from './_app-source.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PAGES = readdirSync(ROOT).filter((f) => f.endsWith('.html'));
@@ -134,7 +135,7 @@ test('the fonts and icons survive a deploy and a dead network', () => {
 });
 
 test('the local snapshots have a door, and restoring is all-or-nothing', () => {
-    const app = read('sale/app.js');
+    const app = readApp();
     const html = read('sale/index.html');
 
     // The snapshots were correct and complete and reachable only by typing
@@ -232,7 +233,7 @@ test('the first screen does not point in a direction', () => {
     // The empty state said "צור פרויקט חדש מימין" long after the box moved
     // above the list. It is seen once, by someone with nothing to compare it
     // to, so nobody ever reported it.
-    const app = read('sale/app.js');
+    const app = readApp();
     const fn = app.slice(app.indexOf('function renderProjectsList'));
     // Comments stripped: the one above the fix quotes the old wording, and a
     // test that cannot tell an explanation from a string is a test that
@@ -304,7 +305,7 @@ test('a stale Google token cannot block its own replacement', () => {
     // whether it was still alive, and every refresh path bailed out early
     // whenever a token was present. So an expired token sat there forever,
     // the app kept showing "מחובר", and the server kept refusing it.
-    const app = read('sale/app.js');
+    const app = readApp();
     assert.match(app, /function _tokenIsFresh/,
         'freshness check is gone — the app is back to trusting any token it finds');
     assert.match(app, /savedToken && _tokenIsFresh\(savedToken\)/,
@@ -319,7 +320,7 @@ test('a stale Google token cannot block its own replacement', () => {
 
 test('the maintenance reminder is asked once and answered "never" without re-asking', () => {
     const html = read('sale/index.html');
-    const app = read('sale/app.js');
+    const app = readApp();
 
     // Stav specified this sentence word for word. It is the only place the app
     // tells you the choice is not final, so it must not drift.
@@ -347,7 +348,7 @@ test('the calendar entry is the action, at the date you take it', () => {
     // the long warning would have been dropped without a word. Stav described
     // what he actually wanted and it dissolves the problem: a one-hour block AT
     // the lead date ("שלח הצעת מחיר ל…"), where no long alarm is needed at all.
-    const app = read('sale/app.js');
+    const app = readApp();
     assert.match(app, /function maintBlocks/, 'the action-block builder is gone');
     assert.match(app, /ckAddDays\(due, -d\)/,
         'blocks no longer sit at due-minus-lead — they are back on the visit date');
@@ -363,7 +364,7 @@ test('the calendar entry is the action, at the date you take it', () => {
 });
 
 test('recurrence is a property of a project, and it ends', () => {
-    const app = read('sale/app.js');
+    const app = readApp();
     const html = read('sale/index.html');
 
     // The job/maintenance switch at creation is gone. Stav's counter-example:
@@ -397,7 +398,7 @@ test('a rendered screen is actually reachable', () => {
     // they are actually reached by: the old tab names still resolve, and the
     // view that opens runs its renderer.
     const html = read('sale/index.html');
-    const app = read('sale/app.js');
+    const app = readApp();
     const panels = [...html.matchAll(/id="panel-([a-z]+)"/g)].map((m) => m[1]);
     assert.ok(panels.includes('clients'), 'the clients panel is gone');
     assert.ok(panels.includes('money'), 'the money panel is gone');
@@ -458,7 +459,7 @@ test('every guide milestone the app fires actually exists in the guide', () => {
     // A guide is optional; a ReferenceError in the middle of createNewProject is
     // not. This shipped: sale/app.js called coachMilestone(), sale/coach.js
     // defined coachHint(), and creating a project threw at the last line.
-    const app = read('sale/app.js');
+    const app = readApp();
     const coach = read('sale/coach.js');
 
     // Whatever name the app uses for the guide, the guide must expose it.

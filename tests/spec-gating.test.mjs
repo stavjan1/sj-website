@@ -11,9 +11,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readApp } from './_app-source.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const APP = readFileSync(join(ROOT, 'sale', 'app.js'), 'utf8');
+const APP = readApp();
 const CHECKLISTS = JSON.parse(readFileSync(join(ROOT, 'data', 'coverage', 'checklists.json'), 'utf8'));
 const COVERAGE = readFileSync(join(ROOT, 'sale', 'coverage.js'), 'utf8');
 

@@ -7,6 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { readApp } from './_app-source.mjs';
 import { trustScore, recordContribution, TRUST_FLOOR, BONUS_DAILY_CAP } from '../functions/api/_contrib.js';
 
 const kv = (seed = {}) => {
@@ -105,14 +106,14 @@ test('the ceiling resets on a new day', async () => {
 test('the client actually measures how long he looked at it', () => {
   // The speed layer is worthless if thinkMs is always null. The strip has to
   // stamp when it appears, not when the module loads.
-  const app = readFileSync(new URL('../sale/app.js', import.meta.url), 'utf8');
+  const app = readApp();
   assert.match(app, /_pfShownAt = Date\.now\(\);/, 'nothing records when the question was shown');
   assert.match(app, /thinkMs: _pfShownAt \? Date\.now\(\) - _pfShownAt : null/,
     'the elapsed time is never sent');
 });
 
 test('a muted contributor is told he is done, not that he is distrusted', () => {
-  const app = readFileSync(new URL('../sale/app.js', import.meta.url), 'utf8');
+  const app = readApp();
   assert.match(app, /תודה, זה הכל לבינתיים/, 'the muted message is gone');
   // And nothing in the client may reveal the score.
   assert.ok(!/trust/.test(app.slice(app.indexOf('function showBonusEarned'),

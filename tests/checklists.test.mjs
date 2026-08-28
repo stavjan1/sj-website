@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readApp } from './_app-source.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -130,7 +131,7 @@ test('the written assumptions stay tied to the characterization', () => {
     // The assumptions paragraph is a claim in a document that goes to a
     // customer. Answer a field that was left open and the paragraph is no
     // longer true, so entering the draft has to re-derive it.
-    const app = read('sale/app.js');
+    const app = readApp();
     const goToDraft = app.slice(app.indexOf('function goToDraft'), app.indexOf('function goToDraft') + 700);
     assert.ok(/refreshSpecTerms\(/.test(goToDraft), 'goToDraft does not refresh the assumptions block');
     assert.ok(app.includes('function refreshSpecTerms'), 'refreshSpecTerms is gone');
@@ -150,7 +151,7 @@ test('a tap during a stage slide is queued before the no-op check', () => {
     // Mid-slide the app still LOOKS like the stage being left, so `from === to`
     // is true for a tap heading back to it. If that check runs first the tap is
     // silently dropped and the thumb ends up somewhere it did not choose.
-    const app = read('sale/app.js');
+    const app = readApp();
     const fn = app.slice(app.indexOf('function goToStage'));
     const body = fn.slice(0, fn.indexOf('\nfunction ', 10));
     const busy = body.indexOf('stageTransitionBusy) { stagePending');
@@ -166,7 +167,7 @@ test('a tap during a stage slide is queued before the no-op check', () => {
 });
 
 test('the page-break guide agrees with the exporter, and never prints', () => {
-    const app = read('sale/app.js');
+    const app = readApp();
 
     // The guide's position is derived from the PDF margin. If the exporter's
     // margin changes and this constant does not, the line lands in the wrong
@@ -196,7 +197,7 @@ test('every file the user picks either works or says why', () => {
     // A FileReader with no onerror fails in complete silence: the dialog
     // closes, nothing changes, nothing to act on. Worst on a backup restore,
     // where the person is already trying to recover something.
-    const app = read('sale/app.js');
+    const app = readApp();
     const readers = [...app.matchAll(/new FileReader\(\)/g)];
     assert.equal(readers.length, 1,
         `${readers.length} FileReaders — they should all go through readFileOrExplain`);
@@ -230,7 +231,7 @@ test('the welcome screen describes the product that was actually built', () => {
     // מהר וזה יוצא שמפספסים דברים". The welcome screen kept selling the old
     // story — one-click pricing, name your project first — which is the first
     // thing a new user reads and the last thing anyone thinks to update.
-    const app = read('sale/app.js');
+    const app = readApp();
     const fn = app.slice(app.indexOf('function showWelcomeOnboarding'));
     const body = fn.slice(0, fn.indexOf('\nfunction closeOnboarding'));
 
@@ -255,7 +256,7 @@ test('changing an answer does not destroy it first', () => {
     // tapping "change" on a critical answer emptied it, dropped the coverage
     // count and re-shut the pricing gate — on a project that may already have
     // been priced and drafted. Tapping to LOOK at an answer lost it.
-    const app = read('sale/app.js');
+    const app = readApp();
     const fn = app.slice(app.indexOf('function editSpecField'));
     const body = fn.slice(0, fn.indexOf('\n}'));
     assert.ok(!/clearSpecAnswer/.test(body),
@@ -293,7 +294,7 @@ test('switching job type cannot silently destroy a characterization', () => {
     // accident, and switching wipes every answer with no way back. Measured:
     // a fully answered charger job lost all 14, and switching back restored
     // nothing.
-    const app = read('sale/app.js');
+    const app = readApp();
     const fn = app.slice(app.indexOf('function setSpecJobType'));
     const body = fn.slice(0, fn.indexOf('\n}'));
 
@@ -323,7 +324,7 @@ test('one tap cannot silently discard accumulated work', () => {
     // Third of a family found in one night: change an answer (destroyed it),
     // switch job type (wiped all 14), reset the design (dropped the block order
     // and styling of every quote). None of them asked, none could be undone.
-    const app = read('sale/app.js');
+    const app = readApp();
 
     const reset = app.slice(app.indexOf('function resetQuoteDesign'));
     const resetBody = reset.slice(0, reset.indexOf('\n}'));
@@ -346,7 +347,7 @@ test('the invitation to price is gated by our checklist, not the agent prose', (
     // prompt never appeared, on a finished characterization with the gate wide
     // open. The premise of this product is that OUR checklist decides when a
     // job is ready to price.
-    const app = read('sale/app.js');
+    const app = readApp();
     const fn = app.slice(app.indexOf('function updatePlanActionBar'));
     const body = fn.slice(0, fn.indexOf('\n}'));
 
@@ -363,7 +364,7 @@ test('a chat message is addressed by stage, not by index alone', () => {
     // array index, so plan[3] and price[3] were both data-index="3" and the
     // edit lookup — a first-match querySelector — could open one and truncate
     // the other. This is the groundwork for showing both as one thread.
-    const app = read('sale/app.js');
+    const app = readApp();
 
     // From the row being drawn, not from the active screen — with both stages
     // in one log the screen is no longer the answer to "which conversation".

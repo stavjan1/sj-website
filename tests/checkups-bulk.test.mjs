@@ -14,11 +14,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readApp } from './_app-source.mjs';
 import { createContext, runInContext } from 'node:vm';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
-const APP = read('sale', 'app.js');
+const APP = readApp();
 const CK = read('checkups', 'app.js');           // the standalone tracker at /checkups/
 const HTML = read('sale', 'index.html');
 

@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { readApp } from './_app-source.mjs';
 import { periodWindows, daysOfMonth } from '../functions/api/analytics.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -67,7 +68,7 @@ test('a month knows its own length, leap year included, and never runs past toda
 test('every class the traffic card renders is styled by the stylesheet the app loads', () => {
     // sale/styles.css is the legacy V2 sheet and is NOT linked from
     // sale/index.html — a rule that lives only there is a rule that never ran.
-    const app = read('sale/app.js');
+    const app = readApp();
     const panels = read('sale/css/panels.css');
     const index = read('sale/index.html');
     assert.ok(index.includes('css/panels.css'), 'sale/index.html no longer loads panels.css');
