@@ -651,8 +651,10 @@ i[class^="fa-"], i[class*=" fa-"] {
 .model-select-input { min-height: 36px; font-size: var(--fs-xs); }
 
 .quota-ring-wrap { display: flex; align-items: center; gap: var(--sp-2); }
-.quota-ring { position: relative; width: 56px; height: 56px; flex-shrink: 0; }
-.quota-ring svg { display: block; }
+/* The old circular dial's rules lived here. The meter is a bar now, with
+   class="quota-meter", while the id stayed the dial's — so those rules kept
+   compiling and styling nothing at all. Removed, along with the mobile override
+   that resized a dial nobody draws. */
 .quota-pct-text {
     position: absolute;
     inset: 0;
@@ -2674,7 +2676,6 @@ i[class^="fa-"], i[class*=" fa-"] {
     .plan-action-bar { padding: var(--sp-1) var(--sp-3); margin: 2px var(--sp-2); border-radius: var(--r-sm); }
     .chat-suggestions { padding: var(--sp-1) var(--sp-2) var(--sp-2); gap: var(--sp-1); }
     .chat-suggestions .chip { min-height: 32px; }
-    .quota-ring, .quota-ring svg { width: 42px; height: 42px; }
     .quota-info-text { font-size: 0.72rem; }
     
 
@@ -5222,9 +5223,12 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
     /* An empty board should not hold a screen open. */
     .pipeline-board:empty { display: none; }
 
-    .pipeline-controls { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-    .pipeline-controls::-webkit-scrollbar { display: none; }
-    .pipeline-controls > * { flex: none; }
+    /* The element is class="pipe-controls" — "pipeline-controls" is its ID. I
+       wrote the ID's name as a class here, which is the same mistake that left
+       the money stats unstyled, made twice in one file. */
+    .pipe-controls { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .pipe-controls::-webkit-scrollbar { display: none; }
+    .pipe-controls > * { flex: none; }
 }
 
 /* ============================================================================
