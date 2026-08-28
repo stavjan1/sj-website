@@ -188,8 +188,14 @@ test('the page-break guide agrees with the exporter, and never prints', () => {
     assert.ok(/page-guide/.test(body) && /remove\(\)/.test(body),
         'the page guides are not stripped before capture');
 
-    const css = read('sale/styles.css');
-    assert.ok(/@media print[\s\S]{0,200}\.page-guide/.test(css),
+    // sale/css/pdf.css, not sale/styles.css. The rule exists in BOTH files, and
+    // this test was reading the one no browser loads — 222KB of legacy V2 CSS
+    // that nothing links. So it has been passing on a copy while the sheet that
+    // actually prints a customer's quote went unchecked: delete the rule from
+    // the real file and this stayed green while red dashed guides started
+    // appearing on quotes people send to customers.
+    const css = read('sale/css/pdf.css');
+    assert.ok(/@media print[\s\S]{0,400}\.page-guide/.test(css),
         'the print path does not hide the page guides');
 });
 

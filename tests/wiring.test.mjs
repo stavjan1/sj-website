@@ -63,7 +63,12 @@ test('the app never calls one of its own globals that no longer exists', () => {
     // Only the names this project owns: a call to a name we declare SOMEWHERE
     // is fine, a call to a name matching our naming conventions that is declared
     // NOWHERE is the deletion this test exists to catch.
-    const ours = /\b((?:render|admin|coach|acct|maint|ck|pipeline|pipe|market|fin|switch|show|save|load|open|close|toggle|set|get|update|refresh|export|import)[A-Z][\w$]*)\s*\(/g;
+    // The verb list is this test's weakness, and it was measured: a sweep
+    // deleted nineteen functions one at a time and ran the whole suite after
+    // each — FOURTEEN passed in silence, because their names began with sync,
+    // resolve, find, clear, connect or handle and none of those were listed.
+    // Every verb this codebase actually starts a global with is listed now.
+    const ours = /\b((?:render|admin|coach|acct|maint|ck|pipeline|pipe|market|fin|switch|show|save|load|open|close|toggle|set|get|update|refresh|export|import|sync|resolve|find|clear|connect|handle|apply|build|create|delete|remove|start|stop|run|check|ensure|schedule|promote|pick|ask|price|quote|report|filter|count|format|parse|copy|send|scan|detect|upload|recover|restore|manual|smart|assign)[A-Z][\w$]*)\s*\(/g;
     const missing = new Map();
     // Prose mentions functions by name ("setDate() is defined by the browser"),
     // and prose is not a call site.
