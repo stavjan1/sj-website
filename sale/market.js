@@ -853,15 +853,12 @@ function pickClient(id) {
     showToast(`ההצעה על שם ${client.name}`);
 }
 
+// Was three browser prompts in a row — name, then phone, then address, each a
+// modal box you had to dismiss to see the next. One form, the same form the
+// work list uses, and the quote picks the customer up when it closes.
 function pickNewClient() {
-    const name = (window.prompt('שם הלקוח:') || '').trim();
-    if (!name) return;
-    const phone = (window.prompt('טלפון (אפשר להשאיר ריק):') || '').trim();
-    const address = (window.prompt('כתובת (אפשר להשאיר ריק):') || '').trim();
-    const client = { id: 'cli' + Date.now(), name, phone, email: '', address, city: '', dealerNumber: '', tags: [] };
-    clientsList.unshift(client);
-    saveClients();
-    pickClient(client.id);
+    openNewClient(null);
+    _newClientThen = (client) => pickClient(client.id);
 }
 
 function updatePreviewFromForm() {

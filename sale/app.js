@@ -3509,15 +3509,14 @@ function assignProjectClient(projectId, value) {
     const proj = projectsList.find((p) => p.id === projectId);
     if (!proj) return;
 
+    // A browser prompt asking only for a name produced customers with no phone
+    // and no address — which is to say, a job with nobody to call about it and
+    // a quote with an empty header. It asks properly now, and remembers which
+    // project it was opened from so the link still happens on save.
     if (value === '__new') {
-        const name = (window.prompt('שם הלקוח החדש:') || '').trim();
-        // Re-render either way, so the select snaps back instead of sitting on
-        // "+ לקוח חדש…" after a cancel.
-        if (name.length < 2) { filterProjectsList(); return; }
-        const existing = clientsList.find((c) => _clientKey(c.name) === _clientKey(name));
-        const client = existing || { id: 'cli' + Date.now(), name, dealerNumber: '', phone: '', email: '', address: '', city: '' };
-        if (!existing) { clientsList.unshift(client); saveClients(); }
-        value = client.id;
+        openNewClient(projectId);
+        filterProjectsList();   // snap the select back off "+ לקוח חדש…"
+        return;
     }
 
     proj.clientId = value || null;
@@ -9769,4 +9768,63 @@ function getToolsPromptBlock() {
 • רצ'ט וסט מפתחות — אלה כלים של רכב ואינסטלציה, לא של החלפת אביזרים או לוח.
 • כלים שכל אדם מחזיק (פטיש, מברג רגיל) כשהעבודה לא דורשת אותם במיוחד.
 • ציוד מגן אישי כשורה ברשימת כלים — הוא מובן מאליו ואינו מה שנשאלת עליו.`;
+}
+
+
+// The new-customer dialog. Name is required; the phone is not, but the form
+// says out loud what is lost without it rather than silently accepting a
+// customer nobody can reach.
+let _newClientFor = null;
+// What to do with the customer once it exists, when the caller wants something
+// other than linking it to a project (the quote editor picks it up instead).
+let _newClientThen = null;
+function openNewClient(projectId) {
+    _newClientFor = projectId || null;
+    _newClientThen = null;
+    const d = document.getElementById('new-client-dialog');
+    if (!d) return;
+    ['nc-name', 'nc-phone', 'nc-addr', 'nc-city'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    const err = document.getElementById('nc-err');
+    if (err) err.style.display = 'none';
+    if (typeof d.showModal === 'function') d.showModal(); else d.setAttribute('open', '');
+    setTimeout(() => document.getElementById('nc-name')?.focus(), 50);
+}
+
+function closeNewClient() {
+    const d = document.getElementById('new-client-dialog');
+    if (!d) return;
+    if (typeof d.close === 'function') d.close(); else d.removeAttribute('open');
+    _newClientFor = null;
+    _newClientThen = null;
+}
+
+function saveNewClient(event) {
+    if (event) event.preventDefault();
+    const val = (id) => (document.getElementById(id)?.value || '').trim();
+    const err = document.getElementById('nc-err');
+    const name = val('nc-name');
+    if (name.length < 2) {
+        if (err) { err.textContent = 'צריך שם לקוח'; err.style.display = 'block'; }
+        return false;
+    }
+    // The same person entered twice is a split history: two quote lists, two
+    // reminder threads, one customer. An existing name wins and is reused.
+    const existing = clientsList.find((c) => _clientKey(c.name) === _clientKey(name));
+    const client = existing || {
+        id: 'cli' + Date.now(), name,
+        dealerNumber: '', phone: val('nc-phone'), email: '',
+        address: val('nc-addr'), city: val('nc-city'),
+    };
+    if (!existing) { clientsList.unshift(client); saveClients(); }
+    const target = _newClientFor;
+    const then = _newClientThen;
+    closeNewClient();
+    if (then) { try { then(client); } catch (e) {} }
+    else if (target) assignProjectClient(target, client.id);
+    else { try { filterProjectsList(); } catch (e) {} }
+    showToast(existing ? `שויך ל-${client.name}` : `${client.name} נוסף`);
+    return false;
 }

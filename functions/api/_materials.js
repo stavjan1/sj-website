@@ -360,18 +360,28 @@ export function searchMaterials(db, query, limit = DEFAULT_LIMIT) {
         // rank a part numbered 1212 above every actual 12-way panel, so it is
         // allowed only for terms long enough that a coincidence is unlikely.
         const whole = it.toks.has(t);
-        const partial = !whole && t.length >= 4 && it.hay.includes(t);
+        // A half-typed cross-section is a real query, not a mistake. Stav, 28/08:
+        // "בחיפוש במאגר רשום 5* לא מצא כלום ו5*6 מצא. זה כדאי שיהיה ככה לדעתך?"
+        // No: he is mid-thought, about to type the size, and every search he uses
+        // all day matches as he types. "5x" is normalised from "5*" and is the
+        // start of "5x6" — so a token that ends in x, or a short numeric one,
+        // matches products whose own token STARTS with it. Scored below a whole
+        // match, so a complete query is never displaced by a partial one.
+        const growing = !whole && (/^[\d.]+x$/.test(t) || (/^[\d.]+$/.test(t) && t.length <= 3));
+        const prefixed = growing && [...it.toks].some((x) => x.startsWith(t));
+        const partial = !whole && !prefixed && t.length >= 4 && it.hay.includes(t);
         const st = (!whole && !partial) ? stem(t) : null;
         const stemmed = st ? it.hay.includes(st) : false;
         const inCat = (!whole && !partial && !stemmed)
           && (it.catHay.includes(t) || (st && it.catHay.includes(st)));
-        if (!whole && !partial && !stemmed && !inCat) continue;
+        if (!whole && !prefixed && !partial && !stemmed && !inCat) continue;
 
         // Weighted by how rare the term is in the catalog: the word that names
         // the product beats the words that merely describe it.
         let w = termWeight(db, t);
         if (t.length >= 5) w += 1;
         if (partial || stemmed) w = Math.max(1, w - 2);
+        if (prefixed) w = Math.max(1, w - 3);   // still typing: a hint, not an answer
         if (inCat) w = 1;              // filed near it, not named it
         if (!literal) w = Math.min(w, 2); // a synonym, not the user's own word
         best = Math.max(best, w);
