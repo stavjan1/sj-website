@@ -24,9 +24,8 @@ const HTML = readFileSync(join(ROOT, 'sale', 'index.html'), 'utf8');
 const APP = readApp();
 const MARKUP = HTML + '\n' + APP;
 
-// Only the sheets /sale/ actually loads. sale/styles.css is the legacy V2 sheet
-// and is not linked from anywhere — including it would flood this with rules
-// that cannot affect a rendered pixel.
+// Only the sheets /sale/ actually loads. The legacy V2 sheet that used to sit
+// beside them, sale/styles.css, was 222KB that no page linked; it is deleted.
 const SHEETS = ['sale/css/panels.css', 'sale/css/shell.css', 'sale/css/pdf.css',
                 'sale/controlroom.css', 'sale/nextstep.css', 'sale/periodic.css',
                 'assets/ui.css'];
@@ -75,9 +74,9 @@ test('the money board keeps the styling it only just got', () => {
 });
 
 test('the legacy sheet is still not loaded, so nobody styles against it', () => {
-    // 222KB of V2 CSS lives at sale/styles.css and nothing links it. That is
-    // fine, and it is why this file ignores it — but if it ever comes back,
-    // every rule in it becomes live at once and this test should be revisited.
+    // sale/styles.css is deleted, and this stays as the guard against it (or
+    // anything like it) being linked back in: the moment a 222KB sheet nobody
+    // reads becomes live, every rule in it starts competing with the real ones.
     assert.ok(!/href="[^"]*sale\/styles\.css/.test(HTML) && !/href="styles\.css/.test(HTML),
         'sale/index.html now loads the legacy sheet — the scan above must include it');
 });

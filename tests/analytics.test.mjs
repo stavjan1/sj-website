@@ -4,8 +4,9 @@
 // silently spilling into the wrong days is invisible on screen — the number
 // just looks plausible. The other is structural: the V3 restyle moved the app
 // onto sale/css/panels.css and left the traffic card's classes behind in the
-// legacy sale/styles.css, so a whole card rendered with browser defaults and
-// nothing failed.
+// legacy sale/styles.css — a sheet no page loaded — so a whole card rendered
+// with browser defaults and nothing failed. That sheet is deleted now; this
+// test is what stopped the classes drifting back out of the live one.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -66,8 +67,9 @@ test('a month knows its own length, leap year included, and never runs past toda
 });
 
 test('every class the traffic card renders is styled by the stylesheet the app loads', () => {
-    // sale/styles.css is the legacy V2 sheet and is NOT linked from
-    // sale/index.html — a rule that lives only there is a rule that never ran.
+    // The rule has to live in the sheet the app LOADS. It used to be possible
+    // for one to live only in the unloaded legacy sheet, which is a rule that
+    // never ran; that sheet is gone, and this keeps the classes where they work.
     const app = readApp();
     const panels = read('sale/css/panels.css');
     const index = read('sale/index.html');

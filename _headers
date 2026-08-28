@@ -51,9 +51,6 @@
 /q/
   Cache-Control: no-cache
 
-/sale/styles.css
-  Cache-Control: no-cache
-
 /sale/app.js
   Cache-Control: no-cache
 
