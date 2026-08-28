@@ -37,7 +37,9 @@ function publicStatus(rec) {
 }
 
 // ── Financy adapter ────────────────────────────────────────────────────────
-// Filled in against the documented API; until then sync reports what it needs.
+// The adapter is written and shipped: functions/api/_financy.js. Credentials are
+// each user's own, entered in the UI — there is no env var to set and nothing
+// waiting on a registration.
 import { financySync, financyRefresh } from './_financy.js';
 
 export async function onRequestGet(context) {

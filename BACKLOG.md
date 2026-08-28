@@ -244,7 +244,7 @@ say them, which is a checklist change, not a drawing change.
   font against a diff that touches hundreds of rendered templates in the file two
   sessions share. Worth doing on the day something else already opens those
   templates — not on its own.
-- Financy (open-banking) connector for the finance dashboard — waiting on Stav's one-time registration at financy.open-finance.ai; server will take keys as env vars.
+- [x] Financy (open-banking) connector — SHIPPED (commit e391925). This line said it was waiting on Stav's registration and on env-var keys, and both halves were wrong: the adapter is `functions/api/_financy.js`, and it takes each user's OWN credentials through the UI, so nothing is waiting on anything. Checked 29/08 by running renderFinance() in four states. Believing this line is what made PRO look like "דלת לחדר ריק".
 - WhatsApp bot variant of the Telegram defect-report bot (Meta API is paid — deferred).
 - [x] PRODUCT_OVERVIEW.md refreshed (25/08/2026): the navigation section described
   V2's two-layer sidebar, and the screens table predated PRO, the money board, the

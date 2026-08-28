@@ -1,7 +1,9 @@
 // ZEREM PRO — cash-flow dashboard (תזרים מזומנים): bank/card accounts, anchor-day
 // cycles, safety floor, past+forecast curve, Financy connector; + Telegram report import.
 // Loads after app.js and uses its globals (isAdmin, showToast, getStorageKey,
-// switchTab, escapeHtml). Server side: /api/finance (admin-gated).
+// switchTab, escapeHtml). Server side: /api/finance.
+// NOT admin-gated any more — that comment outlived the change. Access is per
+// user by tier: pro and business see the dashboard, free sees the upgrade card.
 (function () {
     'use strict';
 
