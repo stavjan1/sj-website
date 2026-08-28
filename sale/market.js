@@ -799,57 +799,36 @@ function sheetDeleteRow(index) {
 }
 
 // ── Choosing the customer, from the customers he has ────────────────────────
-// Opened from two places now: the quote editor, which wants the chosen customer
+// Opened from two places: the quote editor, which wants the chosen customer
 // written onto the sheet, and a row on the work list, which wants the project
-// linked. The target is remembered here so pickClient does the right one.
+// linked. Both go through the one picker dialog now, so the customer list and
+// the category list cannot look like two different products.
 let _clientPickFor = null;
 function openClientPicker(projectId) {
     _clientPickFor = projectId || null;
-    const old = document.getElementById('client-picker');
-    if (old) old.remove();
-    const dlg = document.createElement('dialog');
-    dlg.id = 'client-picker';
-    dlg.className = 'ck-dialog';
-    const rows = (clientsList || []).slice().sort((a, b) => a.name.localeCompare(b.name, 'he'));
-    dlg.innerHTML = `
-        <h3>בחירת לקוח</h3>
-        <div class="search-bar">
-            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-            <input type="text" id="cl-pick-q" placeholder="חיפוש לקוח…" oninput="renderClientPicker()">
-        </div>
-        <div class="cp-list" id="cl-pick-list"></div>
-        <div class="ck-dialog-actions">
-            <button type="button" class="btn btn-accent" onclick="pickNewClient()">
-                <i class="fa-solid fa-plus" aria-hidden="true"></i> הוספת לקוח חדש
-            </button>
-            <button type="button" class="btn btn-secondary" onclick="document.getElementById('client-picker').close()">ביטול</button>
-        </div>`;
-    document.body.appendChild(dlg);
-    renderClientPicker();
-    dlg.showModal();
+    openPickerDialog({
+        title: 'בחירת לקוח',
+        searchPlaceholder: 'חיפוש לקוח…',
+        empty: 'עוד אין לקוחות שמורים. אפשר להוסיף אחד עכשיו.',
+        addLabel: 'לקוח חדש',
+        rows: (clientsList || []).slice()
+            .sort((a, b) => String(a.name).localeCompare(String(b.name), 'he'))
+            .map((c) => ({
+                id: c.id,
+                name: c.name,
+                sub: [c.phone, c.city].filter(Boolean).join(' · '),
+                active: projectId ? false : c.id === (projectsList.find((p) => p.id === activeProjectId) || {}).clientId,
+            })),
+        onPick: (row) => pickClient(row.id),
+        onAdd: () => pickNewClient(),
+    });
 }
 
-function renderClientPicker() {
-    const box = document.getElementById('cl-pick-list');
-    if (!box) return;
-    const q = ((document.getElementById('cl-pick-q') || {}).value || '').trim().toLowerCase();
-    const rows = (clientsList || []).filter((c) => !q || String(c.name || '').toLowerCase().includes(q)
-        || String(c.phone || '').includes(q));
-    if (!rows.length) {
-        box.innerHTML = `<p class="input-help">${(clientsList || []).length ? 'לא נמצא לקוח תואם.' : 'עוד אין לקוחות שמורים. אפשר להוסיף אחד עכשיו.'}</p>`;
-        return;
-    }
-    box.innerHTML = rows.map((c) => `
-        <button type="button" class="cp-row" onclick="pickClient('${escapeHtml(c.id)}')">
-            <span class="cp-name">${escapeHtml(c.name)}</span>
-            <span class="cp-price">${escapeHtml([c.phone, c.city].filter(Boolean).join(' · '))}</span>
-        </button>`).join('');
-}
 
 function pickClient(id) {
     const client = (clientsList || []).find((c) => c.id === id);
-    const dlg = document.getElementById('client-picker');
-    if (dlg) { dlg.close(); dlg.remove(); }
+    // openPickerDialog closes itself before it calls back, so there is nothing
+    // left to dismiss here.
     const target = _clientPickFor;
     _clientPickFor = null;
     if (!client) return;
@@ -878,8 +857,6 @@ function pickClient(id) {
 // work list uses, and the quote picks the customer up when it closes.
 function pickNewClient() {
     const target = _clientPickFor;                 // survive the picker closing
-    const dlg = document.getElementById('client-picker');
-    if (dlg) { try { dlg.close(); } catch (e) {} dlg.remove(); }
     openNewClient(target);
     if (!target) _newClientThen = (client) => pickClient(client.id);
 }

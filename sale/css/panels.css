@@ -182,12 +182,21 @@ i[class^="fa-"], i[class*=" fa-"] {
    ui.css .input look, scoped to panel + overlay content only (the PDF sheets
    contain no form controls, so this cannot leak into them).
    ============================================================================ */
+/* Every field in the app is dressed by THIS rule, and it is scoped to a list of
+   containers. That is the trap: add a new container and its inputs silently fall
+   back to the browser's own white box on a dark screen — which is what happened
+   to the conversation list's search field, and it is the second time in one day
+   I shipped an unstyled control for exactly this reason. Any new top-level
+   container that can hold a field belongs on this list; tests/field-styling
+   .test.mjs fails if one is added and forgotten. */
 .content-panel input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]),
 .content-panel select,
 .content-panel textarea,
 .ck-dialog input:not([type="checkbox"]):not([type="radio"]),
 .ck-dialog select,
 .ck-dialog textarea,
+.convo-panel input:not([type="checkbox"]):not([type="radio"]),
+.convo-panel select,
 .stern-drawer input,
 .lock-card input:not([type="hidden"]),
 .lock-card select {
@@ -202,6 +211,7 @@ i[class^="fa-"], i[class*=" fa-"] {
     transition: border-color var(--t-fast);
 }
 .content-panel textarea, .ck-dialog textarea { min-height: 72px; resize: vertical; }
+.convo-panel input:focus,
 .content-panel input:focus, .content-panel select:focus, .content-panel textarea:focus,
 .ck-dialog input:focus, .ck-dialog select:focus, .ck-dialog textarea:focus,
 .stern-drawer input:focus, .lock-card input:focus, .lock-card select:focus {
@@ -4604,7 +4614,9 @@ i[class^="fa-"], i[class*=" fa-"] {
 .convo-new svg { width: 17px; height: 17px; }
 
 .convo-search-wrap { display: block; margin-block-end: var(--sp-2); }
-.convo-search-wrap input { width: 100%; min-height: 40px; font-size: var(--fs-sm); }
+.convo-search-wrap input { font-size: var(--fs-sm); }
+/* Safari paints its own clear-button and inner shadow on type=search. */
+.convo-panel input[type="search"] { -webkit-appearance: none; appearance: none; }
 
 .convo-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .convo-empty { color: var(--text-3); font-size: var(--fs-xs); line-height: 1.7; padding: var(--sp-3) var(--sp-1); }
@@ -5277,3 +5289,15 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
 .cli-pick-sub { color: var(--text-3); font-size: var(--fs-xs); }
 .proj-client-chip { cursor: pointer; }
 @media (max-width: 768px) { .client-picker { width: calc(100vw - var(--sp-6)); max-width: none; } }
+
+/* The one picker both lists use. Its rows reuse .cp-row / .cp-name / .cp-price,
+   which the catalogue picker already styled — same shape, same weight, so the
+   customer list and the category list cannot look like two products. */
+.picker-dialog { max-width: 420px; }
+.picker-dialog .cp-list { max-height: 46vh; overflow-y: auto; margin-block: var(--sp-2); }
+.picker-dialog .cp-row.is-active { background: var(--accent-soft); border-color: var(--accent); }
+@media (max-width: 768px) {
+    .picker-dialog { width: calc(100vw - var(--sp-6)); max-width: none; }
+    .picker-dialog .ck-dialog-actions { flex-direction: column-reverse; gap: var(--sp-2); }
+    .picker-dialog .ck-dialog-actions .btn { width: 100%; min-height: 46px; }
+}

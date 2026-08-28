@@ -3710,9 +3710,12 @@ function catAddClick(e) {
     addProjectCategory();
 }
 
-function addProjectCategory() {
+// Takes the name as an argument now, and falls back to the field on the work
+// list. It only ever read that input, so a dialog could not add a category
+// without faking one — the same shape that killed three entry points earlier.
+function addProjectCategory(nameArg) {
     const inp = document.getElementById('new-cat-name');
-    const name = (inp?.value || '').trim();
+    const name = String(nameArg != null ? nameArg : (inp?.value || '')).trim();
     if (!name) return;
     if (!appState.settings.projectCategories) appState.settings.projectCategories = [];
     if (!appState.settings.projectCategories.includes(name)) {
@@ -9995,3 +9998,148 @@ function knowledgeFor(text, opts) {
 // apart. It is generalised there instead, so the work list and the quote editor
 // open the same picker.
 
+
+// ============================================================================
+// ONE PICKER, TWO LISTS
+// A native <select> draws its list with the operating system's widget: it
+// cannot be styled, and on Stav's screenshot it opened as a bare white slab
+// over a dark app, looking like a different program. Both controls on a work
+// row were selects — the customer and the category.
+//
+// The customer one already had a hand-written replacement in market.js. Rather
+// than write a second one for categories and have two dialogs drift apart, the
+// shape is extracted here and both go through it. That is the same reuse
+// mistake I nearly made an hour ago, caught the second time before shipping it.
+//
+// Rows are plain data — { id, name, sub, active } — so the caller does not
+// build markup, and the dialog never learns what a customer or a category is.
+// ============================================================================
+function openPickerDialog(opts) {
+    const o = opts || {};
+    const old = document.getElementById('picker-dialog');
+    if (old) old.remove();
+
+    const dlg = document.createElement('dialog');
+    dlg.id = 'picker-dialog';
+    dlg.className = 'ck-dialog picker-dialog';
+    const searchable = (o.rows || []).length > 7;   // a list you can see needs no search
+    dlg.innerHTML = `
+        <h3>${escapeHtml(o.title || '')}</h3>
+        ${searchable ? `<div class="search-bar">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="text" id="picker-q" placeholder="${escapeHtml(o.searchPlaceholder || 'חיפוש…')}">
+        </div>` : ''}
+        <div class="cp-list" id="picker-list"></div>
+        <div class="ck-dialog-actions">
+            ${o.addLabel ? `<button type="button" class="btn btn-accent" data-a="add">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i> ${escapeHtml(o.addLabel)}</button>` : ''}
+            <button type="button" class="btn btn-secondary" data-a="close">סגירה</button>
+        </div>`;
+    document.body.appendChild(dlg);
+
+    const close = () => { try { dlg.close(); } catch (e) {} dlg.remove(); };
+    const list = dlg.querySelector('#picker-list');
+
+    const paint = () => {
+        const q = ((dlg.querySelector('#picker-q') || {}).value || '').trim().toLowerCase();
+        const rows = (o.rows || []).filter((r) => !q
+            || String(r.name || '').toLowerCase().includes(q)
+            || String(r.sub || '').toLowerCase().includes(q));
+        if (!rows.length) {
+            list.innerHTML = `<p class="input-help">${escapeHtml(q ? 'לא נמצאה התאמה.' : (o.empty || 'אין מה לבחור עדיין.'))}</p>`;
+            return;
+        }
+        list.innerHTML = rows.map((r, i) => `
+            <button type="button" class="cp-row${r.active ? ' is-active' : ''}" data-i="${i}">
+                <span class="cp-name">${escapeHtml(r.name)}</span>
+                ${r.sub ? `<span class="cp-price">${escapeHtml(r.sub)}</span>` : ''}
+            </button>`).join('');
+        list.querySelectorAll('.cp-row').forEach((b) => {
+            b.onclick = () => {
+                const row = rows[Number(b.dataset.i)];
+                close();
+                if (o.onPick) o.onPick(row);
+            };
+        });
+    };
+
+    const q = dlg.querySelector('#picker-q');
+    if (q) q.oninput = paint;
+    paint();
+
+    dlg.querySelector('[data-a="close"]').onclick = close;
+    const add = dlg.querySelector('[data-a="add"]');
+    if (add) add.onclick = () => { close(); if (o.onAdd) o.onAdd(); };
+    dlg.addEventListener('cancel', close);
+
+    if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
+    if (q) setTimeout(() => q.focus(), 30);
+    return dlg;
+}
+
+// A work's category. The list is whatever categories already exist plus the
+// ones he has managed, and "קטגוריה חדשה" is on the dialog rather than being a
+// disguised option at the bottom of a dropdown — which is what "+ לקוח חדש…"
+// used to be, and it is why picking it felt like choosing a customer named "+".
+function openCategoryPicker(projectId) {
+    const proj = projectsList.find((p) => p.id === projectId);
+    if (!proj) return;
+    const cats = getProjectCategories();
+    openPickerDialog({
+        title: 'קטגוריה',
+        searchPlaceholder: 'חיפוש קטגוריה…',
+        empty: 'עוד אין קטגוריות. אפשר להוסיף אחת עכשיו.',
+        addLabel: 'קטגוריה חדשה',
+        rows: [{ id: '', name: 'ללא קטגוריה', active: !proj.category }].concat(
+            cats.map((c) => ({ id: c, name: c, active: proj.category === c }))),
+        onPick: (row) => assignProjectCategory(projectId, row.id),
+        onAdd: () => {
+            openNamePrompt({
+                title: 'קטגוריה חדשה',
+                label: 'שם הקטגוריה',
+                placeholder: 'קבלנים, ועדי בית, תחזוקה…',
+                onSave: (name) => {
+                    addProjectCategory(name);
+                    assignProjectCategory(projectId, name);
+                },
+            });
+        },
+    });
+}
+
+// The last browser prompt on a path a customer walks: one short field, asked
+// in the product's own dialog. Kept generic because "give me a name" turns up
+// in more than one place.
+function openNamePrompt(opts) {
+    const o = opts || {};
+    const old = document.getElementById('name-prompt');
+    if (old) old.remove();
+    const dlg = document.createElement('dialog');
+    dlg.id = 'name-prompt';
+    dlg.className = 'ck-dialog';
+    dlg.innerHTML = `
+        <h3>${escapeHtml(o.title || '')}</h3>
+        <div class="form-group">
+            <label for="np-value">${escapeHtml(o.label || 'שם')}</label>
+            <input type="text" id="np-value" placeholder="${escapeHtml(o.placeholder || '')}" value="${escapeHtml(o.value || '')}">
+        </div>
+        <div class="ck-dlg-actions">
+            <button type="button" class="btn btn-secondary" data-a="no">ביטול</button>
+            <button type="button" class="btn btn-accent" data-a="yes">שמור</button>
+        </div>`;
+    document.body.appendChild(dlg);
+    const close = () => { try { dlg.close(); } catch (e) {} dlg.remove(); };
+    const save = () => {
+        const v = (dlg.querySelector('#np-value').value || '').trim();
+        close();
+        if (v && o.onSave) o.onSave(v);
+    };
+    dlg.querySelector('[data-a="yes"]').onclick = save;
+    dlg.querySelector('[data-a="no"]').onclick = close;
+    dlg.querySelector('#np-value').onkeydown = (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); save(); }
+    };
+    dlg.addEventListener('cancel', close);
+    if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
+    setTimeout(() => dlg.querySelector('#np-value')?.focus(), 30);
+}

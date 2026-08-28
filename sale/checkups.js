@@ -1217,10 +1217,6 @@ function renderProjectsList(list) {
     if (stale.length) list = list.filter(p => !staleIds.has(p.id));
 
     const cats = getProjectCategories();
-    const catOptions = (sel) => cats.map(c =>
-        `<option value="${escapeHtml(c)}" ${sel === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
-    const clientOptions = (sel) => clientsList.map(c =>
-        `<option value="${escapeHtml(c.id)}" ${sel === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
 
     list.forEach(p => {
         const isActive = p.id === activeProjectId;
@@ -1250,13 +1246,11 @@ function renderProjectsList(list) {
                     <span><i class="fa-solid fa-calendar"></i> ${formatHebrewDate(p.created)}</span>
                     ${p.approvedAt ? `<span class="approved-badge" title="${escapeHtml('אושרה בקישור' + (p.approvedBy ? ' על ידי ' + p.approvedBy : ''))}"><i class="fa-solid fa-circle-check"></i> אושרה על ידי הלקוח</span>` : ''}
                     ${maintBadgeHtml(p)}
-                    <label class="proj-cat-chip ${p.category ? 'has-cat' : ''}" onclick="event.stopPropagation()">
+                    <button type="button" class="proj-cat-chip ${p.category ? 'has-cat' : ''}"
+                            onclick="event.stopPropagation(); openCategoryPicker('${p.id}')" title="שיוך לקטגוריה">
                         <i class="fa-solid fa-tag"></i>
-                        <select class="proj-cat-select" onchange="assignProjectCategory('${p.id}', this.value)">
-                            <option value="">ללא קטגוריה</option>
-                            ${catOptions(p.category || '')}
-                        </select>
-                    </label>
+                        <span>${escapeHtml(p.category || 'ללא קטגוריה')}</span>
+                    </button>
                     <button type="button" class="proj-cat-chip proj-client-chip ${p.clientId ? 'has-cat' : ''}"
                             onclick="event.stopPropagation(); openClientPicker('${p.id}')" title="שיוך ללקוח">
                         <i class="fa-solid fa-user"></i>
