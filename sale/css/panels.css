@@ -5494,3 +5494,31 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
         display: flex; grid-column: 1 / -1; grid-row: 3;
     }
 }
+
+/* ---- The jobs that belong to nobody -----------------------------------------
+   לקוחות lists customers now, so work with no customer linked has nowhere to
+   appear — and silently vanishing is worse than the phantom customers it used
+   to invent. One line says how many there are, opening it lists them, and each
+   one carries the picker that fixes it. Stav: "ואולי בצד איזה 'ישנם x
+   פרויקטים שלא משויכים ללקוחות' ולחיצה על זה מציג את כל אלו." */
+.orphan-bar {
+    display: flex; align-items: center; gap: var(--sp-2);
+    width: 100%; min-height: 44px; margin-block-end: var(--sp-3);
+    padding: 0 var(--sp-3);
+    background: var(--surface); border: 1px dashed var(--border-strong, var(--border));
+    border-radius: var(--r-sm);
+    color: var(--text-2); font: 600 var(--fs-sm) var(--font-ui);
+    text-align: start; cursor: pointer;
+}
+.orphan-bar:hover { color: var(--text); border-color: var(--accent); }
+.orphan-bar > span { flex: 1 1 auto; min-width: 0; }
+.orphan-bar .ob-caret { transition: transform var(--t-fast); }
+.orphan-bar.is-open .ob-caret { transform: rotate(180deg); }
+.orphan-list {
+    margin-block: calc(-1 * var(--sp-2)) var(--sp-3);
+    padding: var(--sp-2);
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    background: var(--surface);
+}
+.orphan-list[hidden] { display: none; }
+.arch-none { margin: 0; padding: var(--sp-2) var(--sp-3); }

@@ -415,8 +415,23 @@ test('a rendered screen is actually reachable', () => {
 
     // The link that makes the grouping trustworthy.
     assert.match(app, /function projectClient/, 'projects can no longer name a real client');
-    assert.match(app, /const key = linked \? 'id:' \+ linked\.id : _clientKey\(client\)/,
-        'the archive is back to grouping clients by typed text, so a typo splits a customer in two');
+    // Stronger than the rule this replaced. The archive used to GROUP projects
+    // by client — keying on the link where there was one and on typed text
+    // where there was not — so a typo still split a customer, and a customer
+    // with no job yet did not appear at all. It iterates clientsList itself
+    // now, and text typed on a quote cannot invent anybody.
+    // Stav, 29/08: "בלקוחות שיופיעו הלקוחות ולא הפרויקטים."
+    const arch = app.slice(app.indexOf('function renderClientArchive('));
+    const archBody = arch.slice(0, arch.indexOf('\n}'));
+    assert.ok(/let list = \(clientsList \|\| \[\]\)\.map/.test(archBody),
+        'the customers screen is built from projects again, so a saved customer with no job is invisible');
+    assert.ok(!/_clientKey\(/.test(archBody),
+        'typed text is grouping customers again — a name on a quote is not a customer record');
+    // Work linked to nobody must stay findable, or moving to a real customer
+    // list would silently hide it.
+    assert.ok(/orphans\.push\(row\)/.test(archBody), 'unlinked work is dropped instead of counted');
+    assert.ok(/openClientPicker\(/.test(archBody),
+        'the unassigned list must let you fix the link where it reports it');
 });
 
 test('the model is switchable, testable, and never switches itself', () => {

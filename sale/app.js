@@ -2485,38 +2485,58 @@ function _setCfCount(id, n) {
     el.hidden = !n;
 }
 
+// ============================================================================
+// לקוחות IS A LIST OF CUSTOMERS
+// It was a list of PROJECTS wearing customers' names: the renderer walked
+// projectsList, took whatever string sat in quoteData.clientName, and made a
+// "customer" out of it. Two consequences, both wrong, both invisible from the
+// screen itself:
+//   * a real customer you saved and have not worked for yet did not exist here
+//     at all — you added them, and the customers screen did not show them;
+//   * a job with a name typed on its quote and no customer linked INVENTED a
+//     customer, so the archive filled with people who are not in your records
+//     and cannot be phoned, messaged, or given a second job.
+// Stav, 29/08: "בלקוחות שיופיעו הלקוחות ולא הפרויקטים."
+//
+// So the list is clientsList — the actual records — and the jobs hang under
+// the customer they are linked to. Work that is linked to nobody is not a
+// person: it is one line saying how much of it there is, and opening it hands
+// you the picker for each one. A data problem that reports itself, and can be
+// fixed where it is reported.
+// ============================================================================
 function renderClientArchive() {
     const box = document.getElementById('archive-list');
     if (!box) return;
     const q = (document.getElementById('archive-search')?.value || '').trim().toLowerCase();
 
-    // Group active projects by client. A linked client groups by its id, so two
-    // spellings of the same customer stop being two customers; everything else
-    // still falls back to the typed name.
-    const groups = {};
-    (projectsList || []).forEach(p => {
+    const jobsOf = {};
+    const orphans = [];
+    (projectsList || []).forEach((p) => {
+        if (!isJob(p)) return;                     // a question is not a job
         const qd = p.quoteData || {};
-        const linked = projectClient(p);
-        const client = linked ? linked.name : (qd.clientName || p.name || '—').trim();
-        const key = linked ? 'id:' + linked.id : _clientKey(client);
-        const contact = linked
-            ? [linked.phone, linked.email].filter(Boolean).join(' · ')
-            : (qd.clientSub || '');
-        if (!groups[key]) groups[key] = { client, contact, quotes: [] };
-        if (!groups[key].contact && contact) groups[key].contact = contact;
-        groups[key].quotes.push({
+        const row = {
             projectId: p.id,
             number: qd.quoteNumber || '',
             subject: qd.subject || p.name || '',
             date: qd.date || p.created || '',
             total: Number(qd.finalPrice) || 0,
             status: p.status || 'טיוטה',
-            shareLink: p.shareLink || ''
-        });
+            shareLink: p.shareLink || '',
+            typed: (qd.clientName || '').trim(),
+        };
+        const linked = projectClient(p);
+        if (linked) (jobsOf[linked.id] = jobsOf[linked.id] || []).push(row);
+        else orphans.push(row);
     });
 
-    let list = Object.values(groups);
-    if (q) list = list.filter(g => g.client.toLowerCase().includes(q) || (g.contact || '').toLowerCase().includes(q));
+    let list = (clientsList || []).map((c) => ({
+        id: c.id,
+        client: c.name,
+        contact: [c.phone, c.city].filter(Boolean).join(' · '),
+        quotes: (jobsOf[c.id] || []).sort((a, b) => String(b.date).localeCompare(String(a.date))),
+    }));
+
+    if (q) list = list.filter((g) => g.client.toLowerCase().includes(q) || (g.contact || '').toLowerCase().includes(q));
 
     // Two ways of asking "who is worth a phone call": someone with a job that
     // comes back, and someone who has already come back more than once.
@@ -2527,34 +2547,58 @@ function renderClientArchive() {
     _setCfCount('cf-count-repeat', list.filter(isRepeat).length);
     if (clientFilter === 'maint') list = list.filter(underMaint);
     else if (clientFilter === 'repeat') list = list.filter(isRepeat);
-    // Most recent client first (by their newest quote date).
-    list.sort((a, b) => (b.quotes[0]?.date || '').localeCompare(a.quotes[0]?.date || ''));
+
+    // Whoever you worked for most recently is first; a customer with no job yet
+    // sorts to the end rather than disappearing, which is the whole point.
+    list.sort((a, b) => String((b.quotes[0] || {}).date || '').localeCompare(String((a.quotes[0] || {}).date || '')));
+
+    const orphanRow = (x) => `
+        <div class="arch-quote">
+            <div class="arch-q-main" onclick="openProjectFromArchive('${x.projectId}')">
+                <span class="arch-q-subject">${escapeHtml(x.subject || 'ללא נושא')}</span>
+                <span class="arch-q-meta">${x.typed ? escapeHtml(x.typed) + ' · ' : ''}${x.date ? formatHebrewDate(x.date) : ''}${x.total ? ' · ' + x.total.toLocaleString('he-IL') + ' ₪' : ''}</span>
+            </div>
+            <div class="arch-q-side">
+                <button type="button" class="btn btn-accent btn-small"
+                        onclick="event.stopPropagation(); openClientPicker('${x.projectId}')">שייך ללקוח</button>
+            </div>
+        </div>`;
+
+    const orphanBar = (!q && clientFilter === 'all' && orphans.length)
+        ? `<button type="button" class="orphan-bar" id="orphan-bar" onclick="toggleOrphanJobs()" aria-expanded="false">
+               <i class="fa-solid fa-link-slash" aria-hidden="true"></i>
+               <span>ישנן ${orphans.length} ${orphans.length === 1 ? 'עבודה שלא משויכת' : 'עבודות שלא משויכות'} ללקוח</span>
+               <i class="fa-solid fa-chevron-down ob-caret" aria-hidden="true"></i>
+           </button>
+           <div class="orphan-list" id="orphan-list" hidden>${orphans.map(orphanRow).join('')}</div>`
+        : '';
 
     if (list.length === 0) {
-        const noneMsg = clientFilter === 'maint' ? 'אף לקוח לא נמצא תחת תחזוקה. אפשר לסמן עבודה כחוזרת בלשונית "שירות תקופתי".'
+        const noneMsg = clientFilter === 'maint' ? 'אף לקוח לא נמצא תחת תחזוקה. אפשר לסמן עבודה כחוזרת מתוך העבודה עצמה.'
             : clientFilter === 'repeat' ? 'עדיין אין לקוח שחזר יותר מפעם אחת.'
-            : 'עדיין אין לקוחות.';
-        box.innerHTML = `<div class="archive-empty">${q ? 'לא נמצא לקוח בשם הזה.' : escapeHtml(noneMsg)}</div>`;
+            : 'עדיין אין לקוחות שמורים. כל עבודה שתשייך ללקוח תופיע כאן.';
+        box.innerHTML = orphanBar + `<div class="archive-empty">${q ? 'לא נמצא לקוח בשם הזה.' : escapeHtml(noneMsg)}</div>`;
         return;
     }
 
     // Search auto-expands matches; otherwise cards start collapsed (a client is
-    // one line — click to reveal their projects), so the archive stays tidy.
+    // one line — click to reveal their jobs), so the list stays scannable.
     const expandAll = !!q;
-    box.innerHTML = list.map(g => {
+    box.innerHTML = orphanBar + list.map((g) => {
         const totalSum = g.quotes.reduce((s, x) => s + x.total, 0);
         const badge = (st) => `<span class="status-badge status-badge-${st}">${st}</span>`;
-        const rows = g.quotes.map(x => `
+        const rows = g.quotes.length ? g.quotes.map((x) => `
             <div class="arch-quote">
-                <div class="arch-q-main" onclick="openProjectFromArchive('${x.projectId}')" title="פתח את הפרויקט (צפייה)">
+                <div class="arch-q-main" onclick="openProjectFromArchive('${x.projectId}')" title="פתח את העבודה (צפייה)">
                     <span class="arch-q-subject">${escapeHtml(x.subject || 'ללא נושא')}</span>
-                    <span class="arch-q-meta">${x.number ? 'מס\' ' + escapeHtml(x.number) + ' · ' : ''}${x.date ? formatHebrewDate(x.date) : ''} · ${x.total ? x.total.toLocaleString('he-IL') + ' ₪' : '—'}</span>
+                    <span class="arch-q-meta">${x.number ? 'מס. ' + escapeHtml(x.number) + ' · ' : ''}${x.date ? formatHebrewDate(x.date) : ''} · ${x.total ? x.total.toLocaleString('he-IL') + ' ₪' : '—'}</span>
                 </div>
                 <div class="arch-q-side">
                     ${badge(x.status)}
                     ${x.shareLink ? `<button class="btn btn-secondary btn-small" onclick="copyArchiveLink('${encodeURIComponent(x.shareLink)}', event)" title="העתק קישור ללקוח"><i class="fa-solid fa-link"></i></button>` : ''}
                 </div>
-            </div>`).join('');
+            </div>`).join('')
+            : `<p class="input-help arch-none">עוד לא עשית עבודה אצל הלקוח הזה.</p>`;
         return `<div class="archive-card${expandAll ? ' open' : ''}">
             <div class="arch-head" onclick="toggleArchiveCard(this)">
                 <i class="fa-solid fa-chevron-down arch-caret"></i>
@@ -2566,13 +2610,25 @@ function renderClientArchive() {
                     </div>
                 </div>
                 <div class="arch-stats">
-                    <span>${g.quotes.length} ${g.quotes.length === 1 ? 'פרויקט' : 'פרויקטים'}</span>
+                    <span>${g.quotes.length} ${g.quotes.length === 1 ? 'עבודה' : 'עבודות'}</span>
                     <span class="arch-total">${totalSum.toLocaleString('he-IL')} ₪</span>
                 </div>
             </div>
             <div class="arch-quotes">${rows}</div>
         </div>`;
     }).join('');
+}
+
+// The unassigned pile opens in place. It is deliberately NOT a screen of its
+// own: it is a problem you fix and then stop seeing, not a destination.
+function toggleOrphanJobs() {
+    const list = document.getElementById('orphan-list');
+    const bar = document.getElementById('orphan-bar');
+    if (!list || !bar) return;
+    const open = list.hidden;
+    list.hidden = !open;
+    bar.classList.toggle('is-open', open);
+    bar.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 function toggleArchiveCard(headEl) {
     const card = headEl.closest('.archive-card');
