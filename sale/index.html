@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=389">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=390">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,14 +26,14 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=389">
-    <link rel="stylesheet" href="../assets/ui.css?v=389">
-    <link rel="stylesheet" href="css/shell.css?v=389">
-    <link rel="stylesheet" href="css/panels.css?v=389">
-    <link rel="stylesheet" href="controlroom.css?v=389">
-    <link rel="stylesheet" href="periodic.css?v=389">
-    <link rel="stylesheet" href="nextstep.css?v=389">
-    <link rel="stylesheet" href="css/pdf.css?v=389">
+    <link rel="stylesheet" href="../assets/tokens.css?v=390">
+    <link rel="stylesheet" href="../assets/ui.css?v=390">
+    <link rel="stylesheet" href="css/shell.css?v=390">
+    <link rel="stylesheet" href="css/panels.css?v=390">
+    <link rel="stylesheet" href="controlroom.css?v=390">
+    <link rel="stylesheet" href="periodic.css?v=390">
+    <link rel="stylesheet" href="nextstep.css?v=390">
+    <link rel="stylesheet" href="css/pdf.css?v=390">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -2671,21 +2671,21 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/checkups-core.js?v=389"></script>
-    <script src="/assets/listcards.js?v=389"></script>
+    <script src="/assets/checkups-core.js?v=390"></script>
+    <script src="/assets/listcards.js?v=390"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=389"></script>
-    <script src="app.js?v=389"></script>
+    <script src="coverage.js?v=390"></script>
+    <script src="app.js?v=390"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=389"></script>
+    <script src="finance.js?v=390"></script>
     <!-- The guide that points at the screen (first-run tour + milestone hints) -->
-    <script src="coach.js?v=389"></script>
-    <script src="nextstep.js?v=389"></script>
+    <script src="coach.js?v=390"></script>
+    <script src="nextstep.js?v=390"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="../assistant.js?v=389" defer></script>
-    <script src="/track.js?v=389" defer></script>
+    <script src="../assistant.js?v=390" defer></script>
+    <script src="/track.js?v=390" defer></script>
 </body>
 </html>

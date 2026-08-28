@@ -302,6 +302,7 @@ async function adminRefreshUserList() {
                     <span class="au-caret"><i class="fa-solid fa-chevron-down"></i></span>
                     <span class="au-email" dir="ltr">${escapeHtml(u.email)}</span>
                     <span class="au-meta">${joined ? 'נרשם ' + joined + ' · ' : ''}${u.projects} פרויקטים · עודכן ${last}</span>
+                    <span class="au-plan plan-${escapeHtml(u.tier || 'free')}">${escapeHtml(TIER_LABELS[u.tier] || u.tier || 'free')}</span>
                 </button>
                 <div class="admin-user-body" style="display:none;"></div>
             </div>`;
@@ -327,7 +328,10 @@ async function adminToggleUser(btn) {
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
         const projects = d.projects || [];
         const nis = (n) => n ? '₪' + Math.round(n).toLocaleString('he-IL') : '—';
-        body.innerHTML = `<div class="au-tier">מסלול: <b>${escapeHtml(d.tier || 'free')}</b></div>` + (projects.length
+        body.innerHTML = `<div class="au-tier">מסלול:
+            <select class="model-select-input au-tier-sel" onchange="adminSetTierFor('${escapeHtml(email)}', this.value, this)">
+                ${['free', 'pro', 'business'].map((t) => `<option value="${t}" ${((d.tier || 'free') === t) ? 'selected' : ''}>${escapeHtml(TIER_LABELS[t] || t)}</option>`).join('')}
+            </select></div>` + (projects.length
             ? projects.map(p => `<div class="au-proj">
                     <span class="au-proj-name">${escapeHtml(p.name)}</span>
                     <span class="au-proj-meta"><span class="status-badge status-badge-${escapeHtml(p.status)}">${escapeHtml(p.status)}</span> ${nis(p.amount)}</span>
@@ -710,6 +714,27 @@ async function adminLookupTier() {
         if (sel && data.tier) sel.value = data.tier;
     } catch (e) { _adminTierStatus('הבדיקה נכשלה: ' + e.message, false); }
 }
+// Assigning a plan from the row you are already reading, instead of copying an
+// address into the search box above and typing it back in.
+async function adminSetTierFor(email, tier, el) {
+    if (el) el.disabled = true;
+    try {
+        const res = await adminRes('/api/tier', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, tier: tier })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error((data.error && data.error.message) || res.status);
+        showToast(data.email + ' → ' + (TIER_LABELS[data.tier] || data.tier));
+        // The badge on the closed row is now stale; the list is cheap to redraw.
+        adminRefreshUserList();
+    } catch (e) {
+        showToast('השיוך נכשל: ' + e.message, 'error');
+    }
+    if (el) el.disabled = false;
+}
+
 async function adminSetTier() {
     const email = (document.getElementById('admin-tier-email') || {}).value || '';
     const tier = (document.getElementById('admin-tier-select') || {}).value || 'free';

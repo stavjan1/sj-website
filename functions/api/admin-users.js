@@ -68,7 +68,25 @@ export async function onRequestGet(context) {
     }
   } while (cursor && users.length < 500);
 
-  // Most recently active first.
+  // The plan each of them is on. Not a getTierForEmail per user — that is one
+  // KV read each, and this list runs every time the panel opens. Only people
+  // who were GIVEN a plan have a tier: key at all, and paid users are few, so
+  // the whole picture costs one list plus a read per paying customer.
+  const tiers = new Map();
+  try {
+    let tc;
+    do {
+      const res = await env.SJ_DATA.list({ prefix: 'tier:', cursor: tc, limit: 1000 });
+      tc = res.list_complete ? null : res.cursor;
+      const vals = await Promise.all(res.keys.map((k) => env.SJ_DATA.get(k.name)));
+      res.keys.forEach((k, i) => { if (vals[i]) tiers.set(k.name.slice(5), vals[i]); });
+    } while (tc);
+  } catch { /* a missing tier map is a list of free users, not an error page */ }
+  users.forEach((u) => {
+    u.tier = u.email === ADMIN_EMAIL ? 'admin' : (tiers.get(u.email) || 'free');
+  });
+
+  // Most recently active first, and paying customers first within that.
   users.sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
 
   // Delivery state of the signup notification. Shown next to the counter so a

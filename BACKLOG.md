@@ -165,7 +165,11 @@ gating (server-side ADMIN_EMAIL on every admin endpoint), per-user KV keying
       catalog screen's import, which takes name/price/unit columns today).
 - [ ] More adversarial training rounds — waiting for Stav's time: he feeds real examples,
       we check the model's guesses, fix the map each round.
-- [ ] SUMIT selling point surfaced in provider UI (badge exists; consider onboarding highlight).
+- [x] SUMIT selling point surfaced (closed 25/08/2026 — **already there**): the
+      provider picker renders the badge and the note about their free WhatsApp
+      expense agent, and the expenses screen in PRO carries the tip next to the
+      place a person is actually looking at receipts. A third placement would be
+      an advertisement, not a highlight.
 - [ ] Providers: live tests with real accounts (Green Invoice/iCount/EZcount/SUMIT).
 - [ ] Optional Chrome-Claude crawl: supplier material catalog (e.g. big wholesaler) to seed
       system material prices — only if Stav wants; users can also feed via the scrape tab.
@@ -179,7 +183,13 @@ gating (server-side ADMIN_EMAIL on every admin endpoint), per-user KV keying
 
 ## Growth / marketing
 - [ ] Share push into electrician WhatsApp groups (Stav sends /ask/ link; OG card ready).
-- [ ] "Loved by AIs" expansion: keep llms.txt fresh; consider FAQ page for GEO.
+- [x] "Loved by AIs" refresh (25/08/2026): llms.txt described the engineering
+      practice and the pricing figures but **never mentioned ZEREM at all** — a
+      model asked "is there a tool for pricing electrical work in Israel" had
+      nothing of ours to cite. It now carries the product, both entry points
+      (/ask/ and /zerem/) and the calculator, in Hebrew and English. No separate
+      FAQ page: /articles (12 guides) and /pricing-guide already are one, and a
+      third page competing with them is worse for GEO, not better.
 
 ## Tech debt
 - [x] 🟢 checkups: duplicated periodic-service core — **extracted 22/08/2026** to
@@ -227,10 +237,19 @@ say them, which is a checklist change, not a drawing change.
       walkthrough he mentioned he dismissed himself as fantasy.)
 
 ## V3.0 rebuild — queued follow-ups (16.8.2026)
-- Full de-FontAwesome sweep inside sale/app.js rendered templates (V3 shell is already SVG-only; FA CDN kept for panel innerHTML icons meanwhile).
+- [ ] ~~Full de-FontAwesome sweep inside sale/app.js templates~~ — **recommended
+  against, 25/08/2026.** The reason it was queued was the CDN being unreliable on
+  real devices; FontAwesome has since been self-hosted under sale/vendor/, so the
+  icons work offline and forever either way. What is left is a few hundred KB of
+  font against a diff that touches hundreds of rendered templates in the file two
+  sessions share. Worth doing on the day something else already opens those
+  templates — not on its own.
 - Financy (open-banking) connector for the finance dashboard — waiting on Stav's one-time registration at financy.open-finance.ai; server will take keys as env vars.
 - WhatsApp bot variant of the Telegram defect-report bot (Meta API is paid — deferred).
-- Refresh PRODUCT_OVERVIEW.md to describe the V3 shell (one rail, more-drawer, finance panel, funnel card).
+- [x] PRODUCT_OVERVIEW.md refreshed (25/08/2026): the navigation section described
+  V2's two-layer sidebar, and the screens table predated PRO, the money board, the
+  market price list, the control room and the periodic-service strip. All five are
+  in it now, and the V3 banner no longer says "the descriptions below are V2".
 - Visual QA pass on sale/css/panels.css (written against markup, not yet eyeballed screen-by-screen).
 - [x] "תזכיר לי" natural-language calendar reminders from project cards (spec §5ג,
   25/08/2026): a clock button on every project card opens one text field —
