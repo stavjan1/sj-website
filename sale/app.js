@@ -1085,8 +1085,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     const lockClientId = document.getElementById('lock-google-client-id');
     if (lockClientId) lockClientId.value = globalClientId;
-    const settingsClientId = document.getElementById('settings-drive-client-id');
-    if (settingsClientId) settingsClientId.value = globalClientId;
 
     // Theme: follow the computer unless the user said otherwise. A manual choice
     // (flip button / Settings) is saved in settings.theme and re-applied by
@@ -1251,7 +1249,6 @@ function handleExpiredCloudToken() {
     googleAccessToken = null;
     localStorage.removeItem(getStorageKey('sj_drive_access_token'));
     sessionStorage.removeItem(getStorageKey('sj_drive_access_token'));
-    updateDriveStatus(false);
     // The token lapsed, re-arm a fresh mint on the next user gesture so cloud
     // sync recovers by itself instead of silently staying local-only.
     if (typeof armGoogleTokenRefreshOnGesture === 'function') armGoogleTokenRefreshOnGesture();
@@ -5042,8 +5039,6 @@ function loadSettings() {
             // single missing element can't abort loading the rest of the settings.
             const _set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
             _set('settings-gemini-key', appState.settings.geminiApiKey || '');
-            _set('settings-drive-client-id', appState.settings.googleClientId || localStorage.getItem('sj_global_google_client_id') || '');
-            _set('settings-drive-folder-id', appState.settings.googleFolderId || '');
             _set('set-phrasing-db', appState.settings.phrasingDb || '');
             _set('set-stats-share', appState.settings.statsShareMode || 'anon');
 
@@ -6150,7 +6145,7 @@ function saveBusinessSettings() {
     updatePdfCustomStyles();
     updatePreviewFromForm();
     syncCurrentQuoteToProject();
-    syncDatabaseToDrive(true);
+    scheduleCloudSync();
 }
 
 function loadHistory() {
@@ -7142,7 +7137,7 @@ function handleImageUpload(event, type) {
         safeLocalSet(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
         safeLocalSet(getStorageKey('sj_db_last_updated'), Date.now().toString());
         if (isLogo) renderLogo(base64Data); else renderWatermark(base64Data);
-        syncDatabaseToDrive(true);
+        scheduleCloudSync();
         showToast(isLogo ? 'לוגו העסק עודכן בהצלחה' : 'תמונת רקע עודכנה בהצלחה');
     }, isLogo ? { max: 600, mime: 'image/png' } : { max: 1400, mime: 'image/jpeg', quality: 0.72 });
 }
@@ -7154,7 +7149,7 @@ function clearUploadedImage(type) {
         localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
         localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
         renderLogo(null);
-        syncDatabaseToDrive(true);
+        scheduleCloudSync();
         showToast('לוגו החברה הוחזר לברירת המחדל');
     } else if (type === 'bg') {
         localStorage.removeItem(getStorageKey('sj_uploaded_bg'));
@@ -7162,7 +7157,7 @@ function clearUploadedImage(type) {
         localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
         localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
         renderWatermark(null);
-        syncDatabaseToDrive(true);
+        scheduleCloudSync();
         showToast('תמונת הרקע הוסרה');
     }
 }
@@ -7760,6 +7755,19 @@ function _jwtExpiryMs(token) {
 // An opaque access token (ya29…) carries no readable expiry, so we write down
 // when it dies at the moment we mint it. Without this the app could only judge
 // the freshness of ID tokens, and treated every opaque one as valid forever.
+// ── The two keys that say "drive" and are not about Drive ───────────────────
+// Google Drive is gone from this product (Stav, 29/08: "לא צריך את הדרייב,
+// תמחק"), and everything that talked to it has been deleted. These two did
+// not go, and must never go on the strength of their names:
+//   sj_drive_access_token — the Google IDENTITY token. It is also the password
+//     the server checks (functions/api/data.js), and it is read from
+//     sale/finance.js and from ask/index.html, two files nobody opens while
+//     "cleaning up Drive".
+//   sj_drive_token_exp    — that token's expiry, which is how a stale sign-in
+//     is detected and cleared.
+// Renaming them is not a rename: the value lives in real users' browsers, so a
+// new name means every signed-in electrician is signed out. They keep the
+// misleading name, and this comment is the reason they are allowed to.
 function _tokenExpKey() { return getStorageKey('sj_drive_token_exp'); }
 function _rememberTokenExpiry(ms) {
     try { localStorage.setItem(_tokenExpKey(), String(ms)); } catch (e) {}
@@ -8087,7 +8095,6 @@ function adminSignInNow(btn) {
                 _rememberTokenExpiry(Date.now() + (parseInt(resp.expires_in, 10) || 3600) * 1000);
                 authTrail('signin-ok');
                 _announceToken(googleAccessToken);
-                updateDriveStatus(true);
                 refreshTierInfo();
                 renderAdminAll();
             },
@@ -8184,7 +8191,6 @@ function checkGoogleSession() {
     // "אין הרשאה" while the app went on showing "מחובר".
     if (savedToken && _tokenIsFresh(savedToken)) {
         googleAccessToken = savedToken;   // optimistic — show "connected" now
-        updateDriveStatus(true);
     } else if (savedToken) {
         googleAccessToken = null;
         forgetExpiredGoogleToken();
@@ -8232,7 +8238,6 @@ function silentIdTokenAuth() {
                     localStorage.setItem(getStorageKey('sj_drive_access_token'), googleAccessToken);
                     _rememberTokenExpiry(_jwtExpiryMs(googleAccessToken));
                     _announceToken(googleAccessToken);
-                    updateDriveStatus(true);
                     refreshTierInfo();
                     cloudLoadAndMerge(true); // pull + union-merge + push → devices converge
                 }
@@ -8271,7 +8276,6 @@ function forgetExpiredGoogleToken() {
         sessionStorage.removeItem(getStorageKey('sj_drive_access_token'));
         localStorage.removeItem(_tokenExpKey());
     } catch (e) {}
-    updateDriveStatus(false);
     silentIdTokenAuth();
     setTimeout(() => { if (!googleAccessToken) mintGoogleAccessToken(); }, 1500);
 }
@@ -8367,7 +8371,6 @@ function mintGoogleAccessToken() {
                     localStorage.setItem(getStorageKey('sj_drive_access_token'), googleAccessToken);
                     _rememberTokenExpiry(Date.now() + (parseInt(resp.expires_in, 10) || 3600) * 1000);
                     _announceToken(googleAccessToken);
-                    updateDriveStatus(true);
                     refreshTierInfo();
                     cloudLoadAndMerge(true); // pull + union-merge + push → converges every device
                 }
@@ -8382,232 +8385,16 @@ function mintGoogleAccessToken() {
     } catch (e) { authTrail('silent-mint-throw', String(e && e.message)); }
 }
 
-function updateDriveStatus(connected) {
-    const statusLabel = document.getElementById('drive-status');
-    const btn = document.getElementById('btn-connect-drive');
-    const syncSection = document.getElementById('drive-sync-section');
-    if (!statusLabel || !btn) return;
-    
-    if (connected) {
-        statusLabel.className = 'status-connected';
-        statusLabel.innerHTML = '<i class="fa-solid fa-circle-dot"></i> מחובר ל-Google Drive';
-        btn.textContent = 'החלף חשבון / התחבר מחדש';
-        if (syncSection) syncSection.style.display = 'flex';
-        loadDriveFoldersList();
-    } else {
-        statusLabel.className = 'status-disconnected';
-        statusLabel.innerHTML = '<i class="fa-solid fa-circle-dot"></i> מנותק';
-        btn.textContent = 'גבה את עבודתך ע"י יצירת תיקיית הצעות מחיר ב-DRIVE של גוגל';
-        if (syncSection) syncSection.style.display = 'none';
-        const container = document.getElementById('drive-folder-select-container');
-        if (container) container.innerHTML = '';
-    }
-}
-
-function clearDriveSession() {
-    localStorage.removeItem(getStorageKey('sj_drive_access_token'));
-    sessionStorage.removeItem(getStorageKey('sj_drive_access_token'));
-    localStorage.removeItem(getStorageKey('sj_folder_electrical_id'));
-    localStorage.removeItem(getStorageKey('sj_folder_quotes_id'));
-    localStorage.removeItem(getStorageKey('sj_folder_data_id'));
-    localStorage.removeItem(getStorageKey('sj_sync_folder_id'));
-    googleAccessToken = null;
-    updateDriveStatus(false);
-    
-    const pathStatus = document.getElementById('drive-folder-path-status');
-    if (pathStatus) {
-        pathStatus.innerHTML = `
-            <i class="fa-solid fa-file-pdf"></i> קובצי PDF יישמרו בתיקייה הנבחרת<br>
-            <i class="fa-solid fa-database"></i> גיבוי וסנכרון נתונים: <strong>תיקיית מערכת מוסתרת (.sysdata)</strong>
-        `;
-        pathStatus.style.color = '';
-    }
-    const folderInput = document.getElementById('settings-drive-folder-id');
-    if (folderInput) {
-        folderInput.value = '';
-    }
-}
-
-function connectGoogleDrive() {
-    const clientId = document.getElementById('settings-drive-client-id').value.trim();
-    if (!clientId) {
-        showToast('אנא הזן Google Client ID בהגדרות תחילה', 'error');
-        return;
-    }
-    
-    appState.settings.googleClientId = clientId;
-    localStorage.setItem('sj_global_google_client_id', clientId);
-    const lockClientId = document.getElementById('lock-google-client-id');
-    if (lockClientId) lockClientId.value = clientId;
-    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
-    
-    try {
-        googleTokenClient = google.accounts.oauth2.initTokenClient({
-            client_id: clientId,
-            scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly',
-            callback: async (response) => {
-                if (response.error !== undefined) {
-                    showToast('שגיאה בחיבור לגוגל דרייב: ' + response.error, 'error');
-                    return;
-                }
-                googleAccessToken = response.access_token;
-                localStorage.setItem(getStorageKey('sj_drive_access_token'), googleAccessToken);
-                _rememberTokenExpiry(Date.now() + (parseInt(response.expires_in, 10) || 3600) * 1000);
-                _announceToken(googleAccessToken);
-                refreshTierInfo();
-
-                // Clear old cache
-                localStorage.removeItem(getStorageKey('sj_folder_electrical_id'));
-                localStorage.removeItem(getStorageKey('sj_folder_quotes_id'));
-                localStorage.removeItem(getStorageKey('sj_folder_data_id'));
-                localStorage.removeItem(getStorageKey('sj_sync_folder_id'));
-                
-                updateDriveStatus(true);
-                showToast('התחברת ל-Google Drive בהצלחה!');
-                
-                try {
-                    showToast('מזהה ומסנכרן את תיקיית הענן של SJ הנדסת חשמל...');
-                    await resolveSjDriveFolders();
-                    autoDetectQuoteNumber(false);
-                    syncDatabaseFromDrive(false); // Cloud sync
-                } catch (folderErr) {
-                    showToast('שגיאה ביצירת נתיב התיקיות בדרייב: ' + folderErr.message, 'error');
-                }
-            }
-        });
-        
-        googleTokenClient.requestAccessToken({ prompt: '' });
-    } catch (e) {
-        console.error(e);
-        showToast('שגיאה באתחול Google OAuth: ודא שה-Client ID תקין', 'error');
-    }
-}
 
 
-async function findOrCreateFolder(name, parentId) {
-    const escapedName = name.replace(/'/g, "\\'");
-    const query = `name = '${escapedName}' and '${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id,name)&access_token=${googleAccessToken}`);
-    if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`חיפוש תיקייה '${name}' נכשל: ${errText}`);
-    }
-    const data = await res.json();
-    if (data.files && data.files.length > 0) {
-        return data.files[0].id;
-    }
 
-    // Create folder only when search succeeded but returned nothing
-    const metadata = {
-        name: name,
-        mimeType: 'application/vnd.google-apps.folder'
-    };
-    if (parentId !== 'root') {
-        metadata.parents = [parentId];
-    }
-    
-    const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${googleAccessToken}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(metadata)
-    });
-    
-    if (createRes.ok) {
-        const created = await createRes.json();
-        return created.id;
-    }
-    return null;
-}
+
 
 function _userFolderName() {
     const u = (getActiveUser() || 'user').split('@')[0];
     return u.replace(/[^a-zA-Z0-9֐-׿._-]/g, '_').slice(0, 60);
 }
 
-async function resolveSjDriveFolders() {
-    if (!googleAccessToken) return null;
-    
-    const sjElectricalId = localStorage.getItem(getStorageKey('sj_folder_electrical_id'));
-    const quotesId = localStorage.getItem(getStorageKey('sj_folder_quotes_id'));
-    const dataId = localStorage.getItem(getStorageKey('sj_folder_data_id'));
-    
-    if (sjElectricalId && quotesId && dataId) {
-        try {
-            const checkRes = await fetch(`https://www.googleapis.com/drive/v3/files/${quotesId}?fields=trashed&access_token=${googleAccessToken}`);
-            if (checkRes.ok) {
-                const checkData = await checkRes.json();
-                if (checkData.trashed) {
-                    throw new Error('Folder is in trash');
-                }
-                const folderInput = document.getElementById('settings-drive-folder-id');
-                if (folderInput) folderInput.value = quotesId;
-                
-                const pathStatus = document.getElementById('drive-folder-path-status');
-                if (pathStatus) {
-                    pathStatus.innerHTML = `
-                        <i class="fa-solid fa-circle-check" style="color: var(--color-success)"></i> תיקיות פעילות בדרייב:<br>
-                        <i class="fa-solid fa-file-pdf" style="margin-right: 15px;"></i> מזהה תיקיית PDF: <strong>${quotesId}</strong><br>
-                        <i class="fa-solid fa-database" style="margin-right: 15px;"></i> מזהה תיקיית דאטא: <strong>${dataId}</strong>
-                    `;
-                    pathStatus.style.color = 'var(--color-success)';
-                }
-                return { sjElectrical: sjElectricalId, quotes: quotesId, data: dataId };
-            } else {
-                throw new Error('Folder not accessible');
-            }
-        } catch (e) {
-            console.warn('Cached folder IDs are no longer valid, clearing cache:', e);
-            localStorage.removeItem(getStorageKey('sj_folder_electrical_id'));
-            localStorage.removeItem(getStorageKey('sj_folder_quotes_id'));
-            localStorage.removeItem(getStorageKey('sj_folder_data_id'));
-            localStorage.removeItem(getStorageKey('sj_sync_folder_id'));
-        }
-    }
-    
-    try {
-        const serverFolderId = localStorage.getItem('sj_server_folder_id');
-        const username = _userFolderName();
-        let qId;
-
-        if (serverFolderId) {
-            qId = await findOrCreateFolder(username, serverFolderId);
-            if (!qId) throw new Error('שגיאה ביצירת תת-תיקיית משתמש בשרת');
-        } else {
-            const skillsId = await findOrCreateFolder('SKILLS', 'root');
-            if (!skillsId) throw new Error('שגיאה ביצירת תיקיית SKILLS');
-            const saleId = await findOrCreateFolder('SJ-SALE-WEBSITE', skillsId);
-            if (!saleId) throw new Error('שגיאה ביצירת תיקיית SJ-SALE-WEBSITE');
-            qId = await findOrCreateFolder(username, saleId);
-            if (!qId) throw new Error('שגיאה ביצירת תת-תיקיית משתמש');
-        }
-
-        const dId = await findOrCreateFolder('.sysdata', qId);
-        if (!dId) throw new Error('שגיאה ביצירת תיקיית .sysdata');
-
-        localStorage.setItem(getStorageKey('sj_folder_quotes_id'), qId);
-        localStorage.setItem(getStorageKey('sj_folder_data_id'), dId);
-        localStorage.setItem(getStorageKey('sj_sync_folder_id'), dId);
-
-        appState.settings.googleFolderId = qId;
-        localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
-
-        const pathStatus = document.getElementById('drive-folder-path-status');
-        if (pathStatus) {
-            const path = serverFolderId
-                ? 'שרת/' + username + '/'
-                : 'SKILLS/SJ-SALE-WEBSITE/' + username + '/';
-            pathStatus.innerHTML = '<i class="fa-solid fa-circle-check" style="color:var(--color-success)"></i> Drive: <strong>' + path + '</strong>';
-        }
-
-        return { quotes: qId, data: dId };
-    } catch (e) {
-        console.error('Failed to resolve Drive folders:', e);
-        throw e;
-    }
-}
 
 
 
@@ -8619,79 +8406,9 @@ function getCloudDatabaseFilename() {
     return `.sys_config_${activeUser.toLowerCase().replace(/[^a-z0-9_]/g, '_')}.dat`;
 }
 
-// The legacy Google Drive sync engine was retired — Cloudflare KV is the cloud
-// copy. The two entry points below are kept as thin redirects so every old
-// "sync with Drive" call site now syncs with KV instead.
-async function syncDatabaseFromDrive(silent = false) {
-    await cloudLoadAndMerge(silent);
-}
-
-async function syncDatabaseToDrive(silent = true) {
-    scheduleCloudSync();
-}
 
 
-async function autoDetectQuoteNumber(showAlerts = false) {
-    if (!googleAccessToken) {
-        if (showAlerts) showToast('גוגל דרייב אינו מחובר. אנא התחבר דרך הגדרות מערכת', 'error');
-        return;
-    }
-    
-    if (showAlerts) {
-        showToast('סורק קבצים בדרייב לקביעת מספר הצעה...');
-    }
-    
-    try {
-        const folders = await resolveSjDriveFolders();
-        if (!folders || !folders.quotes) {
-            if (showAlerts) showToast('שגיאה בגישה לתיקיית הצעות מחיר בדרייב', 'error');
-            return;
-        }
-        const folderId = folders.quotes;
-        
-        const q = `'${folderId}' in parents and trashed = false`;
-        const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&access_token=${googleAccessToken}`);
-        
-        if (!res.ok) {
-            if (res.status === 401) {
-                clearDriveSession();
-                if (showAlerts) showToast('פג תוקף החיבור לגוגל דרייב. אנא התחבר מחדש בהגדרות', 'error');
-                return;
-            }
-            throw new Error('Drive API error');
-        }
-        
-        const data = await res.json();
-        const files = data.files || [];
-        
-        const year = new Date().getFullYear();
-        let maxNum = 100;
-        
-        files.forEach(file => {
-            const name = file.name;
-            const regex = new RegExp(`${year}-(\\d+)`);
-            const match = name.match(regex);
-            if (match) {
-                const num = parseInt(match[1]);
-                if (num > maxNum) {
-                    maxNum = num;
-                }
-            }
-        });
-        
-        const nextNum = maxNum + 1;
-        const finalQuoteStr = `${year}-${nextNum}`;
-        
-        document.getElementById('form-quote-number').value = finalQuoteStr;
-        appState.currentQuote.quoteNumber = finalQuoteStr;
-        updatePreviewFromForm();
-        
-        showToast(`זוהה מספר הצעה הבא מתוך הדרייב: ${finalQuoteStr}`);
-    } catch (e) {
-        console.error(e);
-        if (showAlerts) showToast('שגיאה בסריקת הדרייב', 'error');
-    }
-}
+
 
 
 // ==========================================================================
@@ -9039,7 +8756,7 @@ function updateUserProfileProfession() {
     showToast('תחום העיסוק עודכן בהצלחה');
     
     // Save to drive if connected
-    syncDatabaseToDrive(true);
+    scheduleCloudSync();
 }
 
 
@@ -9072,8 +8789,6 @@ function handleGoogleLogin() {
     }
     
     localStorage.setItem('sj_global_google_client_id', clientId);
-    const settingsClientId = document.getElementById('settings-drive-client-id');
-    if (settingsClientId) settingsClientId.value = clientId;
 
     try {
         googleTokenClient = google.accounts.oauth2.initTokenClient({
@@ -9265,72 +8980,7 @@ async function completeGoogleLogin(email, profession, token, rememberMe) {
     showToast(`ברוך הבא למערכת, ${email}!`);
 }
 
-async function loadDriveFoldersList() {
-    if (!googleAccessToken) return;
-    try {
-        const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=mimeType%3D'application%2Fvnd.google-apps.folder'+and+trashed%3Dfalse&fields=files(id,name)&access_token=${googleAccessToken}`);
-        if (!res.ok) throw new Error('Failed to fetch folders');
-        const data = await res.json();
-        const folders = data.files || [];
-        
-        const container = document.getElementById('drive-folder-select-container');
-        if (!container) return;
-        
-        if (folders.length === 0) {
-            container.innerHTML = `<span style="color:var(--text-muted); font-size:0.85rem;">לא נמצאו תיקיות נוספות בדרייב. ניצור את תיקיית 'הצעות מחיר' כברירת מחדל.</span>`;
-            return;
-        }
-        
-        // Drive folder names are third-party data — the listing includes folders
-        // OTHER people shared with this user, so a folder named
-        // `</option></select><img src=x onerror=…>` would break out of the select.
-        let options = folders.map(f => `<option value="${escapeHtml(f.id)}">${escapeHtml(f.name)}</option>`).join('');
-        options = `<option value="auto_sj">SJ הנדסת חשמל > הצעות מחיר (ברירת מחדל)</option>` + options;
-        
-        container.innerHTML = `
-            <label style="font-size: 0.85rem; color: var(--text-secondary); display: block; margin-top: 10px;">בחר תיקיית יעד ב-Drive לגיבוי:</label>
-            <select id="settings-drive-folder-select" onchange="handleDriveFolderChange(this.value)" style="width:100%; margin-top: 5px; padding: 8px 12px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: #fff; font-family: inherit;">
-                ${options}
-            </select>
-        `;
-        
-        const currentFolderId = appState.settings.googleFolderId;
-        const select = document.getElementById('settings-drive-folder-select');
-        if (select && currentFolderId) {
-            const hasOption = Array.from(select.options).some(o => o.value === currentFolderId);
-            if (hasOption) {
-                select.value = currentFolderId;
-            }
-        }
-    } catch (e) {
-        console.error('Failed to load drive folders list:', e);
-    }
-}
 
-async function handleDriveFolderChange(folderId) {
-    localStorage.removeItem(getStorageKey('sj_folder_electrical_id'));
-    localStorage.removeItem(getStorageKey('sj_folder_quotes_id'));
-    localStorage.removeItem(getStorageKey('sj_folder_data_id'));
-    localStorage.removeItem(getStorageKey('sj_sync_folder_id'));
-    
-    if (folderId === 'auto_sj') {
-        appState.settings.googleFolderId = '';
-    } else {
-        appState.settings.googleFolderId = folderId;
-    }
-    
-    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
-    
-    try {
-        showToast('מעדכן מיקום תיקייה בדרייב...');
-        await resolveSjDriveFolders();
-        autoDetectQuoteNumber(false);
-        await syncDatabaseToDrive(false);
-        showToast('מיקום התיקייה עודכן וסונכרן בהצלחה');
-    } catch (e) {
-        showToast('שגיאה בעדכון מיקום התיקייה: ' + e.message, 'error');
-    }
-}
 
 
 

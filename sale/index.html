@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=439">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=440">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,14 +26,14 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=439">
-    <link rel="stylesheet" href="../assets/ui.css?v=439">
-    <link rel="stylesheet" href="css/shell.css?v=439">
-    <link rel="stylesheet" href="css/panels.css?v=439">
-    <link rel="stylesheet" href="controlroom.css?v=439">
-    <link rel="stylesheet" href="periodic.css?v=439">
-    <link rel="stylesheet" href="nextstep.css?v=439">
-    <link rel="stylesheet" href="css/pdf.css?v=439">
+    <link rel="stylesheet" href="../assets/tokens.css?v=440">
+    <link rel="stylesheet" href="../assets/ui.css?v=440">
+    <link rel="stylesheet" href="css/shell.css?v=440">
+    <link rel="stylesheet" href="css/panels.css?v=440">
+    <link rel="stylesheet" href="controlroom.css?v=440">
+    <link rel="stylesheet" href="periodic.css?v=440">
+    <link rel="stylesheet" href="nextstep.css?v=440">
+    <link rel="stylesheet" href="css/pdf.css?v=440">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -265,7 +265,6 @@
                     <i class="fa-solid fa-user" aria-hidden="true"></i>
                     <span id="banner-client-name">ללא לקוח</span>
                 </button>
-                <span id="banner-sync-indicator" style="display:none;"><span>מסנכרן…</span></span>
             </div>
 
             <!-- לקוחות — one destination. The client archive and the periodic
@@ -948,7 +947,6 @@
                                             <label for="form-quote-number">מספר הצעה</label>
                                             <div class="input-with-button">
                                                 <input type="text" id="form-quote-number" required placeholder="למשל: 2026-102">
-                                                <button type="button" class="btn btn-secondary btn-small" onclick="autoDetectQuoteNumber(true)" title="סרוק מהדרייב"><i class="fa-solid fa-arrows-rotate"></i></button>
                                             </div>
                                         </div>
                                         <div class="form-group">
@@ -1525,7 +1523,6 @@
 
                         <!-- Cloud backup happens automatically for Google users (Cloudflare KV) —
                              the legacy Google Drive connection UI was removed. -->
-                        <input type="hidden" id="settings-drive-client-id">
 
                         <!-- Theme & Cinematic Background Selector -->
                         <div class="section-card" style="margin-top:20px;">
@@ -2732,29 +2729,29 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/checkups-core.js?v=439"></script>
-    <script src="/assets/listcards.js?v=439"></script>
+    <script src="/assets/checkups-core.js?v=440"></script>
+    <script src="/assets/listcards.js?v=440"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=439"></script>
-    <script src="app.js?v=439"></script>
+    <script src="coverage.js?v=440"></script>
+    <script src="app.js?v=440"></script>
     <!-- app.js was 18,760 lines — a quarter of the repo in one file, and the
          file every parallel session collided in. These five are lifts out of
          it, byte for byte, and they load AFTER it because that is where the
          state they read is declared. -->
-    <script src="chat.js?v=439"></script>
-    <script src="checkups.js?v=439"></script>
-    <script src="market.js?v=439"></script>
-    <script src="reports.js?v=439"></script>
-    <script src="admin.js?v=439"></script>
+    <script src="chat.js?v=440"></script>
+    <script src="checkups.js?v=440"></script>
+    <script src="market.js?v=440"></script>
+    <script src="reports.js?v=440"></script>
+    <script src="admin.js?v=440"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=439"></script>
+    <script src="finance.js?v=440"></script>
     <!-- The guide that points at the screen (first-run tour + milestone hints) -->
-    <script src="coach.js?v=439"></script>
-    <script src="nextstep.js?v=439"></script>
+    <script src="coach.js?v=440"></script>
+    <script src="nextstep.js?v=440"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="/track.js?v=439" defer></script>
+    <script src="/track.js?v=440" defer></script>
 </body>
 </html>
