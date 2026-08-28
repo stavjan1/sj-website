@@ -1,17 +1,17 @@
 {
   "ok": true,
-  "fetchedAt": 1787636123084,
+  "fetchedAt": 1787898154312,
   "cached": false,
   "data": [
     {
       "metricName": "DeadClickCount",
       "information": [
         {
-          "sessionsCount": "0",
+          "sessionsCount": 0,
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
-          "pagesViews": "0",
-          "subTotal": "0"
+          "pagesViews": 0,
+          "subTotal": 0
         }
       ]
     },
@@ -31,11 +31,11 @@
       "metricName": "RageClickCount",
       "information": [
         {
-          "sessionsCount": "0",
+          "sessionsCount": 0,
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
-          "pagesViews": "0",
-          "subTotal": "0"
+          "pagesViews": 0,
+          "subTotal": 0
         }
       ]
     },
