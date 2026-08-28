@@ -174,3 +174,42 @@ test('a closed drawer cannot swallow the app', () => {
     assert.match(body, /syncConversationsLayout\(\)/,
         'switching screens no longer re-decides column vs drawer');
 });
+
+test('the phone row gives the name the whole row, open or closed', () => {
+    // Measured at 375px before the fix: the closed row spent about a third of
+    // itself on a status pill reading "טיוטה" — true of nearly every row, so it
+    // told you nothing while the name you were scanning for was ellipsised. And
+    // opening the row made it WORSE: the desktop rule
+    // `#panel-projects .project-card .project-endcap { grid-column: 2 }` is an
+    // ID selector, so it outranked the phone block's three-class rule no matter
+    // how much later that block was declared, and the clock and bin came back
+    // into row 1 and swelled the auto column to 145px. Title: 261px → 149px.
+    // These two assertions are what keep the phone block winning.
+    assert.match(CSS, /@media \(max-width: 768px\)[\s\S]*?#panel-projects \.project-card \.project-endcap \{ display: none; \}/,
+        'the status pill is back on the closed phone row, taking the name\'s width');
+    assert.match(CSS, /#panel-projects \.project-card\.is-open \.project-endcap \{[^}]*grid-row: 2/,
+        'opening a row puts its controls back beside the name instead of under it');
+});
+
+test('nothing under the conversation may be squeezed to a sliver', () => {
+    // .chat-container is a flex column and every child shrinks by default, so a
+    // long thread quietly stole height from the furniture below it: the three
+    // errand buttons rendered 13px tall out of 36 — "אני רואה שם 3 דברים שאי
+    // אפשר לראות" — and the suggestion chips 32 out of 60. Fixed at the
+    // container, so a control added later is protected without being told.
+    assert.match(CSS, /\.chat-container > \*\s*\{\s*flex: none;\s*\}/,
+        'the chat column can squeeze its own furniture again');
+    assert.match(CSS, /\.chat-container > \.chat-messages\s*\{\s*flex: 1 1 auto; min-height: 0;\s*\}/,
+        'the thread must be the one thing that gives');
+});
+
+test('settings is reachable from the one menu a phone has', () => {
+    // It lived behind the account chip at the very bottom of the drawer, under
+    // Safari's own bar, in a panel that did not scroll to it. Stav: "בטלפון רק
+    // אין גישה להגיע להגדרות בלשונית שלוש קווים."
+    const chat = readFileSync(join(ROOT, 'sale', 'chat.js'), 'utf8');
+    const i = chat.indexOf('function renderDrawerDestinations(');
+    const body = chat.slice(i, chat.indexOf('\n}', i));
+    assert.match(body, /tab: 'settings'/, 'הגדרות is not listed in the drawer');
+    assert.match(body, /tab: 'business'/, 'פרטי העסק is not listed in the drawer');
+});

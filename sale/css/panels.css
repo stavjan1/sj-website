@@ -3842,7 +3842,7 @@ i[class^="fa-"], i[class*=" fa-"] {
    ============================================================================ */
 #panel-pricing { --pt-gap: var(--sp-2); }
 .pt-block {
-    margin-block-end: var(--sp-5); min-width: 0;
+    margin-block-end: var(--sp-4); min-width: 0;
     border: 1px solid var(--border); border-radius: var(--r-md);
     background: var(--surface); overflow: hidden;
 }
@@ -3891,7 +3891,7 @@ i[class^="fa-"], i[class*=" fa-"] {
     color: var(--text-3); cursor: pointer;
 }
 .pt-del:hover { color: var(--danger); border-color: var(--border); background: var(--surface-2); }
-.pt-empty { margin: 0; padding: var(--sp-5) var(--sp-4); text-align: center; font-size: var(--fs-sm); color: var(--text-3); }
+.pt-empty { margin: 0; padding: var(--sp-6) var(--sp-4); text-align: center; font-size: var(--fs-sm); color: var(--text-3); }
 .pt-note { margin: 0; padding: var(--sp-2) var(--sp-4) var(--sp-3); font-size: var(--fs-xs); color: var(--text-3); }
 
 .pt-foot {
@@ -4756,8 +4756,17 @@ body.convo-open { overflow: hidden; }
 .convo-acc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* The list of threads gives up its share of the panel once the destinations
-   are under it — both scroll, and neither is allowed to starve the other. */
-@media (max-width: 768px) { .convo-list { min-height: 22vh; } }
+   are under it — both scroll, and neither is allowed to starve the other.
+   dvh, not vh: on iOS Safari `vh` is the LARGE viewport, the one you only see
+   after the address bar has slid away, so a 22vh floor reserved more room than
+   the screen actually had and pushed the account row off the bottom edge. */
+@media (max-width: 768px) {
+    .convo-list { min-height: 18dvh; }
+    /* Safari's floating bottom bar overlays the page and is not reported in
+       env(safe-area-inset-bottom), so the last row needs room of its own. */
+    .convo-panel { padding-block-end: calc(var(--sp-6) + env(safe-area-inset-bottom, 0px)); }
+    .convo-dests { max-height: none; }
+}
 
 /* ============================================================================
    THE TOP STRIP IS THE APP BAR NOW
@@ -4854,7 +4863,14 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
 @media (max-width: 768px) {
     .project-card {
         display: grid;
-        grid-template-columns: auto 1fr auto;
+        /* Two columns, not three. The third held the status pill, which cost
+           the name about a third of the row to say "טיוטה" — a word that is
+           true of almost every row on the list, so it distinguishes nothing
+           while the thing you are actually scanning for gets an ellipsis.
+           Stav: "גם את המילה טיוטה תעיף בשביל שיראו את כל השם של השיחה."
+           The status did not go away; it moved into the ⋯, with the buttons
+           that change it. */
+        grid-template-columns: 1fr auto;
         align-items: center;
         gap: var(--sp-2);
         min-height: 56px;
@@ -4862,7 +4878,7 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
         margin-block-end: 2px;
     }
     .project-card .card-more {
-        grid-column: 3; grid-row: 1;
+        grid-column: 2; grid-row: 1;
         width: 34px; height: 34px; flex: none;
         display: inline-flex; align-items: center; justify-content: center;
         background: none; border: none; border-radius: var(--r-pill);
@@ -4871,7 +4887,7 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
     .project-card .card-more:hover { background: var(--surface-2); color: var(--text); }
     .project-card .card-more svg { width: 17px; height: 17px; }
 
-    .project-card .project-info { grid-column: 2; grid-row: 1; min-width: 0; }
+    .project-card .project-info { grid-column: 1; grid-row: 1; min-width: 0; }
     /* The title is one line. It was the five-line block at the top of the card. */
     .project-card .project-title {
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -4888,26 +4904,34 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
     .project-card .project-endcap > .btn { display: none; }
     .project-card .project-meta > span:first-child { display: inline-flex; }
 
-    /* The status pill is the one thing that rides on the row itself. */
-    .project-card .project-endcap {
-        grid-column: 1; grid-row: 1;
-        display: flex; align-items: center; gap: var(--sp-1);
-        padding: 0 0 0 var(--sp-2);
-        margin: 0; border: none;
-    }
+    /* Nothing rides on the closed row except the name, the date and the ⋯. */
+    .project-card .project-endcap { display: none; }
     .project-card .row-status { white-space: nowrap; font-size: 10px; }
 
-    /* ---- opened in place ---- */
-    .project-card.is-open { grid-template-rows: auto auto; row-gap: var(--sp-2); }
+    /* ---- opened in place ----
+       Everything the ⋯ reveals goes BELOW the name, never beside it. Opening
+       the row used to bring the clock and the bin back into the first column,
+       which pushed the name into even less room than it had while closed:
+       Stav, "ואחרי שלוחצים על ה-3 נקודות השם אפילו מצטמצם יותר משום מה." Opening a row
+       must never take room from the row. */
+    .project-card.is-open { grid-template-rows: auto auto auto; row-gap: var(--sp-2); }
     .project-card.is-open .project-meta { flex-wrap: wrap; overflow: visible; }
     .project-card.is-open .project-meta > * { display: inline-flex; }
-    .project-card.is-open .stage-chain {
+    .project-card.is-open .project-endcap {
+        display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2);
         grid-column: 1 / -1; grid-row: 2;
-        display: flex; gap: var(--sp-2); padding-inline: var(--sp-2);
+        padding: 0; margin: 0; border: none;
+    }
+    .project-card.is-open .project-endcap > .btn { display: inline-flex; }
+    .project-card.is-open .stage-chain {
+        grid-column: 1 / -1; grid-row: 3;
+        display: flex; gap: var(--sp-2);
     }
     .project-card.is-open .stage-chain .stage-step { flex: 1 1 0; min-height: 40px; justify-content: center; }
-    .project-card.is-open .project-endcap > .btn { display: inline-flex; }
     .project-card.is-open .card-more { color: var(--accent); }
+    /* The recurring-visit chip wraps its own words when it is squeezed, which
+       is what drew the round blob over the buttons in Stav's photograph. */
+    .project-card .maint-chip { white-space: nowrap; }
 }
 
 /* The ⋯ exists to fold a row that is only folded on a phone. On desktop the
@@ -5377,4 +5401,61 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
     .convo-drawer:not(.open) { pointer-events: none; }
     .convo-drawer:not(.open) .convo-scrim { display: none; }
     .convo-drawer.open { pointer-events: auto; }
+}
+
+/* ============================================================================
+   THE CONVERSATION IS THE ONLY THING IN THE COLUMN THAT MAY SHRINK
+   Stav circled a strip on his phone: "אני רואה שם 3 דברים שאי אפשר לראות" —
+   three buttons whose rounded tops peeked out of a 13px slot. Measured: the
+   errand row is 36px tall and was being rendered at 13.
+   .chat-container is a flex column and every child defaults to flex-shrink:1,
+   so once the thread is long enough to fill the screen the overflow is shared
+   out among the furniture beneath it. The log has min-height:0 and scrolls, so
+   it should be absorbing all of it; instead the row of buttons, the suggestion
+   chips and anything else added later quietly lose height until they are
+   slivers. Nothing throws, nothing is hidden, and there is no way to tell from
+   the markup which control is currently a sliver.
+   One rule, applied to the container rather than to each child, so a control
+   added tomorrow is protected without anyone remembering this: everything is
+   its natural height, and the thread takes what is left.
+   ============================================================================ */
+.chat-container > * { flex: none; }
+.chat-container > .chat-messages { flex: 1 1 auto; min-height: 0; }
+
+/* And on a phone the three errands are a strip you swipe, not three squeezed
+   columns: at 375px "flex: 1 1 0" gives each about 110px, which ellipsises
+   every label into uselessness. This repeats the phone rule because the
+   side-by-side block above it comes later in the file and would otherwise win. */
+@media (max-width: 768px) {
+    .side-asks { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .side-ask { flex: none; width: auto; }
+    .side-ask span { overflow: visible; }
+}
+
+/* ---- The phone row, said again loudly enough to be heard ---------------------
+   The block above is written with classes: `.project-card.is-open
+   .project-endcap`. Three classes. The desktop layout that it is meant to
+   replace is written as `#panel-projects .project-card .project-endcap` — an
+   ID, which outranks any number of classes no matter how much later it is
+   declared or which media query it sits in. So on a phone the endcap kept
+   being pulled back into column 2 of row 1, the auto column swelled to 145px
+   to hold a clock, a bin and a status pill, and the name was left 149px of a
+   375px screen: measured, and exactly the "אחרי שלוחצים על ה3 נקודות השם
+   אפילו מצטמצם יותר" Stav photographed. Same specificity, later in the file. */
+@media (max-width: 768px) {
+    #panel-projects .project-card {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: var(--sp-2);
+        padding: var(--sp-2) var(--sp-2) var(--sp-2) 0;
+    }
+    #panel-projects .project-card .project-info { grid-column: 1; grid-row: 1; }
+    #panel-projects .project-card .project-endcap { display: none; }
+    #panel-projects .project-card .stage-chain { display: none; }
+    #panel-projects .project-card.is-open .project-endcap {
+        display: flex; grid-column: 1 / -1; grid-row: 2;
+        margin-inline-start: 0; padding: 0;
+    }
+    #panel-projects .project-card.is-open .stage-chain {
+        display: flex; grid-column: 1 / -1; grid-row: 3;
+    }
 }
