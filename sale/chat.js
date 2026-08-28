@@ -4298,11 +4298,26 @@ function applyAskMeta(proj, responseText) {
 }
 
 // One button, and only when the conversation turned out to be work.
+// The offer to make this a tracked job rides beside the conversation's name,
+// where it says what the thread IS. Stav, 28/08, on three bars stacked over the
+// composer: "זה לא נראה טוב כל העומס במסך... אולי רק למעלה". He is right, and
+// it is not only about space — "פתח כעבודה" is an identity, not a step.
 function updateAskActionBar(proj) {
-    const bar = document.getElementById('ask-action-bar');
-    if (!bar) return;
-    const show = !!proj && isAsk(proj) && proj.looksLikeJob === true;
-    bar.hidden = !show;
+    const chip = document.getElementById('ask-promote-chip');
+    if (!chip) return;
+    chip.hidden = !(proj && isAsk(proj) && proj.looksLikeJob === true);
+}
+
+// The pricing bar keeps one action on the row; the three side-errands open from
+// the ⋯, the same gesture the work list uses. One pattern, learned once.
+function togglePabMore(btn) {
+    const bar = btn.closest('.plan-action-bar');
+    const extra = bar && bar.querySelector('.pab-extra');
+    if (!extra) return;
+    const open = extra.hidden;
+    extra.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+    btn.classList.toggle('is-open', open);
 }
 
 // Promotion: the field changes, the thread stays. This is the whole reason the
@@ -4349,8 +4364,8 @@ function startNewConversation() {
     switchTab('wizard');
     const log = document.getElementById('chat-messages-log');
     if (log) log.innerHTML = '';
-    const bar = document.getElementById('ask-action-bar');
-    if (bar) bar.hidden = true;
+    const chip = document.getElementById('ask-promote-chip');
+    if (chip) chip.hidden = true;
     const input = document.getElementById('chat-user-input');
     if (input) { input.value = ''; input.focus(); }
     try { closeConversationsDrawer(); } catch (e) {}

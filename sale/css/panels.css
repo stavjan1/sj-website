@@ -4970,3 +4970,122 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
     .market-toolbar { flex-wrap: wrap; gap: var(--sp-2); }
     .market-toolbar .input { flex: 1 1 100%; min-height: 40px; }
 }
+
+/* ============================================================================
+   ONE BAR, ONE ACTION
+   Stav, 28/08, on a screenshot with three stacked bars over the composer:
+   "זה לא נראה טוב כל העומס במסך... או לא להציג בכלל את ה'נשמע כמו עבודה שלמה'
+   אולי רק למעלה."
+   Taken, and for a reason beyond space: "פתח כעבודה" answers what this thread
+   IS, not what to do next, so it belongs beside the thread's name. The pricing
+   bar keeps its one real action and folds the three side-errands behind a ⋯ —
+   the same gesture the work list uses, so it is one pattern learned once.
+   ============================================================================ */
+.banner-promote {
+    flex: none;
+    display: inline-flex; align-items: center; gap: var(--sp-1);
+    min-height: 26px; padding: 0 var(--sp-2);
+    background: var(--accent-soft); border: 1px solid var(--accent);
+    border-radius: var(--r-pill);
+    color: var(--text); font: 700 var(--fs-xs) var(--font-ui);
+    cursor: pointer; white-space: nowrap;
+}
+.banner-promote:hover { background: var(--accent); color: var(--on-accent); }
+.banner-promote[hidden] { display: none; }
+
+.plan-action-bar .pab-more {
+    flex: none; width: 32px; height: 32px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: none; border: none; border-radius: var(--r-pill);
+    color: var(--text-3); cursor: pointer;
+}
+.plan-action-bar .pab-more:hover { background: var(--surface-2); color: var(--text); }
+.plan-action-bar .pab-more.is-open { color: var(--accent); }
+.plan-action-bar .pab-more svg { width: 16px; height: 16px; }
+.plan-action-bar .pab-extra {
+    flex-basis: 100%;
+    display: flex; flex-wrap: wrap; gap: var(--sp-2);
+    margin-block-start: var(--sp-2);
+}
+.plan-action-bar .pab-extra[hidden] { display: none; }
+
+/* The line under the title bar stopped short of the edge: the bar carries a
+   bottom border but sits inside .main-content's padding, so the rule ended 24px
+   before the screen did. It spans now. */
+@media (min-width: 769px) {
+    /* .main-content pads sp-6 on both sides, and inside a project it pads a
+       further 168px on the start edge to clear the floating step rail. The
+       banner's rule ended wherever that padding did — 168px short of the screen
+       on the side Stav circled. It reaches now, and the step rail floats over
+       it rather than pushing it. */
+    #project-banner {
+        margin-inline: calc(-1 * var(--sp-6));
+        padding-inline: var(--sp-6);
+    }
+    body.in-project-stage #project-banner {
+        margin-inline-start: calc(-1 * (168px + var(--sp-6)));
+        padding-inline-start: calc(168px + var(--sp-6));
+    }
+}
+
+/* ============================================================================
+   THE SAME CUT, ON EVERY SCREEN
+   Stav, 28/08: "כמו שעכשיו אמרתי לך על המסך הזה אז תעבור על כל המסכים ותעשה
+   את הצימצום הזה לכולם."
+   Measured at 390×844 before this block: עבודות put 391px of chrome above the
+   first work — a title, a sentence explaining what the screen is, two subtabs,
+   148px of search and sort and filter and view controls, and a category strip
+   — and then 396px of stat cards under it. The list you came for was a 72px
+   sliver between two walls.
+   ============================================================================ */
+@media (max-width: 768px) {
+    /* 1. Every screen explained itself in a sentence, to a man who opens this
+          app daily and knows what עבודות is. The titles stay; the lectures go. */
+    .content-panel .section-subtitle { display: none; }
+    .content-panel .section-header { margin-block-end: var(--sp-2); }
+    .content-panel .section-header h2 { font-size: var(--fs-lg); }
+
+    /* 2. Controls are one swipeable strip, not four stacked rows. Nothing is
+          removed — sort, filter and the view switch are all still there, they
+          just stop each claiming a line of a 390px screen. */
+    .project-search-row {
+        display: flex; flex-wrap: nowrap; align-items: center;
+        gap: var(--sp-2);
+        overflow-x: auto; scrollbar-width: none;
+        padding-block-end: 2px;
+    }
+    .project-search-row::-webkit-scrollbar { display: none; }
+    .project-search-row > * { flex: none; }
+    .project-search-row .project-search-input-wrap { flex: 1 0 55%; min-width: 0; }
+    .project-search-row .project-search-input-wrap input { min-height: 40px; }
+    .project-search-row .btn,
+    .project-search-row .chip,
+    .project-search-row select { min-height: 36px; }
+    /* Sort buttons keep their icon and lose the word — the icon is the sort. */
+    .project-sorts .btn span, .projects-views .btn span { display: none; }
+
+    /* 3. Four metric cards, 90px each, stacked under the list. Two by two, and
+          half the height: they are a glance, not a report. */
+    .projects-stats {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--sp-2);
+    }
+    .projects-stats .metric-card {
+        min-height: 0;
+        padding: var(--sp-2) !important;
+        text-align: start;
+    }
+    .projects-stats .metric-card .metric-value { font-size: var(--fs-lg); }
+    .projects-stats .metric-card .metric-label { font-size: 10px; }
+    .projects-stats .metric-card i, .projects-stats .metric-card svg { display: none; }
+
+    /* 4. Category chips: one strip, already horizontal, just tighter. */
+    .projects-cats { padding-block: 0; }
+    .projects-cats .chip { min-height: 32px; }
+
+    /* 5. Card headers inside every panel stop being two-line blocks. */
+    .content-panel .card-header { padding: var(--sp-2) var(--sp-3); }
+    .content-panel .card-header h3 { font-size: var(--fs-sm); }
+    .content-panel .card-subtitle { display: none; }
+}
