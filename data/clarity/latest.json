@@ -1,13 +1,13 @@
 {
   "ok": true,
-  "fetchedAt": 1787898154312,
-  "cached": false,
+  "fetchedAt": 1787924223554,
+  "cached": true,
   "data": [
     {
       "metricName": "DeadClickCount",
       "information": [
         {
-          "sessionsCount": 0,
+          "sessionsCount": 3,
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
           "pagesViews": 0,
@@ -19,19 +19,7 @@
       "metricName": "ExcessiveScroll",
       "information": [
         {
-          "sessionsCount": "0",
-          "sessionsWithMetricPercentage": 0,
-          "sessionsWithoutMetricPercentage": 100,
-          "pagesViews": "0",
-          "subTotal": "0"
-        }
-      ]
-    },
-    {
-      "metricName": "RageClickCount",
-      "information": [
-        {
-          "sessionsCount": 0,
+          "sessionsCount": 3,
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
           "pagesViews": 0,
@@ -40,10 +28,22 @@
       ]
     },
     {
+      "metricName": "RageClickCount",
+      "information": [
+        {
+          "sessionsCount": "3",
+          "sessionsWithMetricPercentage": 0,
+          "sessionsWithoutMetricPercentage": 100,
+          "pagesViews": "0",
+          "subTotal": "0"
+        }
+      ]
+    },
+    {
       "metricName": "QuickbackClick",
       "information": [
         {
-          "sessionsCount": "0",
+          "sessionsCount": "3",
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
           "pagesViews": "0",
@@ -55,11 +55,11 @@
       "metricName": "ScriptErrorCount",
       "information": [
         {
-          "sessionsCount": "0",
+          "sessionsCount": 3,
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
-          "pagesViews": "0",
-          "subTotal": "0"
+          "pagesViews": 0,
+          "subTotal": 0
         }
       ]
     },
@@ -67,7 +67,7 @@
       "metricName": "ErrorClickCount",
       "information": [
         {
-          "sessionsCount": "0",
+          "sessionsCount": "3",
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
           "pagesViews": "0",
@@ -87,10 +87,10 @@
       "metricName": "Traffic",
       "information": [
         {
-          "totalSessionCount": "0",
-          "totalBotSessionCount": "0",
-          "distinctUserCount": "0",
-          "pagesPerSessionPercentage": null
+          "totalSessionCount": "3",
+          "totalBotSessionCount": "1",
+          "distinctUserCount": "3",
+          "pagesPerSessionPercentage": 2.5
         }
       ]
     },
@@ -98,38 +98,85 @@
       "metricName": "EngagementTime",
       "information": [
         {
-          "totalTime": null,
-          "activeTime": null
+          "totalTime": "8",
+          "activeTime": "0"
         }
       ]
     },
     {
       "metricName": "Browser",
-      "information": []
+      "information": [
+        {
+          "name": "Chrome",
+          "sessionsCount": "3"
+        }
+      ]
     },
     {
       "metricName": "Device",
-      "information": []
+      "information": [
+        {
+          "name": "PC",
+          "sessionsCount": "3"
+        }
+      ]
     },
     {
       "metricName": "OS",
-      "information": []
+      "information": [
+        {
+          "name": "Windows",
+          "sessionsCount": "3"
+        }
+      ]
     },
     {
       "metricName": "Country",
-      "information": []
+      "information": [
+        {
+          "name": "Israel",
+          "sessionsCount": "3"
+        }
+      ]
     },
     {
       "metricName": "PageTitle",
-      "information": []
+      "information": [
+        {
+          "name": "SJ הנדסת חשמל | תכנון, ייעוץ ושרטוט מערכות חשמל",
+          "sessionsCount": 3
+        }
+      ]
     },
     {
       "metricName": "ReferrerUrl",
-      "information": []
+      "information": [
+        {
+          "name": null,
+          "sessionsCount": "3"
+        }
+      ]
     },
     {
       "metricName": "PopularPages",
-      "information": []
+      "information": [
+        {
+          "url": "http://localhost:8099/",
+          "visitsCount": 3
+        },
+        {
+          "url": "http://127.0.0.1:8099/certificates.html",
+          "visitsCount": 1
+        },
+        {
+          "url": "http://127.0.0.1:8099/index.html",
+          "visitsCount": 1
+        },
+        {
+          "url": "http://127.0.0.1:8099/about.html",
+          "visitsCount": 1
+        }
+      ]
     }
   ]
 }
