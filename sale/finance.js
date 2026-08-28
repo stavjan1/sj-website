@@ -677,7 +677,12 @@
                 Object.assign(payload, { userId: val('#fin-fz-user'), clientId: val('#fin-fz-client'), clientSecret: val('#fin-fz-secret') });
                 if (!payload.userId || !payload.clientId || !payload.clientSecret) { if (typeof showToast === 'function') showToast('מלאו את שלושת הפרטים מהגדרות Financy → גישה ל-API', 'error'); return; }
             }
-            if (action === 'disconnect' && !confirm('לנתק את Financy ולהסיר את נתוני הבנקים מהתזרים?')) return;
+            if (action === 'disconnect' && !await askConfirm({
+                title: 'לנתק את Financy?',
+                body: 'נתוני הבנקים יוסרו מהתזרים.',
+                confirmLabel: 'נתק',
+                danger: true,
+            })) return;
             b.disabled = true; const label = b.textContent; b.textContent = action === 'saveCreds' ? 'שומר…' : action === 'sync' ? 'מסנכרן…' : 'רגע…';
             try {
                 const token = await liveToken();

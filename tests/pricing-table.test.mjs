@@ -17,7 +17,10 @@ function load(catalog = [], book = {}, rules = {}) {
     const ptStart = app.indexOf('const MATERIAL_UNITS =');
     const ptEnd = app.indexOf('function openPricingTable');
     const qStart = app.indexOf('function quoteBuildMode(proj)');
-    const qEnd = app.indexOf('function ptToQuote()');
+    // Anchored with the optional `async`, because the slice ends AT this index:
+    // matching only the `function` keyword left a bare `async` dangling off the
+    // end of the extracted source the moment ptToQuote learned to await.
+    const qEnd = app.search(/(?:async\s+)?function ptToQuote\(\)/);
     assert.ok(pbStart > -1 && ptStart > -1, 'the pricing helpers moved or were renamed');
     const ctx = vm.createContext({
         appState: { settings: { priceBook: book, pricingRules: rules } },

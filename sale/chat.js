@@ -345,7 +345,7 @@ function skipSpecField(fieldId) {
 // replaced by setSpecAnswer or turned into an assumption by skipSpecField;
 // there is no case for removing one outright.
 
-function setSpecJobType(type) {
+async function setSpecJobType(type) {
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (!proj) return;
     const spec = ensureSpec(proj);
@@ -368,7 +368,13 @@ function setSpecJobType(type) {
         .filter(id => (spec.answers[id] || {}).source !== 'std').length;
     if (answered) {
         const label = (allChecklists()[type] || GENERIC_CHECKLIST).label || type;
-        if (!confirm(`מעבר ל"${label}" יחליף את רשימת השאלות, ו-${answered} התשובות שכבר מילאת יימחקו.\n\nאי אפשר לשחזר אותן אחר כך. להחליף?`)) {
+        if (!await askConfirm({
+            title: 'להחליף את סוג העבודה?',
+            body: `מעבר ל"${label}" מחליף את רשימת השאלות, ו-${answered} התשובות שכבר מילאת יימחקו.`,
+            note: 'אי אפשר לשחזר אותן אחר כך.',
+            confirmLabel: 'החלף',
+            danger: true,
+        })) {
             renderSpecCard(proj);   // repaint so the chip snaps back to the real type
             return;
         }
@@ -3651,7 +3657,7 @@ function quoteItemsFromTable(proj) {
     return items;
 }
 
-function ptToQuote() {
+async function ptToQuote() {
     const proj = _ptProj(); if (!proj) return;
     const items = quoteItemsFromTable(proj);
     if (!items.length) {
@@ -3665,7 +3671,12 @@ function ptToQuote() {
     // asking permission to replace nothing.
     const existing = ((proj.quoteData || {}).items || [])
         .filter((x) => x && (x.title || x.description) && Number(x.price) > 0);
-    if (existing.length && !confirm(`בהצעה כבר יש ${existing.length} סעיפים. להחליף אותם במה שבטבלה?`)) return;
+    if (existing.length && !await askConfirm({
+        title: 'להחליף את מה שכתוב בהצעה?',
+        body: `בהצעה כבר יש ${existing.length} סעיפים. הם יוחלפו במה שבטבלת התמחור.`,
+        confirmLabel: 'החלף',
+        danger: true,
+    })) return;
 
     const totals = pricingTotals(proj);
     proj.quoteData = proj.quoteData || {};
@@ -4498,6 +4509,16 @@ function syncConversationsLayout() {
     }
 }
 window.addEventListener('resize', () => { clearTimeout(window._convoLayoutT); window._convoLayoutT = setTimeout(syncConversationsLayout, 150); });
+// And the breakpoint itself, which is the event that actually matters: a
+// debounced resize can miss the crossing (a maximise that fires no resize in
+// some embeddings, a zoom change, a rotated phone), and missing it leaves the
+// column hidden on a wide screen with the button that opens it hidden too —
+// no way at all back to a conversation. matchMedia fires exactly on the cross.
+try {
+    window.matchMedia('(min-width: 1100px)').addEventListener('change', syncConversationsLayout);
+} catch (e) {
+    try { window.matchMedia('(min-width: 1100px)').addListener(syncConversationsLayout); } catch (e2) {}
+}
 
 function toggleConversationsDrawer() {
     // Nothing to open or close when it is a column.

@@ -804,6 +804,13 @@ function sheetDeleteRow(index) {
 // linked. Both go through the one picker dialog now, so the customer list and
 // the category list cannot look like two different products.
 let _clientPickFor = null;
+// Which customer the picker should show a tick against — the job's, whether the
+// picker was opened from a work row or from the quote editor's own project.
+function _pickerCurrentClient(projectId) {
+    const proj = projectsList.find((p) => p.id === (projectId || activeProjectId));
+    return (proj && proj.clientId) || '';
+}
+
 function openClientPicker(projectId) {
     _clientPickFor = projectId || null;
     openPickerDialog({
@@ -811,14 +818,17 @@ function openClientPicker(projectId) {
         searchPlaceholder: 'חיפוש לקוח…',
         empty: 'עוד אין לקוחות שמורים. אפשר להוסיף אחד עכשיו.',
         addLabel: 'לקוח חדש',
-        rows: (clientsList || []).slice()
+        // The dropdown this replaced had a "ללא לקוח" option, and detaching a
+        // customer from a job you mis-linked is not a thing to lose.
+        rows: [{ id: '', name: 'ללא לקוח', active: !_pickerCurrentClient(projectId) }]
+            .concat((clientsList || []).slice()
             .sort((a, b) => String(a.name).localeCompare(String(b.name), 'he'))
             .map((c) => ({
                 id: c.id,
                 name: c.name,
                 sub: [c.phone, c.city].filter(Boolean).join(' · '),
-                active: projectId ? false : c.id === (projectsList.find((p) => p.id === activeProjectId) || {}).clientId,
-            })),
+                active: c.id === _pickerCurrentClient(projectId),
+            }))),
         onPick: (row) => pickClient(row.id),
         onAdd: () => pickNewClient(),
     });
@@ -831,7 +841,22 @@ function pickClient(id) {
     // left to dismiss here.
     const target = _clientPickFor;
     _clientPickFor = null;
-    if (!client) return;
+    // id === '' is the "ללא לקוח" row: a real choice, not a miss.
+    if (!client) {
+        if (id !== '') return;
+        if (target) { try { assignProjectClient(target, ''); } catch (e) {} return; }
+        const p0 = projectsList.find((p) => p.id === activeProjectId);
+        if (p0) { p0.clientId = null; saveProjects(); }
+        const n = document.getElementById('form-client-name');
+        const sb = document.getElementById('form-client-sub');
+        if (n) n.value = '';
+        if (sb) sb.value = '';
+        updatePreviewFromForm();
+        syncCurrentQuoteToProject();
+        try { filterProjectsList(); } catch (e) {}
+        showToast('השיוך ללקוח הוסר');
+        return;
+    }
 
     // Opened from a row on the work list: link the project and let
     // assignProjectClient do the rest — it is the one place that knows how a

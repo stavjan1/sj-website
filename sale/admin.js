@@ -1176,7 +1176,13 @@ async function adminAnalyzeCatalog() {
             .filter(it => it.name && Number.isFinite(it.price) && it.price > 0);
         if (items.length === 0) throw new Error('הניתוח לא החזיר פריטים');
         const before = priceCatalog.length;
-        if (!confirm(`הניתוח סיים: ${before} פריטים → ${items.length} פריטים נקיים.\nלהחליף את המאגר האישי בתוצאה? (אפשר יהיה לפרסם למערכת אחר כך)`)) {
+        if (!await askConfirm({
+            title: 'להחליף את המאגר האישי?',
+            body: `הניתוח הפך ${before} פריטים ל-${items.length} פריטים נקיים.`,
+            note: 'אפשר יהיה לפרסם למערכת אחר כך.',
+            confirmLabel: 'החלף',
+            danger: true,
+        })) {
             if (status) status.textContent = 'הניתוח בוטל · המאגר לא שונה.';
             return;
         }

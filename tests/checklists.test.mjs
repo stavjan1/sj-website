@@ -298,7 +298,9 @@ test('switching job type cannot silently destroy a characterization', () => {
     const fn = app.slice(app.indexOf('function setSpecJobType'));
     const body = fn.slice(0, fn.indexOf('\n}'));
 
-    assert.ok(/confirm\(/.test(body), 'the job type can be changed without confirming the loss');
+    // askConfirm, not the browser's confirm: the question is the same, the box
+    // is ours. tests/native-dialogs.test.mjs is what keeps the native one out.
+    assert.ok(/await askConfirm\(/.test(body), 'the job type can be changed without confirming the loss');
     // Only when there is something to lose — the agent sets the type on almost
     // every new job, and a dialog there would be intolerable.
     assert.ok(/if \(answered\)/.test(body), 'it asks even when no answers exist yet');
@@ -315,7 +317,7 @@ test('switching job type cannot silently destroy a characterization', () => {
     // type the user has already answered under.
     const prefill = app.slice(app.indexOf('function applySpecPrefill'));
     const prefillBody = prefill.slice(0, prefill.indexOf('\n}\n'));
-    assert.ok(!/confirm\(/.test(prefillBody), 'the agent path would block on a dialog');
+    assert.ok(!/askConfirm\(/.test(prefillBody), 'the agent path would block on a dialog');
     assert.ok(/source === 'user'/.test(prefillBody),
         'the agent can retype a job the user has already answered under');
 });
@@ -328,7 +330,7 @@ test('one tap cannot silently discard accumulated work', () => {
 
     const reset = app.slice(app.indexOf('function resetQuoteDesign'));
     const resetBody = reset.slice(0, reset.indexOf('\n}'));
-    assert.ok(/confirm\(/.test(resetBody), 'the quote design resets with no confirmation');
+    assert.ok(/await askConfirm\(/.test(resetBody), 'the quote design resets with no confirmation');
     // ...but only when there is something to discard.
     assert.ok(/defaultQuoteLayout\(\)\)\)/.test(resetBody),
         'it asks even when the layout is already the default');

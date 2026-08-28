@@ -118,3 +118,59 @@ test('starting work is one screen, not two', () => {
     assert.match(APP, /if \(b\.id === 'tab-home'\) return false;/,
         'בית is filtered out of the destinations, since "שיחה חדשה" is right above them');
 });
+
+test('the way in to the conversations survives every screen', () => {
+    // Stav, 28/08: entered as a guest, had one conversation, and then "פתאום
+    // לא רואים כלום". The thread was saved and the list rendered fine — the
+    // BUTTON was gone. placeBackButton() moves the back arrow and the bell out
+    // of .ctx-bar and into the screen's own heading, then hides the emptied
+    // bar; the ☰ was the one control it never moved, so on every screen with a
+    // title the only door to the conversations went display:none with its
+    // parent. Below 1100px, where the list is a drawer rather than a column,
+    // that left no way back to a conversation at all.
+    const i = APP.indexOf('function placeBackButton(');
+    const body = APP.slice(i, APP.indexOf('\n}', i));
+    assert.match(body, /convo-open-btn/, 'placeBackButton must know about the ☰');
+    // Both directions: into the heading, and back to the bar.
+    assert.match(body, /h2\.insertBefore\(convo/, 'it travels into the title with the others');
+    assert.match(body, /bar\.insertBefore\(convo/, 'and comes home when there is no title');
+    // And emptiness is measured, not inferred — the old `is-empty` was set from
+    // "the header is visible", which was a statement about two other buttons.
+    assert.match(body, /Array\.from\(bar\.children\)\.some/,
+        'is-empty must be decided by what is actually left in the bar');
+    assert.doesNotMatch(body, /toggle\('is-empty', headerVisible\)/,
+        'the old inference is back, and it cannot see a third control');
+});
+
+test('the customer chooser is ours on every surface', () => {
+    // The last native <select> a user meets: it opened as a white OS list over
+    // a dark app, with "+ לקוח חדש" sitting in it disguised as a customer.
+    assert.doesNotMatch(HTML, /id="banner-client-select"/,
+        'the project banner is back on a native dropdown');
+    assert.match(HTML, /class="banner-client"[\s\S]{0,200}openClientPicker/,
+        'the banner opens the product picker');
+    // And detaching stayed possible when the dropdown went away.
+    const market = readFileSync(join(ROOT, 'sale', 'market.js'), 'utf8');
+    const i = market.indexOf('function openClientPicker(');
+    const body = market.slice(i, market.indexOf('\n}', i));
+    assert.match(body, /ללא לקוח/, 'the picker still offers "no customer"');
+});
+
+test('a closed drawer cannot swallow the app', () => {
+    // .convo-drawer is position:fixed inset:0 — the entire viewport — and its
+    // harmlessness rested on JS setting `hidden` whenever the width changed.
+    // A missed resize therefore leaves an invisible scrim (opacity 0) over
+    // everything, eating every click, with nothing on screen to explain it.
+    // CSS now makes a drawer without .open inert below the column breakpoint,
+    // so the flag being stale costs nothing.
+    assert.match(CSS, /\.convo-drawer:not\(\.open\)\s*\{[^}]*pointer-events:\s*none/,
+        'a closed drawer is clickable again');
+    assert.match(CSS, /\.convo-drawer:not\(\.open\)\s\.convo-scrim\s*\{[^}]*display:\s*none/,
+        'the scrim of a closed drawer is back over the app');
+    // And the layout is re-decided on navigation, not only on a resize event —
+    // the one signal that is always delivered.
+    const i = APP.indexOf('function switchTab(');
+    const body = APP.slice(i, APP.indexOf('\n}', i));
+    assert.match(body, /syncConversationsLayout\(\)/,
+        'switching screens no longer re-decides column vs drawer');
+});

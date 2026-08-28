@@ -400,7 +400,7 @@ function maintCopyLink(projectId) {
     const link = maintDeepLink(proj);
     (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject())
         .then(() => showToast('הקישור הועתק'))
-        .catch(() => window.prompt('העתק את הקישור:', link));
+        .catch(() => showLinkDialog('הקישור לתזכורת', link));
     closeMaintCalPicker();
 }
 
@@ -1489,7 +1489,12 @@ async function ckRemoveClient(id) {
     c.updatedAt = Date.now();
     ckPersist();
     ckRender();
-    if (eventId && confirm('למחוק גם את התזכורת מיומן Google?')) {
+    if (eventId && await askConfirm({
+        title: 'למחוק גם את התזכורת ביומן?',
+        body: 'האירוע יימחק מיומן Google שלך.',
+        confirmLabel: 'מחק מהיומן',
+        danger: true,
+    })) {
         ckEnsureCalToken().then((token) =>
             fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events/' + eventId, {
                 method: 'DELETE', headers: { Authorization: 'Bearer ' + token }
@@ -1748,7 +1753,11 @@ async function pdueRun(list) {
     // A number this size is almost always a mistake, and it is not recoverable
     // by pressing undo — there is no undo for ninety calendar events.
     if (events > 100) { showToast('יותר מ-100 אירועים בבת אחת · עדיף לחלק לכמה פעמים', 'error'); return; }
-    if (events > 25 && !confirm('זה ייצור ' + events + ' אירועים ביומן שלך. להמשיך?')) return;
+    if (events > 25 && !await askConfirm({
+        title: 'ליצור ' + events + ' אירועים ביומן?',
+        body: 'כל אירוע נכנס ליומן Google שלך בנפרד.',
+        confirmLabel: 'צור',
+    })) return;
     if (isGuestUser()) { showToast('בלי חשבון Google — מוריד קובץ אחד עם הכל'); return pdueBulkIcs(list); }
 
     // ONE consent for the whole run. Google's popup flow only survives inside

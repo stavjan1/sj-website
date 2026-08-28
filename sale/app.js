@@ -125,7 +125,7 @@ async function adminPublishSystemCatalog() {
         showToast('נדרשת התחברות עם Google כדי לפרסם (אימות מנהל)', 'error');
         return;
     }
-    if (!confirm(`לפרסם ${priceCatalog.length} פריטים כמאגר המערכת לכל המשתמשים?\n(הפעולה מחליפה את מאגר המערכת הקיים)`)) return;
+    if (!(await askConfirm(`לפרסם ${priceCatalog.length} פריטים כמאגר המערכת לכל המשתמשים?`, { title: 'פרסום מאגר המערכת', note: 'הפעולה מחליפה את מאגר המערכת הקיים.', danger: true, confirmLabel: 'פרסם' }))) return;
     if (status) { status.style.display = 'block'; status.style.color = ''; status.textContent = 'מפרסם…'; }
     try {
         const res = await adminRes('/api/catalog', {
@@ -258,7 +258,7 @@ async function adminSavePricingMap() {
     } catch (e) { _pmapStatusHtml(adminErrorHtml(e)); }
 }
 async function adminRevertPricingMap() {
-    if (!confirm('לחזור לברירת המחדל מהקוד? המפה המותאמת תימחק.')) return;
+    if (!(await askConfirm('לחזור לברירת המחדל מהקוד?', { note: 'המפה המותאמת תימחק.', danger: true, confirmLabel: 'אפס' }))) return;
     const ta = document.getElementById('admin-pricing-map');
     if (!ta) return;
     ta.value = '';
@@ -1655,6 +1655,13 @@ function updateBackButton() {
 function placeBackButton() {
     const btn = document.getElementById('ctx-back');
     const bell = document.getElementById('reminder-bell');
+    // The one way in to the conversations. It lives in this bar too, and it was
+    // the only control here that never moved out of it — so on every screen
+    // with a title (which is every screen but the chat) the bar emptied itself
+    // of the other two, went display:none, and took the menu down with it.
+    // Stav, 28/08: entered as a guest, had one conversation, and then "פתאום
+    // לא רואים כלום" — the thread was fine, the door to it was gone.
+    const convo = document.querySelector('.convo-open-btn');
     const bar = document.querySelector('.ctx-bar');
     if (!btn || !bar) return;
     const panel = document.querySelector('.content-panel.active');
@@ -1686,21 +1693,30 @@ function placeBackButton() {
         // rather than matched with :has() so the rule is deterministic.
         const wrap = h2.parentElement;
         if (wrap && wrap.classList.contains('section-header') === false) wrap.classList.add('ctx-title-wrap');
-        if (btn.parentElement !== h2) h2.insertBefore(btn, h2.firstChild);
+        if (convo && convo.parentElement !== h2) h2.insertBefore(convo, h2.firstChild);
+        if (btn.parentElement !== h2) h2.insertBefore(btn, convo ? convo.nextSibling : h2.firstChild);
         if (bell && bell.parentElement !== h2) h2.appendChild(bell);
         btn.classList.add('in-title');
+        if (convo) convo.classList.add('in-title');
         if (bell) bell.classList.add('in-title');
     } else {
         // No visible heading on this screen (the chat on a phone): the strip
         // comes back, because the two controls still need somewhere to be.
         document.querySelectorAll('.section-header h2.has-ctx-btns').forEach((el) => el.classList.remove('has-ctx-btns'));
         document.querySelectorAll('.ctx-title-wrap').forEach((el) => el.classList.remove('ctx-title-wrap'));
-        if (btn.parentElement !== bar) bar.insertBefore(btn, bar.firstChild);
+        if (convo && convo.parentElement !== bar) bar.insertBefore(convo, bar.firstChild);
+        if (btn.parentElement !== bar) bar.insertBefore(btn, convo ? convo.nextSibling : bar.firstChild);
         if (bell && bell.parentElement !== bar) bar.appendChild(bell);
         btn.classList.remove('in-title');
+        if (convo) convo.classList.remove('in-title');
         if (bell) bell.classList.remove('in-title');
     }
-    bar.classList.toggle('is-empty', headerVisible);
+    // Emptiness is now MEASURED, not assumed. The old line said "the header is
+    // visible, therefore the bar is empty", which was true of the two controls
+    // it knew about and false the moment a third one was added. Counting what
+    // is actually left in the bar cannot go stale when a fourth arrives.
+    const stillHere = Array.from(bar.children).some((el) => !el.hidden);
+    bar.classList.toggle('is-empty', !stillHere);
 }
 
 
@@ -2164,8 +2180,18 @@ function clientTags() {
 function saveBroadcastGroup() {
     const rows = (_bcRows || []).filter((r) => _bcPicked.has(r.id));
     if (!rows.length) { showToast('אף אחד לא מסומן', 'error'); return; }
-    const name = (window.prompt('שם הקבוצה (למשל: קבלנים, ועדי בית):') || '').trim();
-    if (!name) return;
+    openNamePrompt({
+        title: 'קבוצה חדשה',
+        label: 'שם הקבוצה',
+        placeholder: 'קבלנים, ועדי בית, תחזוקה…',
+        onSave: (name) => _applyBroadcastGroup(rows, name),
+    });
+}
+
+// The naming used to happen inline, because a browser prompt blocks until it is
+// answered. Ours does not — it calls back — so the work moves into its own
+// function rather than being buried in a closure.
+function _applyBroadcastGroup(rows, name) {
     rows.forEach((row) => {
         const client = _ensureClientForRow(row);
         client.tags = Array.isArray(client.tags) ? client.tags : [];
@@ -2192,18 +2218,22 @@ function _renderBroadcastChips() {
 function broadcastEditContact(id) {
     const row = (_bcRows || []).find((r) => r.id === id);
     if (!row) return;
-    const phone = window.prompt(`טלפון של ${row.name}:`, row.phone || '');
-    if (phone === null) return;
-    const email = window.prompt(`מייל של ${row.name} (אפשר להשאיר ריק):`, row.email || '');
-    if (email === null) return;
-
-    const client = _ensureClientForRow(row);
-    client.phone = phone.trim();
-    client.email = email.trim();
-    saveClients();
-    renderBroadcastList();
-    try { renderClientArchive(); } catch (e) {}
-    showToast('פרטי הקשר נשמרו');
+    openNamePrompt({
+        title: `פרטי הקשר של ${row.name}`,
+        fields: [
+            { key: 'phone', label: 'טלפון', value: row.phone || '', placeholder: '050-0000000', type: 'tel' },
+            { key: 'email', label: 'מייל (לא חובה)', value: row.email || '', placeholder: 'name@example.com', type: 'email' },
+        ],
+        onSave: (v) => {
+            const client = _ensureClientForRow(row);
+            client.phone = (v.phone || '').trim();
+            client.email = (v.email || '').trim();
+            saveClients();
+            renderBroadcastList();
+            try { renderClientArchive(); } catch (e) {}
+            showToast('פרטי הקשר נשמרו');
+        },
+    });
 }
 
 function broadcastText() {
@@ -2336,6 +2366,11 @@ function switchTab(tabId, opts) {
         }
     }
     setTimeout(updateBackButton, 0);
+    // The thread list is a column above 1100px and a drawer below it, and which
+    // one it is has to be re-decided when the width changes. Resize events are
+    // the obvious trigger and are not always delivered — so navigation, which
+    // always is, re-decides it too. Idempotent, so calling it often is free.
+    try { syncConversationsLayout(); } catch (e) {}
 
     // Project-scoped tabs (editor / reports / pricing table) need an open
     // project. The CHAT does not, and used to: it was the one screen that
@@ -2824,7 +2859,7 @@ function renderRecoveryPanel() {
             </div>`).join('') + '</div>';
 }
 
-function confirmRecoveryRestore(index) {
+async function confirmRecoveryRestore(index) {
     const snap = window.sjDataRecovery.list()[index];
     if (!snap) { showToast('הגיבוי כבר לא קיים', 'error'); return; }
     // backupLocalSnapshot skips when there is nothing worth saving, so promising
@@ -2840,7 +2875,12 @@ function confirmRecoveryRestore(index) {
         + (nothingToLose
             ? `כרגע אין נתונים במכשיר, אז אין מה לאבד.`
             : `המצב הנוכחי יישמר כגיבוי, כך שאפשר לחזור ממנו.`);
-    if (!confirm(msg)) return;
+    if (!await askConfirm({
+        title: 'לשחזר את המצב?',
+        body: msg,
+        confirmLabel: 'שחזר',
+        danger: !nothingToLose,
+    })) return;
     if (window.sjDataRecovery.restore(index)) renderRecoveryPanel();
 }
 
@@ -3301,18 +3341,18 @@ function updateActiveProjectBanner(proj) {
         bannerStatus.style.display = 'none';
     }
 
-    // Who the job is for, editable from inside the job.
+    // Who the job is for, editable from inside the job. It was a native <select>, which on Stav's screenshot
+    // opened as a white OS list over a dark app — and "+ לקוח חדש" sat in it
+    // disguised as a customer named "+". It is a button now, into the same
+    // picker the work list uses, so there is one client chooser in the product.
     const clientWrap = document.getElementById('banner-client');
-    const clientSel = document.getElementById('banner-client-select');
-    if (clientWrap && clientSel) {
+    const clientName = document.getElementById('banner-client-name');
+    if (clientWrap && clientName) {
         clientWrap.hidden = !proj;
         if (proj) {
-            const opts = ['<option value="">ללא לקוח</option>']
-                .concat((clientsList || []).map((c) =>
-                    `<option value="${escapeHtml(c.id)}" ${proj.clientId === c.id ? 'selected' : ''}>${escapeHtml(c.name)}</option>`))
-                .concat('<option value="__new">+ לקוח חדש…</option>');
-            clientSel.innerHTML = opts.join('');
-            clientWrap.classList.toggle('has-client', !!proj.clientId);
+            const c = projectClient(proj);
+            clientName.textContent = c ? c.name : 'ללא לקוח';
+            clientWrap.classList.toggle('has-client', !!c);
         }
     }
 
@@ -3533,6 +3573,9 @@ function assignProjectClient(projectId, value) {
     }
     saveProjects();
     filterProjectsList();
+    // The banner used to be a <select> that showed the choice by keeping it
+    // selected; it is a label now, and a label does not repaint itself.
+    if (projectId === activeProjectId) { try { updateActiveProjectBanner(proj); } catch (e) {} }
     try { renderReminderBell(); } catch (e) {}
     showToast(c ? 'שויך ללקוח: ' + c.name : 'השיוך ללקוח הוסר');
 }
@@ -3627,10 +3670,10 @@ function staleDraftsHtml(stale) {
         </details>`;
 }
 
-function deleteStaleDrafts() {
+async function deleteStaleDrafts() {
     const stale = projectsList.filter(isStaleDraft);
     if (!stale.length) return;
-    if (!confirm(`להעביר ${stale.length} טיוטות לסל המחזור? אפשר לשחזר מהסל.`)) return;
+    if (!(await askConfirm(`להעביר ${stale.length} טיוטות לסל המחזור?`, { note: 'אפשר לשחזר מהסל.', danger: true, confirmLabel: 'לסל המחזור' }))) return;
     const ids = new Set(stale.map(p => p.id));
     const now = new Date().toISOString();
     stale.forEach(p => trashedProjectsList.push({ ...p, _deletedAt: now }));
@@ -5877,7 +5920,7 @@ function setQuoteEnglish(on) {
     getQuoteLayout().english = !!on;
     saveQuoteLayout(); applyQuoteLayout(); renderDesignerPreview();
 }
-function resetQuoteDesign() {
+async function resetQuoteDesign() {
     // The layout holds the block order you dragged into place and the
     // alignment, size and weight of each one: the shape of every quote you
     // send. The button is one word next to the designer, and there is no undo,
@@ -5885,7 +5928,13 @@ function resetQuoteDesign() {
     // discard nothing is just noise.
     const current = JSON.stringify(getQuoteLayout());
     if (current !== JSON.stringify(defaultQuoteLayout())) {
-        if (!confirm('לאפס את עיצוב ההצעה לברירת המחדל?\n\nסדר הבלוקים והעיצוב שהגדרת יימחקו, ואי אפשר לשחזר אותם.')) return;
+        if (!await askConfirm({
+            title: 'לאפס את עיצוב ההצעה?',
+            body: 'סדר הבלוקים והעיצוב שהגדרת יחזרו לברירת המחדל.',
+            note: 'אי אפשר לשחזר את מה שהיה.',
+            confirmLabel: 'אפס עיצוב',
+            danger: true,
+        })) return;
     }
     appState.settings.quoteLayout = defaultQuoteLayout();
     saveQuoteLayout(); applyQuoteLayout(); renderDesignerBlocks();
@@ -6896,7 +6945,7 @@ async function shareQuoteLink() {
             await navigator.clipboard.writeText(link);
             showToast('הקישור הועתק · שלח ללקוח בוואטסאפ');
         } catch (e) {
-            prompt('העתק את הקישור ושלח ללקוח:', link);
+            showLinkDialog('הקישור ללקוח', link);
         }
     } catch (e) {
         showToast(e.message || 'יצירת הקישור נכשלה', 'error');
@@ -7630,11 +7679,17 @@ function importHistoryData(event) {
     const file = event.target.files[0];
     if (!file) return;
     
-    readFileOrExplain(file, function (result) {
+    readFileOrExplain(file, async function (result) {
         try {
             const imported = JSON.parse(result);
             if (imported.history && Array.isArray(imported.history)) {
-                if (confirm(`נמצאו ${imported.history.length} הצעות מחיר בקובץ.\n\nשים לב: הייבוא יחליף את כל ההיסטוריה והפרויקטים הנוכחיים בקובץ הגיבוי (לא ימוזג). להמשיך?`)) {
+                if (await askConfirm({
+                    title: 'לייבא את הגיבוי?',
+                    body: `בקובץ יש ${imported.history.length} הצעות מחיר. הייבוא מחליף את כל ההיסטוריה והעבודות שלך — ולא ממזג אותם.`,
+                    note: 'לפני הייבוא נשמר גיבוי של המצב הנוכחי.',
+                    confirmLabel: 'ייבא',
+                    danger: true,
+                })) {
                     backupLocalSnapshot('before import');
                     appState.history = imported.history;
                     if (imported.settings) {
@@ -7842,8 +7897,13 @@ async function adminTelegramSave(btn) {
     if (!token) { showToast('מדביקים כאן את הטוקן מ-BotFather', 'error'); return; }
     await adminTelegramPost({ action: 'save', token }, btn);
 }
-function adminTelegramAction(action, btn, chatId) {
-    if (action === 'disconnect' && !confirm('לנתק את הבוט? הדוחות שכבר נוצרו יישארו.')) return;
+async function adminTelegramAction(action, btn, chatId) {
+    if (action === 'disconnect' && !await askConfirm({
+        title: 'לנתק את הבוט?',
+        body: 'הדוחות שכבר נוצרו יישארו במערכת.',
+        confirmLabel: 'נתק',
+        danger: true,
+    })) return;
     return adminTelegramPost({ action, chatId }, btn);
 }
 async function adminTelegramPost(payload, btn) {
@@ -9111,9 +9171,9 @@ function getProfessionSystemInstruction() {
 // Session logout — the only auth entry points are the lock screen's Google
 // and guest buttons (the legacy manual login/register flow was removed).
 // ==========================================================================
-function handleUserLogout() {
+async function handleUserLogout() {
     authTrail('logout-clicked');
-    if (!confirm('האם אתה בטוח שברצונך להתנתק ולנעול את המערכת?')) return;
+    if (!(await askConfirm('להתנתק מהמערכת?', { confirmLabel: 'התנתק' }))) return;
 
     // Cancel any pending debounced cloud save so it can't fire after the
     // session identity below is gone (or worse, after the next user logs in).
@@ -9257,7 +9317,7 @@ function updateUserProfileProfession() {
     syncDatabaseToDrive(true);
 }
 
-function handleUpdateCredentials(event) {
+async function handleUpdateCredentials(event) {
     if (event) event.preventDefault();
     
     const newUsernameInput = document.getElementById('settings-change-username');
@@ -9290,7 +9350,11 @@ function handleUpdateCredentials(event) {
         return;
     }
     
-    if (!confirm('האם אתה בטוח שברצונך לעדכן את פרטי האבטחה? (שם המשתמש והסיסמה יעודכנו והנתונים המקומיים שלך יועברו לשם המשתמש החדש)')) {
+    if (!await askConfirm({
+        title: 'לעדכן את פרטי הכניסה?',
+        body: 'שם המשתמש והסיסמה יתעדכנו, וכל הנתונים שלך יעברו לשם החדש.',
+        confirmLabel: 'עדכן',
+    })) {
         return;
     }
     
@@ -10112,6 +10176,13 @@ function openCategoryPicker(projectId) {
 // in more than one place.
 function openNamePrompt(opts) {
     const o = opts || {};
+    // One field is the common case and stays a one-liner. `fields` is for the
+    // places that used to fire two browser prompts back to back — a phone box,
+    // then dismiss it, then an email box — which is two modal interruptions for
+    // one edit, and no way to see the first answer while typing the second.
+    const fields = o.fields && o.fields.length ? o.fields : [{
+        key: 'value', label: o.label || 'שם', value: o.value || '', placeholder: o.placeholder || '',
+    }];
     const old = document.getElementById('name-prompt');
     if (old) old.remove();
     const dlg = document.createElement('dialog');
@@ -10119,27 +10190,72 @@ function openNamePrompt(opts) {
     dlg.className = 'ck-dialog';
     dlg.innerHTML = `
         <h3>${escapeHtml(o.title || '')}</h3>
-        <div class="form-group">
-            <label for="np-value">${escapeHtml(o.label || 'שם')}</label>
-            <input type="text" id="np-value" placeholder="${escapeHtml(o.placeholder || '')}" value="${escapeHtml(o.value || '')}">
-        </div>
+        ${fields.map((f, i) => `<div class="form-group">
+            <label for="np-f${i}">${escapeHtml(f.label || '')}</label>
+            <input type="${escapeHtml(f.type || 'text')}" id="np-f${i}"
+                   placeholder="${escapeHtml(f.placeholder || '')}" value="${escapeHtml(f.value || '')}">
+        </div>`).join('')}
         <div class="ck-dlg-actions">
             <button type="button" class="btn btn-secondary" data-a="no">ביטול</button>
-            <button type="button" class="btn btn-accent" data-a="yes">שמור</button>
+            <button type="button" class="btn btn-accent" data-a="yes">${escapeHtml(o.saveLabel || 'שמור')}</button>
         </div>`;
     document.body.appendChild(dlg);
     const close = () => { try { dlg.close(); } catch (e) {} dlg.remove(); };
     const save = () => {
-        const v = (dlg.querySelector('#np-value').value || '').trim();
+        const vals = {};
+        fields.forEach((f, i) => { vals[f.key || ('f' + i)] = (dlg.querySelector('#np-f' + i).value || '').trim(); });
         close();
-        if (v && o.onSave) o.onSave(v);
+        if (!o.onSave) return;
+        // The single-field shorthand hands back the string it was asked for;
+        // anything with named fields hands back the object.
+        if (o.fields && o.fields.length) { o.onSave(vals); return; }
+        if (vals.value) o.onSave(vals.value);
     };
     dlg.querySelector('[data-a="yes"]').onclick = save;
     dlg.querySelector('[data-a="no"]').onclick = close;
-    dlg.querySelector('#np-value').onkeydown = (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); save(); }
+    dlg.querySelectorAll('input').forEach((el) => {
+        el.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } };
+    });
+    dlg.addEventListener('cancel', close);
+    if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
+    setTimeout(() => dlg.querySelector('#np-f0')?.focus(), 30);
+}
+
+// A link to hand over. This was prompt(text, link) — the one use of a browser
+// prompt that was not asking anything: it existed only because a prompt box
+// shows a value you can select and copy. It is the fallback for when the
+// clipboard is refused (Safari without a user gesture, an insecure origin), so
+// it has to work when copying does not: the field is selected on open, and the
+// copy button is there for when it is allowed after all.
+function showLinkDialog(title, link) {
+    const old = document.getElementById('link-dialog');
+    if (old) old.remove();
+    const dlg = document.createElement('dialog');
+    dlg.id = 'link-dialog';
+    dlg.className = 'ck-dialog link-dialog';
+    dlg.innerHTML = `
+        <h3>${escapeHtml(title || 'הקישור')}</h3>
+        <p class="input-help">סמן והעתק, או לחץ על העתקה.</p>
+        <input type="text" id="ld-link" readonly value="${escapeHtml(link || '')}">
+        <div class="ck-dlg-actions">
+            <button type="button" class="btn btn-secondary" data-a="close">סגירה</button>
+            <button type="button" class="btn btn-accent" data-a="copy">העתקה</button>
+        </div>`;
+    document.body.appendChild(dlg);
+    const close = () => { try { dlg.close(); } catch (e) {} dlg.remove(); };
+    const input = dlg.querySelector('#ld-link');
+    dlg.querySelector('[data-a="close"]').onclick = close;
+    dlg.querySelector('[data-a="copy"]').onclick = () => {
+        input.select();
+        // execCommand is the deprecated one that still works where the async
+        // clipboard API is blocked, which is the entire reason this box exists.
+        let ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) {}
+        if (ok) { showToast('הקישור הועתק'); close(); }
+        else showToast('העתק ידנית — הטקסט מסומן', 'error');
     };
     dlg.addEventListener('cancel', close);
     if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
-    setTimeout(() => dlg.querySelector('#np-value')?.focus(), 30);
+    setTimeout(() => { try { input.select(); } catch (e) {} }, 30);
 }
+
