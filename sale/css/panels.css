@@ -4976,3 +4976,53 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
 /* The ⋯ exists to fold a row that is only folded on a phone. On desktop the
    card shows everything already, so the control would open nothing. */
 @media (min-width: 769px) { .project-card .card-more { display: none; } }
+
+/* ============================================================================
+   THE MARKET LIST IS A LIST, NOT A SPREADSHEET
+   Six columns — סעיף, המחיר שלי, חציון, פער, דגימות, and a button — squeezed
+   into 358px meant every cell wrapped: one row measured 161px tall, and the
+   name is the only column you actually read first. On a phone each item is a
+   block: its name on one line, then the numbers on a single labelled strip.
+   The <table> stays a table for desktop and for screen readers; only the
+   phone re-lays it out.
+   ============================================================================ */
+@media (max-width: 768px) {
+    .mk-table thead { display: none; }
+    .mk-table, .mk-table tbody, .mk-table tr, .mk-table td { display: block; width: auto; }
+    .mk-table tr {
+        padding: var(--sp-2);
+        border: 1px solid var(--border);
+        border-radius: var(--r-sm);
+        margin-block-end: var(--sp-2);
+    }
+    .mk-table td { padding: 0; border: none; text-align: start; }
+    .mk-table .mk-name {
+        font-weight: 600; color: var(--text); font-size: var(--fs-sm);
+        margin-block-end: var(--sp-1);
+    }
+    /* The four numbers ride one strip, each wearing its own label — the header
+       row cannot do that job once the columns are gone. */
+    .mk-table td.num {
+        display: inline-flex; align-items: baseline; gap: 4px;
+        margin-inline-end: var(--sp-3);
+        font-size: var(--fs-xs); color: var(--text-2);
+        font-variant-numeric: tabular-nums;
+    }
+    .mk-table td.num::before {
+        content: attr(data-l) ' ';
+        color: var(--text-3); font-size: 10px; font-weight: 600;
+    }
+    .mk-table .mk-range { display: none; }   /* the low–high band is desktop detail */
+    .mk-table td:last-child { margin-block-start: var(--sp-2); }
+    .mk-table td:last-child:empty { margin: 0; }
+    .mk-table td:last-child .btn { width: 100%; min-height: 40px; }
+    .table-scroll { overflow-x: visible; }
+    .market-summary { flex-wrap: wrap; gap: var(--sp-2); font-size: var(--fs-xs); }
+}
+
+/* The catalog row: the name is one line here too. A supplier item called
+   "מא״ז חד פאזי C16 עקומה C כולל התקנה בלוח" was wrapping the row to 61px. */
+@media (max-width: 768px) {
+    .catalog-row .cr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .catalog-row { align-items: center; }
+}

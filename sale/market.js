@@ -90,10 +90,10 @@ async function renderMarketPrices(force) {
             : `${r.gap > 0 ? '+' : ''}${nis(r.gap)} <small>(${r.gapPct > 0 ? '+' : ''}${r.gapPct}%)</small>`;
         return `<tr class="${cls}">
             <td class="mk-name">${escapeHtml(r.name)}</td>
-            <td class="num">${r.mine != null ? nis(r.mine) : '—'}</td>
-            <td class="num">${nis(r.median)}<small class="mk-range">${nis(r.low)}–${nis(r.high)}</small></td>
-            <td class="num mk-gap">${gapTxt}</td>
-            <td class="num">${r.count}</td>
+            <td class="num" data-l="שלי">${r.mine != null ? nis(r.mine) : '—'}</td>
+            <td class="num" data-l="בשוק">${nis(r.median)}<small class="mk-range">${nis(r.low)}–${nis(r.high)}</small></td>
+            <td class="num mk-gap" data-l="פער">${gapTxt}</td>
+            <td class="num" data-l="דגימות">${r.count}</td>
             <td>${r.mine == null ? `<button class="btn btn-secondary btn-small" onclick="marketAdoptPrice('${escapeHtml(r.name).replace(/'/g, "\\'")}', ${Math.round(r.median)})">הוסף למאגר</button>` : ''}</td>
         </tr>`;
     }).join('');
