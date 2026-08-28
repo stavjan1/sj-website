@@ -5207,3 +5207,73 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
     .pipeline-controls::-webkit-scrollbar { display: none; }
     .pipeline-controls > * { flex: none; }
 }
+
+/* ============================================================================
+   ON A WIDE SCREEN, THE LIST STANDS OPEN — LIKE CLAUDE
+   Stav sent a screenshot of Claude beside a screenshot of this app: "את כל
+   החלון הזה תעשה כאילו מסך מלא... אולי אפילו בצד את הרשימה של הפרויקטים רק
+   בשמות. ממש כמו בקלוד."
+   That is the shape: a column of thread names that is always there, and the
+   conversation taking everything else. The drawer already holds exactly that
+   list — on a phone it slides over, and from 1100px up it simply stops being a
+   drawer and becomes the column. Same markup, same code, no second list to
+   keep in step.
+   ============================================================================ */
+@media (min-width: 1100px) {
+    /* Always present, never a modal: no scrim, no transform, no trap. */
+    .convo-drawer {
+        position: static;
+        display: flex;
+        flex: 0 0 264px;
+        min-width: 264px;
+        z-index: auto;
+    }
+    .convo-drawer[hidden] { display: block; }      /* the column does not hide */
+    .convo-scrim { display: none; }
+    .convo-panel {
+        position: static;
+        width: 100%;
+        height: 100%;
+        transform: none;
+        transition: none;
+        border-inline-end: 1px solid var(--border);
+        padding-block: var(--sp-3);
+    }
+    .convo-close { display: none; }                /* nothing to close */
+    /* The app is: rail · list · conversation. */
+    .app-container { display: flex; }
+    .app-container > .convo-drawer { order: 1; }
+    .app-container > .main-content { order: 2; }
+    body.convo-open { overflow: hidden; }
+    /* The conversation takes what is left, rather than sitting in a 940px
+       ribbon with empty space either side. */
+    #panel-wizard.hide-estimate .control-side { max-width: none; }
+    /* The rail's own project steps are the list's job now on this width. */
+    .convo-dests { max-height: 34vh; }
+}
+
+/* ---- The three errands: one row, side by side ----
+   They were three full-width bars stacked under the thread, which is three
+   rows of a screen for three things you press once. Stav: "אולי פשוט בשורה
+   אחת, אחד ליד השני." */
+.side-asks { flex-direction: row; flex-wrap: wrap; gap: var(--sp-2); }
+.side-ask { flex: 1 1 0; min-width: 0; justify-content: center; text-align: center; }
+.side-ask span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The client picker: the same list a native <select> would have popped, drawn
+   by us. The OS widget could not be styled and looked like a different program
+   had opened on top of the app. */
+.client-picker { max-width: 420px; }
+.cli-pick-list { max-height: 46vh; overflow-y: auto; margin-block-end: var(--sp-2); }
+.cli-pick-row {
+    display: flex; flex-direction: column; gap: 2px;
+    width: 100%; min-height: 46px; padding: var(--sp-2);
+    background: none; border: 1px solid transparent; border-radius: var(--r-sm);
+    text-align: start; cursor: pointer;
+}
+.cli-pick-row:hover { background: var(--surface-2); }
+.cli-pick-row.is-active { background: var(--accent-soft); border-color: var(--accent); }
+.cli-pick-name { color: var(--text); font: 600 var(--fs-sm) var(--font-ui); }
+.cli-pick-sub { color: var(--text-3); font-size: var(--fs-xs); }
+.proj-client-chip { cursor: pointer; }
+@media (max-width: 768px) { .client-picker { width: calc(100vw - var(--sp-6)); max-width: none; } }

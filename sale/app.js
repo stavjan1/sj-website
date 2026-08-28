@@ -1497,6 +1497,7 @@ function initUserSession() {
     // guest landed on the project list and had to find the chat itself
     // (Stav, 25/08: "זה נפתח בדיפולט על הפרויקטים ולא עם הצ'אט").
     switchTab('home');
+    try { refreshConversationsColumn(); } catch (e) {}   // the wide-screen thread column
     updateUserProfileUI();
     updateGuestUpgradeUI();
     setupQuotePreviewFit();
@@ -9986,3 +9987,11 @@ function knowledgeFor(text, opts) {
     if (o.full || wantsToolKnowledge(text)) out += getToolsPromptBlock();
     return out;
 }
+
+
+// The client picker lives in market.js and always did: a styled dialog with a
+// search box and an "add a customer" button. I wrote a second one here before
+// noticing, which would have been two lists of the same customers drifting
+// apart. It is generalised there instead, so the work list and the quote editor
+// open the same picker.
+

@@ -799,7 +799,12 @@ function sheetDeleteRow(index) {
 }
 
 // ── Choosing the customer, from the customers he has ────────────────────────
-function openClientPicker() {
+// Opened from two places now: the quote editor, which wants the chosen customer
+// written onto the sheet, and a row on the work list, which wants the project
+// linked. The target is remembered here so pickClient does the right one.
+let _clientPickFor = null;
+function openClientPicker(projectId) {
+    _clientPickFor = projectId || null;
     const old = document.getElementById('client-picker');
     if (old) old.remove();
     const dlg = document.createElement('dialog');
@@ -845,7 +850,17 @@ function pickClient(id) {
     const client = (clientsList || []).find((c) => c.id === id);
     const dlg = document.getElementById('client-picker');
     if (dlg) { dlg.close(); dlg.remove(); }
+    const target = _clientPickFor;
+    _clientPickFor = null;
     if (!client) return;
+
+    // Opened from a row on the work list: link the project and let
+    // assignProjectClient do the rest — it is the one place that knows how a
+    // linked customer reaches the quote header and the reminders.
+    if (target) { try { assignProjectClient(target, client.id); } catch (e) {} return; }
+
+    // Opened from the quote editor: the sheet in front of him is the thing to
+    // fill in.
     const proj = projectsList.find((p) => p.id === activeProjectId);
     if (proj) { proj.clientId = client.id; saveProjects(); }
     const name = document.getElementById('form-client-name');
@@ -862,8 +877,11 @@ function pickClient(id) {
 // modal box you had to dismiss to see the next. One form, the same form the
 // work list uses, and the quote picks the customer up when it closes.
 function pickNewClient() {
-    openNewClient(null);
-    _newClientThen = (client) => pickClient(client.id);
+    const target = _clientPickFor;                 // survive the picker closing
+    const dlg = document.getElementById('client-picker');
+    if (dlg) { try { dlg.close(); } catch (e) {} dlg.remove(); }
+    openNewClient(target);
+    if (!target) _newClientThen = (client) => pickClient(client.id);
 }
 
 function updatePreviewFromForm() {

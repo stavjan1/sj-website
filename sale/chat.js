@@ -4472,7 +4472,22 @@ function closeConversationsDrawer() {
     setTimeout(() => { if (!d.classList.contains('open')) d.hidden = true; }, 220);
 }
 
+// From 1100px up the drawer is not a drawer: it is the column that is always
+// there. It still carries `hidden` for the phone, and CSS overrides that at
+// this width — but its CONTENT is only drawn when it opens, so on a wide screen
+// it would stand there empty until someone pressed a button that does nothing.
+// This paints it, and keeps it painted as threads come and go.
+function isWideLayout() {
+    try { return window.matchMedia('(min-width: 1100px)').matches; } catch (e) { return false; }
+}
+function refreshConversationsColumn() {
+    if (!isWideLayout()) return;
+    try { renderConversationsList(); renderDrawerDestinations(); } catch (e) {}
+}
+
 function toggleConversationsDrawer() {
+    // Nothing to open or close when it is a column.
+    if (isWideLayout()) { refreshConversationsColumn(); return; }
     const d = document.getElementById('convo-drawer');
     if (!d) return;
     if (d.hidden) openConversationsDrawer(); else closeConversationsDrawer();

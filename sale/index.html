@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=416">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=419">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,14 +26,14 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=416">
-    <link rel="stylesheet" href="../assets/ui.css?v=416">
-    <link rel="stylesheet" href="css/shell.css?v=416">
-    <link rel="stylesheet" href="css/panels.css?v=416">
-    <link rel="stylesheet" href="controlroom.css?v=416">
-    <link rel="stylesheet" href="periodic.css?v=416">
-    <link rel="stylesheet" href="nextstep.css?v=416">
-    <link rel="stylesheet" href="css/pdf.css?v=416">
+    <link rel="stylesheet" href="../assets/tokens.css?v=419">
+    <link rel="stylesheet" href="../assets/ui.css?v=419">
+    <link rel="stylesheet" href="css/shell.css?v=419">
+    <link rel="stylesheet" href="css/panels.css?v=419">
+    <link rel="stylesheet" href="controlroom.css?v=419">
+    <link rel="stylesheet" href="periodic.css?v=419">
+    <link rel="stylesheet" href="nextstep.css?v=419">
+    <link rel="stylesheet" href="css/pdf.css?v=419">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -174,6 +174,39 @@
         </aside>
         
         <!-- Main Workspace -->
+    <!-- The conversations list. Every thread the user has had, newest first,
+         questions and jobs together — the sidebar a chat product has. -->
+    <div id="convo-drawer" class="convo-drawer" hidden>
+        <div class="convo-scrim" onclick="closeConversationsDrawer()" aria-hidden="true"></div>
+        <aside class="convo-panel" role="dialog" aria-modal="true" aria-label="השיחות שלי">
+            <div class="convo-head">
+                <button type="button" class="convo-close" onclick="closeConversationsDrawer()" aria-label="סגירה">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+                <h2>השיחות שלי</h2>
+            </div>
+            <button type="button" class="convo-new" onclick="startNewConversation()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                שיחה חדשה
+            </button>
+            <label class="convo-search-wrap">
+                <span class="sr-only">חיפוש בשיחות</span>
+                <input type="search" id="convo-search" placeholder="חיפוש בשיחות…" oninput="renderConversationsList()">
+            </label>
+            <div class="convo-list" id="convo-list"></div>
+
+            <!-- Everywhere else in the app. Mirrored from the real nav buttons
+                 rather than copied, so a destination cannot go missing here and
+                 a future one arrives without anybody remembering this file. -->
+            <nav class="convo-dests" id="convo-dests" aria-label="מסכי המערכת"></nav>
+
+            <button type="button" class="convo-account" onclick="closeConversationsDrawer(); toggleAccountMenu(event);">
+                <span class="convo-acc-avatar" id="convo-acc-avatar">S</span>
+                <span class="convo-acc-name" id="convo-acc-name">החשבון שלי</span>
+            </button>
+        </aside>
+    </div>
+
         <main class="main-content">
 
             <!-- One bar at the top of every screen: the way back, and the bell.
@@ -2394,39 +2427,6 @@
     </div>
 
     <!-- Lock Screen -->
-    <!-- The conversations list. Every thread the user has had, newest first,
-         questions and jobs together — the sidebar a chat product has. -->
-    <div id="convo-drawer" class="convo-drawer" hidden>
-        <div class="convo-scrim" onclick="closeConversationsDrawer()" aria-hidden="true"></div>
-        <aside class="convo-panel" role="dialog" aria-modal="true" aria-label="השיחות שלי">
-            <div class="convo-head">
-                <button type="button" class="convo-close" onclick="closeConversationsDrawer()" aria-label="סגירה">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                </button>
-                <h2>השיחות שלי</h2>
-            </div>
-            <button type="button" class="convo-new" onclick="startNewConversation()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-                שיחה חדשה
-            </button>
-            <label class="convo-search-wrap">
-                <span class="sr-only">חיפוש בשיחות</span>
-                <input type="search" id="convo-search" placeholder="חיפוש בשיחות…" oninput="renderConversationsList()">
-            </label>
-            <div class="convo-list" id="convo-list"></div>
-
-            <!-- Everywhere else in the app. Mirrored from the real nav buttons
-                 rather than copied, so a destination cannot go missing here and
-                 a future one arrives without anybody remembering this file. -->
-            <nav class="convo-dests" id="convo-dests" aria-label="מסכי המערכת"></nav>
-
-            <button type="button" class="convo-account" onclick="closeConversationsDrawer(); toggleAccountMenu(event);">
-                <span class="convo-acc-avatar" id="convo-acc-avatar">S</span>
-                <span class="convo-acc-name" id="convo-acc-name">החשבון שלי</span>
-            </button>
-        </aside>
-    </div>
-
     <div id="lock-screen" class="lock-screen-container" style="display: none;">
         <div class="lock-card">
             <div class="lock-logo">
@@ -2723,29 +2723,29 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/checkups-core.js?v=416"></script>
-    <script src="/assets/listcards.js?v=416"></script>
+    <script src="/assets/checkups-core.js?v=419"></script>
+    <script src="/assets/listcards.js?v=419"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=416"></script>
-    <script src="app.js?v=416"></script>
+    <script src="coverage.js?v=419"></script>
+    <script src="app.js?v=419"></script>
     <!-- app.js was 18,760 lines — a quarter of the repo in one file, and the
          file every parallel session collided in. These five are lifts out of
          it, byte for byte, and they load AFTER it because that is where the
          state they read is declared. -->
-    <script src="chat.js?v=416"></script>
-    <script src="checkups.js?v=416"></script>
-    <script src="market.js?v=416"></script>
-    <script src="reports.js?v=416"></script>
-    <script src="admin.js?v=416"></script>
+    <script src="chat.js?v=419"></script>
+    <script src="checkups.js?v=419"></script>
+    <script src="market.js?v=419"></script>
+    <script src="reports.js?v=419"></script>
+    <script src="admin.js?v=419"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=416"></script>
+    <script src="finance.js?v=419"></script>
     <!-- The guide that points at the screen (first-run tour + milestone hints) -->
-    <script src="coach.js?v=416"></script>
-    <script src="nextstep.js?v=416"></script>
+    <script src="coach.js?v=419"></script>
+    <script src="nextstep.js?v=419"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="/track.js?v=416" defer></script>
+    <script src="/track.js?v=419" defer></script>
 </body>
 </html>

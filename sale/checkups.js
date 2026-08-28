@@ -1257,14 +1257,11 @@ function renderProjectsList(list) {
                             ${catOptions(p.category || '')}
                         </select>
                     </label>
-                    <label class="proj-cat-chip proj-client-chip ${p.clientId ? 'has-cat' : ''}" onclick="event.stopPropagation()" title="שיוך ללקוח">
+                    <button type="button" class="proj-cat-chip proj-client-chip ${p.clientId ? 'has-cat' : ''}"
+                            onclick="event.stopPropagation(); openClientPicker('${p.id}')" title="שיוך ללקוח">
                         <i class="fa-solid fa-user"></i>
-                        <select class="proj-cat-select" onchange="assignProjectClient('${p.id}', this.value)">
-                            <option value="">ללא לקוח</option>
-                            ${clientOptions(p.clientId || '')}
-                            <option value="__new">+ לקוח חדש…</option>
-                        </select>
-                    </label>
+                        <span>${escapeHtml(projectClient(p)?.name || 'ללא לקוח')}</span>
+                    </button>
                 </div>
             </div>
             <div class="stage-chain" title="שלבי העבודה">
