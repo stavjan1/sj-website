@@ -19,22 +19,21 @@
       encodeURIComponent('היי SJ, אני משרת/ת את המדינה ויש לי שאלה בחשמל'),
   };
 
-  // The headline names no force on purpose. Listing them was both heavy and
-  // incomplete — צה"ל, מילואים, משטרה, כבאות and מד"א never fit in one line, and
-  // whoever was left off the list read it as "not me". "משרת/ת את המדינה"
-  // covers all of them in three words; the list moved into the body, where it
-  // is an example rather than a gate.
+  // The headline names no force on purpose: a list in a headline is heavy,
+  // and whoever is left off it reads the card as "not me". The body names the
+  // three that this card is actually about — סדיר, מילואים, כוחות הביטחון —
+  // because the offer is tied to the war, not to emergency services in
+  // general. Stav's call: כבאות, מד"א and police are not on it.
   var COPY = {
     label: 'תומכים במי שמשרת את המדינה',
     eyebrow: 'SJ הנדסת חשמל',
     title: 'משרת/ת את המדינה? אנחנו כאן בשבילך',
-    body: 'סדיר, מילואים, כוחות הביטחון, כבאות והצלה ומד"א: אנחנו תומכים בך ' +
-      'בשעה שהמדינה של כולנו במערכה ממושכת. תרגיש חופשי להתקשר בלי חשש מתשלום. ' +
+    body: 'סדיר, מילואים וכוחות הביטחון, אנחנו תומכים בכם בשעה שהמדינה ' +
+      'של כולנו במערכה ממושכת. תרגיש חופשי להתקשר בלי חשש מתשלום. ' +
       'קצר בבית, תקלה או כל בעיה אחרת, ונדאג לעזור לך מכל הלב.',
     points: [
       'ייעוץ טלפוני ואבחון ראשוני, ללא תשלום וללא התחייבות',
       'בשבילכם בכל זמן שחוזרים הביתה: גם בערב, בסופי שבוע ובחג',
-      'צריך חשמלאי מבצע? נסביר מה נדרש ונפנה אותך לאיש מקצוע אמין',
     ],
     signName: 'סתיו ג\'אן',
     signRole: 'מייסד · מהנדס חשמל · SJ הנדסת חשמל',
