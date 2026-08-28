@@ -349,31 +349,140 @@ async function syncCalendar(id) {
     try { token = await ensureCalendarToken(); }
     catch { toast('נדרש אישור גישה ליומן Google'); return; }
 
+    const res = await pushToGoogle(c, token);
+    if (res.ok) {
+        persist();
+        render();
+        toast('תזכורת חוזרת נקבעה ביומן Google (' + fmtDate(nextDue(c)) + ')');
+        return;
+    }
+    toast(res.reason === 'auth' ? 'ההרשאה ליומן פגה · לחץ שוב על 📅' : 'הוספת התזכורת ליומן נכשלה, נסה שוב');
+}
+
+// The calendar half without a word of UI in it, so the bulk run can call it in
+// a loop behind one consent and one report. Patches an existing event and falls
+// back to creating it when the user deleted it by hand — which is what stops a
+// second run leaving two of the same visit in the calendar.
+async function pushToGoogle(c, token) {
     const base = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
     const body = JSON.stringify(eventBody(c));
     const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
     try {
-        let res;
+        let res = null;
         if (c.eventId) {
             res = await fetch(base + '/' + c.eventId, { method: 'PATCH', headers, body });
-            if (res.status === 404 || res.status === 410) res = null; // event was deleted by hand — recreate
+            if (res.status === 404 || res.status === 410) res = null; // deleted by hand — recreate
         }
         if (!res) res = await fetch(base, { method: 'POST', headers, body });
         if (res.status === 401 || res.status === 403) {
             localStorage.removeItem(CAL_TOKEN_KEY);
-            toast('ההרשאה ליומן פגה · לחץ שוב על 📅');
-            return;
+            return { ok: false, reason: 'auth' };
         }
         const ev = await res.json();
-        if (!res.ok || !ev.id) throw new Error('calendar-error');
+        if (!res.ok || !ev.id) return { ok: false, reason: 'error' };
         c.eventId = ev.id;
         c.updatedAt = Date.now();
-        persist();
-        render();
-        toast('תזכורת חוזרת נקבעה ביומן Google (' + fmtDate(nextDue(c)) + ')');
-    } catch {
-        toast('הוספת התזכורת ליומן נכשלה, נסה שוב');
+        return { ok: true, reason: '' };
+    } catch (e) {
+        return { ok: false, reason: 'error' };
     }
+}
+
+// ---------- "הוסף הכל ליומן" ----------
+//
+// The same rules as the one inside the app: everything that is inside its
+// reminder window AND not in the calendar yet. A record that already carries an
+// event id is skipped — re-pushing it is how a calendar ends up with two of
+// every visit — and a date far out is not booked today, because a calendar full
+// of next year is a calendar nobody opens.
+
+function bulkQueue() {
+    return liveClients()
+        .filter((c) => { const d = nextDue(c); return d && daysUntil(d) <= 28 && !c.eventId; })
+        .sort((a, b) => nextDue(a).localeCompare(nextDue(b)));
+}
+
+function bulkReason(reason) {
+    return reason === 'auth' ? 'ההרשאה ליומן פגה'
+        : reason === 'skipped' ? 'לא נוסה, ההרשאה פגה לפני כן'
+        // A failure on the way back from Google is not proof that nothing was
+        // created there, and "failed" would send him to press it again and book
+        // the visit twice.
+        : 'שגיאה מול היומן · ייתכן שכן נוצר, שווה לבדוק';
+}
+
+function bulkOpen() {
+    const list = bulkQueue();
+    if (!list.length) { toast('אין מה להוסיף · כל מה שקרוב כבר ביומן'); return; }
+    const dlg = document.getElementById('bulk-cal');
+    if (!dlg) return;
+    document.getElementById('bulk-body').innerHTML =
+        `<p class="bulk-sum">${list.length} לקוחות ← <b>${list.length}</b> תזכורות חוזרות ביומן</p>
+         <ul class="bulk-list">${list.map((c) => `<li><span>${esc(c.name)}</span><small>${fmtDate(nextDue(c))}</small></li>`).join('')}</ul>
+         <p class="bulk-note">מה שכבר יושב ביומן לא נוגעים בו. בדיקה שהמועד שלה רחוק תיכנס כשתתקרב.</p>`;
+    document.getElementById('bulk-foot').innerHTML =
+        `<button type="button" class="btn" onclick="bulkClose()">ביטול</button>
+         <button type="button" class="btn primary" onclick="bulkRun()">הוסף ${list.length} ליומן</button>`;
+    dlg.showModal();
+}
+
+function bulkClose() { const d = document.getElementById('bulk-cal'); if (d) d.close(); }
+
+async function bulkRun() {
+    const list = bulkQueue();
+    if (!list.length) return;
+    // ONE consent for the whole run: Google's popup only survives inside the
+    // click that opened it, so a token minted mid-loop is a blocked popup and a
+    // run that dies halfway with no explanation.
+    let token;
+    try { token = await ensureCalendarToken(); }
+    catch { toast('אין הרשאה ליומן · מוריד קובץ אחד עם הכל'); bulkIcs(list); return; }
+
+    document.getElementById('bulk-foot').innerHTML = '';
+    const results = [];
+    for (let i = 0; i < list.length; i++) {
+        const c = list[i];
+        const prog = document.getElementById('bulk-body');
+        if (prog) prog.innerHTML = `<p class="bulk-sum">מוסיף ${i + 1} מתוך ${list.length} · ${esc(c.name)}</p>`;
+        const r = await pushToGoogle(c, token);
+        results.push({ c: c, ok: !!r.ok, reason: r.reason || '' });
+        if (r.reason === 'auth') {
+            for (let j = i + 1; j < list.length; j++) results.push({ c: list[j], ok: false, reason: 'skipped' });
+            break;
+        }
+    }
+    // One write for the run, not one per client.
+    persist();
+    render();
+    bulkResult(results);
+}
+
+function bulkResult(results) {
+    const ok = results.filter((r) => r.ok);
+    const bad = results.filter((r) => !r.ok);
+    document.getElementById('bulk-body').innerHTML =
+        `${ok.length ? `<p class="bulk-sum ok">נוספו ליומן (${ok.length})</p>
+            <ul class="bulk-list">${ok.map((r) => `<li><span>${esc(r.c.name)}</span><small>${fmtDate(nextDue(r.c))}</small></li>`).join('')}</ul>` : ''}
+         ${bad.length ? `<p class="bulk-sum bad">לא נוספו (${bad.length})</p>
+            <ul class="bulk-list">${bad.map((r) => `<li><span>${esc(r.c.name)}</span><small>${esc(bulkReason(r.reason))}</small></li>`).join('')}</ul>` : ''}`;
+    document.getElementById('bulk-foot').innerHTML =
+        `<button type="button" class="btn primary" onclick="bulkClose()">סגור</button>`;
+    if (ok.length && !bad.length) toast('נוספו ' + ok.length + ' תזכורות ליומן');
+}
+
+// No Google account, or consent refused: the whole queue as ONE calendar file.
+// Concatenating single files would produce several BEGIN:VCALENDAR headers,
+// which no calendar will open.
+function bulkIcs(list) {
+    const ics = SJ_CK.icsWrap((list || []).map((c) => SJ_CK.icsVevent(c)), 'Periodic');
+    if (!ics) { toast('אין מה לייצא'); return; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+    a.download = 'periodic-service.ics';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    bulkClose();
+    toast('ירד קובץ אחד עם ' + (list || []).length + ' תזכורות');
 }
 
 // ---------- ICS (iPhone / Apple Calendar / Outlook) ----------

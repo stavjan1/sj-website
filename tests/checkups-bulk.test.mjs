@@ -19,6 +19,7 @@ import { createContext, runInContext } from 'node:vm';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
 const APP = read('sale', 'app.js');
+const CK = read('checkups', 'app.js');           // the standalone tracker at /checkups/
 const HTML = read('sale', 'index.html');
 
 // The body of one function, by brace counting from its declaration.
@@ -137,3 +138,61 @@ test('a run that half-worked reports both halves by name', () => {
     // and "failed" would send him to press it again and book the visit twice.
     assert.match(fn(APP, 'pdueReasonText'), /ייתכן שכן נוצר/);
 });
+
+// ── the same feature on the standalone page ──────────────────────────────
+// /checkups/ is a separate app with its own copy of the plumbing (its own token
+// key, its own storage). The rules that make a bulk calendar run safe are not
+// copied by having the same author twice; they are copied by being checked.
+
+test('the standalone page asks for consent once, before its loop', () => {
+    const body = fn(CK, 'bulkRun');
+    assert.equal((body.match(/ensureCalendarToken/g) || []).length, 1);
+    assert.ok(body.indexOf('ensureCalendarToken') < body.indexOf('for ('),
+        'minted before the loop, or the popup is blocked halfway through');
+});
+
+test('the standalone page writes once per run, not once per client', () => {
+    const body = fn(CK, 'bulkRun');
+    assert.equal((body.match(/persist\(\)/g) || []).length, 1);
+    assert.doesNotMatch(body, /cloudSave\(/, 'the cloud write is debounced behind persist()');
+});
+
+test('the standalone queue skips what is already in the calendar', () => {
+    const body = fn(CK, 'bulkQueue');
+    assert.match(body, /!c\.eventId/, 'a client already booked is not booked again');
+    assert.match(body, /daysUntil\(d\) <= 28/, 'and next year is not booked today');
+});
+
+test('the standalone run stops on an expired token and says what it skipped', () => {
+    const body = fn(CK, 'bulkRun');
+    assert.match(body, /'auth'[\s\S]{0,300}break/);
+    assert.match(body, /reason: 'skipped'/);
+    assert.match(fn(CK, 'bulkReason'), /ייתכן שכן נוצר/,
+        'a network failure is not proof that nothing was created');
+});
+
+test('the standalone page has one calendar builder, and it is the shared one', () => {
+    // Prose that mentions the header is not a builder of one — the comment
+    // explaining WHY there is no second wrapper would otherwise fail the rule
+    // it is explaining.
+    const code = CK.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+    assert.equal((code.match(/BEGIN:VCALENDAR/g) || []).length, 0, 'no hand-rolled wrapper');
+    assert.match(fn(CK, 'bulkIcs'), /SJ_CK\.icsWrap/);
+    assert.match(fn(CK, 'downloadIcs'), /SJ_CK\.icsFile/);
+});
+
+test('the standalone single-client path still goes through the same core', () => {
+    // The refactor must not have left the old inline fetch behind: two upsert
+    // paths that can drift is how one of them quietly stops patching.
+    assert.equal((CK.match(/method: 'PATCH'/g) || []).length, 1, 'exactly one upsert in the file');
+    assert.match(fn(CK, 'syncCalendar'), /pushToGoogle/);
+});
+
+test('the standalone button and dialog exist', () => {
+    const html = read('checkups', 'index.html');
+    assert.match(html, /onclick="bulkOpen\(\)"/);
+    assert.match(html, /id="bulk-cal"/);
+    assert.match(html, /id="bulk-body"/);
+    assert.match(html, /id="bulk-foot"/);
+});
+

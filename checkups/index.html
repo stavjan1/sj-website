@@ -175,6 +175,21 @@
             .row .due { text-align: left; }
             .actions { grid-column: 2 / -1; justify-content: flex-start; }
         }
+
+        /* Bulk calendar dialog */
+        #bulk-cal .bulk-sum { margin: 0 0 8px; font-size: 0.9rem; font-weight: 700; color: var(--text); }
+        #bulk-cal .bulk-sum.ok { color: var(--ok, #34d399); }
+        #bulk-cal .bulk-sum.bad { color: var(--warn, #fcd34d); }
+        #bulk-cal .bulk-list { list-style: none; margin: 0 0 14px; padding: 0; max-block-size: 40vh; overflow-y: auto; }
+        #bulk-cal .bulk-list li {
+            display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+            padding: 6px 0; border-block-end: 1px solid var(--border); font-size: 0.82rem;
+        }
+        #bulk-cal .bulk-list li:last-child { border-block-end: 0; }
+        /* A long client name must not push the date off the edge. */
+        #bulk-cal .bulk-list span { color: var(--text); min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #bulk-cal .bulk-list small { color: var(--muted); white-space: nowrap; }
+        #bulk-cal .bulk-note { margin: 0; font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
     </style>
     <script>try{var t=localStorage.getItem("sj_theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 </head>
@@ -201,6 +216,7 @@
         <input type="search" id="search" placeholder="חיפוש לפי שם, טלפון או כתובת..." oninput="render()">
         <button class="btn small" onclick="openImport()">ייבוא מאקסל</button>
         <button class="btn small" onclick="exportCsv()">ייצוא CSV</button>
+        <button class="btn small" onclick="bulkOpen()" title="קובע ביומן את כל מה שקרוב ועדיין לא נקבע">📅 הוסף הכל ליומן</button>
     </div>
 
     <div class="list" id="list"></div>
@@ -290,11 +306,20 @@
         </div>
     </dialog>
 
+    <!-- Bulk calendar: the list you are about to create, and afterwards the two
+         lists that matter — what went in, and what did not and why. A token
+         that expires mid-run is the normal case here, not an edge case. -->
+    <dialog id="bulk-cal">
+        <h2>הוספת הבדיקות ליומן</h2>
+        <div id="bulk-body"></div>
+        <div class="dlg-actions" id="bulk-foot"></div>
+    </dialog>
+
     <div id="toast"></div>
 </div>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="/assets/checkups-core.js?v=387"></script>
-    <script src="app.js?v=387"></script>
-    <script src="/track.js?v=387" defer></script>
+<script src="/assets/checkups-core.js?v=388"></script>
+    <script src="app.js?v=388"></script>
+    <script src="/track.js?v=388" defer></script>
 </body>
 </html>

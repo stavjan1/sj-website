@@ -241,4 +241,12 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
   already exists, and every predicate reads persisted state — never the DOM,
   never "is that button on screen". Renaming or removing "תמחר פרויקט זה"
   changes copy in nextstep.js and nothing else.
+- 2026-08-25 — Session B: the standalone tracker at /checkups/ got the same
+  "הוסף הכל ליומן" as the one inside the app. Files: `checkups/app.js` (its
+  single-client sync split into pushToGoogle + wrapper, then the bulk block) and
+  `checkups/index.html` (one toolbar button, one dialog, styles inside its own
+  <style> — the page owns its CSS, nothing under sale/css/** was touched).
+  The guards in tests/checkups-bulk.test.mjs now cover both copies: one consent
+  per run, one write per run, skip what is already booked, stop on an expired
+  token, and exactly one calendar-file builder in the repo.
 

@@ -144,6 +144,8 @@ gating (server-side ADMIN_EMAIL on every admin endpoint), per-user KV keying
       calendar*: re-pushing a record that carries an event id is how a calendar
       ends up with two of every visit, and next year's visit in it today is noise.
       Refreshing a date that changed stays the per-row button's job.
+      Same button added to the standalone /checkups/ page on the same day, sharing
+      the one ICS builder in assets/checkups-core.js.
 - [x] The shipped supplier catalog reaches the USER, not only the agent
       (22/08/2026): the "הוספה מהמאגר" picker searches his own prices first and
       then /api/materials (7,364 ARCA items), with a remembered trade-discount
