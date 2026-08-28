@@ -1990,11 +1990,8 @@ function ckMailto(id) {
 function ckCreateQuote(id) {
     const c = ckClients.find((x) => x.id === id);
     if (!c) return;
-    const nameInput = document.getElementById('new-project-name');
-    if (!nameInput) return;
-    nameInput.value = ((c.type || 'בדיקה תקופתית') + ' - ' + c.name).slice(0, 60);
     const prevActive = activeProjectId;
-    createNewProject(); // reuses the tested path: creates + loads + opens the wizard
+    createNewProject({ name: ((c.type || 'בדיקה תקופתית') + ' - ' + c.name).slice(0, 60) });
     // createNewProject bails on the plan gate (upgrade modal) — patch only the
     // NEW project, detected by the active id actually changing.
     if (!activeProjectId || activeProjectId === prevActive) return;

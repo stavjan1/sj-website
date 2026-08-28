@@ -2976,21 +2976,10 @@ function startWorkFromHome() {
     createNewProject({ describe: text, kind: 'ask' });
 }
 
-// The home screen asks for the WORK, not for a name: you type what the customer
-// asked for, and the conversation starts on the spot. The project is what that
-// conversation becomes, the agent titles it from your own words.
-function startWorkFromDescription() {
-    const input = document.getElementById('new-project-name');
-    const text = (input.value || '').trim();
-    createNewProject({ describe: text });
-}
-
-function fillWorkExample(btn) {
-    const input = document.getElementById('new-project-name');
-    if (!input) return;
-    input.value = btn.textContent.trim();
-    input.focus();
-}
+// startWorkFromDescription and fillWorkExample lived here, both reading the
+// same deleted #new-project-name input and neither called from anywhere. The
+// first would have thrown on `input.value` of null if anything ever had.
+// startWorkFromHome and fillHomeExample are the live pair.
 
 // The onboarding guide lives in its own file and is entirely optional. It is
 // also, by definition, called at the exact moments that matter most — a project
@@ -3038,8 +3027,14 @@ function allConversations() {
 function createNewProject(opts) {
     opts = opts || {};
     const isAsk = opts.kind === 'ask';
-    const input = document.getElementById('new-project-name');
-    const typed = ((input && input.value) || '').trim();
+    // The name arrives as an argument. It used to be read out of an input on the
+    // work list — #new-project-name — which was removed when the home screen took
+    // over as the way in, and nobody noticed that three callers were still
+    // seeding that phantom element and bailing out when they could not find it:
+    // the /ask/ handoff (the whole public funnel into the app), "צור הצעה"
+    // from a periodic-service client, and the empty state's own button. All
+    // three did nothing at all, silently.
+    const typed = String(opts.name || '').trim();
     // Naming a job before describing it was the first thing the app asked for
     // and the first place people stalled. An unnamed project is legal now; the
     // characterization agent titles it from the description (see applySpecPrefill).
@@ -3110,7 +3105,6 @@ function createNewProject(opts) {
     projectsList.unshift(newProj);
     saveProjects();
     filterProjectsList();
-    if (input) input.value = '';
     
     loadProject(newProj.id);
     if (!describing) showToast(autoName ? 'פרויקט חדש נפתח, תאר את העבודה והשם ייקבע לבד' : `פרויקט "${name}" נוצר בהצלחה`);
@@ -3175,13 +3169,9 @@ function createProjectFromHandoff() {
     try { h = JSON.parse(localStorage.getItem(ASK_HANDOFF_KEY) || 'null'); } catch {}
     if (!h || !h.job) { dismissAskHandoff(); return; }
     const job = String(h.job).trim();
-    // Reuse the tested creation path: seed the name input, then createNewProject().
-    const nameInput = document.getElementById('new-project-name');
-    if (!nameInput) return;
     const quickPrice = h.price ? String(h.price).slice(0, 60) : '';
     const prevProjectId = activeProjectId;
-    nameInput.value = job.slice(0, 45);
-    createNewProject(); // creates + loads + switches to the wizard (planning stage)
+    createNewProject({ name: job.slice(0, 45) });
     // Creation can be refused (free-plan project cap → upgrade modal). Only a
     // NEW active project means success; otherwise keep the handoff for retry
     // and do NOT auto-send into whatever project happened to be open.
@@ -3436,10 +3426,15 @@ function toggleProjectSort(field) {
 // The empty state's button: put the cursor where the work starts, rather than
 // telling someone which way to look for it.
 function startFirstProject() {
-    const input = document.getElementById('new-project-name');
-    if (!input) return;
-    input.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); }
+    // Work starts in the box on the home screen now, so this sends you there
+    // rather than hunting for an input that was deleted a redesign ago.
+    switchTab('home');
+    setTimeout(() => {
+        const box = document.getElementById('home-input');
+        if (!box) return;
+        box.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        try { box.focus({ preventScroll: true }); } catch (e) { box.focus(); }
+    }, 80);
 }
 
 let projectsView = 'list';
@@ -6504,6 +6499,7 @@ function renderPricingDefaults() {
                     <option value="days" ${r.laborMode === 'days' ? 'selected' : ''}>לפי ימים</option>
                 </select>
             </label>
+            <label>הנחת הסוחר שלך %<input type="number" id="pd-disc" min="0" max="60" value="${tradeDiscount()}"></label>
             <label>מקדם מורכבות<input type="number" step="0.1" id="pd-cx" value="${r.complexityMult}"></label>
             <label>מקדם דחוף<input type="number" step="0.1" id="pd-urgent" value="${r.urgencyUrgent}"></label>
             <label>מקדם בהול<input type="number" step="0.1" id="pd-rush" value="${r.urgencyRush}"></label>
@@ -6512,6 +6508,12 @@ function renderPricingDefaults() {
         <button class="btn btn-secondary btn-small" onclick="savePricingDefaults()"><i class="fa-solid fa-check"></i> שמור ברירות מחדל</button>`;
 }
 function savePricingDefaults() {
+    // One rate, in one place. It used to live only inside the catalogue picker,
+    // which meant you found it by accident while adding an item and could not
+    // change it without opening that dialog again. Stav, 28/08: "הנחה אישית
+    // שיש לאנשים אז שירשם בכללי על כל החומרים לא פר פריט."
+    const d = document.getElementById('pd-disc');
+    if (d) { try { setTradeDiscount(d.value); } catch (e) {} }
     const num = (id, def) => { const v = parseFloat(document.getElementById(id)?.value); return Number.isFinite(v) ? v : def; };
     const presets = (document.getElementById('pd-presets')?.value || '').split(',').map(s => parseInt(s.trim(), 10)).filter(n => n > 0);
     appState.settings.pricingRules = {

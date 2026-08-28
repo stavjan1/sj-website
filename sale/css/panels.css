@@ -5156,3 +5156,8 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
     .pipe-col { flex: 0 0 82%; scroll-snap-align: start; min-height: 0; }
     .pipe-col-body { max-height: 46vh; }
 }
+
+/* The trade discount, said once. It was baked silently into every supplier row,
+   so the sheet showed numbers with no explanation and raising the rate later
+   left old lines on the old one. */
+.ptf-disc { margin: var(--sp-1) 0 0; color: var(--text-3); font-size: var(--fs-xs); }

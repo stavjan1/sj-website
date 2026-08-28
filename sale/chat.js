@@ -3172,6 +3172,16 @@ function syncLaborPrice(proj) {
     if (input) input.value = proj.laborPrice;
 }
 
+// The trade discount is a single rate applied to supplier prices, and until now
+// it was invisible: baked into each row at the moment the row was created, so
+// the sheet showed numbers with no explanation and changing the rate later did
+// nothing to lines already added. It is stated once now, and the raw catalogue
+// price stays on the line as `suggested` so the discount is always checkable.
+function tradeDiscountNote() {
+    const d = tradeDiscount();
+    return d ? `מחירי החומרים כבר כוללים את הנחת הסוחר שלך, ${d}%.` : '';
+}
+
 function pricingTotals(proj) {
     const materials = (proj.materials || []).filter((m) => m && m.checked)
         .reduce((sum, m) => sum + matLineTotal(m), 0);
@@ -3332,6 +3342,7 @@ function renderPricingTable() {
                 <span>תוספות <b>${heNum(Math.round(t.extras))} ₪</b></span>
                 <span class="ptf-sum">סה"כ לפני מע"מ <b>${heNum(Math.round(t.total))} ₪</b></span>
             </div>
+            ${tradeDiscountNote() ? `<p class="ptf-disc">${escapeHtml(tradeDiscountNote())}</p>` : ''}
             <div class="ptf-actions">
                 <div class="pt-modes ptf-build" role="group" aria-label="איך תיראה ההצעה">
                     <button type="button" class="pt-mode${quoteBuildMode(proj) === 'komplet' ? ' on' : ''}" onclick="setQuoteBuildMode('komplet')" title="סעיף אחד, בלי לחשוף עלויות">קומפלט</button>
