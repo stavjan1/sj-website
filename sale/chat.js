@@ -3053,7 +3053,17 @@ function setMaterialPrice(idx, value) {
 // A quantity means nothing without its unit: 25 of a cable is 25 metres, one of
 // an installation is a קומפלט. The list is short on purpose — these are the
 // units an electrician actually writes on a quote.
-const MATERIAL_UNITS = ["יח'", 'מטר', 'קומפלט', 'נק\'', 'מ"ר', 'ק"ג', 'חבילה', 'שעה'];
+// What an electrician actually measures in. גליל joined the list the day the
+// agent started quoting pipe by the coil rather than by the metre — without it
+// the table could not draw the unit the price was in, and a supplier line that
+// arrived in coils had its unit dropped on the floor. יום, סט and זוג are here
+// for the same reason: real lines arrive in them, and a unit the table cannot
+// show leaves a number on the sheet with no meaning beside it.
+const MATERIAL_UNITS = ["יח'", 'מטר', 'גליל', 'קומפלט', 'נק\'', 'סט', 'זוג', 'חבילה', 'מ"ר', 'מ"ק', 'ק"ג', 'שעה', 'יום'];
+// Picking this in the select turns the cell into a text box. A closed list is
+// right until the day it is not, and the alternative — a browser prompt — is
+// exactly what we spent today removing.
+const UNIT_OTHER = '__other';
 
 function matUnit(m) {
     const u = String((m && m.unit) || '').trim();
@@ -3220,6 +3230,8 @@ function renderPricingTable() {
                 <input type="number" class="pt-qty" min="0" step="1" value="${matQty(m)}" onchange="ptSetMatQty(${i}, this.value)" aria-label="כמות">
                 <select class="pt-unit" onchange="ptSetMatUnit(${i}, this.value)" aria-label="יחידה">
                     ${MATERIAL_UNITS.map((u) => `<option value="${escapeHtml(u)}" ${matUnit(m) === u ? 'selected' : ''}>${escapeHtml(u)}</option>`).join('')}
+                    ${MATERIAL_UNITS.includes(matUnit(m)) ? '' : `<option value="${escapeHtml(matUnit(m))}" selected>${escapeHtml(matUnit(m))}</option>`}
+                    <option value="${UNIT_OTHER}">אחר…</option>
                 </select>
             </span>
             <span class="pt-sugg${changed ? ' is-old' : ''}" title="${escapeHtml(ptSourceLabel(m))}">
@@ -3447,8 +3459,38 @@ function _dayRoundLabel() {
 
 function ptSetMatUnit(i, value) {
     const proj = _ptProj(); if (!proj || !proj.materials[i]) return;
+    if (value === UNIT_OTHER) { ptTypeUnit(i); return; }
     proj.materials[i].unit = String(value || '').trim();
     _ptSave(proj);
+}
+
+// "אחר…" swaps the select for an input in place: type the unit, press Enter
+// or leave the field and it becomes the row's unit; Escape puts the select back
+// with nothing changed.
+function ptTypeUnit(i) {
+    const proj = _ptProj(); if (!proj || !proj.materials[i]) return;
+    const sel = document.querySelectorAll('.pt-row .pt-unit')[i];
+    if (!sel) return;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'pt-unit pt-unit-typed';
+    input.placeholder = 'יחידה';
+    input.setAttribute('aria-label', 'יחידת מידה חופשית');
+    let done = false;
+    const finish = (save) => {
+        if (done) return;
+        done = true;
+        const v = String(input.value || '').trim().slice(0, 12);
+        if (save && v) { proj.materials[i].unit = v; _ptSave(proj); }
+        else renderPricingTable();
+    };
+    input.onblur = () => finish(true);
+    input.onkeydown = (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+        else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    };
+    sel.replaceWith(input);
+    input.focus();
 }
 
 function ptSetLaborQty(i, value) {

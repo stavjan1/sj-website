@@ -5161,3 +5161,15 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
    so the sheet showed numbers with no explanation and raising the rate later
    left old lines on the old one. */
 .ptf-disc { margin: var(--sp-1) 0 0; color: var(--text-3); font-size: var(--fs-xs); }
+
+/* The product's own "are you sure", instead of the browser's grey slab with
+   "www.sj-eng.co.il אומר" on it — which reads like a phishing prompt and is the
+   box Stav pointed at. The cancel button holds focus, so Enter cancels. */
+.confirm-dialog { max-width: 420px; }
+.confirm-dialog .confirm-body { margin: 0 0 var(--sp-2); color: var(--text); line-height: 1.6; }
+.confirm-dialog.is-danger h3 { color: var(--danger); }
+@media (max-width: 768px) {
+    .confirm-dialog { width: calc(100vw - var(--sp-6)); max-width: none; }
+    .confirm-dialog .ck-dlg-actions { flex-direction: column-reverse; gap: var(--sp-2); }
+    .confirm-dialog .ck-dlg-actions .btn { width: 100%; min-height: 46px; }
+}

@@ -565,9 +565,9 @@ function loadSavedReport(idx) {
     showToast('הדוח נטען לעריכה');
 }
 
-function deleteSavedReport(idx, e) {
+async function deleteSavedReport(idx, e) {
     if (e) e.stopPropagation();
-    if (!confirm('למחוק את הדוח השמור?')) return;
+    if (!await askConfirm({ title: 'למחוק את הדוח?', body: 'הדוח השמור יימחק.', confirmLabel: 'מחק', danger: true })) return;
     savedReports.splice(idx, 1);
     localStorage.setItem(getStorageKey('sj_reports'), JSON.stringify(savedReports));
     renderSavedReports();

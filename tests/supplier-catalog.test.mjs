@@ -18,6 +18,17 @@ import { createContext, runInContext } from 'node:vm';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const APP = readApp().replace(/\r\n/g, '\n');
 
+// Read out of the source, so the stub cannot drift from the app. A hardcoded
+// copy lived here for months and guarded nothing: when גליל was added so pipe
+// could be quoted by the coil, this file went on asserting that גליל is a unit
+// the table cannot draw — the opposite of the truth — and stayed green. A guard
+// holding its own copy of the thing it guards is decoration.
+const MATERIAL_UNITS = (() => {
+    const m = /const MATERIAL_UNITS = \[([^\]]*)\];/.exec(APP);
+    assert.ok(m, 'MATERIAL_UNITS moved or was renamed');
+    return m[1].split(',').map((x) => x.trim().replace(/^["']|["']$/g, '').replace(/\\'/g, "'"));
+})();
+
 function load(opts = {}) {
     const start = APP.indexOf('let _cpSupplier');
     const end = APP.indexOf('function renderMaterialsChecklist');
@@ -29,7 +40,7 @@ function load(opts = {}) {
         persistSettings: () => {},
         priceCatalog: opts.catalog || [],
         priceBookGet: (name) => (opts.book && name in opts.book ? opts.book[name] : null),
-        MATERIAL_UNITS: ["יח'", 'מטר', 'קומפלט'],
+        MATERIAL_UNITS,
         _ptProj: () => project,
         _ptSave: (p) => saved.push(p),
         showToast: () => {},
@@ -88,12 +99,26 @@ test('a price he typed once beats the catalog, discount and all', () => {
     assert.equal(app.project.materials[0].suggested, 20);
 });
 
+test('a unit the table CAN draw survives the import', () => {
+    // גליל is the case that made this matter. The agent quotes pipe by the coil
+    // now — shops do not sell 15 metres out of a 100m reel — so a coil arriving
+    // from the supplier has to reach the row AS a coil, not be flattened to יח'
+    // with the real unit buried in a note.
+    assert.ok(MATERIAL_UNITS.includes('גליל'), 'גליל is a unit the table knows');
+    const app = load();
+    app.setItems([{ sku: '9', name: 'צינור מריכף 20', price: 180, unit: 'גליל' }]);
+    app.ptAddFromSupplier(0);
+    assert.equal(app.project.materials[0].unit, 'גליל');
+});
+
 test('a unit the table cannot draw is left off rather than faked', () => {
     // The catalog's units come from a supplier's product pages; the table has a
     // closed list. An unknown one must not become an invented row type.
+    const unknown = 'צרור';
+    assert.ok(!MATERIAL_UNITS.includes(unknown), 'the example must be a unit the app really lacks');
     const app = load();
-    app.setItems([{ sku: '1', name: 'סרט בידוד', price: 4, unit: 'גליל' }]);
+    app.setItems([{ sku: '1', name: 'סרט בידוד', price: 4, unit: unknown }]);
     app.ptAddFromSupplier(0);
     assert.equal(app.project.materials[0].unit, undefined);
-    assert.match(app.project.materials[0].details, /גליל/, 'but it is still written down');
+    assert.match(app.project.materials[0].details, new RegExp(unknown), 'but it is still written down');
 });

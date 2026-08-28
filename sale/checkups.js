@@ -204,10 +204,10 @@ function maintSave() {
 
 // Stop following a job from the periodic-service list, without opening the
 // dialog first: the row on that screen is where you decide it is over.
-function maintStop(projectId) {
+async function maintStop(projectId) {
     const proj = projectsList.find((p) => p.id === projectId);
     if (!proj) return;
-    if (!confirm(`להפסיק את המעקב אחרי "${proj.name}"? העבודה עצמה נשארת ברשימה.`)) return;
+    if (!await askConfirm({ title: 'להפסיק את המעקב?', body: `לא נזכיר לך יותר לחזור ל-"${proj.name}".`, note: 'העבודה עצמה נשארת ברשימה.', confirmLabel: 'הפסק מעקב' })) return;
     proj.kind = 'job';
     proj.maintenance = null;
     saveProjects();
@@ -1487,10 +1487,10 @@ function ckMarkDone(id) {
         (c.eventId ? '. כדאי לעדכן גם את היומן (כפתור היומן בשורה)' : ''));
 }
 
-function ckRemoveClient(id) {
+async function ckRemoveClient(id) {
     const c = ckClients.find((x) => x.id === id);
     if (!c) return;
-    if (!confirm('למחוק את "' + c.name + '" מהמעקב?')) return;
+    if (!await askConfirm({ title: 'להסיר מהמעקב?', body: `"${c.name}" לא יופיע עוד בשירות התקופתי.`, confirmLabel: 'הסר', danger: true })) return;
     const eventId = c.eventId;
     // Tombstone, not removal: the record stays (hidden) so the deletion wins
     // the union-merge on every other device instead of being resurrected.

@@ -3261,11 +3261,16 @@ function loadProject(id, navigate = true) {
     try { checkQuoteApproval(proj); } catch (e) {}
 }
 
-function deleteProject(id, event) {
+async function deleteProject(id, event) {
     if (event) event.stopPropagation();
     const proj = projectsList.find(p => p.id === id);
     if (!proj) return;
-    if (!confirm(`העברת "${proj.name}" לסל המחזור · ניתן לשחזר מהגדרות Drive.`)) return;
+    if (!await askConfirm({
+        title: 'להעביר לסל המחזור?',
+        body: `"${proj.name}" יצא מרשימת העבודות.`,
+        note: 'ניתן לשחזר מסל המחזור.',
+        confirmLabel: 'לסל המחזור',
+    })) return;
 
     projectsList = projectsList.filter(p => p.id !== id);
     trashedProjectsList.push({ ...proj, _deletedAt: new Date().toISOString() });
@@ -4891,8 +4896,13 @@ function restoreProject(id) {
     openRecycleBin(); // refresh the list
     showToast(`"${proj.name}" שוחזר`);
 }
-function permanentlyDeleteProject(id) {
-    if (!confirm('למחוק את הפרויקט לצמיתות? לא ניתן יהיה לשחזר.')) return;
+async function permanentlyDeleteProject(id) {
+    if (!await askConfirm({
+        title: 'למחוק לצמיתות?',
+        body: 'העבודה, השיחה וההצעה שלה יימחקו.',
+        note: 'אחרי הפעולה הזאת אין מאין לשחזר.',
+        confirmLabel: 'מחק לצמיתות', danger: true,
+    })) return;
     trashedProjectsList = (trashedProjectsList || []).filter(p => p.id !== id);
     saveProjects();
     openRecycleBin();
@@ -7498,10 +7508,10 @@ function duplicateQuoteFromHistory(id, event) {
     showToast(`שוכפל להצעה חדשה ${copy.quoteNumber} · ערוך את פרטי הלקוח ושמור`);
 }
 
-function deleteQuoteFromHistory(id, event) {
+async function deleteQuoteFromHistory(id, event) {
     if (event) event.stopPropagation();
-    
-    if (!confirm('האם אתה בטוח שברצונך למחוק הצעת מחיר זו לצמיתות?')) {
+
+    if (!await askConfirm({ title: 'למחוק את ההצעה?', body: 'ההצעה תימחק מההיסטוריה לצמיתות.', confirmLabel: 'מחק', danger: true })) {
         return;
     }
     
@@ -9833,4 +9843,64 @@ function saveNewClient(event) {
     else { try { filterProjectsList(); } catch (e) {} }
     showToast(existing ? `שויך ל-${client.name}` : `${client.name} נוסף`);
     return false;
+}
+
+// ============================================================================
+// ASKING BEFORE DESTROYING, IN THE PRODUCT'S OWN VOICE
+// The browser's confirm() renders as "www.sj-eng.co.il אומר" over a grey slab —
+// Stav saw exactly that box when adding a customer and it reads like something
+// a phishing page would put up. It is also unstyleable, unbrandable, and on iOS
+// it steals the whole screen.
+//
+// Twenty-two sites use it. Seven of them are destructive things a real user
+// meets — deleting a work, a quote, a report, a tracked client, emptying the
+// price list — and those are converted here. The rest are admin and settings
+// paths that a customer never reaches; converting them too would be twenty-two
+// chances to make the same mistake for no one's benefit.
+//
+// The contract is deliberately fail-CLOSED: it resolves false unless the user
+// presses the confirm button, and every caller runs its destruction inside the
+// true branch. A mis-wired site therefore does nothing, which is annoying. The
+// opposite design — resolving true on a dismissed dialog — would delete
+// somebody's work, so it is not offered.
+// ============================================================================
+function askConfirm(opts) {
+    const o = typeof opts === 'string' ? { body: opts } : (opts || {});
+    return new Promise((resolve) => {
+        const old = document.getElementById('confirm-dialog');
+        if (old) old.remove();
+
+        const dlg = document.createElement('dialog');
+        dlg.id = 'confirm-dialog';
+        dlg.className = 'ck-dialog confirm-dialog' + (o.danger ? ' is-danger' : '');
+        dlg.innerHTML = `
+            <h3>${escapeHtml(o.title || 'רגע לפני')}</h3>
+            <p class="confirm-body">${escapeHtml(o.body || '')}</p>
+            ${o.note ? `<p class="input-help">${escapeHtml(o.note)}</p>` : ''}
+            <div class="ck-dlg-actions">
+                <button type="button" class="btn btn-secondary" data-a="no">${escapeHtml(o.cancelLabel || 'ביטול')}</button>
+                <button type="button" class="btn ${o.danger ? 'btn-danger' : 'btn-accent'}" data-a="yes">${escapeHtml(o.confirmLabel || 'אישור')}</button>
+            </div>`;
+        document.body.appendChild(dlg);
+
+        let answered = false;
+        const done = (v) => {
+            if (answered) return;
+            answered = true;
+            try { dlg.close(); } catch (e) {}
+            dlg.remove();
+            resolve(v);
+        };
+        dlg.querySelector('[data-a="yes"]').onclick = () => done(true);
+        dlg.querySelector('[data-a="no"]').onclick = () => done(false);
+        // Esc, the backdrop, anything that is not the confirm button: no.
+        dlg.addEventListener('cancel', (e) => { e.preventDefault(); done(false); });
+        dlg.addEventListener('close', () => done(false));
+
+        if (typeof dlg.showModal === 'function') dlg.showModal();
+        else { dlg.setAttribute('open', ''); }
+        // The safe button holds focus, so Enter on a keyboard cancels rather
+        // than destroys.
+        setTimeout(() => dlg.querySelector('[data-a="no"]')?.focus(), 30);
+    });
 }

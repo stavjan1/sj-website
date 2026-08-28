@@ -165,9 +165,14 @@ function deleteCatalogItem(idx) {
     renderPriceCatalog();
 }
 
-function clearPriceCatalog() {
+async function clearPriceCatalog() {
     if (priceCatalog.length === 0) return;
-    if (!confirm('לרוקן את כל מאגר המחירים? פעולה זו אינה הפיכה.')) return;
+    if (!await askConfirm({
+        title: 'לרוקן את המחירים שלך?',
+        body: `${priceCatalog.length} פריטים יימחקו, והסוכן יחזור לתמחר לפי מחירון המערכת.`,
+        note: 'פעולה זו אינה הפיכה.',
+        confirmLabel: 'רוקן', danger: true,
+    })) return;
     priceCatalog = [];
     savePriceCatalog();
     renderPriceCatalog();
