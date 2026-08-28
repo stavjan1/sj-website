@@ -434,10 +434,7 @@ function updateQuotaUI() {
     // whole toolbar row stays out of the conversation's way.
     document.body.classList.toggle('quota-low', !unlimited && pct >= 70);
 }
-function changeGeminiModel(model) {
-    selectedGeminiModel = model;
-    updateQuotaUI();
-}
+
 
 // Weighted "AI engine load": grows with message length and thinking time, so it
 // reflects real compute intensity instead of a crude X/30 request counter.
@@ -522,12 +519,7 @@ async function refreshTierInfo() {
 function applyTierGates() {
     try { refreshChatPhotoGate(); } catch (e) {}
     // Model-class pills: lock "advanced" for plans without it.
-    const advBtn = document.getElementById('model-class-advanced');
-    const lockIco = document.getElementById('model-class-lock');
-    const advAllowed = tierAllows('advancedModel');
-    if (advBtn) advBtn.classList.toggle('locked', !advAllowed);
-    if (lockIco) lockIco.style.display = advAllowed ? 'none' : '';
-    if (!advAllowed && selectedModelClass === 'advanced') setModelClass('basic', true);
+    syncModelClass();
 
     // Settings → "המסלול שלי" card.
     const badge = document.getElementById('tier-badge');
@@ -563,18 +555,14 @@ function zeremCreditHtml() {
     return '<div class="pdf-zerem-credit" id="pdf-zerem-credit">הופק באמצעות זרם ⚡ zerem</div>';
 }
 
-// Generic model pills — the user picks "בסיסי" or "מתקדם ⚡", never a vendor name.
-function setModelClass(cls, silent) {
-    if (cls === 'advanced' && !tierAllows('advancedModel')) {
-        showUpgradeModal('advanced');
-        return;
-    }
-    selectedModelClass = cls === 'advanced' ? 'advanced' : 'basic';
-    const b = document.getElementById('model-class-basic');
-    const a = document.getElementById('model-class-advanced');
-    if (b) b.classList.toggle('active', selectedModelClass === 'basic');
-    if (a) a.classList.toggle('active', selectedModelClass === 'advanced');
-    if (!silent) showToast(selectedModelClass === 'advanced' ? 'עברת למודל המתקדם ⚡: חשיבה עמוקה יותר, מעט איטי יותר' : 'עברת למודל הבסיסי, מהיר וחסכוני');
+// The plan decides the model, not a pair of buttons. Stav, 28/08, asked what
+// was not relevant and this was first: an electrician should not be choosing
+// between "בסיסי" and "מתקדם", and a Pro user should not have to press
+// anything to receive what they already paid for. It is derived now — the best
+// model the plan allows, every time — and the browser still never learns a
+// vendor's name.
+function syncModelClass() {
+    selectedModelClass = tierAllows('advancedModel') ? 'advanced' : 'basic';
 }
 
 // Reports are a Pro feature: the panel stays visible but under a lock overlay,
@@ -926,8 +914,6 @@ function handleProviderFallback(res) {
     const usedValue = PROVIDER_DEFAULT_VALUE[used] || selectedGeminiModel;
     showToast(`נגמרו הבקשות ב-${fromLabel}, עברתי אוטומטית ל-${aiLabel(usedValue)}`, 'error');
     selectedGeminiModel = usedValue;
-    const sel = document.getElementById('gemini-model-select');
-    if (sel) sel.value = usedValue;
     updateQuotaUI();
 }
 
@@ -3228,10 +3214,7 @@ function loadProject(id, navigate = true) {
     localStorage.setItem(getStorageKey('sj_active_project_id'), id);
     pendingChatPhotos = []; renderChatAttachments(); // don't carry photos between projects
 
-    // Reset model to default each time a project is loaded
-    changeGeminiModel('gemini|gemini-2.5-flash');
-    const modelSel = document.getElementById('gemini-model-select');
-    if (modelSel) modelSel.value = 'gemini|gemini-2.5-flash';
+    selectedGeminiModel = 'gemini|gemini-2.5-flash';   // admin routing default
 
     updateActiveProjectBanner(proj);
     filterProjectsList();

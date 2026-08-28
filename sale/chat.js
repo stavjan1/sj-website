@@ -2003,7 +2003,7 @@ async function sendChatMessage() {
 }
 
 // Re-run the pricing agent on the existing history. Shared by sendChatMessage
-// (after a new user turn) and regenerateLastAnswer (after dropping the last reply).
+// (after a new user turn).
 async function runPricingAgent(activeProject, promptChars) {
     const effectiveModel = getEffectiveModel();
 
@@ -2241,36 +2241,8 @@ function escapeHtmlSafe(s) {
 }
 
 // Drop the most recent AI reply and ask the agent to answer again.
-async function regenerateLastAnswer() {
-    if (!activeProjectId) {
-        showToast('אין שיחה פעילה לניסוח מחדש', 'error');
-        return;
-    }
-    const activeProject = projectsList.find(p => p.id === activeProjectId);
-    if (!activeProject) return;
 
-    // Mode-aware: regenerate in whichever conversation is on screen.
-    const planning = activeChatMode === 'plan';
-    const history = planning ? ensurePlanHistory(activeProject) : activeProject.chatHistory;
-    if (!history || history.length === 0) {
-        showToast('אין עדיין תשובה לנסח מחדש', 'error');
-        return;
-    }
-    // Remove a trailing model reply (if present) so we re-answer the last user turn.
-    if (history[history.length - 1].role === 'model') {
-        history.pop();
-    }
-    if (!history.some(m => m.role === 'user')) {
-        showToast('אין הודעת משתמש לנסח עליה תשובה', 'error');
-        return;
-    }
-    saveProjects();
-    renderChatHistory(proj);
-    if (planning) await runPlanningAgent(activeProject);
-    else await runPricingAgent(activeProject);
-}
-
-// ── Streaming + chat-search helpers ──
+// ── Streaming helpers ──
 function scrollChatToBottom() {
     const log = document.getElementById('chat-messages-log');
     if (log) log.scrollTop = log.scrollHeight;
@@ -2332,29 +2304,6 @@ async function consumeSSEStream(response, onProgress) {
 }
 
 // ── Chat search ──
-let chatSearchQuery = '';
-function filterChatMessages(query) {
-    chatSearchQuery = (query || '').trim();
-    const clearBtn = document.getElementById('chat-search-clear');
-    if (clearBtn) clearBtn.style.display = chatSearchQuery ? 'block' : 'none';
-    applyChatSearch();
-}
-function clearChatSearch() {
-    const input = document.getElementById('chat-search-input');
-    if (input) input.value = '';
-    filterChatMessages('');
-}
-function applyChatSearch() {
-    const log = document.getElementById('chat-messages-log');
-    if (!log) return;
-    const q = chatSearchQuery.toLowerCase();
-    log.querySelectorAll('.chat-bubble').forEach(bubble => {
-        if (bubble.id === 'chat-typing-bubble') return;
-        const text = bubble.textContent || '';
-        const hit = !q || text.toLowerCase().includes(q);
-        bubble.classList.toggle('search-hidden', !hit);
-    });
-}
 
 // When true, the NEXT user message pushed by sendChatMessage is a behind-the-
 // scenes instruction: the AI receives it but it never appears in the chat UI.
@@ -2606,7 +2555,6 @@ function renderChatHistory(projOrHistory) {
     });
 
     scrollChatToActiveStage(log);
-    applyChatSearch();
 }
 
 // ── "Was that price right?" ─────────────────────────────────────────────────
