@@ -4900,3 +4900,79 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
 @media (max-width: 768px) {
     .home-hint { display: none; }
 }
+
+/* ============================================================================
+   A PROJECT IS A ROW
+   Stav, 28/08, with a screenshot of one work filling a whole phone: "שורה של
+   כל פרויקט אמורה להיות שורה, תסדר את זה." It was a desktop card shrunk down —
+   a five-line wrapped title, a date, a round "תזכיר לי לחזור" button, two
+   dropdown chips, two stage buttons and two icon buttons. Roughly 700px for
+   one line of information.
+   The row shows what you scan a list for: name, status, date. The ⋯ opens the
+   rest in place, rather than deleting it — the client picker in particular has
+   nowhere else to live on a phone since the title bar dropped it.
+   Desktop keeps the card it always had; this is the last block in the file, so
+   it wins over the earlier project-card rules at this width only.
+   ============================================================================ */
+@media (max-width: 768px) {
+    .project-card {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: var(--sp-2);
+        min-height: 56px;
+        padding: var(--sp-2) var(--sp-2) var(--sp-2) 0;
+        margin-block-end: 2px;
+    }
+    .project-card .card-more {
+        grid-column: 3; grid-row: 1;
+        width: 34px; height: 34px; flex: none;
+        display: inline-flex; align-items: center; justify-content: center;
+        background: none; border: none; border-radius: var(--r-pill);
+        color: var(--text-3); cursor: pointer;
+    }
+    .project-card .card-more:hover { background: var(--surface-2); color: var(--text); }
+    .project-card .card-more svg { width: 17px; height: 17px; }
+
+    .project-card .project-info { grid-column: 2; grid-row: 1; min-width: 0; }
+    /* The title is one line. It was the five-line block at the top of the card. */
+    .project-card .project-title {
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        font-size: var(--fs-sm); line-height: 1.35;
+    }
+    /* Second line of the row: the date only, until the row is opened. */
+    .project-card .project-meta {
+        gap: var(--sp-2);
+        font-size: var(--fs-xs);
+        flex-wrap: nowrap; overflow: hidden;
+    }
+    .project-card .project-meta > *,
+    .project-card .stage-chain,
+    .project-card .project-endcap > .btn { display: none; }
+    .project-card .project-meta > span:first-child { display: inline-flex; }
+
+    /* The status pill is the one thing that rides on the row itself. */
+    .project-card .project-endcap {
+        grid-column: 1; grid-row: 1;
+        display: flex; align-items: center; gap: var(--sp-1);
+        padding: 0 0 0 var(--sp-2);
+        margin: 0; border: none;
+    }
+    .project-card .row-status { white-space: nowrap; font-size: 10px; }
+
+    /* ---- opened in place ---- */
+    .project-card.is-open { grid-template-rows: auto auto; row-gap: var(--sp-2); }
+    .project-card.is-open .project-meta { flex-wrap: wrap; overflow: visible; }
+    .project-card.is-open .project-meta > * { display: inline-flex; }
+    .project-card.is-open .stage-chain {
+        grid-column: 1 / -1; grid-row: 2;
+        display: flex; gap: var(--sp-2); padding-inline: var(--sp-2);
+    }
+    .project-card.is-open .stage-chain .stage-step { flex: 1 1 0; min-height: 40px; justify-content: center; }
+    .project-card.is-open .project-endcap > .btn { display: inline-flex; }
+    .project-card.is-open .card-more { color: var(--accent); }
+}
+
+/* The ⋯ exists to fold a row that is only folded on a phone. On desktop the
+   card shows everything already, so the control would open nothing. */
+@media (min-width: 769px) { .project-card .card-more { display: none; } }

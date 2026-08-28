@@ -1240,6 +1240,10 @@ function renderProjectsList(list) {
         // it, which is unreadable on a list of them: show the opening sentence.
         const cardTitle = (p.autoName && p.name === 'פרויקט חדש') ? draftPreview(p) : p.name;
         card.innerHTML = `
+            <button type="button" class="card-more" aria-label="עוד פעולות" aria-expanded="false"
+                    onclick="toggleProjectCard(this, event)">
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg>
+            </button>
             <div class="project-info">
                 <div class="project-title">${escapeHtml(cardTitle)}</div>
                 <div class="project-meta">
@@ -1273,7 +1277,7 @@ function renderProjectsList(list) {
                 </button>
             </div>
             <div class="project-endcap">
-                <span class="project-status-badge status-badge-${status}"
+                <span class="project-status-badge row-status status-badge-${status}"
                       onclick="cycleProjectStatus('${p.id}', event)"
                       title="לחץ לשינוי סטטוס">${status}</span>
                 <button class="btn btn-secondary btn-small" onclick="openRemindDialog('${p.id}', event)" title="תזכיר לי · בשפה חופשית" aria-label="תזכיר לי">
@@ -2053,4 +2057,23 @@ function scrollChatToActiveStage(log) {
     log.scrollTop = last.nextElementSibling
         ? Math.max(0, last.offsetTop + last.offsetHeight - log.clientHeight + 24)
         : log.scrollHeight;
+}
+
+
+// One project is one row. Stav, 28/08, with a screenshot of a single work
+// filling an entire phone screen: "שורה של כל פרויקט אמורה להיות שורה,
+// תסדר את זה."
+//
+// The row shows what you scan a list for — the name, its status, its date —
+// and the ⋯ opens the rest in place: the two stage buttons, the category and
+// client pickers, the reminder and the delete. Opening in place rather than
+// deleting them matters: the client picker is not reachable from anywhere else
+// on a phone since the title bar dropped it, and a list that quietly removes
+// the only way to do something is worse than a list that is too tall.
+function toggleProjectCard(btn, event) {
+    if (event) event.stopPropagation();
+    const card = btn.closest('.project-card');
+    if (!card) return;
+    const open = card.classList.toggle('is-open');
+    btn.setAttribute('aria-expanded', String(open));
 }
