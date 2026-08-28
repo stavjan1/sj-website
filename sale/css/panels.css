@@ -1383,7 +1383,14 @@ i[class^="fa-"], i[class*=" fa-"] {
 /* ============================================================================
    08. PANEL: STATISTICS — pipeline (#panel-statistics)
    ============================================================================ */
-.pipeline-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-3); margin-block-end: var(--sp-3); }
+/* The money board's stats container is class="pipe-summary" id="pipeline-summary",
+   and every rule here targeted the ID's name as a CLASS — so it styled a stray
+   empty element in #panel-statistics and left the real one with no styling at
+   all: display:block, four full-width blocks with no gap, their numbers and
+   labels running into each other. That is the overlap Stav photographed, and it
+   predates today. Both names are covered now, and the id stays out of the
+   stylesheet so this cannot happen again. */
+.pipeline-summary, .pipe-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-3); margin-block-end: var(--sp-3); }
 .pipe-stat {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -2829,7 +2836,7 @@ i[class^="fa-"], i[class*=" fa-"] {
     .project-endcap { margin-inline-start: auto; }
 
     /* ==== Statistics stacks ==== */
-    .pipeline-summary { grid-template-columns: 1fr 1fr; }
+    .pipeline-summary, .pipe-summary { grid-template-columns: 1fr 1fr; }
     .pipeline-board { grid-template-columns: 1fr; }
 
     /* ==== Checkups rows collapse ==== */
@@ -5198,7 +5205,7 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
    set grid-template-columns:1fr, so it wins.
    ============================================================================ */
 @media (max-width: 768px) {
-    .pipeline-summary { grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
+    .pipeline-summary, .pipe-summary { grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
     .pipe-stat { padding: var(--sp-2); min-height: 0; }
     .pipe-stat-num { font-size: var(--fs-lg); }
     .pipe-stat-lbl { font-size: 10px; }
@@ -5232,6 +5239,15 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
    keep in step.
    ============================================================================ */
 @media (min-width: 1100px) {
+    /* The floating step rail listed אפיון / תמחור / הצעה as fixed-position
+       buttons at a hardcoded offset — the exact offset the new column now
+       occupies, so it was drawn on top of it. And it is the same three steps the
+       column already carries. One place, not two: the rail goes at this width,
+       and the main column stops reserving 168px for something that is no longer
+       there. */
+    .project-rail { display: none !important; }
+    body.in-project-stage .main-content { padding-inline-start: var(--sp-6); }
+
     /* Always present, never a modal: no scrim, no transform, no trap. */
     .convo-drawer {
         position: static;
