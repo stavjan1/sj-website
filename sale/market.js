@@ -13,7 +13,11 @@
 // ==========================================================================
 let marketData = null;          // { items:[{name, count, median, low, high}] }
 let marketSort = 'gap';
-let catalogView = 'mine';
+// The market opens first. Stav, 28/08: the screen used to open on an empty
+// list with a form on it, which is the product asking HIM for data before
+// giving him any — while the one view that is worth something the moment you
+// arrive, and needs nothing from you, was hidden behind a tab.
+let catalogView = 'market';
 
 function setCatalogView(view) {
     catalogView = view === 'market' ? 'market' : 'mine';
@@ -125,17 +129,21 @@ function marketAdoptPrice(name, price) {
     priceCatalog.push({ name: String(name).slice(0, 120), price: Math.round(price), unit: 'יח\u0027' });
     savePriceCatalog();
     renderMarketPrices();
-    showToast(`"${name}" נוסף למאגר לפי מחיר השוק`);
+    showToast(`נשמר: מעכשיו אתה מתמחר "${name}" ב-${Math.round(price)} ₪`);
 }
 
 function renderPriceCatalog() {
     const list = document.getElementById('catalog-list');
     const countEl = document.getElementById('catalog-count');
     if (countEl) countEl.textContent = priceCatalog.length;
+    // The tab carries the number too: "המחירים שלי (0)" says at a glance that
+    // there is nothing there yet, without having to open it to find out.
+    const tabCount = document.getElementById('catalog-count-tab');
+    if (tabCount) tabCount.textContent = priceCatalog.length;
     if (!list) return;
     const q = (document.getElementById('catalog-search')?.value || '').toLowerCase().trim();
     if (priceCatalog.length === 0) {
-        list.innerHTML = '<div class="catalog-empty">המאגר ריק. סרוק דף ספק או הוסף פריט ידנית.</div>';
+        list.innerHTML = '<div class="catalog-empty">עדיין לא שינית שום מחיר, וזה בסדר: הסוכן מתמחר לפי מחירון המערכת.<br><span class="input-help">במחירון השוק תראה איפה אתה יקר או זול מהאחרים, וכל מחיר שתאמץ מופיע כאן.</span></div>';
         return;
     }
     const items = priceCatalog.filter(it => !q || it.name.toLowerCase().includes(q));

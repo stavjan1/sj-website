@@ -4942,3 +4942,31 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
     .catalog-row .cr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
     .catalog-row { align-items: center; }
 }
+
+/* ============================================================================
+   THE PRICE SCREEN OPENS ON WHAT IT KNOWS, NOT ON A FORM
+   The personal catalogue is load-bearing — it is "המחיר שלי" in the market
+   comparison, it is the layer that overrides the system prices when the agent
+   quotes, and an admin publish turns it into the catalogue every user gets.
+   So it stays. What was wrong is that the screen LED with it: an empty list
+   and a form, asking Stav for data before giving him any.
+   The market view opens first now. Inside "המחירים שלי" the saved list — the
+   result — comes before the machinery that fills it, which on a phone had put
+   it below four cards of forms.
+   ============================================================================ */
+@media (max-width: 768px) {
+    #catalog-view-mine { display: flex; flex-direction: column; gap: var(--sp-3); }
+    /* The saved list is the second grid child; on one column it belongs first. */
+    #catalog-view-mine > .section-card { order: -1; }
+    #catalog-view-mine > div:first-child { order: 1; }
+    /* Sorting chips are a strip you swipe, not four wrapped rows. */
+    .market-sorts {
+        display: flex; flex-wrap: nowrap; gap: var(--sp-1);
+        overflow-x: auto; scrollbar-width: none;
+        padding-block-end: 2px;
+    }
+    .market-sorts::-webkit-scrollbar { display: none; }
+    .market-sorts .chip { flex: none; }
+    .market-toolbar { flex-wrap: wrap; gap: var(--sp-2); }
+    .market-toolbar .input { flex: 1 1 100%; min-height: 40px; }
+}
