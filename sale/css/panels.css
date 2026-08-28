@@ -10,7 +10,7 @@
    Selector names are the EXISTING DOM vocabulary — do not rename here.
 
    NOT styled here (other files own them):
-   - Shell: .sidebar / .topnav / bottom bar / .project-rail / settings drawer
+   - Shell: .sidebar / .topnav / bottom bar / settings drawer
    - PDF sheets: #quote-pdf-sheet, #report-pdf-sheet, .a4-sheet, .rpt-*, .pdf-*
    - Marketing pages.
    ============================================================================ */
@@ -4765,7 +4765,13 @@ body.convo-open { overflow: hidden; }
     /* Safari's floating bottom bar overlays the page and is not reported in
        env(safe-area-inset-bottom), so the last row needs room of its own. */
     .convo-panel { padding-block-end: calc(var(--sp-6) + env(safe-area-inset-bottom, 0px)); }
-    .convo-dests { max-height: none; }
+    /* The destination list is now the whole menu of the product — the phone
+       has no bottom bar, by decision — so it is long, and it must be the part
+       that gives. `flex: none` kept it at its full natural height and pushed
+       the account row off the bottom edge, which is the same disappearance
+       הגדרות suffered before it became a destination. It shrinks and scrolls;
+       the account row stays where the thumb expects it. */
+    .convo-dests { flex: 0 1 auto; min-height: 0; max-height: none; overflow-y: auto; }
 }
 
 /* ============================================================================
@@ -5067,10 +5073,6 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
         margin-inline: calc(-1 * var(--sp-6));
         padding-inline: var(--sp-6);
     }
-    body.in-project-stage #project-banner {
-        margin-inline-start: calc(-1 * (168px + var(--sp-6)));
-        padding-inline-start: calc(168px + var(--sp-6));
-    }
 }
 
 /* ============================================================================
@@ -5274,8 +5276,6 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
        column already carries. One place, not two: the rail goes at this width,
        and the main column stops reserving 168px for something that is no longer
        there. */
-    .project-rail { display: none !important; }
-    body.in-project-stage .main-content { padding-inline-start: var(--sp-6); }
 
     /* Always present, never a modal: no scrim, no transform, no trap. */
     .convo-drawer {
@@ -5306,6 +5306,41 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
     #panel-wizard.hide-estimate .control-side { max-width: none; }
     /* The rail's own project steps are the list's job now on this width. */
     .convo-dests { max-height: 34vh; }
+
+    /* ---- The list belongs to the CONVERSATION, not to the screen -----------
+       264px of thread names were glued to the price catalogue, the customer
+       archive and the money board, which have nothing to do with them: 340px
+       of chrome, 24% of a 1440px screen, before any content began.
+       The list appears where a conversation is, and is simply not there on a
+       tool screen. Nothing to collapse, so nothing a non-technical user can
+       press by accident and lose the product behind.
+       The TOOL screens are listed, not the conversation ones, so that both a
+       browser without :has() and a screen somebody writes next year fall to
+       the safe side — the column shows up where it is not needed, rather than
+       vanishing where it is. */
+    body:has(#panel-clients.active)    #convo-drawer,
+    body:has(#panel-money.active)      #convo-drawer,
+    body:has(#panel-pro.active)        #convo-drawer,
+    body:has(#panel-catalog.active)    #convo-drawer,
+    body:has(#panel-projects.active)   #convo-drawer,
+    body:has(#panel-settings.active)   #convo-drawer,
+    body:has(#panel-business.active)   #convo-drawer,
+    body:has(#panel-reports.active)    #convo-drawer,
+    body:has(#panel-history.active)    #convo-drawer,
+    body:has(#panel-statistics.active) #convo-drawer,
+    body:has(#panel-admin.active)      #convo-drawer { display: none; }
+
+    /* ---- and nothing is drawn twice --------------------------------------
+       Measured at 1440: the icon rail and this panel were both drawing
+       עבודות · לקוחות · כסף · PRO · מאגר מחירים, side by side, at the same
+       time. The rail is the one declaration of a destination — this panel
+       MIRRORS it, in renderDrawerDestinations() — so the copy is what goes.
+       The steps of an open project stay: at this width the sidebar hides them
+       (they are a sub-group of a project, not six-plus-three destinations in a
+       76px column), so these rows are their only home here. */
+    .convo-dest:not(.is-step) { display: none; }
+    .convo-account { display: none; }
+    .convo-dests:not(:has(.is-step)) { display: none; }
 }
 
 /* ---- The three errands: one row, side by side ----

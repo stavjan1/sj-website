@@ -3386,34 +3386,6 @@ const PROJECT_RAIL_DOCS = [
     { docType: 'Receipt', label: 'קבלה',    icon: 'fa-receipt' },
 ];
 
-function renderProjectRail() {
-    const rail = document.getElementById('project-rail');
-    if (!rail) return;
-    const proj = projectsList.find(p => p.id === activeProjectId);
-    const cur = ((document.querySelector('.content-panel.active') || {}).id || '').replace('panel-', '');
-    const priced = !!(proj && proj.quoteData && Number(proj.quoteData.finalPrice) > 0);
-    const step = (s, i) => `
-        <button class="rail-step ${s.tab === cur ? 'active' : ''}" onclick="switchTab('${s.tab}')" title="${s.label}">
-            <span class="rail-step-num">${i + 1}</span>
-            <i class="fa-solid ${s.icon}"></i>
-            <span class="rail-step-label">${s.label}</span>
-        </button>`;
-    const docBtn = (d) => priced
-        ? `<button class="rail-step" onclick="openAccountingForProject('${activeProjectId}','${d.docType}')" title="הפק ${d.label} לפרויקט זה">
-                <span class="rail-step-num"><i class="fa-solid fa-plus"></i></span>
-                <i class="fa-solid ${d.icon}"></i><span class="rail-step-label">${d.label}</span>
-           </button>`
-        : `<button class="rail-step rail-soon" disabled title="יש לסיים תחילה תמחור (הצעה עם מחיר סופי) כדי להפיק ${d.label}">
-                <span class="rail-step-num"><i class="fa-solid fa-lock"></i></span>
-                <i class="fa-solid ${d.icon}"></i><span class="rail-step-label">${d.label}</span>
-           </button>`;
-    rail.innerHTML = `
-        <button class="rail-back" onclick="switchTab('projects')" title="חזרה לכל הפרויקטים">
-            <i class="fa-solid fa-arrow-right"></i><span>הפרויקטים</span>
-        </button>
-        <div class="rail-proj" title="${proj ? escapeHtml(proj.name) : ''}">${proj ? escapeHtml(proj.name) : ''}</div>
-        <div class="rail-steps">${PROJECT_RAIL_STAGES.map(step).join('')}</div>`;
-}
 
 // Jump from a project straight into the accounting create form, prefilled.
 function openAccountingForProject(projectId, docType) {
@@ -3431,15 +3403,18 @@ function openAccountingForProject(projectId, docType) {
 }
 
 function updateProjectRail() {
-    const rail = document.getElementById('project-rail');
-    if (!rail) return;
-    // Only show the rail on the actual project stages: a project can stay open
-    // while the user visits העדפות/חשבונות, and the rail shouldn't float there.
+    // The flag FIRST, and the element after it. `in-project-stage` means "you
+    // are standing on a stage of an open project", and three rules depend on
+    // it that have nothing to do with the rail — the project banner's
+    // visibility among them. Reading the element first and returning early made
+    // the flag a property of the rail's existence, so the moment the rail is
+    // deleted the banner would vanish with it, for a reason no one could find
+    // by reading either file. Order is the whole fix.
     const cur = ((document.querySelector('.content-panel.active') || {}).id || '').replace('panel-', '');
     const onStage = !!activeProjectId && PROJECT_RAIL_STAGES.some(s => s.tab === cur);
     document.body.classList.toggle('in-project-stage', onStage);
+
     if (!onStage) return;
-    renderProjectRail();
     // Pin the rail below the top bar AND the active-project banner, so it never
     // rides up over them (measure the banner's bottom when it's visible).
     const tn = document.getElementById('topnav');

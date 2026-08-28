@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=433">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=438">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,14 +26,14 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=433">
-    <link rel="stylesheet" href="../assets/ui.css?v=433">
-    <link rel="stylesheet" href="css/shell.css?v=433">
-    <link rel="stylesheet" href="css/panels.css?v=433">
-    <link rel="stylesheet" href="controlroom.css?v=433">
-    <link rel="stylesheet" href="periodic.css?v=433">
-    <link rel="stylesheet" href="nextstep.css?v=433">
-    <link rel="stylesheet" href="css/pdf.css?v=433">
+    <link rel="stylesheet" href="../assets/tokens.css?v=438">
+    <link rel="stylesheet" href="../assets/ui.css?v=438">
+    <link rel="stylesheet" href="css/shell.css?v=438">
+    <link rel="stylesheet" href="css/panels.css?v=438">
+    <link rel="stylesheet" href="controlroom.css?v=438">
+    <link rel="stylesheet" href="periodic.css?v=438">
+    <link rel="stylesheet" href="nextstep.css?v=438">
+    <link rel="stylesheet" href="css/pdf.css?v=438">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -119,6 +119,17 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M20.6 13.4 12 22l-9-9V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>
                     <span>מאגר מחירים</span>
                 </button>
+                <!-- הגדרות is a SCREEN, and it already contains פרופיל משתמש and
+                     ערכת נושא — the two things the account chip was offering.
+                     Stav, 28/08: "הגדרות ומשתמש זה דברים שונים?" They were not,
+                     so it stops being a row inside a popover and becomes a
+                     destination like every other one. renderDrawerDestinations()
+                     mirrors .sidebar .nav-btn, so the phone drawer gets it from
+                     here without a second list to keep in step. -->
+                <button class="nav-btn" id="tab-settings" onclick="switchTab('settings')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.36.43.65.79.79H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <span>הגדרות</span>
+                </button>
             </nav>
 
             <!-- The account menu. Theme, business details, settings, the way
@@ -153,9 +164,6 @@
                     </div>
                     <button type="button" class="am-item" role="menuitem" onclick="accountMenuGo('business')">
                         <i class="fa-solid fa-briefcase" aria-hidden="true"></i> פרטי העסק
-                    </button>
-                    <button type="button" class="am-item" role="menuitem" onclick="accountMenuGo('settings')">
-                        <i class="fa-solid fa-gear" aria-hidden="true"></i> הגדרות
                     </button>
                     <button type="button" class="am-item am-admin" role="menuitem" id="am-admin-item" onclick="accountMenuGo('admin')" hidden>
                         <i class="fa-solid fa-shield-halved" aria-hidden="true"></i> ניהול מערכת
@@ -233,9 +241,12 @@
                 </button>
             </div>
 
-            <!-- In-project stage rail (desktop): vertical steps on the RTL start
-                 (right) + a back button. Populated by renderProjectRail(). -->
-            <aside class="project-rail" id="project-rail" aria-label="שלבי הפרויקט"></aside>
+            <!-- The floating step rail is gone. It was a third navigation
+                 surface — after the icon rail and the thread column — that
+                 existed only between 861 and 1099px, reserved 168px of every
+                 project screen for itself, and drew the same three steps the
+                 sidebar was being forced to hide so they would not appear
+                 twice. The steps live in the sidebar now, at every width. -->
 
             <!-- Context header — the project you're inside + sync state -->
             <div class="active-project-banner" id="project-banner">
@@ -2723,29 +2734,29 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/checkups-core.js?v=433"></script>
-    <script src="/assets/listcards.js?v=433"></script>
+    <script src="/assets/checkups-core.js?v=438"></script>
+    <script src="/assets/listcards.js?v=438"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=433"></script>
-    <script src="app.js?v=433"></script>
+    <script src="coverage.js?v=438"></script>
+    <script src="app.js?v=438"></script>
     <!-- app.js was 18,760 lines — a quarter of the repo in one file, and the
          file every parallel session collided in. These five are lifts out of
          it, byte for byte, and they load AFTER it because that is where the
          state they read is declared. -->
-    <script src="chat.js?v=433"></script>
-    <script src="checkups.js?v=433"></script>
-    <script src="market.js?v=433"></script>
-    <script src="reports.js?v=433"></script>
-    <script src="admin.js?v=433"></script>
+    <script src="chat.js?v=438"></script>
+    <script src="checkups.js?v=438"></script>
+    <script src="market.js?v=438"></script>
+    <script src="reports.js?v=438"></script>
+    <script src="admin.js?v=438"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=433"></script>
+    <script src="finance.js?v=438"></script>
     <!-- The guide that points at the screen (first-run tour + milestone hints) -->
-    <script src="coach.js?v=433"></script>
-    <script src="nextstep.js?v=433"></script>
+    <script src="coach.js?v=438"></script>
+    <script src="nextstep.js?v=438"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="/track.js?v=433" defer></script>
+    <script src="/track.js?v=438" defer></script>
 </body>
 </html>

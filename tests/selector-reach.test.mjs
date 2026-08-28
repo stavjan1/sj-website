@@ -210,6 +210,54 @@ test('settings is reachable from the one menu a phone has', () => {
     const chat = readFileSync(join(ROOT, 'sale', 'chat.js'), 'utf8');
     const i = chat.indexOf('function renderDrawerDestinations(');
     const body = chat.slice(i, chat.indexOf('\n}', i));
-    assert.match(body, /tab: 'settings'/, 'הגדרות is not listed in the drawer');
+    // הגדרות is a real rail button now — Stav asked whether it and the user
+    // chip were even different things, and they were not: the settings screen
+    // already holds פרופיל משתמש and ערכת נושא. Being a rail button
+    // means the drawer gets it through the mirror, not a second list to keep.
+    assert.match(HTML, /id="tab-settings"/, 'הגדרות is not a destination in the rail');
+    assert.match(body, /\.sidebar \.nav-btn/, 'the drawer stopped mirroring the rail');
     assert.match(body, /tab: 'business'/, 'פרטי העסק is not listed in the drawer');
+    assert.doesNotMatch(body, /tab: 'settings'/,
+        'הגדרות is hard-coded here as well as mirrored from the rail — it would draw twice');
+});
+
+test('the thread list belongs to the conversation, not to every screen', () => {
+    // Measured at 1440 before: 76px rail + 264px thread column = 340px of
+    // chrome, 24% of the screen, on the price catalogue — where a list of
+    // conversation titles has nothing to do with anything on screen. And the
+    // same five destinations were drawn TWICE, side by side, at once.
+    // The list now appears only where a conversation is. There is nothing to
+    // collapse, which is the answer to "Gemini or Claude": neither needed a
+    // toggle, because a panel that is only ever there when it is relevant is
+    // not in the way. Measured after: tool screens 1100 → 1364px of content.
+    assert.match(CSS, /body:has\(#panel-catalog\.active\)\s+#convo-drawer/,
+        'the thread column follows the conversation no longer');
+    // The TOOL screens are enumerated, never the conversation ones: a browser
+    // without :has(), or a screen written next year, must fail to the side
+    // where the column APPEARS rather than the side where it vanishes.
+    assert.doesNotMatch(CSS, /body:has\(#panel-wizard\.active\)\s+#convo-drawer\s*\{[^}]*display:\s*none/,
+        'the gate is listed the dangerous way round — a new screen would lose the list silently');
+    assert.match(CSS, /\.convo-dest:not\(\.is-step\)\s*\{\s*display: none;\s*\}/,
+        'the destinations are mirrored into the panel and drawn twice again');
+});
+
+test('there is one step rail, and it is the sidebar', () => {
+    // The floating .project-rail was a third navigation surface: it existed
+    // only between 861 and 1099px, reserved 168px of every project screen for
+    // itself, and drew the same three steps the sidebar was being forced to
+    // hide so they would not appear twice. Deleting it returned 168px of
+    // content at 1017px — the width Stav's own laptop reports.
+    assert.ok(!/project-rail/.test(HTML), 'the floating step rail is back in the markup');
+    assert.ok(!/renderProjectRail/.test(APP), 'its renderer is back');
+    assert.ok(!/168px/.test(readFileSync(join(ROOT, 'sale', 'css', 'shell.css'), 'utf8')),
+        'the 168px reservation for it is back');
+    // The flag it used to own outlives it, and three rules depend on that —
+    // the project banner's visibility among them. Reading the element first
+    // and returning early made the flag a property of the rail's existence.
+    const i = APP.indexOf('function updateProjectRail(');
+    const body = APP.slice(i, APP.indexOf('\n}', i));
+    const flag = body.indexOf("classList.toggle('in-project-stage'");
+    const early = body.indexOf('if (!onStage) return;');
+    assert.ok(flag > -1 && early > flag,
+        'in-project-stage must be set before anything can return early, or the banner disappears with it');
 });

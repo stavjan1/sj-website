@@ -168,31 +168,6 @@ body.in-project.in-project-stage #project-banner { display: flex; }
 /* main column wraps banner + scrolling panels */
 .main-column { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
-/* ---------- in-project step rail (desktop, injected by renderProjectRail) ---------- */
-@media (min-width: 861px) {
-  .project-rail {
-    position: fixed; inset-block-start: var(--topnav-h, 52px); inset-inline-start: 76px;
-    width: 168px; padding: var(--sp-3);
-    display: flex; flex-direction: column; gap: var(--sp-1);
-  }
-  body.in-project-stage .main-content { padding-inline-start: calc(168px + var(--sp-6)); }
-  .project-rail button {
-    display: flex; align-items: center; gap: var(--sp-2);
-    min-height: 40px; padding: 0 var(--sp-3);
-    background: none; border: none; border-radius: var(--r-sm);
-    color: var(--text-2); font: 500 var(--fs-sm) var(--font-ui);
-    cursor: pointer; text-align: start;
-  }
-  .project-rail button:hover { background: var(--surface-2); color: var(--text); }
-  .project-rail button.active { color: var(--text); background: var(--accent-soft); }
-  .project-rail button[disabled] { opacity: 0.4; pointer-events: none; }
-}
-@media (max-width: 860px) {
-  .project-rail { display: none; }
-}
-/* Leaving a project leaves the rail's old buttons in the DOM — never show
-   them outside a project stage, at any width. */
-body:not(.in-project-stage) .project-rail { display: none !important; }
 
 /* The "עוד" drawer was deleted with waves B–C: four destinations fit both the
    rail and a phone's bottom bar, so the sheet, its backdrop and their two
@@ -236,10 +211,73 @@ body:not(.in-project-stage) .project-rail { display: none !important; }
 }
 
 /* The three project steps had two homes at once: the floating rail and this
-   sidebar, one above לקוחות/כסף/PRO. Stav, 22/08: "עדין נפתחים ה3 תמחור וזה
-   בלשונית צד… תבטל את ההופעה של הדבר הזה." So wherever the rail exists, the
-   sidebar keeps out of it; narrower than that the rail is gone and these are
-   the only way between the stages, so there they stay. */
-@media (min-width: 861px) {
-  .proj-tab { display: none !important; }
+   sidebar. Stav, 22/08: "עדין נפתחים ה3 תמחור וזה בלשונית צד… תבטל את
+   ההופעה של הדבר הזה." His objection was the DUPLICATION, and the fix
+   then was to silence the sidebar wherever the rail existed. The rail no
+   longer exists, so the duplication is gone at the source and the sidebar is
+   the one home the steps have — at every width, which is also the only way
+   an open project can still be navigated once the thread column stops
+   mirroring the sidebar's destinations. */
+
+/* ---- The open project's three steps are a sub-group, not three destinations --
+   Deleting the floating rail gave the steps back to the sidebar, which took it
+   from six labelled buttons to nine plus a name label. Measured at 1017×560 —
+   a 1525px Windows laptop at 150% scaling, which is what Stav is actually
+   using — the column then needed 689px of a 560px screen, and `.sidebar` is
+   `overflow-y:auto` with `scrollbar-width:none`: it scrolls with no scrollbar,
+   no fade, nothing. "מאגר מחירים" simply was not there, and nothing on screen
+   said to scroll for it.
+   They are steps INSIDE the thing you already opened, not places beside it, so
+   they are drawn as steps: shorter, dimmer, and marked as belonging to the
+   project above them. That is 66px back, and it is also the more honest
+   drawing. */
+.nav-btn.proj-tab {
+    min-height: 34px; flex-direction: row; justify-content: center; gap: var(--sp-1);
+    font-size: 10px; opacity: .85;
+}
+.nav-btn.proj-tab svg { width: 15px; height: 15px; }
+.nav-btn.proj-tab .step-num { font-size: 9px; }
+
+/* The name of the open project is on the banner, two inches to the side, in a
+   larger type. Saying it again in an 76px column costs a row and reads as a
+   second thing. */
+.nav-proj-label { display: none; }
+
+/* Above 1100px the thread column is on screen and carries the steps itself, so
+   the sidebar goes back to being six destinations. */
+@media (min-width: 1100px) {
+    .nav-btn.proj-tab { display: none; }
+}
+
+/* And when it still does not fit — a 448px-tall window will defeat any vertical
+   list — the column must at least LOOK scrollable. An invisible scroll is how
+   "מאגר מחירים" went missing without a symptom. */
+.sidebar { scrollbar-width: thin; }
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border-strong, var(--border)); border-radius: 4px; }
+
+/* ---- A short laptop is the common laptop -----------------------------------
+   1525×672 device pixels at Windows' default 150% scaling is 1017×448 CSS —
+   and that is the machine the owner of this product is using. A 76px column of
+   ten labelled destinations needs 644px. It scrolls, so nothing is lost in the
+   sense that a bug loses it; but the last destination is simply not on the
+   screen, and nobody scrolls a navigation column they cannot see a scrollbar
+   on. Below 700px of viewport the rail trades padding for rows: the labels
+   stay, because a non-technical user reads them, and the air goes. */
+@media (max-height: 700px) {
+    .nav-btn { min-height: 44px; padding-block: 2px; gap: 1px; }
+    .nav-btn svg { width: 19px; height: 19px; }
+    .nav-btn.proj-tab { min-height: 30px; }
+    .sidebar { padding-block: var(--sp-2); }
+    .sidebar-logo { height: 34px; }
+    .sidebar-footer .nav-btn, .sidebar-footer .user-chip { min-height: 40px; }
+}
+
+/* Shorter still, and the logo goes: it is a link back to the marketing site,
+   which is the one thing in this column that is not navigation inside the app.
+   Below this height every row has to earn its place. */
+@media (max-height: 540px) {
+    .sidebar-logo { display: none; }
+    .nav-btn { min-height: 40px; }
+    .nav-btn.proj-tab { min-height: 26px; }
 }
