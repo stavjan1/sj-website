@@ -3834,7 +3834,12 @@ function renderStatistics() {
     // The board is the money in flight. A conversation that stopped a week ago
     // and never reached a price is not in flight, and counting it in the first
     // column made the funnel look busier than the work actually is.
-    (projectsList || []).filter(p => !isStaleDraft(p))
+    // Jobs only. When a conversation stopped needing a project to exist, the
+    // work list and the dashboard learned to tell the two apart and this board
+    // did not — so every "כמה לוקח קבלן משתלבות?" landed in the first
+    // column as money in flight. A question is not a pipeline.
+    (projectsList || []).filter(isJob)
+        .filter(p => !isStaleDraft(p))
         .filter(p => pipeMonth === 'all' || projectMonthKey(p) === pipeMonth)
         .forEach(p => { (cols[projectPipelineStage(p)] || cols.planning).push(p); });
 
@@ -9903,4 +9908,81 @@ function askConfirm(opts) {
         // than destroys.
         setTimeout(() => dlg.querySelector('[data-a="no"]')?.focus(), 30);
     });
+}
+
+// ============================================================================
+// THE AGENT CARRIES WHAT THE QUESTION NEEDS
+// Stav, 28/08, after a day of taking things off the screen: apply the same
+// principle to the pricing agent's mind — practical, and not showing what is
+// not needed.
+//
+// It is the same rule, one level down. A conversation turn was carrying 14,661
+// characters of knowledge before the question was even read: the whole labour
+// price book (6,488), the field anchors (3,628), the tool bag (1,743), on top
+// of whatever the server attaches — the pricing map, the equipment kit, the
+// supplier catalogue lookup, the coverage checklist. Asked "מה החתך ל-32 אמפר
+// ב-25 מטר?", every one of those was dead weight.
+//
+// And the argument is NOT the token bill. It is that a model given four
+// reference works and a question about cable cross-section spends its attention
+// deciding which one you meant. The short answers Stav asked for come more
+// easily to a prompt that is not carrying three books it cannot use.
+//
+// The bias is deliberately generous: money knowledge rides unless the turn is
+// clearly not about money, because a block wrongly withheld makes the answer
+// worse and a worse answer costs far more than the tokens ever will. Tools are
+// the opposite — narrow, and only on a real tool question — because that block
+// exists to name things correctly, not to be consulted.
+// ============================================================================
+
+// Anything that could touch a price: a number, a currency, a quantity, a verb
+// that means work. If any of this is present the money books ride along.
+const MONEY_HINTS = /\d|₪|שקל|מחיר|כמה|עול|תמחר|תמחור|הצעה|עלות|לוקח|גובה|יקר|זול|רווח|הנחה|מע"מ|מעמ/;
+// Work being described, even with no number in the sentence.
+const WORK_HINTS = /התקנ|החלפ|הוספ|פירוק|חיבור|העברה|הזזה|שדרוג|תיקון|בדיקה|הרחבה|בנייה|שיפוץ|עבודה|פרויקט/;
+// A question about the trade itself, which the books cannot answer.
+const SPEC_HINTS = /חתך|ממ"ר|ממר|תקן|חוק|מותר|אסור|למה|איך עובד|מה זה|הפרש בין|עומס|נפילת מתח|zs|לולאת/i;
+
+// Words that are unambiguously about money, as opposed to a bare number — "32
+// אמפר" and "25 מטר" are digits in a question about cable, not a price.
+const MONEY_WORDS = /₪|שקל|מחיר|כמה עול|כמה לוקח|תמחר|תמחור|הצעה|עלות|גובה|יקר|זול|רווח|הנחה|מע"מ|מעמ/;
+
+function wantsMoneyKnowledge(text) {
+    const t = String(text || '');
+    if (!t.trim()) return true;                       // nothing to go on: carry it
+    if (MONEY_WORDS.test(t) || WORK_HINTS.test(t)) return true;
+    // A question about the trade itself — cross-section, a regulation, why
+    // something behaves as it does. Numbers live in these too ("חתך ל-32 אמפר
+    // ב-25 מטר"), so a bare digit is not enough to call it a pricing turn.
+    if (SPEC_HINTS.test(t)) return false;
+    // Everything else: carry the books. The bias is generous on purpose — a
+    // block wrongly withheld makes the answer worse, and a worse answer costs
+    // far more than the tokens ever will.
+    return MONEY_HINTS.test(t) || true;
+}
+
+// The tool bag is for naming tools, so it rides only when tools are the
+// subject. Everything else it would only sit there.
+const TOOL_HINTS = /כלי|כלים|מברג|ג'וקר|גוקר|תוכי|פלייר|סטריפר|פטישון|מקדח|קפיץ השחל|ציוד|מה צריך|במה משתמש/;
+function wantsToolKnowledge(text) {
+    return TOOL_HINTS.test(String(text || ''));
+}
+
+// The last thing the person actually said — what the next answer is about.
+function lastUserSaid(history) {
+    const msgs = (history || []).filter((m) => m && m.role === 'user' && !m.hidden);
+    const last = msgs[msgs.length - 1];
+    return (last && last.parts && last.parts[0] && last.parts[0].text) || '';
+}
+
+// One place that decides what a turn carries, so the three agents cannot drift
+// apart on it. `full` is the itemised quote, which needs everything by
+// definition — that is the turn that produces the numbers.
+function knowledgeFor(text, opts) {
+    const o = opts || {};
+    const money = o.full || wantsMoneyKnowledge(text);
+    let out = '';
+    if (money) out += getSternLaborPromptBlock() + getMarketAnchorsPromptBlock();
+    if (o.full || wantsToolKnowledge(text)) out += getToolsPromptBlock();
+    return out;
 }

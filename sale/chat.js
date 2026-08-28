@@ -1777,10 +1777,12 @@ async function runPlanningAgent(activeProject) {
         // pricing map are already attached server-side, so they are not repeated
         // here; the strategy essay stays out on purpose, because the whole point
         // of this answer is that it is short.
+        // The planning turn always prices, so the money books always ride; the
+        // tool bag only when tools are the subject.
         const planSystem = getPlanningSystemInstruction()
             + getSternLaborPromptBlock()
             + getMarketAnchorsPromptBlock()
-            + getToolsPromptBlock();
+            + (wantsToolKnowledge(lastUserSaid(activeProject.planChatHistory)) ? getToolsPromptBlock() : '');
         const response = await callAI(effectiveModel, {
             messages: historyToMessages(planSystem, activeProject.planChatHistory),
             // Tells the server which equipment kit to attach, so the product
@@ -2013,7 +2015,10 @@ async function runPricingAgent(activeProject, promptChars) {
     const recentUserText = (activeProject.chatHistory || [])
         .filter(m => m.role === 'user').slice(-2)
         .map(m => (m.parts && m.parts[0] && m.parts[0].text) || '').join(' ');
-    const systemInstructionText = getProfessionSystemInstruction() + getSternLaborPromptBlock() + getPriceCatalogPromptBlock(recentUserText) + getMarketAnchorsPromptBlock() + getToolsPromptBlock() + getPricingInstinctPromptBlock();
+    // The itemised quote is the turn that produces the numbers, so it carries
+        // everything by definition — except the tool bag, which is still only for
+        // when tools are being asked about.
+        const systemInstructionText = getProfessionSystemInstruction() + getSternLaborPromptBlock() + getPriceCatalogPromptBlock(recentUserText) + getMarketAnchorsPromptBlock() + (wantsToolKnowledge(recentUserText) ? getToolsPromptBlock() : '') + getPricingInstinctPromptBlock();
     const _t0 = performance.now();
     setQuotaCharging(true);
     try {
@@ -4301,10 +4306,9 @@ async function runAskAgent(proj) {
     const _t0 = performance.now();
     setQuotaCharging(true);
     try {
+        // What this question needs, not everything the app knows.
         const system = getAskSystemInstruction()
-            + getSternLaborPromptBlock()
-            + getMarketAnchorsPromptBlock()
-            + getToolsPromptBlock();
+            + knowledgeFor(lastUserSaid(proj.planChatHistory));
         const response = await callAI(effectiveModel, {
             messages: historyToMessages(system, proj.planChatHistory),
             // A conversation answers in lines, not in pages. The job agents ask
