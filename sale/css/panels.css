@@ -5089,3 +5089,70 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
     .content-panel .card-header h3 { font-size: var(--fs-sm); }
     .content-panel .card-subtitle { display: none; }
 }
+
+/* The three errands moved out of a bar above the composer and into the column
+   beside it, where Stav drew a circle round the empty space. They are things
+   you ask the conversation FOR, so they belong next to the conversation. */
+.side-asks { display: flex; flex-direction: column; gap: var(--sp-1); margin-block-start: var(--sp-2); }
+.side-asks[hidden] { display: none; }
+.side-ask {
+    display: flex; align-items: center; gap: var(--sp-2);
+    width: 100%; min-height: 40px; padding: 0 var(--sp-3);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm);
+    color: var(--text-2); font: 600 var(--fs-xs) var(--font-ui);
+    text-align: start; cursor: pointer;
+}
+.side-ask:hover { border-color: var(--accent); color: var(--text); }
+.side-ask i { width: 15px; color: var(--text-3); }
+.side-ask:hover i { color: var(--accent); }
+/* On a phone they are a swipeable strip under the thread, not a stacked block. */
+@media (max-width: 768px) {
+    .side-asks { flex-direction: row; overflow-x: auto; scrollbar-width: none; padding-inline: var(--sp-2); }
+    .side-asks::-webkit-scrollbar { display: none; }
+    .side-ask { flex: none; width: auto; min-height: 36px; }
+}
+
+/* ============================================================================
+   כסף, ON A PHONE
+   I could not exercise this screen signed in — it is gated behind Google and I
+   only have a guest session — so this is the same reduction applied to the same
+   shapes, from the markup: a five-tab bar that wraps to two rows, three KPI
+   cards that stack to 270px, a document list built like the work list was, and
+   a five-column kanban, which is the one thing a 390px screen genuinely cannot
+   show side by side. Stav still has to confirm it with his own account.
+   ============================================================================ */
+@media (max-width: 768px) {
+    /* Five destinations, one swipeable strip. */
+    .acct-tabbar {
+        display: flex; flex-wrap: nowrap; gap: var(--sp-1);
+        overflow-x: auto; scrollbar-width: none;
+    }
+    .acct-tabbar::-webkit-scrollbar { display: none; }
+    .acct-tab { flex: none; min-height: 40px; white-space: nowrap; font-size: var(--fs-xs); }
+
+    /* Three numbers are a row, not three cards. */
+    .acct-kpis { display: grid !important; grid-template-columns: repeat(3, 1fr); gap: var(--sp-2); }
+    .acct-kpi { padding: var(--sp-2); text-align: center; }
+    .acct-kpi .ak-num { font-size: var(--fs-md); }
+    .acct-kpi .ak-lbl { font-size: 10px; }
+    .acct-scope { display: flex; gap: var(--sp-1); }
+    .acct-scope-btn { flex: 1; min-height: 36px; font-size: var(--fs-xs); }
+
+    /* A document is a row: what it is, who it is for, how much. */
+    .doc-row, .acct-item { padding: var(--sp-2); gap: var(--sp-2); }
+    .doc-row .doc-main { display: flex; flex-wrap: wrap; gap: 2px var(--sp-2); min-width: 0; }
+    .doc-row .doc-client { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 55%; }
+    .doc-row .doc-date, .acct-item .doc-date { font-size: 10px; }
+
+    /* A five-column board cannot be five columns here. It becomes one column
+       per screen that you swipe between — which is what every mobile kanban
+       does, because the alternative is five unreadable slivers. */
+    .pipeline-board {
+        display: flex !important; flex-wrap: nowrap;
+        overflow-x: auto; scroll-snap-type: x mandatory;
+        gap: var(--sp-2); scrollbar-width: none;
+    }
+    .pipeline-board::-webkit-scrollbar { display: none; }
+    .pipe-col { flex: 0 0 82%; scroll-snap-align: start; min-height: 0; }
+    .pipe-col-body { max-height: 46vh; }
+}

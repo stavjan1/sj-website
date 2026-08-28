@@ -73,7 +73,11 @@ test('a supplier line carries retail as the suggestion and his cost as the price
     assert.equal(row.price, 15, 'what he pays is the discounted one');
     assert.equal(row.unit, 'מטר');
     assert.equal(row.source, 'supplier');
-    assert.match(row.details, /5951160/, 'the SKU travels with the line, so it can be ordered');
+    // The SKU still travels so the exact item can be re-ordered, but it is a
+    // field now rather than words in the visible פירוט — a customer reading a
+    // quote has no use for a supplier's part number (Stav, 28/08).
+    assert.equal(row.sku, '5951160', 'the SKU travels with the line, so it can be ordered');
+    assert.ok(!/5951160/.test(row.details), 'and never in the text anyone reads');
 });
 
 test('a price he typed once beats the catalog, discount and all', () => {

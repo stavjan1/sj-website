@@ -1504,21 +1504,20 @@ function _lastModelText(history) {
 function updatePriceActionBar(proj) {
     const bar = document.getElementById('price-action-bar');
     if (!bar) return;
-    // Was: a regex hunting for "סה\"כ" and a digit in the agent's last message.
-    // Prose is not state — the same answer worded differently hid the bar on a
-    // finished pricing, and a chatty answer with no numbers behind it showed the
-    // bar on an empty table. The table is the fact.
-    const priced = pricingTotals(proj).total > 0;
-    const show = activeChatMode === 'price'
-        && proj && getProjectStage(proj) === 'pricing'
-        && (proj.chatHistory || []).some(m => m.role === 'user')
-        && priced;
-    bar.style.display = show ? 'flex' : 'none';
+    // "המשך להכנת טיוטה" was a second door to הצעת מחיר, which is
+    // already a step in the rail beside the chat — Stav: "גם ככה יש בצד כפתור".
+    // The bar is gone; the three errands it carried moved beside the thread.
+    if (bar) bar.style.display = 'none';
 }
 
 // The one line under the conversation that says the card exists, what is in it,
 // and that opening it is one tap. It only appears once the card has something.
 function updateSpecStrip(proj) {
+    const asks = document.getElementById('side-asks');
+    if (asks) {
+        const project = proj || projectsList.find((p) => p.id === activeProjectId);
+        asks.hidden = !(project && !isAsk(project));
+    }
     const strip = document.getElementById('spec-strip');
     if (!strip) return;
     const project = proj || projectsList.find((p) => p.id === activeProjectId);
@@ -1780,7 +1779,8 @@ async function runPlanningAgent(activeProject) {
         // of this answer is that it is short.
         const planSystem = getPlanningSystemInstruction()
             + getSternLaborPromptBlock()
-            + getMarketAnchorsPromptBlock();
+            + getMarketAnchorsPromptBlock()
+            + getToolsPromptBlock();
         const response = await callAI(effectiveModel, {
             messages: historyToMessages(planSystem, activeProject.planChatHistory),
             // Tells the server which equipment kit to attach, so the product
@@ -2013,7 +2013,7 @@ async function runPricingAgent(activeProject, promptChars) {
     const recentUserText = (activeProject.chatHistory || [])
         .filter(m => m.role === 'user').slice(-2)
         .map(m => (m.parts && m.parts[0] && m.parts[0].text) || '').join(' ');
-    const systemInstructionText = getProfessionSystemInstruction() + getSternLaborPromptBlock() + getPriceCatalogPromptBlock(recentUserText) + getMarketAnchorsPromptBlock() + getPricingInstinctPromptBlock();
+    const systemInstructionText = getProfessionSystemInstruction() + getSternLaborPromptBlock() + getPriceCatalogPromptBlock(recentUserText) + getMarketAnchorsPromptBlock() + getToolsPromptBlock() + getPricingInstinctPromptBlock();
     const _t0 = performance.now();
     setQuotaCharging(true);
     try {
@@ -2991,7 +2991,7 @@ function priceBookSet(name, price) {
 // and yours remembered beside it.
 const QUOTE_EXTRAS = [
     { key: 'inspector', label: 'בדיקת חשמלאי בודק', suggested: 600 },
-    { key: 'delivery',  label: 'הובלה ואספקה',      suggested: 150 },
+    { key: 'delivery',  label: 'קניות והבאת חומרים', suggested: 150 },
     { key: 'waste',     label: 'פינוי פסולת',        suggested: 250 },
     { key: 'travel',    label: 'נסיעות',             suggested: 120 },
 ];
@@ -3065,7 +3065,7 @@ function matUnit(m) {
 // are how the job is actually sold — "יום וחצי" becomes two days at his daily
 // rate, because the trip to the supplier is part of the day.
 const LABOR_MODES = [
-    { key: 'sum',   label: 'לפי סעיף' },
+    { key: 'sum',   label: 'קומפלט' },
     { key: 'hours', label: 'לפי שעות' },
     { key: 'days',  label: 'לפי ימים' },
 ];
@@ -3857,7 +3857,7 @@ function renderCatalogPicker() {
             const mineP = tradePrice(retail);
             return `
             <button type="button" class="cp-row cp-sup" onclick="ptAddFromSupplier(${i})">
-                <span class="cp-name">${escapeHtml(it.name || '')}${it.sku ? `<small class="cp-sku">מק"ט ${escapeHtml(String(it.sku))}</small>` : ''}</span>
+                <span class="cp-name">${escapeHtml(it.name || '')}</span>
                 <span class="cp-price">${heNum(mineP)} ₪${it.unit ? ' / ' + escapeHtml(it.unit) : ''}${
                     disc ? `<small class="cp-was">קמעונאי ${heNum(retail)}</small>` : ''}</span>
             </button>`;
@@ -3883,12 +3883,18 @@ function ptAddFromSupplier(i) {
     if (!it || !proj) return;
     const retail = Number(it.price) || 0;
     const remembered = priceBookGet(it.name);
-    const details = [it.sku ? `מק"ט ${it.sku}` : '', it.unit ? `יחידה: ${it.unit}` : '']
+    const details = [it.unit ? `יחידה: ${it.unit}` : '']
         .filter(Boolean).join(' · ');
     proj.materials = proj.materials || [];
     proj.materials.push({
         name: it.name,
         details,
+        // The catalogue number stays ON the line but never in the visible text.
+        // Stav, 28/08: "בהוספה מהמאגר רשום את המקטים, תעיף שלא יראו בכלל
+        // בשום מקום" — a customer reading a quote has no use for a supplier's
+        // part number. But it is what lets the exact item be re-ordered, so it
+        // moves from the words to a field rather than being thrown away.
+        sku: it.sku || undefined,
         qty: 1,
         unit: MATERIAL_UNITS.includes(it.unit) ? it.unit : undefined,
         price: remembered === null ? tradePrice(retail) : remembered,
@@ -4244,7 +4250,8 @@ async function runAskAgent(proj) {
     try {
         const system = getAskSystemInstruction()
             + getSternLaborPromptBlock()
-            + getMarketAnchorsPromptBlock();
+            + getMarketAnchorsPromptBlock()
+            + getToolsPromptBlock();
         const response = await callAI(effectiveModel, {
             messages: historyToMessages(system, proj.planChatHistory),
             // A conversation answers in lines, not in pages. The job agents ask

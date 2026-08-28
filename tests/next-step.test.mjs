@@ -105,14 +105,21 @@ test('the plan card is the exact complement of the pricing gate', () => {
     assert.equal(nextStepFor({ ...base, _missing: [] }), null);
 });
 
-test('the pricing bar reads the table, not the agent’s prose', () => {
-    // It used to hunt for the characters "סה\"כ" and a digit in the last model
-    // message: the same answer worded differently hid the bar on a finished
-    // pricing, and a chatty answer with no numbers showed it on an empty table.
+test('no second door to the quote stacks over the composer', () => {
+    // The bar is gone entirely. Stav, 28/08: "להמשיך לטיוטה זה מיותר. גם ככה יש
+    // בצד כפתור הצעת מחיר", and the three errands beside it went with it. What
+    // this guards now is that it stays gone, that it never grows back the
+    // prose-sniffing trigger it once had, and — the part that matters — that
+    // everything it used to carry is still reachable beside the thread.
     const i = APP.indexOf('function updatePriceActionBar');
     const body = APP.slice(i, APP.indexOf('\n}', i));
-    assert.ok(body.includes('pricingTotals'), 'the bar reads the totals');
-    assert.ok(!/\/סה\[/.test(body), 'and no longer greps the conversation');
+    assert.ok(!body.includes('pricingTotals'), 'the bar no longer decides anything');
+    assert.ok(!body.includes('סה'), 'and never went back to reading the conversation');
+    const HTML = readFileSync(join(ROOT, 'sale', 'index.html'), 'utf8');
+    assert.match(HTML, /id="side-asks"/, 'the side column exists');
+    assert.match(HTML, /openSpecFromChat\(\)/, 'דיוק העבודה is still reachable');
+    assert.match(HTML, /askListInChat\('materials'\)/, 'רשימת חומרים is still reachable');
+    assert.match(HTML, /askListInChat\('tools'\)/, 'רשימת כלים is still reachable');
 });
 
 test('a dismissal is per project, survives a reload, and stays out of quoteData', () => {
