@@ -4748,3 +4748,73 @@ body.convo-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
     .convo-panel, .convo-scrim { transition: none; }
 }
+
+/* ============================================================================
+   THE PHONE LOSES ITS BOTTOM BAR
+   Stav, 28/08: "אולי גם להעלים את כל השורה למטה ושהמוצר יהיה רק שיחה ועם
+   כפתור שפותח תפריט, או משהו בסגנון. אתה תחליט."
+   Decided: it goes. The comparison that settles it is Claude's own phone app —
+   one screen is the conversation and everything else is behind one control —
+   because that is the shape of a product where the chat IS the thing and the
+   other screens are tools you visit. WhatsApp keeps a bottom bar, but its four
+   tabs are peers; here they never were. Inside a project the bar had six
+   destinations across 320px, which is ~53px each including a Hebrew label.
+   The bar's 60px plus the reserve above it come back to the conversation.
+   ============================================================================ */
+@media (max-width: 768px) {
+    .sidebar { display: none; }
+    /* Nothing is docked at the bottom any more, so nothing needs reserving for
+       it — only the home indicator. This is the third place that used to hold
+       space for that bar; the other two are already gone. */
+    .main-content { padding-block-end: env(safe-area-inset-bottom, 0px); }
+    .content-panel { padding-block-end: calc(var(--sp-4) + env(safe-area-inset-bottom, 0px)); }
+    #panel-wizard.active,
+    #panel-wizard.active.hide-estimate { padding-block: var(--sp-2) 0; }
+    .chat-input-area { padding-block-end: calc(var(--sp-2) + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* The drawer's second half: everywhere else. */
+.convo-dests {
+    flex: none;
+    display: flex; flex-direction: column; gap: 1px;
+    margin-block-start: var(--sp-2);
+    padding-block-start: var(--sp-2);
+    border-block-start: 1px solid var(--border);
+    max-height: 42vh; overflow-y: auto;
+}
+.convo-dest {
+    display: flex; align-items: center; gap: var(--sp-3);
+    width: 100%; min-height: 44px; padding: 0 var(--sp-2);
+    background: none; border: none; border-radius: var(--r-sm);
+    color: var(--text-2); font: 500 var(--fs-sm) var(--font-ui);
+    text-align: start; cursor: pointer;
+}
+.convo-dest:hover { background: var(--surface-2); color: var(--text); }
+.convo-dest.is-active { background: var(--accent-soft); color: var(--text); font-weight: 700; }
+.convo-dest svg { width: 19px; height: 19px; flex: none; }
+/* The three stages of an open project are steps inside it, not places beside
+   it, and the indent is the only thing that has to say so. */
+.convo-dest.is-step { padding-inline-start: var(--sp-6); font-size: var(--fs-xs); }
+
+.convo-account {
+    flex: none;
+    display: flex; align-items: center; gap: var(--sp-3);
+    width: 100%; min-height: 48px; padding: 0 var(--sp-2);
+    margin-block-start: var(--sp-2); padding-block-start: var(--sp-2);
+    border: none; border-block-start: 1px solid var(--border); background: none;
+    color: var(--text); font: 600 var(--fs-sm) var(--font-ui);
+    text-align: start; cursor: pointer; border-radius: 0;
+}
+.convo-account:hover { color: var(--accent); }
+.convo-acc-avatar {
+    width: 30px; height: 30px; flex: none; border-radius: var(--r-pill);
+    background: var(--surface-2) center/cover no-repeat; color: var(--text-2);
+    display: inline-flex; align-items: center; justify-content: center;
+    font: 700 12px var(--font-ui); overflow: hidden;
+}
+.convo-acc-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.convo-acc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The list of threads gives up its share of the panel once the destinations
+   are under it — both scroll, and neither is allowed to starve the other. */
+@media (max-width: 768px) { .convo-list { min-height: 22vh; } }

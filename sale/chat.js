@@ -4414,6 +4414,7 @@ function openConversationsDrawer() {
     const d = document.getElementById('convo-drawer');
     if (!d) return;
     renderConversationsList();
+    renderDrawerDestinations();
     d.hidden = false;
     // A forced reflow, not requestAnimationFrame. rAF does not fire in a tab
     // that is not compositing — a background tab, a hidden window, a browser
@@ -4424,6 +4425,7 @@ function openConversationsDrawer() {
     void d.offsetWidth;
     d.classList.add('open');
     document.body.classList.add('convo-open');
+    document.querySelector('.convo-open-btn')?.setAttribute('aria-expanded', 'true');
     const q = document.getElementById('convo-search');
     if (q) { q.value = ''; }
 }
@@ -4433,6 +4435,7 @@ function closeConversationsDrawer() {
     if (!d) return;
     d.classList.remove('open');
     document.body.classList.remove('convo-open');
+    document.querySelector('.convo-open-btn')?.setAttribute('aria-expanded', 'false');
     // Wait out the slide before hiding, or it vanishes instead of leaving.
     setTimeout(() => { if (!d.classList.contains('open')) d.hidden = true; }, 220);
 }
@@ -4523,4 +4526,53 @@ function openConversation(id) {
         try { setChatMode('plan', p); } catch (e) {}
     }
     closeConversationsDrawer();
+}
+
+// The drawer's list of everywhere else, MIRRORED from the rail rather than
+// written out again. Stav, 28/08: "אולי גם להעלים את כל השורה למטה ושהמוצר
+// יהיה רק שיחה ועם כפתור שפותח תפריט."
+//
+// Copying the nine destinations into this file would have worked today and
+// rotted by the next feature: the phone would quietly be missing whatever the
+// rail gained, and nobody would find out, because nothing tests that two hand
+// written lists agree. Reading the buttons means the rail stays the single
+// place a destination is declared, the admin door follows its own `hidden`
+// flag, and the project stages appear exactly when the app says they should.
+function renderDrawerDestinations() {
+    const box = document.getElementById('convo-dests');
+    if (!box) return;
+    const inProject = document.body.classList.contains('in-project');
+    const active = document.querySelector('.content-panel.active');
+    const activeId = active ? active.id.replace('panel-', '') : '';
+
+    const btns = [...document.querySelectorAll('.sidebar .nav-btn')].filter((b) => {
+        if (b.hidden) return false;                                   // admin, until it is not
+        if (b.classList.contains('proj-tab') && !inProject) return false;  // stages need a project
+        return true;
+    });
+
+    box.innerHTML = btns.map((b) => {
+        const tab = (b.id || '').replace('tab-', '').replace('-rail', '');
+        const label = (b.querySelector('span')?.textContent || b.textContent || '').trim();
+        const icon = b.querySelector('svg')?.outerHTML || '';
+        const on = tab === activeId ? ' is-active' : '';
+        const step = b.classList.contains('proj-tab') ? ' is-step' : '';
+        return `<button type="button" class="convo-dest${on}${step}" onclick="goFromDrawer('${tab}')">
+            ${icon}<span>${escapeHtml(label)}</span>
+        </button>`;
+    }).join('');
+
+    // The account chip's identity, so the drawer can show who is signed in
+    // without a second source for the same two strings.
+    const av = document.getElementById('convo-acc-avatar');
+    const nm = document.getElementById('convo-acc-name');
+    const railAv = document.getElementById('user-chip-avatar');
+    const railNm = document.getElementById('user-chip-name');
+    if (av && railAv) { av.innerHTML = railAv.innerHTML; av.style.background = getComputedStyle(railAv).background; }
+    if (nm && railNm) nm.textContent = railNm.textContent || 'החשבון שלי';
+}
+
+function goFromDrawer(tab) {
+    closeConversationsDrawer();
+    try { switchTab(tab); } catch (e) {}
 }
