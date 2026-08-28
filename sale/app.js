@@ -2331,8 +2331,11 @@ function switchTab(tabId, opts) {
     }
     setTimeout(updateBackButton, 0);
 
-    // Project-scoped tabs (chat / editor / reports) need an open project.
-    if ((tabId === 'wizard' || tabId === 'create' || tabId === 'reports' || tabId === 'pricing') && !activeProjectId) {
+    // Project-scoped tabs (editor / reports / pricing table) need an open
+    // project. The CHAT does not, and used to: it was the one screen that
+    // demanded a project before it would let you type, which is what made a
+    // one-line question cost a project. An empty chat is a new conversation.
+    if ((tabId === 'create' || tabId === 'reports' || tabId === 'pricing') && !activeProjectId) {
         showToast('אנא בחר או צור פרויקט תחילה בלשונית ניהול פרויקטים', 'error');
         switchTab('projects');
         return;
@@ -2960,7 +2963,12 @@ function startWorkFromHome() {
     const text = (input && input.value || '').trim();
     if (!text) { input && input.focus(); return; }
     input.value = '';
-    createNewProject({ describe: text });
+    // A conversation, not a project. What he typed might be a job worth
+    // tracking or might be "כמה לוקח קבלן משתלבות?", and the box cannot
+    // tell which — so it stops guessing and stops charging a project for the
+    // guess. The agent reads which it is and offers the work board only when
+    // there is work.
+    createNewProject({ describe: text, kind: 'ask' });
 }
 
 // The home screen asks for the WORK, not for a name: you type what the customer
@@ -2991,8 +2999,40 @@ function coachSay(id, delay) {
     } catch (e) { /* a hint is never worth an exception */ }
 }
 
+// Which of the two a record is. Everything written before 28/08 predates the
+// field, and every one of those was a job, so an absent `kind` reads as 'job'
+// — no migration, and an old backup restored tomorrow still lands correctly.
+function isAsk(p) { return !!p && p.kind === 'ask'; }
+function isJob(p) { return !!p && p.kind !== 'ask'; }
+function countJobs() { return projectsList.filter(isJob).length; }
+// Newest first, conversations and jobs together: this is the Claude-style list,
+// and there the sidebar does not care what a thread later turned into.
+function allConversations() {
+    return projectsList.slice().sort((a, b) =>
+        (b.touched || Date.parse(b.created) || 0) - (a.touched || Date.parse(a.created) || 0));
+}
+
+// A conversation is the thing that exists; a job is what one becomes.
+//
+// Stav, 28/08: "לפעמים בן אדם רק שואל 'כמה לוקח קבלן משתלבות?' והתשובה תהיה
+// '500 שח למטר', לא צריך להכניס דבר כזה תחת פרויקט... אולי שיהיה כמו בקלוד, כל שיחה
+// נשמרת בצד ואפשר לחזור אליה בכל רגע ואפשר גם להוסיף אחת לפרויקט."
+//
+// The deep version of that, which is the point: the product had the hierarchy
+// upside down. A project owned a chat, so a question could not exist without
+// first paying for a project — a name, a card on the work list, a slot against
+// the plan's project cap, and a three-stage workflow — to get one line back.
+//
+// It is one record either way, which is what makes this cheap. `kind` is the
+// only difference: an 'ask' is a conversation (no card on the work list, no
+// slot against the cap, answered by whoever the question needs), a 'job' is a
+// tracked piece of work with stages, a spec card and a quote. Promotion is a
+// field change, so the thread survives it untouched — no second store, no
+// migration, no adapter, and every renderer, save path and KV backup that
+// already understands a project understands a conversation for free.
 function createNewProject(opts) {
     opts = opts || {};
+    const isAsk = opts.kind === 'ask';
     const input = document.getElementById('new-project-name');
     const typed = ((input && input.value) || '').trim();
     // Naming a job before describing it was the first thing the app asked for
@@ -3004,14 +3044,20 @@ function createNewProject(opts) {
     const autoName = describing || !typed;
 
     // Plan gate: the free plan allows a fixed number of simultaneous projects.
-    const projCap = tierLimit('projects');
-    if (!isAdmin() && projCap !== -1 && projectsList.length >= projCap) {
-        showUpgradeModal('projects');
-        return;
+    // Questions are not projects. Counting them here would have meant three
+    // "כמה עולה..." questions locking a free user out of opening real work,
+    // which is the opposite of what a free tier is for.
+    if (!isAsk) {
+        const projCap = tierLimit('projects');
+        if (!isAdmin() && projCap !== -1 && countJobs() >= projCap) {
+            showUpgradeModal('projects');
+            return;
+        }
     }
 
     const newProj = {
         id: 'proj_' + Date.now(),
+        kind: isAsk ? 'ask' : 'job',
         name: name,
         autoName: autoName,
         created: getTodayDateString(),
@@ -3021,7 +3067,10 @@ function createNewProject(opts) {
         // later receives the FULL product list (incl. accessories), not just
         // the headline item ("עמדת טעינה" בלי כל הציוד הנלווה).
         stage: 'planning',
-        planChatHistory: [
+        // A conversation opens on what the person said, the way every chat the
+        // user has ever used opens. The greeting belongs to the job flow, where
+        // an empty screen genuinely needs to explain what to type.
+        planChatHistory: isAsk ? [] : [
             {
                 role: 'model',
                 parts: [{ text: `תאר לי את העבודה במילים שלך (למשל: "התקנת עמדת טעינה בחניון תת-קרקעי, 15 מטר מהלוח") — ואחזיר לך **מחיר** מיד, לפי ההנחות המקובלות לעבודה כזאת. אם משהו ישנה את המספר משמעותית, אשאל על זה אחרי.` }]
@@ -3413,7 +3462,9 @@ function filterProjectsList() {
     const q = (document.getElementById('project-search-q')?.value || '').trim().toLowerCase();
     const statusFilter = document.getElementById('project-status-filter')?.value || 'all';
 
-    let filtered = projectsList.slice();
+    // Conversations live in the conversations list, not on the work board. A
+    // question you asked on the way to the van is not a job you are running.
+    let filtered = projectsList.filter(isJob);
 
     // Search what is on the card, not only the stored name: a work the agent
     // has not titled yet is called "פרויקט חדש", so searching for the words you
@@ -4540,9 +4591,12 @@ function updateMetricsDashboard() {
     let sentCount = 0;
     let approvedCount = 0;
     let approvedSum = 0;
-    let totalCount = projectsList.length;
+    // "כמה עבודות פתוחות" must not count the questions, or the number on the
+    // dashboard stops meaning anything the moment the chat gets used.
+    const jobs = projectsList.filter(isJob);
+    let totalCount = jobs.length;
 
-    projectsList.forEach(proj => {
+    jobs.forEach(proj => {
         const status = proj.status || 'טיוטה';
         const finalPrice = (proj.quote && proj.quote.finalPrice) ? parseFloat(proj.quote.finalPrice) : 0;
         

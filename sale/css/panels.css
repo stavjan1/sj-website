@@ -4621,3 +4621,130 @@ i[class^="fa-"], i[class*=" fa-"] {
        so no future include can put it back on top of the composer. */
     #sj-assist-launcher, #sj-assist-panel { display: none !important; }
 }
+
+/* ============================================================================
+   THE CONVERSATIONS LIST
+   "אולי שיהיה כמו בקלוד, כל שיחה נשמרת בצד ואפשר לחזור אליה בכל רגע."
+   A side sheet on a phone and on a desktop alike, because it is the same list
+   and the same gesture — the only thing that changes is how much of the screen
+   it is allowed to take.
+   ============================================================================ */
+.convo-open-btn {
+    flex: none;
+    width: 34px; height: 34px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: none; border: 1px solid transparent; border-radius: var(--r-pill);
+    color: var(--text-2); cursor: pointer;
+}
+.convo-open-btn:hover { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+.convo-open-btn svg { width: 19px; height: 19px; }
+
+.convo-drawer { position: fixed; inset: 0; z-index: calc(var(--z-nav) + 20); }
+.convo-drawer[hidden] { display: none; }
+.convo-scrim {
+    position: absolute; inset: 0;
+    background: var(--scrim);
+    opacity: 0; transition: opacity var(--t-fast);
+}
+.convo-drawer.open .convo-scrim { opacity: 1; }
+
+.convo-panel {
+    position: absolute; inset-block: 0; inset-inline-start: 0;
+    width: min(86vw, 340px);
+    display: flex; flex-direction: column;
+    background: var(--surface);
+    border-inline-end: 1px solid var(--border);
+    padding: var(--sp-3) var(--sp-3) calc(var(--sp-3) + env(safe-area-inset-bottom, 0px));
+    transform: translateX(var(--convo-out, -100%));
+    transition: transform 180ms ease;
+}
+/* RTL: the panel starts at the right edge, so it leaves to the right. */
+[dir="rtl"] .convo-panel, html[dir="rtl"] .convo-panel { --convo-out: 100%; }
+.convo-drawer.open .convo-panel { transform: translateX(0); }
+
+.convo-head { display: flex; align-items: center; gap: var(--sp-2); margin-block-end: var(--sp-3); }
+.convo-head h2 { margin: 0; font-size: var(--fs-md); font-weight: 700; color: var(--text); }
+.convo-close {
+    flex: none; width: 36px; height: 36px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: none; border: none; border-radius: var(--r-pill);
+    color: var(--text-3); cursor: pointer;
+}
+.convo-close:hover { background: var(--surface-2); color: var(--text); }
+.convo-close svg { width: 18px; height: 18px; }
+
+.convo-new {
+    display: flex; align-items: center; justify-content: center; gap: var(--sp-2);
+    min-height: 44px; width: 100%;
+    margin-block-end: var(--sp-2);
+    background: var(--accent); color: var(--on-accent);
+    border: none; border-radius: var(--r-md);
+    font: 700 var(--fs-sm) var(--font-ui); cursor: pointer;
+}
+.convo-new:hover { background: var(--accent-strong); }
+.convo-new svg { width: 17px; height: 17px; }
+
+.convo-search-wrap { display: block; margin-block-end: var(--sp-2); }
+.convo-search-wrap input { width: 100%; min-height: 40px; font-size: var(--fs-sm); }
+
+.convo-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.convo-empty { color: var(--text-3); font-size: var(--fs-xs); line-height: 1.7; padding: var(--sp-3) var(--sp-1); }
+
+.convo-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px var(--sp-2);
+    width: 100%;
+    /* 44px is the floor for a touch target, and these rows are two lines of
+       text, so they clear it comfortably — but the padding is what guarantees
+       it when a title is short. */
+    min-height: 56px;
+    padding: var(--sp-2);
+    margin-block-end: 2px;
+    background: none; border: 1px solid transparent; border-radius: var(--r-sm);
+    text-align: start; cursor: pointer;
+}
+.convo-row:hover { background: var(--surface-2); }
+.convo-row.is-active { background: var(--accent-soft); border-color: var(--accent); }
+.convo-row-top { grid-column: 1 / -1; display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.convo-title {
+    flex: 1 1 auto; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--text); font: 600 var(--fs-sm) var(--font-ui);
+}
+.convo-badge {
+    flex: none; padding: 1px 7px; border-radius: var(--r-pill);
+    background: var(--surface-2); color: var(--text-3);
+    font: 700 10px/1.6 var(--font-ui);
+}
+.convo-row.is-active .convo-badge { background: var(--surface); }
+.convo-snip {
+    grid-column: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--text-3); font-size: var(--fs-xs);
+}
+.convo-when { grid-column: 2; color: var(--text-3); font-size: 10px; white-space: nowrap; align-self: end; }
+
+/* The screen behind a modal sheet must not scroll under it. */
+body.convo-open { overflow: hidden; }
+
+/* The label on the drawer's search box is for a screen reader, not for the eye,
+   and this codebase had no class that meant that — so the markup was asking for
+   one that did not exist and the word would simply have been printed. */
+.sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    margin: -1px; padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Someone who has asked their phone to stop animating gets the panel in place
+   rather than sliding. It is also the honest behaviour when frames are not
+   being produced at all: no transition means no state to be frozen half-way
+   through, which is exactly how this drawer was caught sitting off-screen. */
+@media (prefers-reduced-motion: reduce) {
+    .convo-panel, .convo-scrim { transition: none; }
+}
