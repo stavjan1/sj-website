@@ -322,13 +322,13 @@
     if (!messages.some(function (m) { return m.role === 'user'; })) {
       addBubble('bot', toSJ
         ? 'בשמחה! ספרו לי קודם במשפט במה מדובר, ואז נעביר את הפנייה ל-SJ ונחזור אליכם.'
-        : 'אשמח לשלוח לך סיכום! ספרו לי קודם במה אפשר לעזור, ואז נשלח לכם את השיחה למייל.');
+        : 'אשמח לשלוח לכם סיכום! ספרו לי קודם במה אפשר לעזור, ואז נשלח את השיחה למייל.');
       return;
     }
     clearSuggestions();
     var form = el('div', 'sj-assist-emailform');
     form.innerHTML =
-      '<div class="sj-assist-ef-title">' + (toSJ ? 'נעביר את שיחתך ל-SJ, נחזור אליך בהקדם' : 'נשמח לשלוח לך את סיכום השיחה למייל') + '</div>' +
+      '<div class="sj-assist-ef-title">' + (toSJ ? 'נעביר את השיחה ל-SJ ונחזור אליכם בהקדם' : 'נשמח לשלוח לכם את סיכום השיחה למייל') + '</div>' +
       '<input type="text" class="sj-assist-ef-name" placeholder="שם מלא" autocomplete="name">' +
       '<input type="email" class="sj-assist-ef-email" placeholder="כתובת מייל" autocomplete="email">' +
       '<div class="sj-assist-ef-row">' +
@@ -387,7 +387,7 @@
       .then(function (res) {
         if (res.ok && res.d && res.d.ok) {
           form.remove();
-          addBubble('bot', res.d.message || 'נשלח! נחזור אליך בהקדם.');
+          addBubble('bot', res.d.message || 'נשלח! נחזור אליכם בהקדם.');
         } else {
           btn.disabled = false; btn.textContent = 'שליחה';
           msg.textContent = (res.d && res.d.error && res.d.error.message) || 'השליחה נכשלה. נסו שוב.';
