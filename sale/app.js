@@ -429,6 +429,10 @@ function updateQuotaUI() {
             : reqs >= allowance ? 'המכסה להיום נגמרה, מתאפסת בחצות'
             : `נשארו ${Math.max(0, allowance - reqs)} להיום, מתאפס בחצות`;
     }
+    // The meter earned its place on screen only when the day is running out.
+    // At 3 of 100 it is machinery; at 70+ it is information. Below that the
+    // whole toolbar row stays out of the conversation's way.
+    document.body.classList.toggle('quota-low', !unlimited && pct >= 70);
 }
 function changeGeminiModel(model) {
     selectedGeminiModel = model;
@@ -1650,7 +1654,11 @@ window.addEventListener('popstate', () => {
 
 function updateBackButton() {
     const btn = document.getElementById('ctx-back');
-    if (btn) btn.hidden = navBackStack.length === 0;
+    // Home is the root: "back" from the root is a promise the button cannot
+    // keep, and it was sitting on the greeting in Stav's screenshot. A screen
+    // with nowhere to go back to shows no back.
+    const onHome = document.querySelector('.content-panel.active')?.id === 'panel-home';
+    if (btn) btn.hidden = onHome || navBackStack.length === 0;
     placeBackButton();
 }
 

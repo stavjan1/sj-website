@@ -4865,3 +4865,38 @@ body.convo-open { overflow: hidden; }
         padding-block-end: calc(var(--sp-8) + env(safe-area-inset-bottom, 0px));
     }
 }
+
+/* ============================================================================
+   THE CHAT HAS NO TOOLBAR
+   Stav, 28/08, as product owner: "להעיף את כל הקשקשת מהמסך... הכי פשוט שאפשר."
+   Above the conversation sat a row of machinery — model pills, a daily quota
+   meter reading "3 מתוך 100", search, retry, the card button. WhatsApp has
+   none of these, and neither does any chat he compared this to. The principle:
+   nothing sits above the conversation unless it is information RIGHT NOW.
+   - Model choice: not the user's job. Gone from the screen; the server picks.
+   - Quota: machinery at 3/100, information at 70+. The row returns, holding
+     only the meter, once updateQuotaUI marks the body quota-low.
+   - Search / retry: power tools nobody reaches for above a chat. Functions
+     stay alive; the buttons go.
+   - The spec card opens from the strip inside the conversation (both stages
+     now) and from the desktop rail — not from a toolbar button.
+   This is the LAST block in the file on purpose: it overrides every earlier
+   toolbar rule, including the media queries.
+   ============================================================================ */
+.chat-toolbar { display: none; }
+body.quota-low .chat-toolbar {
+    display: flex;
+    padding: 4px var(--sp-3);
+    border-block-end: 1px solid var(--border);
+}
+body.quota-low .chat-toolbar .model-class-pills,
+body.quota-low .chat-toolbar .chat-search-wrap,
+body.quota-low .chat-toolbar #btn-regenerate,
+body.quota-low .chat-toolbar #btn-toggle-estimate { display: none !important; }
+body.quota-low .chat-toolbar .model-quota-bar { flex: 1 1 auto; }
+body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
+
+/* A keyboard hint on a screen with no keyboard. */
+@media (max-width: 768px) {
+    .home-hint { display: none; }
+}

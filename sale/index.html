@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=399">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=400">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,14 +26,14 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=399">
-    <link rel="stylesheet" href="../assets/ui.css?v=399">
-    <link rel="stylesheet" href="css/shell.css?v=399">
-    <link rel="stylesheet" href="css/panels.css?v=399">
-    <link rel="stylesheet" href="controlroom.css?v=399">
-    <link rel="stylesheet" href="periodic.css?v=399">
-    <link rel="stylesheet" href="nextstep.css?v=399">
-    <link rel="stylesheet" href="css/pdf.css?v=399">
+    <link rel="stylesheet" href="../assets/tokens.css?v=400">
+    <link rel="stylesheet" href="../assets/ui.css?v=400">
+    <link rel="stylesheet" href="css/shell.css?v=400">
+    <link rel="stylesheet" href="css/panels.css?v=400">
+    <link rel="stylesheet" href="controlroom.css?v=400">
+    <link rel="stylesheet" href="periodic.css?v=400">
+    <link rel="stylesheet" href="nextstep.css?v=400">
+    <link rel="stylesheet" href="css/pdf.css?v=400">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -598,8 +598,7 @@
             <section id="panel-wizard" class="content-panel">
                 <div class="section-header" style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:16px;">
                     <div>
-                        <h2><i class="fa-solid fa-comments text-accent"></i> אפיון העבודה</h2>
-                        <p class="section-subtitle">מספרים לסוכן מה העבודה, והוא ממלא את כרטיס האפיון. כשהוא מלא, עוברים לתמחור.</p>
+                        <h2><i class="fa-solid fa-comments text-accent"></i> שיחה</h2>
                     </div>
                 </div>
 
@@ -746,7 +745,7 @@
                                     onclick="toggleChatDictation()" title="הכתבה קולית" aria-label="הכתבה קולית" style="display:none;">
                                     <i class="fa-solid fa-microphone" aria-hidden="true"></i>
                                 </button>
-                                <textarea id="chat-user-input" rows="2" placeholder="כתוב הודעה למומחה התמחור" onkeydown="handleChatKeyDown(event)"></textarea>
+                                <textarea id="chat-user-input" rows="2" placeholder="תאר עבודה או שאל שאלה…" onkeydown="handleChatKeyDown(event)"></textarea>
                                 <button class="btn btn-accent" id="btn-send-chat" onclick="sendChatMessage()">
                                     <i class="fa-solid fa-paper-plane"></i>
                                 </button>
@@ -2724,29 +2723,29 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/checkups-core.js?v=399"></script>
-    <script src="/assets/listcards.js?v=399"></script>
+    <script src="/assets/checkups-core.js?v=400"></script>
+    <script src="/assets/listcards.js?v=400"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=399"></script>
-    <script src="app.js?v=399"></script>
+    <script src="coverage.js?v=400"></script>
+    <script src="app.js?v=400"></script>
     <!-- app.js was 18,760 lines — a quarter of the repo in one file, and the
          file every parallel session collided in. These five are lifts out of
          it, byte for byte, and they load AFTER it because that is where the
          state they read is declared. -->
-    <script src="chat.js?v=399"></script>
-    <script src="checkups.js?v=399"></script>
-    <script src="market.js?v=399"></script>
-    <script src="reports.js?v=399"></script>
-    <script src="admin.js?v=399"></script>
+    <script src="chat.js?v=400"></script>
+    <script src="checkups.js?v=400"></script>
+    <script src="market.js?v=400"></script>
+    <script src="reports.js?v=400"></script>
+    <script src="admin.js?v=400"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=399"></script>
+    <script src="finance.js?v=400"></script>
     <!-- The guide that points at the screen (first-run tour + milestone hints) -->
-    <script src="coach.js?v=399"></script>
-    <script src="nextstep.js?v=399"></script>
+    <script src="coach.js?v=400"></script>
+    <script src="nextstep.js?v=400"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="/track.js?v=399" defer></script>
+    <script src="/track.js?v=400" defer></script>
 </body>
 </html>

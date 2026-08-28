@@ -1524,7 +1524,9 @@ function updateSpecStrip(proj) {
     const project = proj || projectsList.find((p) => p.id === activeProjectId);
     const panel = document.getElementById('panel-wizard');
     const panelOpen = panel && !panel.classList.contains('hide-estimate');
-    if (!project || activeChatMode !== 'plan' || panelOpen) { strip.hidden = true; return; }
+    // Both stages: with the toolbar gone this strip is the chat's one door to
+    // the card, and the pricing stage needs that door as much as planning does.
+    if (!project || panelOpen) { strip.hidden = true; return; }
 
     const cov = specCoverage(project);
     if (!cov.answered) { strip.hidden = true; return; }
@@ -1667,19 +1669,16 @@ function getPlanningSystemInstruction() {
 אסור לפתוח בשאלות. אסור לכתוב שאתה "בשלב האפיון" או שאינך קובע מחירים, אתה כן קובע.
 חסר לך מידע? הנח מה שאיש מקצוע מנוסה היה מניח לעבודה כזאת, כתוב את ההנחה בשורה אחת, ותמחר לפיה.
 
-# מבנה התשובה, בדיוק כך ובלי כותרות נוספות
-1. **המחיר**, בשורה הראשונה: טווח בשקלים, מה כלול (עבודה בלבד / כולל חומר), לפני מע"מ, ועל איזו הנחה הוא נשען.
-   לדוגמה: "**900–1,200 ₪**, עבודה בלבד לפני מע"מ — בהנחה שהקופסאות קיימות בעומק סטנדרטי ויש מקום פנוי בלוח."
-2. **כדי לדייק:** עד שתי שאלות, במשפט אחד, ורק אם התשובה מזיזה את המחיר ב-15% ומעלה.
-   מבחן: אם ההפרש בין התשובות הוא שקלים בודדים או פריט זול אחד, אל תשאל. הנח את הנפוץ והמשך.
-   **רשימה שחורה, אלה לעולם לא שאלות** — הנח לגביהן ותמשיך: חד-פאזי מול תלת-פאזי על קטע כבל קצר (הבדל של שקל למטר), כמה מא"זים או פחתים להוסיף, אם יש מקום פנוי בלוח (תמיד הנח שיש, ואם אין זה סעיף "סידור לוח" בהמשך), עומק קופסה סטנדרטי, האם לכלול אביזר זול.
-   **מה כן שווה לשאול**: כל מה שקשור לתוואי ולתשתית, כי שם נמצא הכסף.
-   **חובה**: בעבודת עמדת טעינה או כל קו תשתית, סעיף "כדי לדייק" אינו רשות. תשאל איך הכבל עובר, עם האפשרויות לבחירה: תעלה גלויה עה"ט / חציבה סמויה / מעבר בגבס עם סגירה וצבע / חפירה והרמת משתלבות. הרמת משתלבות לבדה היא ~500 ₪ למטר רץ, כלומר על 15 מטר היא לבדה שווה יותר מכל שאר העבודה: לתמחר עבודה כזאת בלי לשאול את זה הוא לירות באוויר.
-   בכל עבודה אחרת: אין שאלה שעוברת את מבחן ה-15%? השמט את הסעיף לגמרי.
-3. **שווה מבט:** עד שלושה תבליטים, ורק מה שאינו סטנדרטי בעבודה הזאת ועולה כסף אם יתגלה בשטח.
+# איך לדבר: כמו קולגה בוואטסאפ, לא כמו טופס
+בלי כותרות, בלי סעיפים ממוספרים, בלי מבנה קבוע. עד 5 שורות, ופחות זה יותר טוב.
+המשפט הראשון הוא המחיר: טווח בשקלים, מה כלול, לפני מע"מ, ועל איזו הנחה. לדוגמה:
+"900–1,200 ₪ עבודה בלבד לפני מע"מ, בהנחה שהקופסאות סטנדרטיות ויש מקום בלוח."
+אחריו, ורק אם באמת יש: שאלה אחת במשפט פשוט, ועד שני משפטים קצרים על משהו לא סטנדרטי שיעלה כסף אם יתגלה בשטח. בלי שורת סיום ובלי להפנות לכפתורים — המסך כבר מציע את ההמשך מתחת לשיחה.
 
-הכותרות "כדי לדייק:" ו"שווה מבט:" נכתבות מודגשות בשורה משלהן, לא כפריט ברשימה ולא עם כוכבית לפניהן. התבליטים עצמם בלבד הם רשימה.
-4. שורת סיום אחת: "רוצה פירוט מלא לפי סעיפים? לחץ 'תמחר פרויקט זה'."
+# מתי מותר לשאול
+רק שאלה שמזיזה את המחיר ב-15% ומעלה. הפרש של שקלים בודדים — מניחים וממשיכים.
+לעולם לא שואלים: חד-פאזי מול תלת-פאזי על קטע קצר, כמה מא"זים, אם יש מקום בלוח (תמיד מניחים שיש), עומק קופסה, אם לכלול אביזר זול.
+חובה לשאול, בעמדת טעינה או כל קו תשתית שהתוואי שלו לא נמסר: איך הכבל עובר — תעלה גלויה, חציבה, מעבר בגבס, או חפירה והרמת משתלבות (~500 ₪ למטר רץ — על 15 מטר זה לבד שווה יותר מכל שאר העבודה). שם נמצא הכסף, ולתמחר בלי לשאול את זה זה לירות באוויר.
 
 # מה אסור לכתוב
 - רשימת כלי עבודה. הוא בעל המקצוע, יש לו מברג.
@@ -1687,7 +1686,7 @@ function getPlanningSystemInstruction() {
 - רשימת חומרים מלאה מיוזמתך. יש לזה כפתור נפרד.
 - שאלת סגירה גנרית ("האם הרשימה מכסה הכל?").
 - חזרה על מה שכבר נאמר בשיחה.
-- יותר מ-12 שורות טקסט גלוי. קצר יותר תמיד עדיף.
+- כותרות מודגשות, אימוג'ים, "לסיכום". טקסט רץ, עד 5 שורות.
 
 # מאיפה המספר
 - לעולם אל תנקוב בשם של מחירון, ספק או מאגר שממנו לקחת מחיר. המספר הוא שלו, לא של מי שפירסם אותו.
@@ -2477,17 +2476,16 @@ function buildChatView(proj) {
         return rows;
     }
 
-    if (plan.length) rows.push({ divider: 'plan' });
+    // No stage dividers. "1 · אפיון" over a conversation is the workflow
+    // talking about itself, and Stav asked it to stop: the thread reads as one
+    // conversation, the way every chat he compared it to does.
     plan.forEach((msg, i) => rows.push({ stage: 'plan', i, msg }));
-
-    let openedPrice = false;
     price.forEach((msg, i) => {
         // A new project seeds BOTH threads with a greeting, so a merged view
         // would open with two assistants introducing themselves. Positional
         // rather than string-matched: only the pricing thread's own opening
         // model message, and only when a characterization sits above it.
         if (i === 0 && plan.length && msg && msg.role === 'model') return;
-        if (!openedPrice) { rows.push({ divider: 'price' }); openedPrice = true; }
         rows.push({ stage: 'price', i, msg });
     });
     return rows;
@@ -2530,6 +2528,10 @@ function renderChatHistory(projOrHistory) {
         }
         const msg = row.msg;
         if (!msg || msg.hidden) return; // behind-the-scenes instruction — AI-only, never shown
+        // The handoff turn is the app talking to the pricing agent ("האפיון
+        // הושלם ואושר..." plus the whole card). Machinery, not conversation:
+        // it stays in the history the agent reads and out of the one he does.
+        if (msg.handoff) return;
         const msgIndex = row.i;
         const bubble = document.createElement('div');
         const role = msg.role === 'user' ? 'user' : 'model';
@@ -4255,8 +4257,7 @@ function getAskSystemInstruction() {
 **תיאור של עבודה שלמה** ("התקנת עמדת טעינה 15 מטר מהלוח", "החלפת לוח בדירת 4 חדרים")
 ← זו כבר עבודה, לא שאלה. תן טווח מחיר בשורה הראשונה עם ההנחה שהוא נשען עליה. אם התוואי לא ידוע, שאל על זה שאלה אחת ויחידה: איך הכבל עובר — תעלה גלויה, חציבה, מעבר בגבס, או חפירה והרמת משתלבות. שם נמצאים האלפים.
 **לעולם אל תשאל** אם יש מקום פנוי בלוח, כמה מא"זים להוסיף, חד-פאזי מול תלת-פאזי על קטע קצר, או עומק קופסה. הנח את הנפוץ והמשך — אלה שקלים בודדים, והם מבזבזים את השאלה האחת שיש לך.
-סיים בשורה אחת בלבד:
-"רוצה שאפתח את זה כעבודה? אז נבנה רשימת חומרים והצעת מחיר מלאה."
+בלי שורת סיום על לפתוח פרויקט: המסך מציע את זה בכפתור מתחת לשיחה, ולהגיד את זה פעמיים זה רעש.
 
 **המשך שיחה** ← ענה על מה שנאמר עכשיו. אל תחזור על מה שכבר אמרת.
 
