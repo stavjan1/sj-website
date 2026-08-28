@@ -1196,3 +1196,130 @@ async function adminAnalyzeCatalog() {
         if (status) { status.style.color = 'var(--color-danger)'; status.textContent = 'הניתוח נכשל: ' + e.message; }
     }
 }
+
+// ============================================================================
+// WHAT PEOPLE ACTUALLY ASK
+// Stav, 28/08: "אני רוצה שיהיה לי גישה לראות את כל השיחות של כל משתמש. כדי
+// ללמוד. הAI בווצאפ זה ככה וגם פה זה חשוב."
+//
+// The pricing agent has been tuned all week against examples we invented and
+// against prices from a WhatsApp group. This is the other half: the questions
+// real electricians typed, in their own words, including the ones the agent
+// answered badly. A question it fumbled here is the next thing to fix — that is
+// the whole reason this screen exists, and why it lives under מנוע ה-AI rather
+// than under משתמשים.
+//
+// The list is previews. Opening one thread is a second request that names one
+// user and one conversation, so browsing never pulls anybody's full record over
+// the wire. The gate is server-side: /api/admin-convos checks the verified
+// Google email against ADMIN_EMAIL and there is no parameter that widens it.
+// ============================================================================
+let _adminConvos = [];
+let _adminConvosLoaded = false;
+// One refresh is one KV read per user, out of a daily budget shared with the
+// whole product — including the save path and the pricing agent's quota check.
+// A held-down Enter key on a focused refresh button is ~30 requests a second.
+let _convosLoading = false;
+
+async function renderAdminConvos() {
+    const box = document.getElementById('admin-convos-body');
+    if (!box) return;
+    if (_convosLoading) return;
+    _convosLoading = true;
+    box.innerHTML = '<p class="input-help">טוען…</p>';
+    try {
+        const res = await adminRes('/api/admin-convos');
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        _adminConvos = Array.isArray(d.threads) ? d.threads : [];
+        _adminConvosLoaded = true;
+        renderAdminConvoList(d);
+    } catch (e) {
+        box.innerHTML = `<p class="input-help" style="color:var(--danger);">הטעינה נכשלה: ${escapeHtml(String(e.message || e))}</p>`;
+    } finally {
+        _convosLoading = false;
+    }
+}
+
+function renderAdminConvoList(meta) {
+    const box = document.getElementById('admin-convos-body');
+    if (!box) return;
+    if (!_adminConvosLoaded) return;
+
+    const q = (document.getElementById('admin-convo-q')?.value || '').trim().toLowerCase();
+    const rows = _adminConvos.filter((t) => !q
+        || String(t.title).toLowerCase().includes(q)
+        || String(t.asked).toLowerCase().includes(q)
+        || String(t.answered).toLowerCase().includes(q)
+        || String(t.email).toLowerCase().includes(q));
+
+    if (!rows.length) {
+        box.innerHTML = `<p class="input-help">${q ? 'לא נמצאה שיחה שמתאימה.' : 'עוד אין שיחות במערכת.'}</p>`;
+        return;
+    }
+
+    const head = meta
+        ? `<p class="input-help" style="margin:0 0 8px;">${meta.total} שיחות אצל ${meta.users} משתמשים${meta.usersTruncated
+            ? ` · נסרקו ${meta.users} משתמשים בלבד`
+            : (meta.truncated ? ' · מוצגות האחרונות בלבד' : '')}${meta.failed ? ` · ${meta.failed} לא נקראו` : ''}</p>`
+        : `<p class="input-help" style="margin:0 0 8px;">${rows.length} מתוך ${_adminConvos.length}</p>`;
+
+    box.innerHTML = head + `<div class="convo-feed">` + rows.map((t, i) => `
+        <button type="button" class="cf-row" onclick="openAdminConvo(${i})">
+            <div class="cf-top">
+                <span class="cf-title">${escapeHtml(t.title)}</span>
+                <span class="cf-kind ${t.kind === 'ask' ? 'is-ask' : ''}">${t.kind === 'ask' ? 'שאלה' : 'עבודה'}</span>
+            </div>
+            <div class="cf-said">${escapeHtml(t.asked || '—')}</div>
+            <div class="cf-meta">
+                <span>${escapeHtml(t.email)}</span>
+                <span>${t.messages} הודעות</span>
+                <span>${escapeHtml(crWhen(t.when))}</span>
+            </div>
+        </button>`).join('') + `</div>`;
+
+    // The click handler indexes into the FILTERED list, so it has to be the
+    // list the row was drawn from.
+    _adminConvoView = rows;
+}
+
+let _adminConvoView = [];
+
+async function openAdminConvo(i) {
+    const t = _adminConvoView[i];
+    if (!t) return;
+    const old = document.getElementById('convo-read');
+    if (old) old.remove();
+
+    const dlg = document.createElement('dialog');
+    dlg.id = 'convo-read';
+    dlg.className = 'ck-dialog convo-read';
+    dlg.innerHTML = `
+        <h3>${escapeHtml(t.title)}</h3>
+        <p class="input-help">${escapeHtml(t.email)} · ${t.messages} הודעות</p>
+        <div class="cr-body" id="cr-body"><p class="input-help">טוען…</p></div>
+        <div class="ck-dlg-actions">
+            <button type="button" class="btn btn-secondary" data-a="close">סגירה</button>
+        </div>`;
+    document.body.appendChild(dlg);
+    const close = () => { try { dlg.close(); } catch (e) {} dlg.remove(); };
+    dlg.querySelector('[data-a="close"]').onclick = close;
+    dlg.addEventListener('cancel', close);
+    if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
+
+    try {
+        const res = await adminRes(`/api/admin-convos?user=${encodeURIComponent(t.email)}&id=${encodeURIComponent(t.id)}`);
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        const body = dlg.querySelector('#cr-body');
+        if (!body) return;                       // closed while it was loading
+        body.innerHTML = (d.messages || []).map((m) => `
+            <div class="cr-msg ${m.role === 'user' ? 'is-user' : 'is-ai'}">
+                <span class="cr-who">${m.role === 'user' ? 'הוא' : 'הסוכן'}</span>
+                <p>${escapeHtml(m.text).replace(/\n/g, '<br>')}</p>
+            </div>`).join('') || '<p class="input-help">אין הודעות בשיחה הזאת.</p>';
+    } catch (e) {
+        const body = dlg.querySelector('#cr-body');
+        if (body) body.innerHTML = `<p class="input-help" style="color:var(--danger);">${escapeHtml(String(e.message || e))}</p>`;
+    }
+}

@@ -5522,3 +5522,37 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
 }
 .orphan-list[hidden] { display: none; }
 .arch-none { margin: 0; padding: var(--sp-2) var(--sp-3); }
+
+/* ---- The conversation feed in admin -----------------------------------------
+   The pricing agent is tuned against invented examples and a WhatsApp group;
+   this is the other half — what real electricians typed. Built to be SCANNED:
+   what he asked is the loud line, because that is the thing you are hunting
+   for, and who he is and when is the quiet one. */
+.convo-feed { display: flex; flex-direction: column; gap: var(--sp-2); max-height: 60vh; overflow-y: auto; }
+.cf-row {
+    display: flex; flex-direction: column; gap: 4px; width: 100%;
+    padding: var(--sp-3);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm);
+    color: var(--text-2); font: 400 var(--fs-sm) var(--font-ui);
+    text-align: start; cursor: pointer;
+}
+.cf-row:hover { border-color: var(--accent); }
+.cf-top { display: flex; align-items: center; gap: var(--sp-2); }
+.cf-title { flex: 1 1 auto; min-width: 0; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cf-kind {
+    flex: none; padding: 1px 8px; border-radius: var(--r-pill);
+    background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: 700;
+}
+.cf-kind.is-ask { background: var(--surface-2); color: var(--text-3); }
+.cf-said { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cf-meta { display: flex; flex-wrap: wrap; gap: var(--sp-2); color: var(--text-3); font-size: var(--fs-xs); }
+
+/* Reading one thread: the shape of the chat it came from, so what the agent
+   said reads the way the user read it. */
+.convo-read { max-width: 720px; width: min(92vw, 720px); }
+.convo-read .cr-body { max-height: 62vh; overflow-y: auto; display: flex; flex-direction: column; gap: var(--sp-3); padding-block: var(--sp-2); }
+.cr-msg { max-width: 84%; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md); }
+.cr-msg p { margin: 0; line-height: 1.6; white-space: normal; }
+.cr-msg.is-user { align-self: flex-start; background: var(--surface-2); }
+.cr-msg.is-ai { align-self: flex-end; background: var(--accent-soft); }
+.cr-who { display: block; margin-block-end: 2px; color: var(--text-3); font-size: 10px; font-weight: 700; }
