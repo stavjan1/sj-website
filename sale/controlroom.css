@@ -637,3 +637,29 @@ body.cr-lock #admin-room { flex: 1 1 auto; min-block-size: 0; }
 @media (max-width: 860px) {
     #panel-admin { padding: 8px; border-radius: 14px; }
 }
+
+/* ---------- the lock needs HEIGHT, not just width ----------
+   "One screen, nothing scrolls" is a good rule on a monitor and a bad one on a
+   laptop: eight tiles inside 640px of content area get about 110px each, so
+   every tile grows its own scrollbar and every number in the room is cut in
+   half. Stav, 28/08, with a screenshot of exactly that: "במסך הראשי לא רואים
+   טוב את הכל."
+   Numbers you cannot read are worse than a scroll, so the lock releases below
+   1080px of viewport height — the same surrender the phone breakpoint already
+   makes, applied to the axis that actually decides whether it can work.
+   1080 rather than 900 because it was measured, not guessed: at 1000px one tile
+   was still clipping. The room needs roughly the KPI row plus four tile rows,
+   and below that the promise cannot be kept. If it ever clips above this line
+   too, the honest move is to drop the lock rather than raise the number
+   again — a screen that hides half its numbers is not one screen, it is a
+   smaller screen. */
+@media (max-height: 1080px) {
+    body.cr-lock .main-content { overflow: auto; }
+    body.cr-lock #panel-admin.content-panel.active { display: block; }
+    body.cr-lock #admin-room { flex: none; }
+    .ctlroom { min-block-size: auto; }
+    .cr-grid { grid-template-rows: none; }
+    /* Enough for a heading, a headline number and two lines under it. */
+    .cr-tile { min-block-size: 190px; }
+    .cr-body { overflow: visible; }
+}

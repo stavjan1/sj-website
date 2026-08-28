@@ -1350,9 +1350,7 @@ function setChatMode(mode, projOverride) {
     renderStageRail(proj);
     renderSpecCard(proj);
     updatePlanActionBar(proj);
-    updatePriceActionBar(proj);
     updateSpecStrip(proj);
-    updateStageHint(proj);
     try { window.renderNextStep && window.renderNextStep(); } catch (e) {}
 }
 
@@ -1480,15 +1478,10 @@ function renderStageRail(proj) {
     });
 }
 
-function updateStageHint(proj) {
-    const hint = document.getElementById('stage-hint');
-    if (!hint) return;
-    const stage = getProjectStage(proj);
-    const labels = { planning: 'שלב 1/3, אפיון', pricing: 'שלב 2/3 · תמחור', draft: 'שלב 3/3 · טיוטה' };
-    // "Where am I": project name + stage, always visible in the chat header.
-    const name = proj && proj.name ? (proj.name.length > 18 ? proj.name.slice(0, 18) + '…' : proj.name) : '';
-    hint.textContent = name ? `${name} · ${labels[stage] || ''}` : (labels[stage] || '');
-}
+// updateStageHint painted #stage-hint, a "שלב 2/3" line in the chat header. The
+// header went with the toolbar, and the stage is on the rail beside the thread
+// anyway — the function has been writing into nothing ever since.
+
 
 // A clear "next step" after pricing has answers: continue to the draft.
 // Last model-message text of a chat history (or '' when the last turn isn't a reply).
@@ -1501,14 +1494,10 @@ function _lastModelText(history) {
 
 // "מעבר לטיוטה" only once the pricing agent actually delivered numbers
 // (a סה"כ with digits), not while it's still asking/characterizing.
-function updatePriceActionBar(proj) {
-    const bar = document.getElementById('price-action-bar');
-    if (!bar) return;
-    // "המשך להכנת טיוטה" was a second door to הצעת מחיר, which is
-    // already a step in the rail beside the chat — Stav: "גם ככה יש בצד כפתור".
-    // The bar is gone; the three errands it carried moved beside the thread.
-    if (bar) bar.style.display = 'none';
-}
+// updatePriceActionBar lived here. When its bar was removed from the markup this
+// morning the function stayed behind, looking up an element that is gone and
+// returning — a leftover of my own, found by sweeping for exactly that shape.
+
 
 // The one line under the conversation that says the card exists, what is in it,
 // and that opening it is one tap. It only appears once the card has something.
@@ -1744,7 +1733,6 @@ function applySpecPrefill(proj, responseText) {
                 proj.quoteData.clientName = '';
             }
             filterProjectsList();
-            updateStageHint(proj);
             showToast('הפרויקט נקרא "' + title + '"');
         }
     }
@@ -2062,7 +2050,6 @@ async function runPricingAgent(activeProject, promptChars) {
 
         showTypingIndicator(false);
         renderChatHistory(activeProject);
-        updatePriceActionBar(activeProject); // clear "next step" → draft
 
         applyMaterialsFromResponse(activeProject, responseText);
     } catch (err) {
