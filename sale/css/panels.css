@@ -5602,3 +5602,51 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
 @media (max-width: 768px) {
     .plan-grid { grid-template-columns: 1fr; }
 }
+
+/* The background picker in the quote-design card. */
+.wm-picker { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.wm-choice {
+    padding: 6px 12px; border-radius: var(--r-pill);
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text-2); font: 600 var(--fs-xs) var(--font-ui); cursor: pointer;
+}
+.wm-choice:hover { border-color: var(--accent); color: var(--text); }
+.wm-choice.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+/* ---- The quote is not a card, it is a document ------------------------------
+   Stav, 29/08: "לא צריך שיהיה במסגרת של הקוביה הזאת, שיהיה פתוח למסגרת של כל
+   המסך." Measured on a 375px phone: .preview-side was a 343px box with a 1px
+   border and a 12px radius, inset inside the panel's own 16px padding — so the
+   thing the customer will actually receive was being previewed through a
+   window, at 91% of a screen that is already small.
+   It bleeds to the edges now. A frame around a document says "this is a widget
+   in an app"; no frame says "this is the page you are about to send". */
+@media (max-width: 768px) {
+    #panel-create .preview-side,
+    #panel-pricing .preview-side {
+        border: none;
+        border-radius: 0;
+        background: transparent;
+    }
+    /* The panel gives up its side padding and hands it back to the children
+       that still want it. Measured first, and this is why: .preview-side is a
+       GRID item, so its width is its track's width — an inline width:100vw on
+       it still computed to 343px on a 375px screen. You cannot widen a grid
+       item past its track; you have to widen the track. */
+    #panel-create.active,
+    #panel-pricing.active { padding-inline: 0; }
+    #panel-create > .chat-mode-toggle,
+    #panel-create > .next-step,
+    #panel-create > .quote-design,
+    #panel-pricing > .chat-mode-toggle,
+    #panel-pricing > .next-step,
+    #panel-create .control-side,
+    #panel-pricing .control-side,
+    #panel-create > .section-header,
+    #panel-pricing > .section-header { padding-inline: var(--sp-4); }
+    /* The sheet itself keeps its paper white and its shadow — that is what
+       makes it read as paper rather than as a section of the page. */
+    #panel-create .sheet-scroller,
+    #panel-pricing .sheet-scroller { padding-inline: 0; }
+    .preview-actions { padding-inline: var(--sp-4); }
+}

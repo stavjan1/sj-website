@@ -9543,12 +9543,12 @@ const PLAN_CARDS = [
         has: ['מספר שאלות מוגבל ליום', 'עד 3 עבודות פתוחות', '3 הצעות מחיר בחודש', 'תמונה או שתיים ביום'],
     },
     {
-        tier: 'pro', name: 'גולד ⚡', price: '',
+        tier: 'pro', name: 'גולד ⚡', price: '19 ₪ לחודש',
         line: 'למי שמתמחר כל שבוע.',
         has: ['שאלות ללא הגבלה מעשית', 'עבודות והצעות ללא הגבלה', 'תמונות מהשטח בשיחה', 'קישור אישור ללקוח', 'דוחות ותזכורות', 'המודל המתקדם'],
     },
     {
-        tier: 'business', name: 'דיימונד 💎', price: '',
+        tier: 'business', name: 'דיימונד 💎', price: '49 ₪ לחודש',
         line: 'כשהחשבוניות והכסף גם בפנים.',
         has: ['כל מה שבגולד', 'חיבור למערכת החשבוניות שלך', 'תזרים מזומנים וחיבור בנקים', 'מאגר מחירים אישי גדול'],
     },
@@ -9577,7 +9577,7 @@ function openPlansDialog() {
                     <ul class="pc-has">${p.has.map((h) => `<li>${escapeHtml(h)}</li>`).join('')}</ul>
                 </div>`).join('')}
         </div>
-        <p class="input-help">המחירים של גולד ודיימונד עוד לא נקבעו. בינתיים אפשר לכתוב לסתיו ולקבל גישה.</p>
+        <p class="input-help">לשדרוג, כתוב לסתיו בוואטסאפ.</p>
         <div class="ck-dlg-actions">
             <button type="button" class="btn btn-secondary" data-a="close">סגירה</button>
         </div>`;
@@ -9625,4 +9625,76 @@ function noteGuestAsk() {
         // One left. Say what signing in BUYS, not what it prevents.
         showToast('נשארה לך שאלה אחת כאורח · התחברות עם Google פותחת את המערכת המלאה, חינם', 'error');
     }
+}
+
+// ============================================================================
+// THE BACKGROUND BEHIND THE QUOTE
+// Stav, 29/08: "תעשה שיהיה אפשר לבחור תמונה רקע של הברק שיש עכשיו או מפת ארץ
+// ישראל או חלק או להעלות תמונה."
+//
+// Uploading already worked — handleImageUpload('bg') → renderWatermark(). What
+// was missing is that an electrician who has no logo and no image had nothing
+// to choose, so every quote in the product looked identical. Two built-ins,
+// drawn as SVG data URIs rather than files: they inherit the sheet's primary
+// colour, they cost no request, and html2canvas rasterises them cleanly, which
+// a remote image is not guaranteed to do.
+// ============================================================================
+const WATERMARK_PRESETS = {
+    none: { label: 'ללא', svg: null },
+    bolt: {
+        label: 'ברק',
+        svg: (c) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">`
+            + `<path fill="${c}" d="M13 2L4.5 13h6l-1.5 9L18.5 10h-6z"/></svg>`,
+    },
+    israel: {
+        label: 'מפת ישראל',
+        // A stylised silhouette, not a survey map: the north, the coastal
+        // waist and the Negev triangle down to Eilat, which is what makes it
+        // readable at 4% opacity behind text.
+        svg: (c) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">`
+            + `<path fill="${c}" d="M52 3 L62 11 L60 23 L57 33 L63 47 L57 56 L50 97 L44 74 L33 62`
+            + ` L27 52 L22 45 L27 34 L31 26 L37 16 L45 8 Z"/></svg>`,
+    },
+};
+
+function _watermarkDataUri(key, color) {
+    const p = WATERMARK_PRESETS[key];
+    if (!p || !p.svg) return null;
+    // encodeURIComponent, not btoa: the SVG contains '#' from the colour, and a
+    // raw '#' inside a data: URI truncates it at the fragment.
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(p.svg(color || '#1e3a8a'));
+}
+
+// The chosen background, whatever its source. One function so the sheet, the
+// settings preview and the PDF can never disagree about what is behind the text.
+function applyWatermarkChoice(key, silent) {
+    const choice = key || appState.settings.pdfWatermarkKind || 'bolt';
+    appState.settings.pdfWatermarkKind = choice;
+
+    if (choice === 'upload') {
+        const saved = appState.settings.uploadedBg || localStorage.getItem(getStorageKey('sj_uploaded_bg'));
+        if (!saved) {
+            if (!silent) showToast('עוד לא העלית תמונה — בחר קובץ ואז הרקע יופיע', 'error');
+            renderWatermark(null);
+        } else {
+            renderWatermark(saved);
+        }
+    } else {
+        const color = (document.getElementById('pdf-primary-color') || {}).value
+            || appState.settings.pdfPrimaryColor || '#1e3a8a';
+        renderWatermark(_watermarkDataUri(choice, color));
+    }
+
+    try { localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings)); } catch (e) {}
+    try { scheduleCloudSync(); } catch (e) {}
+    _syncWatermarkPicker();
+    if (!silent) showToast('הרקע עודכן');
+}
+
+function _syncWatermarkPicker() {
+    const cur = appState.settings.pdfWatermarkKind || 'bolt';
+    document.querySelectorAll('.wm-choice').forEach((b) => {
+        b.classList.toggle('is-on', b.dataset.wm === cur);
+        b.setAttribute('aria-pressed', b.dataset.wm === cur ? 'true' : 'false');
+    });
 }
