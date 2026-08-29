@@ -1,0 +1,121 @@
+<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Heebo:wght@400;500;700&family=Rubik:wght@500;700;900&family=David+Libre:wght@400;700&family=Frank+Ruhl+Libre:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--font-display:"Rubik","Assistant","Heebo",sans-serif;}
+h1,h2,h3,h4{font-family:var(--font-display);}
+*{box-sizing:border-box;}
+body{margin:0;background:#334155;}
+.stage{display:flex;gap:24px;padding:20px;align-items:flex-start;}
+</style>
+<link rel="stylesheet" href="css/pdf.css">
+<link rel="stylesheet" href="_review-engineer.css">
+</head><body>
+<div class="stage">
+<div id="quote-pdf-sheet" class="a4-sheet tpl-engineer" dir="rtl" style="--pdf-custom-font:'Assistant', sans-serif;--pdf-custom-font-size-body:12px;--pdf-custom-line-height:1.4;--pdf-custom-primary:#16324f;--pdf-custom-secondary:#5b6b7d;">
+  <div class="pdf-watermark" id="pdf-watermark-bg" style="opacity:0"></div>
+  <div class="pdf-wrapper">
+    <header class="pdf-header pdf-block" data-block="header" style="order:0">
+      <div class="pdf-header-grid">
+        <div class="pdf-recipient-column">
+          <div class="recipient-label">לכבוד:</div>
+          <div class="recipient-name" id="pdf-client-name">משפחת אברמוביץ</div>
+          <div class="recipient-sub" id="pdf-client-sub">רח' הרצל 14, דירה 7, ראשון לציון
+טל': 052-844-1290</div>
+        </div>
+        <div class="pdf-logo-column" id="pdf-logo-area">
+          <div class="pdf-logo-wrapper" id="pdf-logo-container">
+            <svg viewBox="0 0 100 100" class="pdf-logo-svg" id="fallback-logo">
+              <circle cx="50" cy="50" r="46" fill="#0f172a" stroke="#3b82f6" stroke-width="3"/>
+              <path d="M 32 40 C 32 28, 68 28, 68 40 C 68 52, 32 48, 32 60 C 32 72, 68 72, 68 60" fill="none" stroke="#60a5fa" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M 58 46 L 58 70 C 58 80, 32 80, 32 70" fill="none" stroke="#3b82f6" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="pdf-company-title" id="pdf-comp-title">א. כהן חשמל ובקרה</div>
+          <div class="pdf-company-subtitle" id="pdf-comp-sub">חשמלאי מוסמך · רישיון 3</div>
+          <div class="pdf-company-owner" id="pdf-comp-owner">אבי כהן</div>
+        </div>
+        <div class="pdf-meta-column">
+          <div class="meta-item"><span id="pdf-date" class="meta-val-date">29/08/2026</span></div>
+          <div class="meta-item"><span class="meta-val-number">הצעת מחיר מס': <span id="pdf-number">2026-118</span></span></div>
+        </div>
+      </div>
+    </header>
+    <div class="pdf-header-divider" style="order:0"></div>
+    <div class="pdf-title-container pdf-block" data-block="title" style="order:1">
+      <h1 class="pdf-title">הצעת מחיר ל<span id="pdf-subject">שיפוץ חשמל במטבח</span></h1>
+      <div class="underline-bar"></div>
+    </div>
+    <div class="pdf-content-area pdf-block" data-block="body" style="order:2">
+      <div id="pdf-work-items" class="pdf-items-list">
+        <table class="pdf-table">
+          <thead><tr>
+            <th style="width: 8%; text-align: center;">סעיף</th>
+            <th style="width: 72%;">תיאור ותכולת העבודה</th>
+            <th style="width: 20%; text-align: left;">מחיר (₪)</th>
+          </tr></thead>
+          <tbody>
+            <tr><td style="font-family: 'Outfit', sans-serif; font-weight: 700; text-align: center;">1</td>
+              <td><div data-item-field="title" style="font-weight: 700; color: var(--pdf-primary); text-decoration: underline; margin-bottom: 4px;">הכנת תשתית לנקודות כוח במטבח</div>
+              <div data-item-field="description" style="white-space: pre-line; line-height: 1.5; color: var(--pdf-text-main); font-size: 0.9rem;">חציבה, הנחת צנרת ומשיכת כבל 3x2.5 מהלוח, כולל 6 נקודות מעל השיש ו-2 נקודות מתחת.</div></td>
+              <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight: 700; text-align: left; color: var(--pdf-primary);"><span data-item-field="price">2,450</span> ₪</td></tr>
+            <tr><td style="font-family: 'Outfit', sans-serif; font-weight: 700; text-align: center;">2</td>
+              <td><div data-item-field="title" style="font-weight: 700; color: var(--pdf-primary); text-decoration: underline; margin-bottom: 4px;">נקודות ייעודיות למכשירי חשמל</div>
+              <div data-item-field="description" style="white-space: pre-line; line-height: 1.5; color: var(--pdf-text-main); font-size: 0.9rem;">קו נפרד לתנור בנוי, לכיריים אינדוקציה ולמדיח, כל אחד עם מאמ"ת ייעודי בלוח.</div></td>
+              <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight: 700; text-align: left; color: var(--pdf-primary);"><span data-item-field="price">1,780</span> ₪</td></tr>
+            <tr><td style="font-family: 'Outfit', sans-serif; font-weight: 700; text-align: center;">3</td>
+              <td><div data-item-field="title" style="font-weight: 700; color: var(--pdf-primary); text-decoration: underline; margin-bottom: 4px;">שדרוג לוח החשמל הדירתי</div>
+              <div data-item-field="description" style="white-space: pre-line; line-height: 1.5; color: var(--pdf-text-main); font-size: 0.9rem;">הוספת מפסק פחת נפרד למטבח, 4 מאמ"תים, סידור וסימון הלוח מחדש.</div></td>
+              <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight: 700; text-align: left; color: var(--pdf-primary);"><span data-item-field="price">1,320</span> ₪</td></tr>
+            <tr><td style="font-family: 'Outfit', sans-serif; font-weight: 700; text-align: center;">4</td>
+              <td><div data-item-field="title" style="font-weight: 700; color: var(--pdf-primary); text-decoration: underline; margin-bottom: 4px;">תאורת מטבח</div>
+              <div data-item-field="description" style="white-space: pre-line; line-height: 1.5; color: var(--pdf-text-main); font-size: 0.9rem;">8 ספוטים שקועים בגבס, פס לד מתחת לארונות עליונים כולל שנאי ומפסק נפרד.</div></td>
+              <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight: 700; text-align: left; color: var(--pdf-primary);"><span data-item-field="price">1,950</span> ₪</td></tr>
+            <tr><td style="font-family: 'Outfit', sans-serif; font-weight: 700; text-align: center;">5</td>
+              <td><div data-item-field="title" style="font-weight: 700; color: var(--pdf-primary); text-decoration: underline; margin-bottom: 4px;">נקודת מים חמים / דוד</div>
+              <div data-item-field="description" style="white-space: pre-line; line-height: 1.5; color: var(--pdf-text-main); font-size: 0.9rem;">העברת פיקוד הדוד ללוח החדש והתקנת שעון שבת דיגיטלי.</div></td>
+              <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight: 700; text-align: left; color: var(--pdf-primary);"><span data-item-field="price">640</span> ₪</td></tr>
+            <tr><td style="font-family: 'Outfit', sans-serif; font-weight: 700; text-align: center;">6</td>
+              <td><div data-item-field="title" style="font-weight: 700; color: var(--pdf-primary); text-decoration: underline; margin-bottom: 4px;">בדיקה, סימון ומסירה</div>
+              <div data-item-field="description" style="white-space: pre-line; line-height: 1.5; color: var(--pdf-text-main); font-size: 0.9rem;">בדיקת התנגדות בידוד והארקה, סימון מעגלים בלוח ומסירה מסודרת ללקוח.</div></td>
+              <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight: 700; text-align: left; color: var(--pdf-primary);"><span data-item-field="price">480</span> ₪</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pdf-terms-box" id="pdf-terms-box">
+        <div class="pdf-term-row"><span class="pdf-term-k">תוקף ההצעה</span><span class="pdf-term-v" data-term-field="validityDays">14 ימים מתאריך ההצעה</span></div>
+        <div class="pdf-term-row"><span class="pdf-term-k">תנאי תשלום</span><span class="pdf-term-v" data-term-field="paymentTerms">30% מקדמה בתחילת העבודה, היתרה בסיום ובמסירה</span></div>
+        <div class="pdf-term-row"><span class="pdf-term-k">מועד ביצוע</span><span class="pdf-term-v" data-term-field="startWithinDays">תחילת עבודה תוך 7 ימים מאישור ההצעה, משך העבודה כ־3 ימי עבודה</span></div>
+        <div class="pdf-term-row"><span class="pdf-term-k">אחריות</span><span class="pdf-term-v" data-term-field="warranty">12 חודשי אחריות על העבודה ועל החומרים שסופקו על ידינו</span></div>
+      </div>
+      <div class="pdf-summary-box">
+        <div class="summary-title">פירוט תנאים נוספים:</div>
+        <div class="summary-text" id="pdf-summary">העבודה תבוצע בתיאום מראש עם הלקוח, בימים א'-ה' בין 08:00 ל-17:00. פינוי פסולת בניין באחריות הלקוח.</div>
+      </div>
+      <div class="pdf-warning-box" id="pdf-exclusions"><span data-term-field="exclusions">המחיר אינו כולל: תיקוני טיח וצבע לאחר החציבה, גופי תאורה ומכשירי חשמל, עבודות אינסטלציה, ובדיקת מהנדס חשמל מטעם חברת החשמל.</span></div>
+    </div>
+    <div id="pdf-signature-row" class="pdf-block" data-block="signature" style="display:none; margin-top:20px; margin-bottom:20px; justify-content:space-between; border-top:1px dashed var(--pdf-custom-secondary, #cbd5e1); padding-top:12px; direction: rtl; order:3">
+      <div style="display:flex; flex-direction:column; gap:4px; width:45%; text-align:right;">
+        <span style="font-weight:700; font-size:0.92rem; color:var(--pdf-custom-primary, #1e3a8a);">חתימת מאשר ההצעה (הלקוח):</span>
+        <div id="pdf-client-signature-slot" style="height:35px; border-bottom:1px solid #94a3b8; margin-top:6px; position:relative;"><span id="pdf-client-signature-caption" style="font-size:0.7rem; color:#94a3b8; position:absolute; bottom:-18px; right:0;">שם ותאריך החתימה</span></div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:4px; width:45%; text-align:left; align-items:flex-end;">
+        <span style="font-weight:700; font-size:0.92rem; color:var(--pdf-custom-primary, #1e3a8a); width:100%; text-align:left;">חתימת מכין ההצעה:</span>
+        <div style="height:35px; border-bottom:1px solid #94a3b8; margin-top:6px; position:relative; width:100%;"><span style="font-size:0.7rem; color:#94a3b8; position:absolute; bottom:-18px; left:0;">חתימה וחותמת העסק</span></div>
+      </div>
+    </div>
+    <div class="pdf-footer-section" style="order:5">
+      <div class="pdf-price-row"><span class="price-label">סה"כ לתשלום:</span><span class="price-val" id="pdf-total-price">8,620 ₪</span></div>
+      <div class="price-sub-label" id="pdf-vat-label">המחיר אינו כולל מע"מ ; ישולם בסוף העבודה</div>
+      <div class="pdf-footer-line"></div>
+      <footer class="pdf-company-footer">
+        <div class="footer-row font-bold"><span>א. כהן חשמל ובקרה</span><span class="bullet">|</span><span>אבי כהן</span><span class="bullet">|</span><span>עוסק מורשה: 038112947</span></div>
+        <div class="footer-row text-secondary"><span>אימייל: avi@cohen-electric.co.il</span><span class="bullet">|</span><span>סלולרי: 054-771-3320</span><span class="bullet">|</span><span>אתר: www.cohen-electric.co.il</span></div>
+        <div class="footer-row text-secondary"><span>כתובת: רח' התעשייה 8, ראשון לציון</span></div>
+        <div class="footer-notice">הצעת מחיר זו תקפה לשלושה חודשים. עם אישור וחתימת הלקוח תשמש כהסכם לביצוע העבודה בהתאם לאמור בה.</div>
+        <div class="pdf-zerem-credit" id="pdf-zerem-credit">הופק באמצעות זרם ⚡ zerem</div>
+      </footer>
+    </div>
+  </div>
+</div>
+</div>
+</body></html>

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>tpl-classic harness</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Heebo:wght@400;500;700&family=Rubik:wght@500;700;900&family=David+Libre:wght@400;700&family=Frank+Ruhl+Libre:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./pdf.css">
+<link rel="stylesheet" href="./classic.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin:0; background:#111827; font-family:'Assistant',sans-serif; }
+  .bar { position:fixed; inset-block-start:0; inset-inline:0; z-index:99; background:#0b1220; color:#fff; padding:8px 14px; display:flex; gap:14px; align-items:center; font-size:13px; }
+  .stage { padding:56px 20px 40px; display:flex; flex-wrap:wrap; gap:24px; justify-content:center; }
+  .lbl { color:#fff; font-size:12px; margin:0 0 6px; }
+  .mono .a4-sheet { filter:none; }
+  .mono .a4-sheet * { color:#000 !important; border-color:#555 !important; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <label><input type="checkbox" id="t-theme" checked> tpl-classic</label>
+  <label><input type="checkbox" id="t-sig"> שורת חתימה</label>
+  <label>base <input type="range" id="t-size" min="10" max="18" value="12"> <span id="v-size">12</span>px</label>
+  <label>accent <input type="color" id="t-primary" value="#1e3a8a"></label>
+  <label>accent2 <input type="color" id="t-secondary" value="#3b82f6"></label>
+  <span id="h-list"></span> <span id="h-table"></span>
+</div>
+<div class="stage" id="stage"></div>
+
+<script>
+const ITEMS = [
+  ['פירוק לוח חשמל קיים והתקנת לוח תלת-פאזי חדש', 'פירוק הלוח הקיים, אספקה והתקנה של לוח 24 מודולים הכולל מפסק ראשי 3x40A, ממסר פחת 4x40A/30mA ומאמ"תים לכל המעגלים בבית.', '4,800'],
+  ['ביצוע הארקת יסוד ובדיקת התנגדות', 'הארקת יסוד לפי תקן ישראלי, מדידה במגר והפקת דוח בדיקה לצורך חיבור חברת החשמל.', '2,200'],
+  ['תוספת 6 נקודות חשמל בסלון ובמטבח', 'חציבה, השחלת כבלים והתקנת שקעים תקניים, כולל תיקוני טיח סביב נקודות העבודה.', '1,650'],
+  ['תוספת נקודת מאור לתאורת חוץ', 'כולל מפסק ייעודי והגנת זרם דלף נפרדת.', '380'],
+  ['אספקה והתקנת עמדת טעינה לרכב חשמלי 7.4kW', 'עמדת טעינה עם מאמ"ת ייעודי, הגנת RCD מסוג B וחיווט מהלוח הראשי עד לחניה.', '3,900'],
+  ['בדיקת מתקן, מדידות ומסירת תיק מתקן', 'בדיקה סופית של המתקן כולל מדידות רציפות והתנגדות, ומסירת תיק מתקן מסודר ללקוח.', '650'],
+];
+
+function sheet(mode) {
+  const rows = ITEMS.map((it, i) => `
+        <tr data-item-index="${i}">
+          <td style="font-family: 'Outfit', sans-serif; font-weight: 700; text-align: center;">${i + 1}</td>
+          <td>
+            <div data-item-field="title" style="font-weight: 700; color: var(--pdf-primary); text-decoration: underline; margin-bottom: 4px;">${it[0]}</div>
+            <div data-item-field="description" style="white-space: pre-line; line-height: 1.5; color: var(--pdf-text-main); font-size: 0.9rem;">${it[1]}</div>
+          </td>
+          <td style="font-family: 'Outfit', 'Rubik', sans-serif; font-weight: 700; text-align: left; color: var(--pdf-primary);">
+            <span data-item-field="price">${it[2]}</span> ₪
+          </td>
+        </tr>`).join('');
+
+  const list = ITEMS.map((it, i) => `
+        <div class="pdf-work-item" data-item-index="${i}">
+          <div class="pdf-item-title">${i + 1}. <span data-item-field="title">${it[0]}</span></div>
+          <div class="pdf-item-desc" data-item-field="description">${it[1]}</div>
+        </div>`).join('');
+
+  const body = mode === 'table'
+    ? `<table class="pdf-table"><thead><tr>
+         <th style="width: 8%; text-align: center;">סעיף</th>
+         <th style="width: 72%;">תיאור ותכולת העבודה</th>
+         <th style="width: 20%; text-align: left;">מחיר (₪)</th>
+       </tr></thead><tbody>${rows}</tbody></table>`
+    : list;
+
+  return `
+<div class="a4-sheet tpl-classic" dir="rtl" data-mode="${mode}" style="--pdf-custom-font:'Assistant', sans-serif; --pdf-custom-font-size-body:12px; --pdf-custom-line-height:1.4; --pdf-custom-primary:#1e3a8a; --pdf-custom-secondary:#3b82f6;">
+  <div class="pdf-watermark" style="opacity:0.04; color:#1e3a8a;"></div>
+  <div class="pdf-wrapper">
+    <header class="pdf-header pdf-block" data-block="header">
+      <div class="pdf-header-grid">
+        <div class="pdf-recipient-column">
+          <div class="recipient-label">לכבוד:</div>
+          <div class="recipient-name">משפחת לוי</div>
+          <div class="recipient-sub">רחוב הרצל 45, ראשון לציון
+052-1234567</div>
+        </div>
+        <div class="pdf-logo-column" id="pdf-logo-area">
+          <div class="pdf-logo-wrapper">
+            <svg viewBox="0 0 100 100" class="pdf-logo-svg">
+              <circle cx="50" cy="50" r="46" fill="#0f172a" stroke="#3b82f6" stroke-width="3"></circle>
+              <path d="M 32 40 C 32 28, 68 28, 68 40 C 68 52, 32 48, 32 60 C 32 72, 68 72, 68 60" fill="none" stroke="#60a5fa" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
+              <path d="M 58 46 L 58 70 C 58 80, 32 80, 32 70" fill="none" stroke="#3b82f6" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+          </div>
+          <div class="pdf-company-title">SJ הנדסת חשמל</div>
+          <div class="pdf-company-subtitle">תכנון ויעוץ חשמל</div>
+          <div class="pdf-company-owner">סתיו ג'אן</div>
+        </div>
+        <div class="pdf-meta-column">
+          <div class="meta-item"><span class="meta-val-date">28/08/2026</span></div>
+          <div class="meta-item"><span class="meta-val-number">הצעת מחיר מס': <span>2026-101</span></span></div>
+        </div>
+      </div>
+    </header>
+    <div class="pdf-header-divider"></div>
+    <div class="pdf-title-container pdf-block" data-block="title">
+      <h1 class="pdf-title">הצעת מחיר ל<span>החלפת לוח חשמל ותוספת נקודות</span></h1>
+      <div class="underline-bar"></div>
+    </div>
+    <div class="pdf-content-area pdf-block" data-block="body">
+      <div class="pdf-items-list">${body}</div>
+      <div class="pdf-terms-box">
+        <div class="pdf-term-row"><span class="pdf-term-k">תוקף ההצעה</span><span class="pdf-term-v">30 ימים מתאריך ההצעה</span></div>
+        <div class="pdf-term-row"><span class="pdf-term-k">תנאי תשלום</span><span class="pdf-term-v">30% מקדמה עם אישור ההצעה, היתרה בסיום העבודה</span></div>
+        <div class="pdf-term-row"><span class="pdf-term-k">מועד ביצוע</span><span class="pdf-term-v">תחילת עבודה תוך 14 ימים מאישור ההצעה, משך העבודה כ־3 ימי עבודה</span></div>
+        <div class="pdf-term-row"><span class="pdf-term-k">אחריות</span><span class="pdf-term-v">12 חודשי אחריות על העבודה, ואחריות יצרן על הציוד</span></div>
+      </div>
+      <div class="pdf-summary-box">
+        <div class="summary-title">פירוט תנאים נוספים:</div>
+        <div class="summary-text">העבודה תתבצע בתיאום מראש עם הדיירים. הפסקות החשמל יתוזמנו לשעות היום ולא יעלו על 4 שעות רצופות.</div>
+      </div>
+      <div class="pdf-warning-box"><span data-term-field="exclusions">המחיר אינו כולל איתור או תיקון תקלות קיימות שיתגלו במהלך העבודה, עבודות בנייה וגמר, ואגרות או בדיקות של חברת החשמל.</span></div>
+    </div>
+    <div id="pdf-signature-row-${mode}" class="pdf-block sig-row" data-block="signature" style="display:none; margin-top:20px; margin-bottom:20px; justify-content:space-between; border-top:1px dashed var(--pdf-custom-secondary, #cbd5e1); padding-top:12px; direction: rtl;">
+      <div style="display:flex; flex-direction:column; gap:4px; width:45%; text-align:right;">
+        <span style="font-weight:700; font-size:0.92rem; color:var(--pdf-custom-primary, #1e3a8a);">חתימת מאשר ההצעה (הלקוח):</span>
+        <div style="height:35px; border-bottom:1px solid #94a3b8; margin-top:6px; position:relative;">
+          <span style="font-size:0.7rem; color:#94a3b8; position:absolute; bottom:-18px; right:0;">שם ותאריך החתימה</span>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:4px; width:45%; text-align:left; align-items:flex-end;">
+        <span style="font-weight:700; font-size:0.92rem; color:var(--pdf-custom-primary, #1e3a8a); width:100%; text-align:left;">חתימת מכין ההצעה:</span>
+        <div style="height:35px; border-bottom:1px solid #94a3b8; margin-top:6px; position:relative; width:100%;">
+          <span style="font-size:0.7rem; color:#94a3b8; position:absolute; bottom:-18px; left:0;">חתימה וחותמת העסק</span>
+        </div>
+      </div>
+    </div>
+    <div class="pdf-footer-section">
+      <div class="pdf-price-row">
+        <span class="price-label">סה"כ לתשלום:</span>
+        <span class="price-val">13,580 ש"ח</span>
+      </div>
+      <div class="price-sub-label">פטור ממע"מ (עוסק פטור)</div>
+      <div class="pdf-footer-line"></div>
+      <footer class="pdf-company-footer">
+        <div class="footer-row font-bold"><span>SJ הנדסת חשמל</span><span class="bullet">|</span><span>סתיו ג'אן</span><span class="bullet">|</span><span>עוסק פטור: 207382920</span></div>
+        <div class="footer-row text-secondary"><span>אימייל: info@sj-eng.co.il</span><span class="bullet">|</span><span>סלולרי: 053-530-2887</span><span class="bullet">|</span><span>אתר: www.sj-eng.co.il</span></div>
+        <div class="footer-row text-secondary"><span>כתובת: דרך בן גוריון 138, בת ים, יחידה 1304</span></div>
+        <div class="footer-notice">הצעת מחיר זו תקפה לשלושה חודשים. עם אישור וחתימת הלקוח תשמש כהסכם לביצוע העבודה בהתאם לאמור בה.</div>
+        <div class="pdf-zerem-credit">הופק באמצעות זרם ⚡ zerem</div>
+      </footer>
+    </div>
+  </div>
+</div>`;
+}
+
+const stage = document.getElementById('stage');
+stage.innerHTML = `<div><p class="lbl">רשימה (ללא מחירים לפי סעיף)</p>${sheet('list')}</div>
+                   <div><p class="lbl">טבלה מפורטת</p>${sheet('table')}</div>`;
+
+function measure() {
+  document.querySelectorAll('.a4-sheet').forEach(s => {
+    const h = Math.max(s.scrollHeight, s.offsetHeight), page = s.offsetWidth * (277 / 190);
+    const el = document.getElementById(s.dataset.mode === 'list' ? 'h-list' : 'h-table');
+    el.textContent = `${s.dataset.mode}: ${h}px / page ${Math.round(page)}px → ${(h / page).toFixed(2)} pages`;
+    el.style.color = h <= page ? '#4ade80' : '#f87171';
+  });
+}
+measure();
+
+document.getElementById('t-theme').onchange = e => {
+  document.querySelectorAll('.a4-sheet').forEach(s => s.classList.toggle('tpl-classic', e.target.checked));
+  measure();
+};
+document.getElementById('t-sig').onchange = e => {
+  document.querySelectorAll('.sig-row').forEach(s => s.style.display = e.target.checked ? 'flex' : 'none');
+  measure();
+};
+document.getElementById('t-size').oninput = e => {
+  document.getElementById('v-size').textContent = e.target.value;
+  document.querySelectorAll('.a4-sheet').forEach(s => s.style.setProperty('--pdf-custom-font-size-body', e.target.value + 'px'));
+  measure();
+};
+document.getElementById('t-primary').oninput = e => {
+  document.querySelectorAll('.a4-sheet').forEach(s => s.style.setProperty('--pdf-custom-primary', e.target.value));
+};
+document.getElementById('t-secondary').oninput = e => {
+  document.querySelectorAll('.a4-sheet').forEach(s => s.style.setProperty('--pdf-custom-secondary', e.target.value));
+};
+</script>
+</body>
+</html>

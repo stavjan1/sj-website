@@ -21,7 +21,7 @@ import { adminGate, rateLimit, dayKey, jsonResponse } from './_tiers.js';
 
 // The AI pools the ledger in _ai.js writes under. Listed rather than scanned:
 // Pages KV list() is paginated and slow, and this set changes about once a year.
-const AI_POOLS = ['gemini:primary', 'gemini:backup', 'gemini:paid', 'deepseek', 'grok', 'cloudflare', 'all'];
+const AI_POOLS = ['gemini:primary', 'gemini:backup', 'gemini:paid', 'grok', 'cloudflare', 'all'];
 
 // Three properties, because they answer three different questions: the office
 // site sells engineering, the זרם page sells the product, and the app itself is

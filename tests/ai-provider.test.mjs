@@ -185,11 +185,20 @@ test('the spare key is reached for before anyone is made to wait', () => {
   // Waiting eight seconds on a rate-limited key while an idle second key sits
   // there is the wrong way round, and the first version did exactly that.
   const src = readFileSync(new URL('../functions/api/_ai.js', import.meta.url), 'utf8');
-  const backupAt = src.indexOf('env.GEMINI_API_KEY_2 && env.GEMINI_API_KEY_2 !== key');
-  const waitAt = src.indexOf('quotaScope === \'minute\'');
-  assert.ok(backupAt > -1 && waitAt > -1, 'the backup-key or wait path is gone');
-  assert.ok(backupAt < waitAt,
-    'the request waits on a busy key before trying the idle spare one');
+  // It is a LADDER now, not one spare key: free, free, then the paid key, which
+  // is the overflow for everybody rather than a private pool for paying
+  // customers (Stav, 29/08). All of it still has to happen before anyone waits.
+  const ladderAt = src.indexOf('const ladder = [');
+  const waitAt = src.indexOf("quotaScope === 'minute'");
+  assert.ok(ladderAt > -1 && waitAt > -1, 'the spare-key ladder or the wait path is gone');
+  assert.ok(ladderAt < waitAt,
+    'the request waits on a busy key before trying the idle spare ones');
+  const rungs = src.slice(ladderAt, src.indexOf('].filter(', ladderAt));
+  assert.match(rungs, /GEMINI_API_KEY_2/, 'the free backup key is no longer tried');
+  assert.match(rungs, /GEMINI_API_KEY_PAID/,
+    'the paid key is not in the ladder, so free users drop to a weaker model while it sits idle');
+  assert.ok(rungs.indexOf('GEMINI_API_KEY_2') < rungs.indexOf('GEMINI_API_KEY_PAID'),
+    'the paid key is tried before the free spare one');
 
   // And the wait must not fire on a daily quota, which no amount of waiting
   // clears.

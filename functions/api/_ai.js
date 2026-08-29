@@ -9,7 +9,6 @@
 //
 // Server env keys (set in Cloudflare Pages → Settings → Environment variables):
 //   GEMINI_API_KEY   — Google AI Studio key (primary, free tier)
-//   DEEPSEEK_API_KEY — DeepSeek key (fallback, cheap)
 //   XAI_API_KEY      — xAI/Grok key (optional)
 // Workers AI (free, no key — runs on Cloudflare itself, works everywhere):
 //   add a "Workers AI" binding named `AI` in Pages → Settings → Functions → Bindings.
@@ -43,14 +42,6 @@ export const PROVIDERS = {
       'gemini-2.0-flash', 'gemini-1.5-flash',
     ],
   },
-  deepseek: {
-    label: 'DeepSeek',
-    kind: 'openai',
-    url: 'https://api.deepseek.com/chat/completions',
-    keyEnv: ['DEEPSEEK_API_KEY'],
-    defaultModel: 'deepseek-chat',
-    models: ['deepseek-chat', 'deepseek-reasoner'],
-  },
   grok: {
     label: 'Grok',
     kind: 'openai',
@@ -71,7 +62,11 @@ export const PROVIDERS = {
 // Order tried on fallback once the explicitly-requested provider is placed first.
 // `cloudflare` is last: preferred only when no external key works, but always
 // available (free, via binding) so the chain never ends empty.
-const FALLBACK_SEQUENCE = ['gemini', 'deepseek', 'grok', 'cloudflare'];
+// DeepSeek is gone — Stav never held a key for it, so every position it
+// occupied in this chain was a step that could only ever fail and cost a
+// round-trip on the way to the next one. Stav, 29/08: "בכללי אין דיפסיק אחי,
+// לא הבאתי מפתח שלו. תעיף את ההיסטוריה הזאת מהמערכת."
+const FALLBACK_SEQUENCE = ['gemini', 'grok', 'cloudflare'];
 
 // Statuses that mean "this provider can't serve right now — try the next":
 // 429 quota/rate, 401/403 bad/expired key, 402 no balance, 5xx upstream.
@@ -458,7 +453,7 @@ function callOnce(name, key, opts) {
       stream: !!opts.stream,
     };
     if (opts.max_tokens) payload.max_tokens = opts.max_tokens;
-    if (opts.response_format && model !== 'deepseek-reasoner') payload.response_format = opts.response_format;
+    if (opts.response_format) payload.response_format = opts.response_format;
     return fetch(cfg.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
@@ -671,17 +666,23 @@ async function runProviders(env, opts) {
     if (without.length) order = without;
   }
   if (order.length === 0) {
-    return errorResponse('לא הוגדר מנוע AI בשרת. הוסיפו "AI binding" (Workers AI) בהגדרות Cloudflare Pages: חינם, ללא מפתח. אפשר גם GEMINI_API_KEY / DEEPSEEK_API_KEY.', 501);
+    return errorResponse('לא הוגדר מנוע AI בשרת. הוסיפו "AI binding" (Workers AI) בהגדרות Cloudflare Pages: חינם, ללא מפתח. אפשר גם GEMINI_API_KEY.', 501);
   }
 
   for (let i = 0; i < order.length; i++) {
     const name = order[i];
-    // Cost isolation: paying customers (pro/business/admin) run on a separate
-    // Gemini key when GEMINI_API_KEY_PAID is set, so free-tier usage never
-    // eats the paid pool — and Stav can read each pool's cost separately.
-    const key = (name === 'gemini' && opts.paidTier && env.GEMINI_API_KEY_PAID)
-      ? env.GEMINI_API_KEY_PAID
-      : keyFor(env, name);
+    // The paid Gemini key is the OVERFLOW, not a private pool for paying
+    // customers. Stav, 29/08: "שהמפתח תשלום לא ישמש את מי שמשלם. אלה שפשוט
+    // כולם ישתמשו בחינמיים וברגע שנגמר המגבלה היומית אז שכולם יעברו למפתח
+    // שבתשלום."
+    //
+    // He is right, and the old design had it backwards. Reserving the paid key
+    // for pro/business meant the free keys' daily quota went unspent while
+    // paying users burned money, AND that a free user hitting the wall fell
+    // straight to a weaker model — the worst outcome for the person most likely
+    // to be deciding whether this product is any good. Free first for everyone,
+    // paid when free is exhausted, for everyone. Order below in callGemini.
+    const key = keyFor(env, name);
 
     const label = aiPoolLabel(env, name, opts.paidTier);
 
@@ -769,26 +770,37 @@ async function runProviders(env, opts) {
       // on the very card used to decide whether to pay for more.
     }
 
-    // Gemini only: a second personal key (env.GEMINI_API_KEY_2, e.g. a backup
-    // Google account) is tried immediately on a quota/auth error, before
-    // falling through to a weaker provider further down the chain. This is
-    // the same "retry on error" idiom already used for the whole provider
-    // chain below -- just one level deeper, since only Gemini has 2 keys.
-    if (name === 'gemini' && RETRIABLE.includes(upstream.status) && env.GEMINI_API_KEY_2 && env.GEMINI_API_KEY_2 !== key) {
-      // The first key just refused. THIS is the moment worth recording: from
-      // the user's side the retry hides it completely.
-      await recordAiUse(env, label, upstream.status === 429 ? 'quota' : 'fail', modelUsed,
-        { status: upstream.status, scope: quotaScope, note: 'נופל למפתח הגיבוי' });
-      try {
-        const retryUpstream = await callOnce(name, env.GEMINI_API_KEY_2, { ...opts, model: modelForThis });
-        if (!RETRIABLE.includes(retryUpstream.status)) {
-          await recordAiUse(env, 'gemini:backup', 'ok', modelUsed);
-          return normalize(name, retryUpstream, !!opts.stream, { 'X-AI-Provider': name });
-        }
-        await recordAiUse(env, 'gemini:backup', retryUpstream.status === 429 ? 'quota' : 'fail', modelUsed,
-          { status: retryUpstream.status, note: 'שני מפתחות Gemini נכשלו' });
-        upstream = retryUpstream; // both Gemini keys failed; fall through to the next provider below
-      } catch (e) { /* keep the original upstream response, fall through below */ }
+    // Gemini's key LADDER, tried in order before anything weaker is reached for.
+    // Free, free, then paid — the paid key is the overflow for EVERYBODY rather
+    // than a private pool for paying customers (Stav, 29/08). That way the free
+    // daily quota is actually spent before a shekel is, and a free user who
+    // arrives after the wall still gets a proper answer instead of Llama, which
+    // is the outcome that decides whether he thinks the product is any good.
+    if (name === 'gemini' && RETRIABLE.includes(upstream.status)) {
+      const ladder = [
+        { k: env.GEMINI_API_KEY_2, pool: 'gemini:backup', note: 'נופל למפתח הגיבוי' },
+        { k: env.GEMINI_API_KEY_PAID, pool: 'gemini:paid', note: 'נופל למפתח בתשלום' },
+      ].filter((r) => r.k && r.k !== key);
+
+      let tried = key;
+      for (const rung of ladder) {
+        if (rung.k === tried) continue;
+        // Record the refusal that sent us here. From the user's side the retry
+        // hides it completely, so this is the only place it is visible.
+        await recordAiUse(env, label, upstream.status === 429 ? 'quota' : 'fail', modelUsed,
+          { status: upstream.status, scope: quotaScope, note: rung.note });
+        try {
+          const retryUpstream = await callOnce(name, rung.k, { ...opts, model: modelForThis });
+          if (!RETRIABLE.includes(retryUpstream.status)) {
+            await recordAiUse(env, rung.pool, 'ok', modelUsed);
+            return normalize(name, retryUpstream, !!opts.stream, { 'X-AI-Provider': name });
+          }
+          await recordAiUse(env, rung.pool, retryUpstream.status === 429 ? 'quota' : 'fail', modelUsed,
+            { status: retryUpstream.status });
+          upstream = retryUpstream;
+          tried = rung.k;
+        } catch (e) { /* keep the last upstream response and try the next rung */ }
+      }
     }
 
 

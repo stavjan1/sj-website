@@ -2,7 +2,7 @@
 // The system prompt and scope live HERE on the server, not in the browser, so
 // visitors can't read it, re-role the bot, or repurpose the endpoint as a free
 // general LLM. Multi-provider with auto-fallback via ./_ai.js (default Gemini →
-// DeepSeek → Grok).
+// Grok).
 
 import { generate } from './_ai.js';
 import { rateLimit, loadModelClass } from './_tiers.js';
@@ -120,7 +120,7 @@ async function handleAssistant(context) {
 
   // Model/provider are pinned SERVER-SIDE. This endpoint is public and
   // unauthenticated, so honoring a client-supplied `provider`/`model` let anyone
-  // curl it into the expensive advanced class (gemini-2.5-pro / deepseek-reasoner)
+  // curl it into the expensive advanced class (gemini-2.5-pro)
   // — the tier-gated "מודל מתקדם ⚡" — on our key, for free. Same rule as
   // /api/chat: the browser never names a real model.
   // Follows the same admin-chosen basic model as the rest of the product, so a

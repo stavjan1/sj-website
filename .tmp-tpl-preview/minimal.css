@@ -1,0 +1,594 @@
+/* ==========================================================================
+   ZEREM · quote template "נקייה" — the quiet one.
+   A CSS THEME ONLY. Add `tpl-minimal` to #quote-pdf-sheet; change no markup.
+
+   The idea: no boxes, no tints, no zebra, no coloured labels. Hierarchy comes
+   from size, weight and space alone. Five lines exist on the whole page —
+   under the letterhead, above and below the priced list, above the total and
+   above the colophon — and every one of them is a 1px hairline. Nothing else
+   on the sheet is drawn; the rest is type and air.
+
+   Three things this file works around, all of them existing machinery:
+     a) Several base rules paint with the ROOT --pdf-primary / --pdf-secondary
+        (navy #1e3a8a / blue #3b82f6), which no template ever changed. Those
+        variables are redefined at sheet scope below, so every rule that reads
+        them — including the inline styles market.js writes into the table —
+        lands inside this ramp instead.
+     b) The base sheet mixes rem and em, so the body-size slider moved the body
+        and nothing else (item titles 1.1rem = 17.6px against a 12px body).
+        Everything here is em, so the document scales as one system.
+     c) 'Outfit' is referenced for numerals but is NOT in the Google Fonts
+        link — it silently falls back. Weights are limited to 400/500/700,
+        which is the honest range for Heebo / Rubik / David Libre.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. The ink ramp. One ink, three greys, two hairlines — nothing else.
+   -------------------------------------------------------------------------- */
+.a4-sheet.tpl-minimal {
+    --q-ink:   #16181c;   /* headings and the words that carry the price   */
+    --q-soft:  #4b5057;   /* descriptions, secondary prose                 */
+    --q-mute:  #85898f;   /* labels, meta, footer                          */
+    --q-faint: #a9adb3;   /* captions                                      */
+    --q-hair:  #dcdee1;   /* the quiet hairline                            */
+    --q-rule:  #b2b6bc;   /* the structural hairline (4 on the page)       */
+
+    /* Re-ink the legacy palette at sheet scope. This one block desaturates
+       the header divider, the company name, the recipient, the item titles,
+       the table head, the summary title, the total row and the footer rule —
+       all of which were hard-wired to the 2019 navy. */
+    --pdf-text-main: var(--q-ink);
+    --pdf-text-muted: var(--q-mute);
+    --pdf-border: var(--q-hair);
+    --pdf-line: var(--q-hair);
+    --pdf-secondary: var(--q-hair);
+    --pdf-danger: var(--q-ink);
+    /* Deliberately NOT --pdf-custom-primary: the user's brand colour is spent
+       on exactly two lines (the title and the total, both already locked to it
+       upstream). Prose stays graphite so the page survives a mono printer. */
+    --pdf-primary: var(--q-ink);
+
+    color: var(--q-ink);
+    /* ~15mm side margins instead of ~13mm. The single cheapest way to make a
+       sheet look like it came off a designer's desk; the vertical is trimmed
+       to pay for it, so the one-page budget survives (see the note at the
+       foot of this file). */
+    padding: 42px 58px 32px;
+}
+
+/* --------------------------------------------------------------------------
+   2. Letterhead. The 1.2fr / 1fr / 1.2fr row with a centred logo is a Word
+      certificate. Re-mapped to the shape an Israeli quote actually has:
+      identity at the start, document meta at the end, "לכבוד" on its own row
+      beneath. Pure grid placement — the DOM order is untouched, and column 1
+      is the start column in RTL and in the English LTR mode alike.
+   -------------------------------------------------------------------------- */
+.a4-sheet.tpl-minimal .pdf-header { margin-bottom: 0; }
+
+.a4-sheet.tpl-minimal .pdf-header-grid {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    align-items: start;
+    column-gap: 24px;
+    row-gap: 8px;
+}
+
+.a4-sheet.tpl-minimal .pdf-logo-column {
+    grid-column: 1;
+    grid-row: 1;
+    /* Overrides --logo-align: this template owns its letterhead axis. The
+       logo WIDTH slider keeps working. */
+    align-items: flex-start;
+    text-align: start;
+}
+
+.a4-sheet.tpl-minimal .pdf-meta-column {
+    grid-column: 2;
+    grid-row: 1;
+    /* Sits on the same baseline as the business name, not floating at the
+       top of a 75px logo — the letterhead reads as one horizontal band. */
+    align-self: end;
+    align-items: flex-end;
+    text-align: end;
+    gap: 3px;
+    font-weight: 400;
+    padding-bottom: 2px;
+}
+
+.a4-sheet.tpl-minimal .pdf-recipient-column {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    align-items: flex-start;
+    text-align: start;
+    gap: 2px;
+}
+
+.a4-sheet.tpl-minimal .pdf-logo-wrapper {
+    justify-content: flex-start;
+    margin-bottom: 5px;
+}
+
+/* The built-in fallback mark is a blue-on-navy badge. Only users who have not
+   uploaded a logo ever see it; in this template it goes monochrome so the
+   page never has exactly one coloured object on it. An uploaded <img> is
+   untouched. */
+.a4-sheet.tpl-minimal .pdf-logo-svg circle { fill: var(--q-ink); stroke: var(--q-ink); }
+.a4-sheet.tpl-minimal .pdf-logo-svg path   { stroke: #ffffff; }
+
+.a4-sheet.tpl-minimal .pdf-company-title {
+    font-size: 1.32em;
+    font-weight: 500;
+    color: var(--q-ink);
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    margin-bottom: 3px;
+}
+
+/* Was a blue-underlined pill with a 150px floor. Now it is just a line of
+   type under the business name, which is what it says. */
+.a4-sheet.tpl-minimal .pdf-company-subtitle {
+    display: block;
+    font-size: 0.82em;
+    font-weight: 400;
+    color: var(--q-mute);
+    letter-spacing: 0.02em;
+    border-bottom: 0;
+    padding-bottom: 0;
+    margin-bottom: 1px;
+    min-width: 0;
+}
+
+.a4-sheet.tpl-minimal .pdf-company-owner {
+    font-size: 0.82em;
+    font-weight: 400;
+    color: var(--q-mute);
+}
+
+.a4-sheet.tpl-minimal .meta-item { display: block; }
+
+.a4-sheet.tpl-minimal .meta-val-date,
+.a4-sheet.tpl-minimal .meta-val-number {
+    font-size: 0.82em;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    color: var(--q-mute);
+}
+
+/* The quote number is the one thing in the meta column anyone looks up twice. */
+.a4-sheet.tpl-minimal .meta-val-number span {
+    font-weight: 500;
+    color: var(--q-ink);
+}
+
+.a4-sheet.tpl-minimal .recipient-label {
+    font-size: 0.72em;
+    font-weight: 500;
+    color: var(--q-mute);
+    /* Hebrew has no capitals, so tracking is how a label says "I am a label". */
+    letter-spacing: 0.12em;
+    margin-bottom: 3px;
+}
+
+.a4-sheet.tpl-minimal .recipient-name {
+    font-size: 1.15em;
+    font-weight: 500;
+    color: var(--q-ink);
+    text-decoration: none;
+    line-height: 1.3;
+}
+
+.a4-sheet.tpl-minimal .recipient-sub {
+    font-size: 0.88em;
+    font-weight: 400;
+    color: var(--q-soft);
+    line-height: 1.45;
+}
+
+.a4-sheet.tpl-minimal .pdf-header-divider {
+    height: 1px;
+    background-color: var(--q-rule);
+    margin-top: 12px;
+    margin-bottom: 0;
+}
+
+/* --------------------------------------------------------------------------
+   3. The document's name. Big, light, flush to the margin, no box under it.
+   -------------------------------------------------------------------------- */
+.a4-sheet.tpl-minimal .pdf-title-container {
+    text-align: start;
+    margin-top: 20px;
+    margin-bottom: 16px;
+}
+
+.a4-sheet.tpl-minimal .pdf-title {
+    display: block;
+    font-size: 1.82em;
+    font-weight: 400;
+    line-height: 1.25;
+    letter-spacing: -0.012em;
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+/* The accent bar under the title is the one ornament this template refuses. */
+.a4-sheet.tpl-minimal .underline-bar { display: none; }
+
+/* --------------------------------------------------------------------------
+   4. The work. Two renderers share this section: a plain list, and a priced
+      table whose cells carry INLINE styles from market.js — hence the few
+      !important declarations, which exist only to beat those inline styles.
+   -------------------------------------------------------------------------- */
+.a4-sheet.tpl-minimal .pdf-content-area { min-height: 0; }
+
+.a4-sheet.tpl-minimal .pdf-items-list {
+    gap: 12px;
+    margin-bottom: 0;
+}
+
+.a4-sheet.tpl-minimal .pdf-work-item { gap: 3px; }
+
+.a4-sheet.tpl-minimal .pdf-item-title {
+    font-size: 1.02em;
+    font-weight: 500;
+    color: var(--q-ink);
+    /* An underlined heading is the single most amateur mark on the old sheet. */
+    text-decoration: none;
+    line-height: 1.4;
+    margin-bottom: 0;
+}
+
+.a4-sheet.tpl-minimal .pdf-item-desc { padding: 0; }
+
+/* Same element in the list renderer, an inline-styled <div> in the table
+   renderer. One rule so both read identically. */
+.a4-sheet.tpl-minimal [data-item-field="title"] {
+    font-weight: 500 !important;
+    text-decoration: none !important;
+    color: var(--q-ink);
+}
+
+.a4-sheet.tpl-minimal [data-item-field="description"] {
+    /* market.js writes 0.9rem inline — 14.4px, LARGER than the 12px body it
+       sits inside. This puts the description back under its own heading. */
+    font-size: 0.92em !important;
+    line-height: 1.5 !important;
+    color: var(--q-soft) !important;
+}
+
+/* --- the priced table: rows, not cells ---------------------------------- */
+.a4-sheet.tpl-minimal .pdf-table {
+    /* was 0.95rem — a root-relative size inside an em document, which is why
+       the head and the body never agreed */
+    font-size: 1em;
+    margin-bottom: 0;
+}
+
+.a4-sheet.tpl-minimal .pdf-table th {
+    background: none;
+    border: 0;
+    border-bottom: 1px solid var(--q-rule);
+    color: var(--q-mute);
+    font-weight: 500;
+    font-size: 0.72em;
+    letter-spacing: 0.1em;
+    padding: 0 12px 7px;
+    text-align: start;
+    vertical-align: bottom;
+}
+
+/* The base sheet locks every th/td to the body size with an id + !important.
+   The live sheet carries the id; the full-screen preview and the designer
+   preview are clones with the id stripped. Stating the size twice is what
+   makes the preview, the live sheet and the PDF agree. */
+.a4-sheet.tpl-minimal#quote-pdf-sheet .pdf-table th {
+    font-size: 0.72em !important;
+}
+
+.a4-sheet.tpl-minimal .pdf-table td {
+    border: 0;
+    border-top: 1px solid var(--q-hair);
+    padding: 6px 12px;
+    vertical-align: top;
+    text-align: start;
+}
+
+.a4-sheet.tpl-minimal .pdf-table tbody tr:first-child td {
+    border-top: 0;
+    padding-top: 8px;
+}
+
+/* The list is bracketed, top and bottom, so the terms below it can never be
+   mistaken for two more rows. These two are the table — there is no grid. */
+.a4-sheet.tpl-minimal .pdf-table tbody tr:last-child td {
+    border-bottom: 1px solid var(--q-rule);
+}
+
+.a4-sheet.tpl-minimal .pdf-table tbody tr:nth-child(even) { background-color: transparent; }
+
+/* Everything hangs on one optical margin: the outer cells lose their padding
+   so the table's edges line up with the title, the terms and the footer. */
+.a4-sheet.tpl-minimal .pdf-table th:first-child,
+.a4-sheet.tpl-minimal .pdf-table td:first-child { padding-inline-start: 0; }
+
+.a4-sheet.tpl-minimal .pdf-table th:last-child,
+.a4-sheet.tpl-minimal .pdf-table td:last-child  { padding-inline-end: 0; }
+
+/* Row number: was centred, bold, and in a font that is not loaded — 'Outfit'
+   is written inline but never linked, so the column rendered in the browser's
+   default sans inside an otherwise Hebrew document. Flush, light, grey. */
+.a4-sheet.tpl-minimal .pdf-table th:first-child,
+.a4-sheet.tpl-minimal .pdf-table td:first-child {
+    text-align: start !important;
+}
+
+.a4-sheet.tpl-minimal .pdf-table td:first-child {
+    font-family: 'Rubik', 'Heebo', sans-serif !important;
+    font-weight: 500 !important;
+    color: var(--q-mute);
+}
+
+/* Money column. `text-align: left` is written inline, which is the outer edge
+   in Hebrew and the WRONG one the moment the sheet flips to English; `end` is
+   the outer edge in both. Isolated so the bidi algorithm cannot reorder
+   "1,250 ₪", and tabular so the figures line up down the column. */
+.a4-sheet.tpl-minimal .pdf-table th:last-child,
+.a4-sheet.tpl-minimal .pdf-table td:last-child {
+    text-align: end !important;
+}
+
+.a4-sheet.tpl-minimal .pdf-table td:last-child {
+    font-weight: 500 !important;
+    unicode-bidi: isolate;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   5. Terms — תוקף ההצעה / תנאי תשלום / מועד ביצוע / אחריות.
+      The four lines a customer reads once and a court reads later. Set as a
+      definition list on a fixed key column: no border, no tint, no radius.
+   -------------------------------------------------------------------------- */
+.a4-sheet.tpl-minimal .pdf-terms-box {
+    border: 0;
+    background: none;
+    border-radius: 0;
+    padding: 0;
+    margin-block-start: 26px;
+    gap: 2px;
+}
+
+.a4-sheet.tpl-minimal .pdf-term-row {
+    /* was 0.82rem = 13px, i.e. larger than the body it explains */
+    font-size: 0.86em;
+    line-height: 1.4;
+    gap: 0;
+    align-items: baseline;
+}
+
+.a4-sheet.tpl-minimal .pdf-term-k {
+    flex: 0 0 96px;
+    min-width: 96px;
+    font-weight: 400;
+    color: var(--q-mute);
+    letter-spacing: 0.02em;
+}
+
+.a4-sheet.tpl-minimal .pdf-term-v { color: var(--q-ink); }
+
+/* --------------------------------------------------------------------------
+   6. Additional terms and exclusions. The old sheet gave these a tinted card
+      and a red dashed alarm box; both read as a web UI, and the red one is
+      the first thing a customer's eye lands on. They are paragraphs now.
+   -------------------------------------------------------------------------- */
+.a4-sheet.tpl-minimal .pdf-summary-box {
+    /* `border: 0` is what kills the base rule's physical border-right */
+    background: none;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    /* keeps the base sheet's behaviour: absorbs the slack on a short quote */
+    margin-block-start: auto;
+    margin-block-end: 0;
+    padding-block-start: 14px;
+    font-size: 1em;
+}
+
+.a4-sheet.tpl-minimal .summary-title {
+    font-size: 0.72em;
+    font-weight: 500;
+    color: var(--q-mute);
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+}
+
+.a4-sheet.tpl-minimal .summary-text {
+    color: var(--q-soft);
+    line-height: 1.55;
+}
+
+/* With the card gone, an empty summary would leave a floating label. */
+.a4-sheet.tpl-minimal .summary-text:empty { display: none; }
+.a4-sheet.tpl-minimal .pdf-summary-box:has(.summary-text:empty) .summary-title { display: none; }
+
+.a4-sheet.tpl-minimal .pdf-warning-box {
+    color: var(--q-ink);
+    font-weight: 400;
+    text-align: start;
+    border: 0;
+    background: none;
+    background-color: transparent;
+    border-radius: 0;
+    padding: 0;
+    margin-block: 13px 0;
+    line-height: 1.5;
+}
+
+/* No exclusions typed → no empty block and no stray spacing. */
+.a4-sheet.tpl-minimal .pdf-warning-box:has([data-term-field="exclusions"]:empty) { display: none; }
+
+/* --------------------------------------------------------------------------
+   7. Signatures. Off by default; when it is on, it must not look like a fax
+      form. The dashed rule goes, the space stays, and the only marks left are
+      the two lines people actually sign on.
+      Everything here fights an inline style, hence !important throughout.
+      `display` is never touched — app.js owns it.
+   -------------------------------------------------------------------------- */
+.a4-sheet.tpl-minimal [data-block="signature"] {
+    border-top: 0 !important;
+    margin-top: 24px !important;
+    /* the captions hang 14px below the row box — this is their room */
+    margin-bottom: 18px !important;
+    padding-top: 0 !important;
+}
+
+.a4-sheet.tpl-minimal [data-block="signature"] > div {
+    width: 42% !important;
+    gap: 0 !important;
+}
+
+.a4-sheet.tpl-minimal [data-block="signature"] > div > span {
+    font-size: 0.72em !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.1em !important;
+    color: var(--q-mute) !important;
+}
+
+/* The signed line. Height is left alone — a captured signature image is
+   absolutely positioned inside it at 44px and would clip. */
+.a4-sheet.tpl-minimal [data-block="signature"] > div > div {
+    border-bottom: 1px solid var(--q-rule) !important;
+    margin-top: 12px !important;
+}
+
+.a4-sheet.tpl-minimal [data-block="signature"] > div > div > span {
+    font-size: 8px !important;
+    color: var(--q-faint) !important;
+    bottom: -14px !important;
+}
+
+/* --------------------------------------------------------------------------
+   8. The total. A centred, double-underlined price is a certificate. An
+      invoice puts the label at the margin and the figure at the opposite
+      edge, on the same axis as the money column above it.
+   -------------------------------------------------------------------------- */
+.a4-sheet.tpl-minimal .pdf-footer-section { align-items: stretch; }
+
+.a4-sheet.tpl-minimal .pdf-price-row {
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    font-size: 1em;
+    font-weight: 400;
+    border-top: 1px solid var(--q-rule);
+    padding-top: 11px;
+    margin-bottom: 2px;
+}
+
+.a4-sheet.tpl-minimal .price-label {
+    text-decoration: none;
+    font-size: 0.82em;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: var(--q-mute);
+}
+
+.a4-sheet.tpl-minimal .price-val {
+    text-decoration: none;
+    font-size: 1.72em;
+    font-weight: 500;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    unicode-bidi: isolate;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    white-space: nowrap;
+}
+
+/* מע"מ / when it is paid — sits under the figure, not under the label. */
+.a4-sheet.tpl-minimal .price-sub-label {
+    text-align: end;
+    font-size: 0.72em;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    color: var(--q-mute);
+    margin-bottom: 16px;
+}
+
+.a4-sheet.tpl-minimal .pdf-footer-line {
+    height: 1px;
+    background-color: var(--q-hair);
+    margin-bottom: 7px;
+}
+
+/* --------------------------------------------------------------------------
+   9. The colophon. Contact details belong at the foot of the page, small and
+      on the same margin as everything above them — not centred at body size,
+      which is what the sheet does today (the id rule pins the footer to 12px,
+      so the size is set on the rows instead).
+   -------------------------------------------------------------------------- */
+.a4-sheet.tpl-minimal .pdf-company-footer {
+    text-align: start;
+    gap: 2px;
+    line-height: 1.45;
+}
+
+.a4-sheet.tpl-minimal .footer-row {
+    justify-content: flex-start;
+    gap: 6px;
+    font-size: 8.4px;
+    letter-spacing: 0.01em;
+}
+
+.a4-sheet.tpl-minimal .footer-row.font-bold {
+    font-weight: 500;
+    color: var(--q-ink);
+}
+
+.a4-sheet.tpl-minimal .footer-row.text-secondary { color: var(--q-mute); }
+
+.a4-sheet.tpl-minimal .bullet {
+    color: var(--q-hair);
+    font-weight: 400;
+}
+
+/* Hebrew has no true italic — the browser skews the letters. It looked like a
+   typo on a legal sentence, so it is set upright. */
+.a4-sheet.tpl-minimal .footer-notice {
+    font-size: 7.6px;
+    font-style: normal;
+    color: var(--q-mute);
+    line-height: 1.5;
+    margin-top: 7px;
+}
+
+.a4-sheet.tpl-minimal .pdf-zerem-credit {
+    text-align: end;
+    font-size: 7px;
+    letter-spacing: 0.08em;
+    color: var(--q-faint);
+    margin-top: 4px;
+}
+
+/* --------------------------------------------------------------------------
+   10. On-document editing chrome. Never captured — the add-row button is
+       hidden outside edit mode — but it should not shout inside a quiet
+       sheet while he is typing on it.
+   -------------------------------------------------------------------------- */
+.a4-sheet.tpl-minimal .sheet-add-row {
+    margin-top: 12px;
+    font-size: 0.82em;
+    letter-spacing: 0.02em;
+}
+
+/* --------------------------------------------------------------------------
+   The page budget, measured — not guessed.
+   html2pdf maps the sheet's 794px width to 190mm, so one A4 page holds
+   794 x (277/190) = 1158 source px. Rendered against the real markup with the
+   app's border-box reset:
+       6 priced rows + terms + summary + exclusions + colophon → 1123px (1 page)
+       8 priced rows, most with a description             → 1145px (1 page)
+       8 rows in the plain-list renderer                  → 1123px (1 page)
+   The signature block adds ~100px, so it costs the last two rows.
+   Anything added here comes out of 13px of slack at eight items.
+   -------------------------------------------------------------------------- */

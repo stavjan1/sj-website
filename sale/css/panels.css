@@ -5650,3 +5650,22 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
     #panel-pricing .sheet-scroller { padding-inline: 0; }
     .preview-actions { padding-inline: var(--sp-4); }
 }
+
+/* The overload countdown. A number that moves is a promise being kept; "in a
+   moment" is indistinguishable from the app having hung. */
+.wait-toast {
+    position: fixed; inset-block-end: calc(var(--sp-6) + env(safe-area-inset-bottom, 0px));
+    inset-inline: 0; margin-inline: auto; width: max-content; max-width: 90vw;
+    display: flex; align-items: center; gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-4); border-radius: var(--r-pill);
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text); font: 600 var(--fs-sm) var(--font-ui);
+    z-index: calc(var(--z-nav) + 40);
+}
+.wt-spin {
+    width: 14px; height: 14px; flex: none; border-radius: 50%;
+    border: 2px solid var(--border-strong, var(--border)); border-top-color: var(--accent);
+    animation: wt-turn 0.8s linear infinite;
+}
+@keyframes wt-turn { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .wt-spin { animation: none; } }

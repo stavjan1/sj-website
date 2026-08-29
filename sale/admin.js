@@ -685,7 +685,6 @@ const AI_POOL_LABELS = {
     'gemini:primary': 'Gemini · מפתח ראשי',
     'gemini:backup': 'Gemini · מפתח גיבוי',
     'gemini:paid': 'Gemini · מפתח משלמים',
-    deepseek: 'DeepSeek',
     grok: 'Grok',
     cloudflare: 'Workers AI (חינם)',
     all: 'כשל מלא · כל הספקים'

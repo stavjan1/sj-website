@@ -360,15 +360,12 @@ let selectedGeminiModel = 'gemini|gemini-2.5-flash';
 const MODEL_LABELS = {
     'gemini|gemini-2.0-flash': 'Gemini 2.0 Flash',
     'gemini|gemini-2.5-flash': 'Gemini 2.5 Flash',
-    'deepseek|deepseek-chat': 'DeepSeek V3',
-    'deepseek|deepseek-reasoner': 'DeepSeek R1',
     'grok|grok-2-latest': 'Grok 2'
 };
 // Each provider's default "provider|model" value — used when an automatic
 // server-side fallback switches us to a different provider.
 const PROVIDER_DEFAULT_VALUE = {
     gemini: 'gemini|gemini-2.5-flash',
-    deepseek: 'deepseek|deepseek-chat',
     grok: 'grok|grok-2-latest'
 };
 const WEIGHTED_DAILY_BUDGET_DEFAULT = 400;
@@ -855,13 +852,22 @@ async function callAI(value, payload) {
     // If the proxy answered (including a real provider error like 400/402), use it —
     // EXCEPT when it signals "not available / no server key" (404 = not deployed, 501 = no key).
     if (proxyRes && proxyRes.status !== 404 && proxyRes.status !== 501) {
-        // Daily AI quota exhausted → show the upgrade screen (once per event).
         if (proxyRes.status === 429) {
-            try {
-                proxyRes.clone().json().then(d => {
-                    if (d && d.error && d.error.code === 'QUOTA_AI') showUpgradeModal('ai');
-                }).catch(() => {});
-            } catch (e) {}
+            let d = null;
+            try { d = await proxyRes.clone().json(); } catch (e) {}
+            const err = (d && d.error) || {};
+            // Daily quota exhausted → the upgrade screen. Nothing to wait for:
+            // the day does not end sooner because you waited.
+            if (err.code === 'QUOTA_AI') { showUpgradeModal('ai'); }
+            // A per-minute burst — ten people arriving from the same WhatsApp
+            // group at once. This one DOES clear by waiting, so the message is
+            // not "try later" but a countdown that sends the question by
+            // itself. Stav, 29/08. A person told to wait and then made to
+            // retype is a person who closes the tab.
+            else if (err.code === 'RATE' && err.retryAfterMs && !payload._waited) {
+                await countdownToast(err.retryAfterMs, 'יש עומס על המערכת · שולח בעוד');
+                return callAI(value, { ...payload, _waited: true });
+            }
         }
         handleProviderFallback(proxyRes);
         return proxyRes;
@@ -908,10 +914,10 @@ async function readAIError(response) {
         if (data && data.error && data.error.message) {
             const m = data.error.message;
             if (/invalid api key|authentication|invalid_request_error.*key|unauthor/i.test(m)) {
-                return 'מפתח ה-AI אינו תקין. ודא שהוגדר מפתח DeepSeek תקין (מתחיל ב-sk-), בשרת או בהגדרות.';
+                return 'מפתח ה-AI אינו תקין. בדוק את מפתח Gemini בשרת או בהגדרות.';
             }
             if (/insufficient balance|quota|exceeded|payment/i.test(m)) {
-                return 'נגמרה היתרה/המכסה של חשבון ה-AI. טען יתרה ב-platform.deepseek.com או נסה שוב מאוחר יותר.';
+                return 'נגמרה המכסה של חשבון ה-AI. נסה שוב מאוחר יותר.';
             }
             return m;
         }
@@ -6174,7 +6180,7 @@ function savePriceCatalog(sync = true) {
 // Reference block injected into the pricing agent so its material estimates use
 // the user's real supplier prices instead of guesses. Kept compact and in a
 // STABLE (sorted) order so it sits in a cacheable system-prompt prefix: both
-// DeepSeek and Gemini then serve the repeated catalog from cache (~10x cheaper),
+// Gemini then serves the repeated catalog from cache (~10x cheaper),
 // which is what makes "resend every message" effectively free. Capped so a huge
 // catalog never blows up the prompt.
 function getPriceCatalogPromptBlock(contextText) {
@@ -9696,5 +9702,31 @@ function _syncWatermarkPicker() {
     document.querySelectorAll('.wm-choice').forEach((b) => {
         b.classList.toggle('is-on', b.dataset.wm === cur);
         b.setAttribute('aria-pressed', b.dataset.wm === cur ? 'true' : 'false');
+    });
+}
+
+// A visible wait. Stav asked for a countdown rather than "בעוד רגע", and he was
+// right to: a number that moves is a promise being kept, while "in a moment" is
+// indistinguishable from the app having hung.
+function countdownToast(ms, prefix) {
+    return new Promise((resolve) => {
+        const total = Math.max(1, Math.ceil(ms / 1000));
+        let left = total;
+        const el = document.createElement('div');
+        el.className = 'wait-toast';
+        el.innerHTML = `<span class="wt-spin" aria-hidden="true"></span><span class="wt-text"></span>`;
+        const paint = () => { el.querySelector('.wt-text').textContent = `${prefix} ${left}`; };
+        paint();
+        document.body.appendChild(el);
+        const t = setInterval(() => {
+            left -= 1;
+            if (left <= 0) {
+                clearInterval(t);
+                el.remove();
+                resolve();
+                return;
+            }
+            paint();
+        }, 1000);
     });
 }

@@ -2,7 +2,7 @@
 // The browser sends OpenAI-style { modelClass?, messages, response_format?,
 // stream? } and reads choices[...] back. Keys stay server-side. Provider
 // fallback + format translation live in ./_ai.js. Default provider: Gemini,
-// falling back to DeepSeek (then Grok) when out of quota.
+// falling back to Grok, then Workers AI, when out of quota.
 //
 // Move 2 (tiers): the daily quota comes from the caller's plan
 // (guest/free/pro/business — see ./_tiers.js, admin-tunable via KV
@@ -62,7 +62,19 @@ async function handleChat(context) {
   // now-public /ask/ AI endpoint from spam / cost bombs. 12/min per IP is far
   // above real use; admin exempt. Fails open if KV isn't bound.
   if (!isAdmin && !(await rateLimit(env, request, 'chat', 12))) {
-    return json({ error: { code: 'RATE', message: 'יותר מדי בקשות בזמן קצר, המתן דקה ונסה שוב.' } }, 429);
+    // The limiter counts per calendar minute, so the wait is exactly the time
+    // left in this one — a real number, not "try again later". The client
+    // counts it down and re-sends by itself, because a person told to wait and
+    // then made to retype is a person who closes the tab. Stav, 29/08:
+    // "שהמערכת תדע ותגיד לאחד 'יש עומס ההודעה תשלח בעוד x'."
+    const msLeft = 60000 - (Date.now() % 60000);
+    return json({
+      error: {
+        code: 'RATE',
+        retryAfterMs: msLeft,
+        message: `יש עומס על המערכת · ההודעה תישלח בעוד ${Math.ceil(msLeft / 1000)} שניות.`,
+      },
+    }, 429);
   }
   const tier = await getTierForEmail(env, email);
   const config = await loadTierConfig(env);
