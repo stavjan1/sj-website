@@ -5808,21 +5808,60 @@ function openQuoteDesigner() {
             <button class="upgrade-close" onclick="closeQuoteDesigner()" aria-label="סגור">✕</button>
             <div class="designer-controls">
                 <div class="designer-head">
-                    <h2><i class="fa-solid fa-object-group text-accent"></i> עיצוב ידני של ההצעה</h2>
+                    <h2><i class="fa-solid fa-palette text-accent"></i> עיצוב הצעת המחיר</h2>
                     <label class="designer-eng">
                         <input type="checkbox" id="designer-english" ${getQuoteLayout().english ? 'checked' : ''} onchange="setQuoteEnglish(this.checked)">
                         <span>הצעה באנגלית (LTR)</span>
                     </label>
                 </div>
-                <p class="input-help" style="margin:0 0 12px;">גרור בלוקים לשינוי סדר, וכוונן יישור / גודל / הדגשה / קו תחתון. התצוגה מתעדכנת בזמן אמת ←</p>
-                <div id="designer-blocks" class="designer-blocks"></div>
+
+                <!-- The three things that were in three places. Stav, 29/08:
+                     "אי אפשר לשים את בחירת עיצוב מודרני וכו בלמעלה והמסך שמראה
+                     איך זה יוצא למטה. זה קשור אחד לשני ושמת אותם בנפרד."
+                     He is right — a picker whose effect you cannot see is a
+                     guess. Templates, background and the fine controls now sit
+                     beside the paper they change. -->
+                <div class="dz-step" id="dz-step-tpl">
+                    <div class="dz-step-head"><span class="dz-num">1</span> תבנית</div>
+                    <div class="dz-tpls">
+                        ${Object.keys(PDF_TEMPLATES).map((k) => `
+                            <button type="button" class="dz-tpl" data-tpl="${k}"
+                                    onclick="designerPickTemplate('${k}')">${escapeHtml(PDF_TEMPLATES[k].label)}</button>`).join('')}
+                    </div>
+                </div>
+
+                <div class="dz-step" id="dz-step-bg">
+                    <div class="dz-step-head"><span class="dz-num">2</span> רקע וצבע</div>
+                    <div class="wm-picker">
+                        <button type="button" class="wm-choice" data-wm="bolt" onclick="designerSetWatermark('bolt')">⚡ ברק</button>
+                        <button type="button" class="wm-choice" data-wm="israel" onclick="designerSetWatermark('israel')">🗺️ מפת ישראל</button>
+                        <button type="button" class="wm-choice" data-wm="upload" onclick="designerSetWatermark('upload')">🖼️ שלי</button>
+                        <button type="button" class="wm-choice" data-wm="none" onclick="designerSetWatermark('none')">ללא</button>
+                    </div>
+                    <div class="dz-knobs">
+                        <label>גודל טקסט
+                            <input type="range" min="10" max="15" step="0.5" id="dz-size"
+                                   value="${(appState.settings.pdfFontSizeBody || 12)}" oninput="designerKnob('size', this.value)">
+                        </label>
+                        <label>צפיפות שורות
+                            <input type="range" min="1.2" max="1.7" step="0.05" id="dz-lh"
+                                   value="${(appState.settings.pdfLineHeight || 1.4)}" oninput="designerKnob('lh', this.value)">
+                        </label>
+                    </div>
+                </div>
+
+                <div class="dz-step" id="dz-step-blocks">
+                    <div class="dz-step-head"><span class="dz-num">3</span> סדר ומיקום</div>
+                    <p class="input-help" style="margin:0 0 8px;">גרור בלוק כדי להזיז אותו, וכוונן יישור / גודל / הדגשה.</p>
+                    <div id="designer-blocks" class="designer-blocks"></div>
+                </div>
                 <div class="designer-actions">
                     <button class="btn btn-secondary" onclick="resetQuoteDesign()"><i class="fa-solid fa-rotate-left"></i> אפס</button>
                     <button class="btn btn-accent" onclick="closeQuoteDesigner()"><i class="fa-solid fa-check"></i> סיימתי</button>
                 </div>
             </div>
             <div class="designer-preview-pane">
-                <div class="designer-preview-label"><i class="fa-solid fa-eye"></i> תצוגה מקדימה חיה</div>
+                <div class="designer-preview-label"><i class="fa-solid fa-eye"></i> כך ההצעה תצא ללקוח</div>
                 <div id="designer-preview" class="designer-preview"></div>
             </div>
         </div>`;
@@ -5830,6 +5869,8 @@ function openQuoteDesigner() {
     document.body.appendChild(modal);
     renderDesignerBlocks();
     renderDesignerPreview();
+    syncDesignerPickers();
+    maybeCoachDesigner();
     window.addEventListener('resize', renderDesignerPreview);
 }
 function closeQuoteDesigner() {
@@ -9764,4 +9805,86 @@ function countdownToast(ms, prefix) {
             paint();
         }, 1000);
     });
+}
+
+// ── The design screen's own controls ────────────────────────────────────────
+// Each of these does the same thing the settings card does, and then repaints
+// the paper — because the whole point of moving them here is that you see the
+// result. Without the repaint this is the old arrangement with a shorter walk.
+function designerPickTemplate(key) {
+    applyPdfTemplate(key, true);
+    applySheetTemplateClass(key);
+    renderDesignerPreview();
+    syncDesignerPickers();
+}
+
+function designerSetWatermark(kind) {
+    applyWatermarkChoice(kind, true);
+    renderDesignerPreview();
+    syncDesignerPickers();
+}
+
+function designerKnob(which, value) {
+    const id = which === 'size' ? 'pdf-font-size-body' : 'pdf-line-height';
+    const el = document.getElementById(id);
+    if (el) { el.value = value; }
+    if (which === 'size') appState.settings.pdfFontSizeBody = value;
+    else appState.settings.pdfLineHeight = value;
+    try { updatePdfCustomStyles(); } catch (e) {}
+    renderDesignerPreview();
+}
+
+function syncDesignerPickers() {
+    const tpl = appState.settings.pdfTemplate || 'classic';
+    document.querySelectorAll('.dz-tpl').forEach((b) => b.classList.toggle('is-on', b.dataset.tpl === tpl));
+    const wm = appState.settings.pdfWatermarkKind || 'bolt';
+    document.querySelectorAll('#quote-designer .wm-choice').forEach((b) => b.classList.toggle('is-on', b.dataset.wm === wm));
+}
+
+// ── The first time only ─────────────────────────────────────────────────────
+// Stav asked for this in his own words, and the words are his: three short
+// labels that say what the screen is and what each part does. It runs once —
+// a walkthrough that returns is a walkthrough people learn to dismiss without
+// reading, which is worse than none.
+const DESIGNER_COACH = [
+    { sel: '.designer-head h2', text: 'זה מסך עיצוב הצעת המחיר' },
+    { sel: '#dz-step-tpl', text: 'ופה זה בורר בחירה מתבניות' },
+    { sel: '#dz-step-bg', text: 'כאן יש לך אפשרות לדייק את הגחמות שלך — תמונת רקע, גודל פונט, מיקום המידע וכו\'' },
+];
+
+function maybeCoachDesigner() {
+    let seen = false;
+    try { seen = localStorage.getItem('sj_seen_designer_coach') === '1'; } catch (e) {}
+    if (seen) return;
+    coachDesignerStep(0);
+}
+
+function coachDesignerStep(i) {
+    document.getElementById('dz-coach')?.remove();
+    const step = DESIGNER_COACH[i];
+    if (!step) {
+        try { localStorage.setItem('sj_seen_designer_coach', '1'); } catch (e) {}
+        return;
+    }
+    const target = document.querySelector(step.sel);
+    if (!target) { coachDesignerStep(i + 1); return; }
+
+    target.classList.add('dz-lit');
+    const box = document.createElement('div');
+    box.id = 'dz-coach';
+    box.className = 'dz-coach';
+    box.innerHTML = `
+        <p>${escapeHtml(step.text)}</p>
+        <div class="dz-coach-foot">
+            <span>${i + 1} / ${DESIGNER_COACH.length}</span>
+            <button type="button" class="btn btn-accent btn-small">${i + 1 === DESIGNER_COACH.length ? 'הבנתי' : 'הבא'}</button>
+        </div>`;
+    box.querySelector('button').onclick = () => {
+        target.classList.remove('dz-lit');
+        coachDesignerStep(i + 1);
+    };
+    const r = target.getBoundingClientRect();
+    box.style.top = Math.min(window.innerHeight - 150, r.bottom + 10) + 'px';
+    box.style.insetInlineStart = Math.max(12, r.left) + 'px';
+    document.body.appendChild(box);
 }

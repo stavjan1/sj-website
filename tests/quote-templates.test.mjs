@@ -55,3 +55,34 @@ test('מודגשת is not offered, and that was measured not guessed', () => {
     assert.match(CSS, /DESIGNED, MEASURED, NOT SHIPPED/,
         'the note explaining why it is absent is gone, so somebody will re-add it');
 });
+
+test('the picker and the paper are on the same screen', () => {
+    // Stav, 29/08: "אי אפשר לשים את בחירת עיצוב מודרני וכו בלמעלה והמסך שמראה
+    // איך זה יוצא למטה. זה קשור אחד לשני ושמת אותם בנפרד." A picker whose
+    // effect you cannot see is a guess, not a choice — so the template row, the
+    // background and the two knobs moved into the designer, which already had
+    // the live paper beside it.
+    const i = APP.indexOf('function openQuoteDesigner');
+    const body = APP.slice(i, APP.indexOf('\n}', APP.indexOf('renderDesignerPreview();', i)));
+    assert.match(body, /dz-step-tpl/, 'the template picker is not on the design screen');
+    assert.match(body, /dz-step-bg/, 'the background picker is not on the design screen');
+    assert.match(body, /designer-preview/, 'the live paper is gone from the design screen');
+
+    // And every control must repaint the paper, or this is the old arrangement
+    // with a shorter walk.
+    for (const fn of ['designerPickTemplate', 'designerSetWatermark', 'designerKnob']) {
+        const j = APP.indexOf('function ' + fn);
+        assert.ok(j > -1, `${fn} is gone`);
+        assert.match(APP.slice(j, APP.indexOf('\n}', j)), /renderDesignerPreview\(\)/,
+            `${fn} changes the design without repainting the preview`);
+    }
+});
+
+test('the walkthrough runs once, in his words', () => {
+    // A walkthrough that returns is one people learn to dismiss without
+    // reading, which is worse than none.
+    assert.match(APP, /sj_seen_designer_coach/, 'the walkthrough no longer remembers it has run');
+    for (const line of ['זה מסך עיצוב הצעת המחיר', 'ופה זה בורר בחירה מתבניות']) {
+        assert.ok(APP.includes(line), `the walkthrough lost the line: ${line}`);
+    }
+});
