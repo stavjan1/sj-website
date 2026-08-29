@@ -677,7 +677,10 @@
 }
 @media (max-width: 860px) {
     .pdf-fs-content { width: 100%; }
-    .pdf-fs-content .a4-sheet { transform: scale(0.62); transform-origin: top center; }
+    /* No fixed scale. 0.62 x 794 = 492px, which fits no phone; fitFullPreview()
+       in sale/app.js measures the stage and scales to it. The origin stays here
+       because the scale is applied inline. */
+    .pdf-fs-content .a4-sheet { transform-origin: top center; }
 }
 
 /* ==========================================================================

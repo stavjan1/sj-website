@@ -44,3 +44,29 @@ test('the previews still drop the id, because two of one id is its own bug', () 
     assert.ok(clones >= 2 && drops >= 2,
         'a preview stopped removing the cloned id — getElementById may now find the copy');
 });
+
+test('the document fits the screen it is being looked at on', () => {
+    // Measured on a 375px phone before the fix: the A4 sat at left:-435 — more
+    // than half of what the electrician was about to send his customer was off
+    // the side of the screen, on the only device three of four reviewers work
+    // from. The inline sheet is hidden on a phone, so the fullscreen preview is
+    // the ONLY way to see the document there, and it had a hardcoded
+    // `transform: scale(0.62)` in CSS. 0.62 × 794 = 492px, which fits no phone.
+    const APP2 = readApp();
+    const CSS = readFileSync(join(ROOT, 'sale', 'css', 'pdf.css'), 'utf8');
+
+    assert.ok(!/\.pdf-fs-content \.a4-sheet\s*\{[^}]*scale\(/.test(CSS),
+        'the fullscreen preview is back on a fixed scale, which cannot fit an unknown screen');
+    assert.match(APP2, /function fitFullPreview/, 'the fullscreen preview no longer measures and fits');
+
+    const i = APP2.indexOf('function fitFullPreview');
+    const body = APP2.slice(i, APP2.indexOf(String.fromCharCode(10) + '}', i));
+    // Scaling alone leaves the LAYOUT box at 794px, so the scaled document ends
+    // up correctly sized and still off-screen. The wrapper has to shrink too.
+    assert.match(body, /wrap\.style\.width/, 'the wrapper no longer takes the scaled width, so layout and pixels disagree');
+    // And the origin must follow the writing direction: in RTL the box overflows
+    // to the LEFT, so a left origin scales outward from a corner already off
+    // the screen — measured at left:-435, the whole document past the edge.
+    assert.match(body, /direction[\s\S]{0,120}top right/,
+        'the scale origin ignores writing direction again');
+});

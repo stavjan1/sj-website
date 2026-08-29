@@ -1410,18 +1410,68 @@ function repairMojibake(s) {
 }
 
 // ===== Live A4 preview fit (scale the sheet so the whole page fits the pane) =====
-function fitQuotePreview() {
-    const scroller = document.querySelector('#panel-create .sheet-scroller');
-    const sheet = document.getElementById('quote-pdf-sheet');
-    if (!scroller || !sheet) return;
+// Fit an A4 sheet into whatever box it has been put in. The sheet is locked to
+// a true 794px because the PDF capture depends on that exact layout — squeeze
+// it and the line breaks in the exported file stop matching what was on screen
+// — so it is SCALED rather than resized.
+//
+// One function for both places it happens. It used to serve only the inline
+// editor, and the fullscreen preview had a hardcoded `transform: scale(0.62)`
+// in CSS instead. 0.62 × 794 = 492px, which does not fit a 375px phone: a
+// first-time reviewer measured the document at left:-435, so more than half of
+// what he was about to send his customer was off the side of the screen, on
+// the only device he works from. A fixed number cannot fit an unknown screen.
+function fitSheetInto(sheet, box, pad) {
+    if (!sheet || !box) return;
     sheet.style.transform = 'none';
     sheet.style.marginBottom = '0';
-    const avail = scroller.clientWidth - 60; // 30px scroller padding each side
-    let s = avail > 0 ? Math.min(1, avail / 794) : 1; // 794px = A4 width @96dpi
+    const avail = box.clientWidth - (pad == null ? 60 : pad);
+    let s = avail > 0 ? Math.min(1, avail / 794) : 1;   // 794px = A4 at 96dpi
     if (!isFinite(s) || s <= 0) s = 1;
     sheet.style.transform = `scale(${s})`;
     // Collapse the empty space the unscaled height would otherwise reserve.
     sheet.style.marginBottom = `${-(1 - s) * sheet.offsetHeight}px`;
+    return s;
+}
+
+function fitQuotePreview() {
+    fitSheetInto(document.getElementById('quote-pdf-sheet'),
+                 document.querySelector('#panel-create .sheet-scroller'));
+}
+
+// The fullscreen preview — the only way to see the document on a phone, since
+// the inline sheet is hidden there.
+function fitFullPreview() {
+    const modal = document.getElementById('pdf-fullscreen-modal');
+    if (!modal || modal.style.display === 'none') return;
+    const stage = modal.querySelector('.pdf-fs-stage') || modal.querySelector('.pdf-fs-content');
+    const sheet = modal.querySelector('.a4-sheet');
+    if (!stage || !sheet) return;
+
+    // Scaling alone is not enough, and this is the part that took a second
+    // measurement to see: transform does not change the LAYOUT box. The sheet
+    // still occupies 794px, so on a 375px stage it overflows both sides and the
+    // centring puts the visible, scaled document at left:-209 — correctly
+    // sized and still half off the screen.
+    // So the wrapper is given the scaled dimensions and the sheet is scaled
+    // from its top-left corner. Layout and pixels then agree, and ordinary
+    // centring does the rest.
+    // The origin follows the WRITING DIRECTION, and getting this wrong is worse
+    // than not scaling at all. The sheet's layout box stays 794px, so inside a
+    // narrower wrapper it overflows — to the LEFT in RTL. Scaling from
+    // 'top left' then scales outward from a corner that is already off-screen:
+    // measured at left:-435, the whole document past the edge. The corner that
+    // is actually anchored is the one the text starts at.
+    const rtl = (getComputedStyle(sheet).direction || 'rtl') === 'rtl';
+    sheet.style.transformOrigin = rtl ? 'top right' : 'top left';
+    const s = fitSheetInto(sheet, stage, 32) || 1;
+    const wrap = sheet.parentElement;
+    if (wrap && wrap.classList.contains('pdf-fs-content')) {
+        wrap.style.width = Math.round(794 * s) + 'px';
+        wrap.style.maxWidth = '100%';
+    }
+    // fitSheetInto's negative margin assumes centre-origin; with a left origin
+    // the collapse is the same amount, so it stays correct.
 }
 function setupQuotePreviewFit() {
     if (window._quoteFitObs) { fitQuotePreview(); return; }
@@ -7600,6 +7650,28 @@ function openFullPdfPreview() {
     target.appendChild(clone);
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
+    // After it is in the document, so the stage has a real width to measure.
+    requestAnimationFrame(fitFullPreview);
+    setTimeout(fitFullPreview, 60);          // and once more for a late font/image
+
+    // A ResizeObserver on the stage, not only a window resize listener. This
+    // codebase has already been caught once assuming a resize event always
+    // arrives — it does not, in every embedding — and the same pattern is
+    // already used for the inline sheet in setupQuotePreviewFit. Rotating a
+    // phone must refit the document, and this is the signal that always comes.
+    // Registered once: it was previously added on every open and never removed,
+    // so opening the preview ten times left ten listeners behind.
+    if (!window._fsFitObs && typeof ResizeObserver !== 'undefined') {
+        const stage = modal.querySelector('.pdf-fs-stage');
+        if (stage) {
+            window._fsFitObs = new ResizeObserver(() => fitFullPreview());
+            window._fsFitObs.observe(stage);
+        }
+    }
+    if (!window._fsFitBound) {
+        window.addEventListener('resize', fitFullPreview);
+        window._fsFitBound = true;
+    }
 }
 function closeFullPdfPreview() {
     const modal = document.getElementById('pdf-fullscreen-modal');
