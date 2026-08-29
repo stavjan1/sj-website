@@ -2604,9 +2604,16 @@ function _pfBox(index) {
 }
 
 // The question that asks why, shown only for "ממש לא".
-function _pfNoteHtml(index) {
-    return `<span style="color:var(--text-2);">מה היה לא בסדר?</span>
-        <input class="pf-note" type="text" maxlength="200" placeholder="למשל: פי שתיים ממה שגובים כאן" style="${PF_INPUT}">
+function _pfNoteHtml(index, verdict) {
+    // A softer question for the softer verdicts: "ממש לא" is a complaint and is
+    // asked what went wrong; "קצת גבוה/נמוך" is an expert disagreeing by a
+    // margin, and is asked where the mistake is — which is a question he can
+    // answer precisely and enjoys answering.
+    const near = verdict === 'bit_high' || verdict === 'bit_low';
+    const ask = near ? 'חושב שאתה יודע איפה הטעות? תסביר לנו' : 'מה היה לא בסדר?';
+    const eg = near ? 'למשל: שעת עבודה כאן היא 250 ולא 300' : 'למשל: פי שתיים ממה שגובים כאן';
+    return `<span style="color:var(--text-2);">${ask}</span>
+        <input class="pf-note" type="text" maxlength="200" placeholder="${eg}" style="${PF_INPUT}">
         <button type="button" style="${PF_CHIP}" onclick="submitPriceFeedback(${index}, this)">שלח</button>
         <button type="button" style="${PF_CHIP}opacity:0.65;" onclick="submitPriceFeedback(${index}, this, true)">דלג</button>`;
 }
@@ -2672,9 +2679,15 @@ function sendPriceFeedback(index, verdict, btn) {
     // one that earns a second question. The other three are a single tap and
     // are over — asking a satisfied user to explain himself is how a widget
     // stops being used.
-    if (verdict === 'way_off') {
+    // "קצת גבוה" and "קצת נמוך" are the two verdicts that carry the most useful
+    // information and used to carry none: they recorded a direction and threw
+    // away the reason. Stav, 29/08: "תוסיף ליד ההצבעה הזאת אפשרות 'חושב שאתה
+    // יודע איפה הטעות? תסביר לנו'." The man holding the quote is the only
+    // person who knows whether the labour rate, the quantity or the assumption
+    // was wrong, and he is standing right there.
+    if (verdict === 'way_off' || verdict === 'bit_high' || verdict === 'bit_low') {
         if (el) {
-            el.innerHTML = _pfNoteHtml(index);
+            el.innerHTML = _pfNoteHtml(index, verdict);
             const inp = el.querySelector('.pf-note');
             if (inp) inp.focus();
         }

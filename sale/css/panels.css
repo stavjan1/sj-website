@@ -5556,3 +5556,18 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
 .cr-msg.is-user { align-self: flex-start; background: var(--surface-2); }
 .cr-msg.is-ai { align-self: flex-end; background: var(--accent-soft); }
 .cr-who { display: block; margin-block-end: 2px; color: var(--text-3); font-size: 10px; font-weight: 700; }
+
+/* The verdict on the row, before you open it. A pile of conversations becomes
+   a queue of the ones that went wrong. */
+.cf-vote {
+    flex: none; padding: 1px 8px; border-radius: var(--r-pill);
+    font-size: 10px; font-weight: 700; background: var(--surface-2); color: var(--text-3);
+}
+.cf-vote.v-spot_on  { background: var(--accent-soft); color: var(--accent); }
+.cf-vote.v-bit_high,
+.cf-vote.v-bit_low  { background: rgba(240,192,64,0.14); color: var(--warn-text, #f0c040); }
+.cf-vote.v-way_off  { background: rgba(220,80,80,0.16); color: var(--danger); }
+.cf-note {
+    color: var(--text-2); font-size: var(--fs-xs); font-style: italic;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}

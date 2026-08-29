@@ -1214,6 +1214,15 @@ async function adminAnalyzeCatalog() {
 // the wire. The gate is server-side: /api/admin-convos checks the verified
 // Google email against ADMIN_EMAIL and there is no parameter that widens it.
 // ============================================================================
+// The four verdicts, as the electrician sees them. Mirrors VERDICTS in
+// functions/api/feedback.js.
+const PF_VERDICT_HE = {
+    way_off: 'ממש לא',
+    bit_high: 'קצת גבוה',
+    spot_on: 'בול',
+    bit_low: 'קצת נמוך',
+};
+
 let _adminConvos = [];
 let _adminConvosLoaded = false;
 // One refresh is one KV read per user, out of a daily budget shared with the
@@ -1228,10 +1237,28 @@ async function renderAdminConvos() {
     _convosLoading = true;
     box.innerHTML = '<p class="input-help">טוען…</p>';
     try {
-        const res = await adminRes('/api/admin-convos');
+        // The feed and the verdicts, together. /api/feedback already returns the
+        // recent entries and each carries quoteId — which IS the project id —
+        // so the join is free and costs no extra scan of anybody's data.
+        // Stav, 29/08: seeing whether he called the price גבוה/מדויק/נמוך
+        // BEFORE opening the thread is the whole point of the list: it turns a
+        // pile of conversations into a queue of the ones that went wrong.
+        const [res, fbRes] = await Promise.all([
+            adminRes('/api/admin-convos'),
+            adminRes('/api/feedback').catch(() => null),
+        ]);
         const d = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
         _adminConvos = Array.isArray(d.threads) ? d.threads : [];
+
+        let fb = {};
+        try {
+            const fd = fbRes ? await fbRes.json() : null;
+            (fd && Array.isArray(fd.entries) ? fd.entries : []).forEach((e) => {
+                if (e && e.quoteId && !fb[e.quoteId]) fb[e.quoteId] = e;   // newest first already
+            });
+        } catch (e) { /* no verdicts is a feed without badges, not a failure */ }
+        _adminConvos.forEach((t) => { const e = fb[t.id]; if (e) { t.verdict = e.verdict; t.note = e.note || ''; } });
         _adminConvosLoaded = true;
         renderAdminConvoList(d);
     } catch (e) {
@@ -1268,8 +1295,10 @@ function renderAdminConvoList(meta) {
         <button type="button" class="cf-row" onclick="openAdminConvo(${i})">
             <div class="cf-top">
                 <span class="cf-title">${escapeHtml(t.title)}</span>
+                ${t.verdict ? `<span class="cf-vote v-${t.verdict}">${escapeHtml(PF_VERDICT_HE[t.verdict] || t.verdict)}</span>` : ''}
                 <span class="cf-kind ${t.kind === 'ask' ? 'is-ask' : ''}">${t.kind === 'ask' ? 'שאלה' : 'עבודה'}</span>
             </div>
+            ${t.note ? `<div class="cf-note">“${escapeHtml(t.note)}”</div>` : ''}
             <div class="cf-said">${escapeHtml(t.asked || '—')}</div>
             <div class="cf-meta">
                 <span>${escapeHtml(t.email)}</span>
