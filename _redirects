@@ -4,10 +4,22 @@
 # Internal working docs + analytics data live in the repo root (the deploy
 # root) — serve 404 instead of exposing them. robots.txt entries would only
 # advertise the paths; this actually blocks them.
+# Three of these were listed and four were not, which is the failure mode of a
+# list that is maintained by hand: the ones added later were simply forgotten.
+# Everything in the repo is deployed (there is no .cfignore), so any file added
+# to the root is public the moment it is committed.
 /ANALYTICS.md         /404.html   404
 /BACKLOG.md           /404.html   404
 /PRODUCT_OVERVIEW.md  /404.html   404
+/COORDINATION.md      /404.html   404
+/ROADMAP.md           /404.html   404
+/ELECTRICAL_KIT.md    /404.html   404
+/README.md            /404.html   404
 /data/clarity/*       /404.html   404
+# The security review's own notes: how the CSP was verified and what it does and
+# does not cover. Publishing the review of the defences alongside the defences
+# is the one file on this list that actually helps an attacker.
+/scripts/*            /404.html   404
 
 /app    /sale/    301
 

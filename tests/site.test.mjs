@@ -4,6 +4,7 @@
 // a service worker precaching a shell that no longer matched the app.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -504,4 +505,23 @@ test('every guide milestone the app fires actually exists in the guide', () => {
 
     // The call site itself must be unable to throw.
     assert.match(app, /function coachSay\(id, delay\) \{\s*try \{/);
+});
+
+test('every internal doc in the deploy root is blocked, not just the remembered ones', () => {
+  // There is no .cfignore, so everything committed is served. The block list is
+  // maintained by hand and had drifted: ANALYTICS/BACKLOG/PRODUCT_OVERVIEW were
+  // listed, COORDINATION/ROADMAP/ELECTRICAL_KIT/README and the whole security
+  // review under scripts/ were not.
+  const red = readFileSync(new URL('../_redirects', import.meta.url), 'utf8');
+  const rooted = execSync('git ls-files "*.md"', { cwd: new URL('..', import.meta.url) })
+    .toString().split('\n').map((s) => s.trim()).filter(Boolean)
+    .filter((f) => f !== 'llms.txt');
+
+  const unblocked = rooted.filter((f) => {
+    const dir = f.includes('/') ? f.slice(0, f.indexOf('/')) : null;
+    if (dir && (red.includes('/' + dir + '/*') || red.includes('/' + dir + '/'))) return false;
+    return !red.includes('/' + f);
+  });
+  assert.deepEqual(unblocked, [],
+    'these internal documents are publicly served — add them to _redirects');
 });
