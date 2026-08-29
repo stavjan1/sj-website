@@ -101,8 +101,18 @@ async function handleChat(context) {
           },
         }, 429);
       }
-      // Best-effort increment (KV is eventually consistent — good enough here).
-      context.waitUntil(env.SJ_DATA.put(key, String(used + 1), { expirationTtl: 60 * 60 * 26 }));
+      // AWAITED, not waitUntil. waitUntil runs the write AFTER the response is
+      // sent, so a person clicking send four times in ten seconds had every one
+      // of those requests read the same stale 0 and be allowed — the guest's
+      // three questions were reachable to roughly a dozen. Awaiting it closes
+      // the sequential case, which is the one a human actually produces.
+      //
+      // A scripted PARALLEL burst can still overshoot: KV is eventually
+      // consistent and there is no atomic increment on this plan. That is a
+      // known limit, not an oversight — the honest bound here is "a few extra
+      // on a deliberate flood", and the per-minute IP limiter caps how fast a
+      // flood can arrive at all.
+      await env.SJ_DATA.put(key, String(used + 1), { expirationTtl: 60 * 60 * 26 });
     }
   }
 

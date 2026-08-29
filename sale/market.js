@@ -388,6 +388,10 @@ function addWorkItemRow(title = '', description = '', price = 0) {
 
     const row = document.createElement('div');
     row.className = 'work-item-form-row';
+    // The row remembers its own price even when there is no visible field for
+    // it. Without this, every save made while per-item prices are switched off
+    // wrote 0 over the real number — see getWorkItemsFromForm.
+    row.dataset.price = String(Number(price) || 0);
     row.innerHTML = `
         <div class="work-item-form-grid ${isItemized ? '' : 'no-price-col'}">
             <div class="row-index">${index}</div>
@@ -399,7 +403,8 @@ function addWorkItemRow(title = '', description = '', price = 0) {
             </div>
             ${isItemized ? `
             <div class="form-group" style="margin-bottom:0">
-                <input type="number" class="item-price-input" placeholder="מחיר" value="${price || ''}" oninput="calculateItemizedTotal()">
+                <input type="number" class="item-price-input" placeholder="מחיר" value="${price || ''}"
+                       oninput="this.closest('.work-item-form-row').dataset.price = (parseFloat(this.value) || 0); calculateItemizedTotal()">
             </div>
             ` : ''}
             <div class="work-item-actions">
@@ -467,8 +472,15 @@ function getWorkItemsFromForm(includeEmpty) {
     Array.from(container.children).forEach(row => {
         const title = row.querySelector('.item-title-input').value.trim();
         const desc = row.querySelector('.item-desc-input').value.trim();
+        // With per-item prices OFF — which is the default — addWorkItemRow does
+        // not render .item-price-input at all. This used to read that missing
+        // element and fall back to 0, so a quote that HAD prices lost every one
+        // of them the next time anything saved, silently and permanently. The
+        // row keeps the value in a data attribute for exactly this case.
         const priceInput = row.querySelector('.item-price-input');
-        const price = priceInput ? (parseFloat(priceInput.value) || 0) : 0;
+        const price = priceInput
+            ? (parseFloat(priceInput.value) || 0)
+            : (parseFloat(row.dataset.price) || 0);
         
         if (title || desc || includeEmpty) {
             items.push({ title, description: desc, price });
@@ -784,8 +796,13 @@ function sheetSetItem(index, field, value) {
     if (field === 'title') row.querySelector('.item-title-input').value = value;
     if (field === 'description') row.querySelector('.item-desc-input').value = value;
     if (field === 'price') {
+        const clean = String(value).replace(/[^\d.]/g, '');
+        // The row's own copy is updated whether or not the input is on screen —
+        // the sheet lets you edit a price in place even when the per-item column
+        // is switched off, and that edit used to go nowhere.
+        row.dataset.price = String(parseFloat(clean) || 0);
         const input = row.querySelector('.item-price-input');
-        if (input) { input.value = String(value).replace(/[^\d.]/g, ''); calculateItemizedTotal(); }
+        if (input) { input.value = clean; calculateItemizedTotal(); }
     }
     updatePreviewFromForm();
     syncCurrentQuoteToProject();

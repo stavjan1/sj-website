@@ -54,6 +54,15 @@ export async function onRequestGet(context) {
   if (msg) {
     const gate = await requirePayingUser(context);
     if (gate.error) return gate.error;
+    // Being a paying user is permission to read YOUR documents, not everyone's.
+    // A record with no owner is one created before this existed — allowed, so an
+    // upgrade does not break the status of a document already in flight.
+    if (env.SJ_DATA && gate.email) {
+      const owner = await env.SJ_DATA.get(`invdoc:${String(msg)}`);
+      if (owner && owner !== gate.email.toLowerCase()) {
+        return jsonResponse({ error: { message: 'המסמך אינו שייך לחשבון הזה.' } }, 403);
+      }
+    }
     const r = await smartbeeCall(env, 'GET', '/Documents/' + encodeURIComponent(msg));
     if (!r.ok) return jsonResponse({ error: { message: r.error || 'בדיקת סטטוס נכשלה' }, status: r.status, detail: r.data }, 502);
     return jsonResponse({ ok: true, status: r.data });
@@ -164,6 +173,19 @@ export async function onRequestPost(context) {
   // The create response wraps the tracking id in `result` (resultCodeId 101 =
   // queued). Later GET ?msg=<id> reports 102=created / 96=validation error.
   const apiMessageId = r.data && (r.data.result || r.data.apiMessageId || r.data.id);
+  // Remember whose document this is. Every paying user's invoices go through ONE
+  // shared SmartBee account, so the tracking id is the only thing separating
+  // them — and the status endpoint below used to accept any id from any paying
+  // caller. Ids are opaque, but "hard to guess" is not an access control, and
+  // the thing behind it is another electrician's invoice: his customer's name,
+  // address and what they were charged.
+  if (apiMessageId && env.SJ_DATA && gate.email) {
+    context.waitUntil(env.SJ_DATA.put(
+      `invdoc:${String(apiMessageId)}`,
+      gate.email.toLowerCase(),
+      { expirationTtl: 60 * 60 * 24 * 400 },
+    ));
+  }
   const codeId = r.data && r.data.resultCodeId;
   if (codeId && codeId >= 94 && codeId <= 99) {
     return jsonResponse({ error: { message: 'SmartBee דחתה את המסמך.', code: 'VALIDATION' }, detail: r.data }, 400);

@@ -51,9 +51,27 @@ export async function onRequestPost(context) {
   if (quoteId) {
     const seenKey = `pdfseen:${email.toLowerCase()}:${mo}:${quoteId}`;
     const seenCountKey = `pdfseenN:${email.toLowerCase()}:${mo}`;
-    if (await env.SJ_DATA.get(seenKey)) {
+    // A REPEAT IS FREE, BUT NOT INFINITELY FREE. The cap below counts DISTINCT
+    // ids, and the bypass this endpoint is exposed to uses exactly one: send the
+    // same client-chosen quoteId on every export and it is "seen" forever, so
+    // the counter is never touched and the monthly limit never applies. The
+    // distinct-id ceiling cannot see that, because there is only ever one id.
+    //
+    // Re-exporting the same quote after a revision is a real thing an
+    // electrician does, so it stays free — twelve times a month, which is more
+    // than anyone revises one document and far less than unlimited.
+    const REPEATS_PER_QUOTE = 12;
+    const seenRaw = await env.SJ_DATA.get(seenKey);
+    if (seenRaw) {
+      const repeats = parseInt(seenRaw, 10) || 1;
       const used = parseInt((await env.SJ_DATA.get(counterKey)) || '0', 10);
-      return jsonResponse({ allow: true, used, limit, repeat: true });
+      if (repeats < REPEATS_PER_QUOTE) {
+        context.waitUntil(env.SJ_DATA.put(seenKey, String(repeats + 1),
+          { expirationTtl: 60 * 60 * 24 * 40 }));
+        return jsonResponse({ allow: true, used, limit, repeat: true });
+      }
+      // Past the free-revision allowance: this export is charged like any other.
+      if (used >= limit) return jsonResponse({ allow: false, reason: 'quota', used, limit });
     }
     const distinct = parseInt((await env.SJ_DATA.get(seenCountKey)) || '0', 10);
     if (distinct >= MAX_REMEMBERED) {

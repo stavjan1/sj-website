@@ -10237,7 +10237,13 @@ const PLAN_CARDS = [
     {
         tier: 'free', name: 'סילבר', price: 'חינם',
         line: 'להתחיל, ולראות שזה עובד.',
-        has: ['מספר שאלות מוגבל ליום', 'עד 3 עבודות פתוחות', '3 הצעות מחיר בחודש', 'תמונה או שתיים ביום'],
+        // "תמונה או שתיים ביום" was on this card while BOTH tier tables say
+        // chatPhotos: false for free — the client's at TIER_LIMITS and the
+        // server's in _tiers.js. So the plans dialog sold a feature the plan is
+        // gated out of, and the first time a free user attached a photo the
+        // product called him a liar. Photos are a גולד line; they are listed
+        // there and not here.
+        has: ['מספר שאלות מוגבל ליום', 'עד 3 עבודות פתוחות', '3 הצעות מחיר בחודש', 'גיבוי ענן עם חשבון Google'],
     },
     {
         tier: 'pro', name: 'גולד ⚡', price: '19 ₪ לחודש',
