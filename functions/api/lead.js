@@ -87,17 +87,34 @@ export async function onRequestPost(context) {
     return json({ error: { message: 'נשלחו היום הרבה סיכומים. נסו שוב מחר או פנו אלינו ישירות.' } }, 429);
   }
 
+  // The last thing the caller controls that leaves this building. The ceilings
+  // above bound HOW MANY mails go out; this bounds what one can carry.
+  //
+  // The mail is sent from SJ's verified domain, and in the abuse case the
+  // visitor-authored turns are attacker-authored — so a working link inside
+  // them is a phishing payload wearing SJ's return address. Defanged in the
+  // USER turns only: the assistant’s own replies come from our model and may
+  // legitimately link to the site. The text still reads; the link no longer
+  // clicks.
+  const defang = (t) => t.replace(/https?:\/\/\S+|www\.\S+/gi, '[קישור הוסר]');
   const transcript = turns
     // Each turn is bounded like /api/assistant does it: this endpoint is public
     // and feeds an AI call, so message size cannot be attacker-chosen.
-    .map((m) => (m.role === 'user' ? 'מתעניין: ' : 'העוזר של SJ: ') + m.content.trim().slice(0, 2000))
+    .map((m) => {
+      const text = m.content.trim().slice(0, 2000);
+      return m.role === 'user'
+        ? 'מתעניין: ' + defang(text)
+        : 'העוזר של SJ: ' + text;
+    })
     .join('\n\n');
 
   // 1) AI-drafted personalised follow-up (non-streaming).
   let draft = '';
   try {
     const res = await generate(env, {
-      provider: (body.provider || 'gemini').toLowerCase(),
+      // Pinned, not body.provider: an endpoint that needs no account does not
+      // choose which model it spends the product's key on.
+      provider: 'gemini',
       messages: [
         { role: 'system', content: DRAFT_PROMPT },
         { role: 'user', content: `שם המתעניין: ${name}\n\nתמלול השיחה:\n${transcript}` },

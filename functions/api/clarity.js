@@ -38,6 +38,13 @@ export async function onRequestPost(context) {
 
 export async function onRequestGet(context) {
   const { request, env } = context;
+  // The POST beside this one has had adminGate since it was written; this GET
+  // never did. It returns the BUSINESS's own Clarity analytics — sessions,
+  // pages, where visitors drop off — to anyone who asks. Not customer data, but
+  // Stav's traffic figures were public, and a rate limit is not an
+  // authorisation check.
+  const gate = await adminGate(request);
+  if (!gate.ok) return gate.response;
   if (!env.SJ_DATA) return jsonResponse({ ok: false, error: 'KV לא מוגדר' }, 501);
   if (!(await rateLimit(env, request, 'clarity', 5))) {
     return jsonResponse({ ok: false, error: 'rate-limited' }, 429);

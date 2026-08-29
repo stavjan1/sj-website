@@ -5,7 +5,7 @@
 // Grok).
 
 import { generate } from './_ai.js';
-import { rateLimit, loadModelClass } from './_tiers.js';
+import { rateLimit, dailyQuota, loadModelClass } from './_tiers.js';
 
 const PUBLIC_PROMPT = `אתה "העוזר ההנדסי של SJ": עוזר חכם מבית SJ הנדסת חשמל, משרד תכנון, ייעוץ ושרטוט מערכות חשמל בישראל בסמכות מהנדס חשמל רשום בפנקס המהנדסים.
 
@@ -112,6 +112,13 @@ async function handleAssistant(context) {
   // Public, unauthenticated LLM endpoint — rate-limit per IP so it can't be
   // hammered to burn Gemini tokens. 12/min is far above real chat use. Fails
   // open if KV isn't bound (same idiom as /api/chat).
+  // A per-IP minute limiter bounds one abuser, not a hundred: the wrong shape
+  // of guard for an unauthenticated endpoint that spends the product's own AI
+  // key on every call. /api/lead already pairs the two and /api/stats now
+  // does; this was the last open one.
+  if (!(await dailyQuota(env, 'assistant:all', 1500))) {
+    return json({ error: { message: 'העוזר עמוס היום. נסו שוב מחר, או פנו אלינו ישירות.' } }, 429);
+  }
   if (!(await rateLimit(env, request, 'assistant', 12))) {
     return json({ error: { message: 'יותר מדי בקשות בזמן קצר, המתן דקה ונסה שוב.' } }, 429);
   }

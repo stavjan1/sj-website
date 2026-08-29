@@ -32,6 +32,7 @@ async function loadConfig(env) {
             : (Array.isArray(cfg.allowed) ? cfg.allowed : [])
         ).map(v => String(v).trim()).filter(Boolean),
         openToFirst: !!cfg.openToFirst,   // "the next chat that writes gets in"
+        pairArmedAt: Number(cfg.pairArmedAt) || 0,
     };
 }
 
@@ -260,7 +261,26 @@ async function handleUpdate(env, cfg, update) {
     // "the next chat that writes gets in", which is how the owner pairs his own
     // phone without ever copying a chat id by hand.
     if (!cfg.allowed.includes(String(chatId))) {
-        if (cfg.openToFirst) {
+        // The window has always had a timestamp — telegram-setup.js writes
+        // pairArmedAt when the owner presses "חבר את הטלפון שלי" — and nothing
+        // has ever read it. So an armed window stayed armed forever, and the
+        // first stranger to message the bot got in and could read the business's
+        // reports. Ten minutes is longer than walking to your phone.
+        const PAIR_WINDOW_MS = 10 * 60 * 1000;
+        const armedFresh = cfg.openToFirst
+            && cfg.pairArmedAt > 0
+            && (Date.now() - cfg.pairArmedAt) < PAIR_WINDOW_MS;
+        if (cfg.openToFirst && !armedFresh) {
+            // Expired: close it, and say so rather than silently refusing.
+            try {
+                const raw = JSON.parse(await env.SJ_DATA.get('config:telegram') || '{}');
+                raw.openToFirst = false;
+                await env.SJ_DATA.put('config:telegram', JSON.stringify(raw));
+            } catch { }
+            await say(cfg, chatId, 'חלון החיבור נסגר (עברו יותר מ-10 דקות). פותחים שוב בזרם: ניהול ← בוט הטלגרם.');
+            return;
+        }
+        if (armedFresh) {
             cfg.allowed.push(String(chatId));
             try {
                 const raw = JSON.parse(await env.SJ_DATA.get('config:telegram') || '{}');

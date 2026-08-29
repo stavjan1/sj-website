@@ -77,8 +77,16 @@ export async function onRequestPost(context) {
   let items = [];
   try {
     const aiRes = await generate(env, {
-      provider: (body.provider || 'gemini').toLowerCase(),
-      model: body.model,
+      // NOT body.provider / body.model. This endpoint needs no account, and
+      // pickModel accepts any name on the allowlist — which includes
+      // gemini-2.5-pro, the model _tiers.js gates behind advancedModel for
+      // paying users only. An anonymous caller could name it and run it on the
+      // product's own key, draining the shared free quota and then spilling
+      // onto GEMINI_API_KEY_PAID. /api/chat already derives the model from the
+      // caller's tier and never trusts the body; this now does the same, and
+      // the extraction is a fixed prompt at temperature 0, so there was never a
+      // reason for the caller to have an opinion about the model at all.
+      provider: 'gemini',
       messages: [
         { role: 'system', content: EXTRACT_PROMPT },
         { role: 'user', content: `כתובת: ${url}\n\nתוכן הדף:\n${content}` },
@@ -147,9 +155,15 @@ async function tryShopifyCollection(url) {
     const u = new URL(url);
     const m = u.pathname.match(/\/collections\/([^/?#]+)/);
     if (!m) return null;
-    const res = await fetch(`${u.origin}/collections/${m[1]}/products.json?limit=250`, {
-      headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36' },
-    });
+    // fetchNoSsrfRedirect, not a bare fetch. This file builds a careful manual
+    // redirect follower for exactly this reason twenty lines above — and then
+    // this fast path used plain `fetch`, which follows redirects by default. A
+    // public Shopify-looking host could 302 the request to an internal target
+    // after isPublicHttpUrl had already passed. One door locked, one open, in
+    // the same file.
+    const target = `${u.origin}/collections/${m[1]}/products.json?limit=250`;
+    if (!isPublicHttpUrl(target)) return null;
+    const res = await fetchNoSsrfRedirect(target);
     if (!res.ok) return null;
     const data = await res.json().catch(() => null);
     if (!data || !Array.isArray(data.products)) return null;
