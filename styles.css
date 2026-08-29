@@ -115,6 +115,18 @@
   .header-actions .btn { display: none; }
 }
 
+/* Header shortcut to ZEREM, phone only (the desktop nav has it in full). */
+.zerem-quick {
+  display: none; align-items: center; gap: 6px;
+  min-height: 40px; padding-inline: var(--sp-3);
+  border: 1px solid var(--accent); border-radius: var(--r-sm);
+  color: var(--accent); font-weight: 700; font-size: var(--fs-sm);
+  text-decoration: none; white-space: nowrap;
+}
+.zerem-quick:hover, .zerem-quick:focus-visible { color: var(--accent-strong); border-color: var(--accent-strong); }
+.zerem-quick svg { width: 15px; height: 15px; flex: none; }
+@media (max-width: 900px) { .zerem-quick { display: inline-flex; } }
+
 /* ---------- hero ----------
    V3 opened every page with type on a flat ground, and the page read as a
    printed document: nothing to look at, nowhere for the eye to land. The
@@ -140,9 +152,17 @@
 .facts-band .fact span { font-size: var(--fs-sm); color: rgb(255 255 255 / 0.72); }
 .facts-band .fact a { color: rgb(255 255 255 / 0.72); text-decoration: underline; text-underline-offset: 3px; }
 .facts-band .fact a:hover { color: #FFFFFF; }
+/* On a phone the row used to break after two numbers, so the rating dropped
+   to a line of its own and the band read as a list instead of a row of proof.
+   Three equal columns, centred, with the type stepped down enough that the
+   longest label ("42 ביקורות בגוגל") wraps inside its own third rather than
+   pushing anything out. nowrap is the whole point — never let it break. */
 @media (max-width: 560px) {
-  .facts-band .wrap { gap: var(--sp-6); }
-  .facts-band .fact { flex: 1 1 40%; }
+  .facts-band { padding-block: var(--sp-6); }
+  .facts-band .wrap { flex-wrap: nowrap; gap: var(--sp-3); }
+  .facts-band .fact { flex: 1 1 0; min-width: 0; align-items: center; text-align: center; }
+  .facts-band .fact b { font-size: var(--fs-2xl); }
+  .facts-band .fact span { font-size: var(--fs-xs); line-height: 1.3; }
 }
 .hero h1 {
   font-family: var(--font-display);
