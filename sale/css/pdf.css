@@ -482,43 +482,51 @@
       templates (classic/modern/minimal) and the customizer in app.js
    ========================================================================== */
 
-/* ===== Dynamic PDF Styling variables and Mini Preview layout ===== */
-#quote-pdf-sheet {
+/* ===== Dynamic PDF Styling variables and Mini Preview layout =====
+   A CLASS, not the id it used to be. Both preview paths — "תצוגה מלאה" and the
+   designer's live preview — do cloneNode(true) followed by removeAttribute('id')
+   to avoid a duplicate id in the document. That is correct, and it silently
+   dropped all sixteen rules below, so the clone fell back to body's 16px while
+   the real sheet and the exported PDF are 12px.
+   Measured: preview 16px, PDF 12px. A third bigger, with different line breaks,
+   on the screen whose entire job is "look at the exact PDF before you send it".
+   A class survives cloning; an id cannot. */
+.quote-sheet {
     font-family: var(--pdf-custom-font, 'Heebo', sans-serif) !important;
     line-height: var(--pdf-custom-line-height, 1.4) !important;
 }
 
-#quote-pdf-sheet .pdf-wrapper {
+.quote-sheet .pdf-wrapper {
     font-size: var(--pdf-custom-font-size-body, 12px) !important;
 }
 
-#quote-pdf-sheet td,
-#quote-pdf-sheet th,
-#quote-pdf-sheet .summary-text,
-#quote-pdf-sheet .pdf-warning-box,
-#quote-pdf-sheet .pdf-company-footer {
+.quote-sheet td,
+.quote-sheet th,
+.quote-sheet .summary-text,
+.quote-sheet .pdf-warning-box,
+.quote-sheet .pdf-company-footer {
     font-size: var(--pdf-custom-font-size-body, 12px) !important;
 }
 
-#quote-pdf-sheet .pdf-title {
+.quote-sheet .pdf-title {
     color: var(--pdf-custom-primary, #1e3a8a) !important;
 }
 
-#quote-pdf-sheet .underline-bar {
+.quote-sheet .underline-bar {
     background-color: var(--pdf-custom-secondary, #3b82f6) !important;
 }
 
-#quote-pdf-sheet #pdf-total-price {
+.quote-sheet #pdf-total-price {
     color: var(--pdf-custom-primary, #1e3a8a) !important;
 }
 
-#quote-pdf-sheet #pdf-logo-container svg {
+.quote-sheet #pdf-logo-container svg {
     color: var(--pdf-custom-primary, #1e3a8a) !important;
 }
 
 /* English mode: the sheet flips to LTR; keep the money column readable */
-#quote-pdf-sheet.pdf-english { direction: ltr; }
-#quote-pdf-sheet.pdf-english .pdf-header-grid { direction: ltr; }
+.quote-sheet.pdf-english { direction: ltr; }
+.quote-sheet.pdf-english .pdf-header-grid { direction: ltr; }
 
 /* Designer block styles forced onto text-bearing children (a child <h1>/<td>
    resets text-decoration, so an inline underline on the block did nothing). */
@@ -729,12 +737,12 @@
         visibility: hidden;
     }
 
-    #quote-pdf-sheet,
-    #quote-pdf-sheet * {
+    .quote-sheet,
+    .quote-sheet * {
         visibility: visible;
     }
 
-    #quote-pdf-sheet {
+    .quote-sheet {
         position: absolute;
         left: 0;
         top: 0;
