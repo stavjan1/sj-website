@@ -1847,3 +1847,68 @@
    It is a deliberately roomy template, so the room comes off the blocks that
    have the most and lose the least: the gaps between items and around the
    summary. The look survives; the second page does not. */
+
+/* ============================================================================
+   MAKING THEM READ AS DIFFERENT DOCUMENTS
+   Stav, clicking through them: "התבניות משנות רק את הפונט." Measured, that was
+   unfair — title size, alignment and rule weight all changed — but he was right
+   about the EXPERIENCE, which is the thing that counts. The differences were
+   typographic restraint of the kind a designer admires and a user cannot see.
+   So each template now commits to one structural idea it alone owns. Still no
+   markup change, still one page at eight items, still safe under html2canvas —
+   borders, backgrounds, spacing and weight only.
+   ============================================================================ */
+
+/* קלאסית — the accountant's letter. A ruled masthead, and the total set apart
+   on its own rule, the way a printed invoice separates the sum from the list. */
+.quote-sheet.tpl-classic .pdf-header {
+    border-block-end: 2px solid var(--pdf-custom-primary, #1e3a8a);
+    padding-block-end: 10px;
+}
+.quote-sheet.tpl-classic .pdf-title { letter-spacing: .02em; }
+.quote-sheet.tpl-classic .pdf-work-item {
+    border-block-end: 1px solid #e5e7eb;
+    padding-block-end: 7px;
+}
+.quote-sheet.tpl-classic .pdf-footer-section {
+    border-block-start: 2px solid var(--pdf-custom-primary, #1e3a8a);
+    padding-block-start: 8px;
+}
+
+/* נקייה — no rules anywhere. Hierarchy carried by weight and air alone, and the
+   one place colour appears is the total. The document a designer would send. */
+.quote-sheet.tpl-minimal .pdf-header,
+.quote-sheet.tpl-minimal .pdf-footer-section,
+.quote-sheet.tpl-minimal .pdf-work-item,
+.quote-sheet.tpl-minimal .pdf-terms-box,
+.quote-sheet.tpl-minimal .pdf-summary-box { border: none; }
+.quote-sheet.tpl-minimal .pdf-title {
+    font-weight: 300; letter-spacing: .06em; text-transform: none;
+}
+.quote-sheet.tpl-minimal .pdf-item-title { font-weight: 600; }
+.quote-sheet.tpl-minimal .pdf-work-item { padding-block-end: 11px; }
+.quote-sheet.tpl-minimal #pdf-total-price { font-weight: 700; }
+
+/* הנדסית — a technical submission. Every block in a ruled box, labels in small
+   caps, and figures in a tabular face so columns of numbers line up. */
+.quote-sheet.tpl-engineer .pdf-header {
+    border: 1px solid #cbd5e1; padding: 9px 11px;
+}
+.quote-sheet.tpl-engineer .pdf-terms-box,
+.quote-sheet.tpl-engineer .pdf-summary-box {
+    border: 1px solid #cbd5e1; padding: 8px 10px;
+}
+.quote-sheet.tpl-engineer .recipient-label,
+.quote-sheet.tpl-engineer .meta-item,
+.quote-sheet.tpl-engineer .pdf-term-k {
+    letter-spacing: .08em; font-size: .82em; color: #475569;
+}
+.quote-sheet.tpl-engineer .pdf-item-title,
+.quote-sheet.tpl-engineer #pdf-total-price,
+.quote-sheet.tpl-engineer .price-val {
+    font-variant-numeric: tabular-nums;
+}
+.quote-sheet.tpl-engineer .pdf-work-item {
+    border-inline-start: 2px solid var(--pdf-custom-secondary, #0e7490);
+    padding-inline-start: 8px;
+}

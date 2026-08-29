@@ -6091,7 +6091,7 @@ async function resetQuoteDesign() {
 const PDF_TEMPLATES = {
     classic: {
         label: 'קלאסית', cls: 'tpl-classic',
-        font: "'David Libre', serif", size: '12', lh: '1.4',
+        font: "'Frank Ruhl Libre', serif", size: '12', lh: '1.4',
         primary: '#1e3a8a', secondary: '#3b82f6', watermark: true
     },
     minimal: {

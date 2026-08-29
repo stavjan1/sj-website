@@ -46,7 +46,14 @@
 .a4-sheet {
     background-color: var(--pdf-bg);
     color: var(--pdf-text-main);
-    font-family: 'David Libre', 'Frank Ruhl Libre', 'Heebo', serif;
+    /* Frank Ruhl Libre first, not David Libre. Measured at 100px with real
+       glyph bounding boxes, Latin cap height ÷ Hebrew letter height:
+       Frank Ruhl 1.10 · David Libre 1.17 · Assistant 1.18 · Heebo 1.23.
+       Stav: "ה-A של האמפר בגודל לא פרופורציונלי" — on "3x25A" the A was
+       towering over the Hebrew beside it. Latin capitals are taller than
+       Hebrew letters in every Hebrew face, so this picks the closest pairing
+       rather than pretending to cure it. */
+    font-family: 'Frank Ruhl Libre', 'David Libre', 'Heebo', serif;
     width: 794px; /* A4 width at 96 DPI */
     /* NEVER let flexbox squeeze the sheet below true A4 width — the preview
        shrinks it with transform:scale instead, and the PDF capture relies on
