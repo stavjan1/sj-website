@@ -4171,7 +4171,13 @@ function renderEstimateTotal() {
 // ==========================================================================
 // AI Phrasing Agent (סוכן ניסוח הצעת מחיר)
 // ==========================================================================
-async function exportChatToQuote() {
+// `el` is the button that was actually pressed (onclick passes `this`). Two
+// buttons trigger this, so locking one by id was never enough — and a re-entry
+// guard matters more here than anywhere else in the app: this call ships the
+// entire conversation to the model, so a second press is not a small waste.
+let _exportingQuote = false;
+async function exportChatToQuote(el) {
+    if (_exportingQuote) return;
     if (!activeProjectId) {
         showToast('אין פרויקט פעיל לייצוא', 'error');
         return;
@@ -4186,10 +4192,13 @@ async function exportChatToQuote() {
         return;
     }
 
-    const btn = document.getElementById('btn-export-to-quote');
-    const origText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> מנסח הצעת מחיר...`;
+    // Every button that can start this, not just the first one with the id.
+    _exportingQuote = true;
+    const btns = Array.from(document.querySelectorAll('.js-export-to-quote'));
+    const btn = el || btns[0];
+    const origHtml = new Map(btns.map((b) => [b, b.innerHTML]));
+    btns.forEach((b) => { b.disabled = true; });
+    if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> מנסח הצעת מחיר...`;
     
     // Format conversation history
     const conversationText = proj.chatHistory.map(msg => {
@@ -4323,9 +4332,12 @@ ${extrasText ? `תוספות שסתיו סימן (כל אחת סעיף נפרד 
         console.error(err);
         showToast(humanAiError(err), 'error');
     } finally {
+        // In a finally, and for EVERY trigger — a lock released only on the
+        // success path is a button that stays dead after one network blip, and
+        // one that releases only itself leaves the twin still disabled.
         setQuotaCharging(false);
-        btn.disabled = false;
-        btn.innerHTML = origText;
+        _exportingQuote = false;
+        btns.forEach((b) => { b.disabled = false; b.innerHTML = origHtml.get(b); });
     }
 }
 

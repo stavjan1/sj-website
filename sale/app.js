@@ -4084,8 +4084,12 @@ function clientCardsHtml(items, stage) {
 }
 
 function renderStatistics() {
-    const board = document.getElementById('pipeline-board');
-    if (!board) return;
+    // Every board on the page, not the first element with one id. Two screens
+    // show this — the money view and the "צינור העבודה" panel — and they used to
+    // share ids, so one of them was always empty.
+    const boards = Array.from(document.querySelectorAll('.pipe-board, .pipeline-board'));
+    if (!boards.length) return;
+    const board = boards[0];
     const nis = (n) => '₪' + Math.round(n).toLocaleString('he-IL');
     const cols = {};
     PIPELINE_COLS.forEach(c => cols[c.key] = []);
@@ -4101,7 +4105,7 @@ function renderStatistics() {
         .filter(p => pipeMonth === 'all' || projectMonthKey(p) === pipeMonth)
         .forEach(p => { (cols[projectPipelineStage(p)] || cols.planning).push(p); });
 
-    board.innerHTML = PIPELINE_COLS.map(c => {
+    const boardHtml = PIPELINE_COLS.map(c => {
         const items = cols[c.key];
         const sum = items.reduce((s, p) => s + projectAmount(p), 0);
         const cards = items.length ? (pipeGroupByClient ? clientCardsHtml(items, c.key) : items.map(p => {
@@ -4133,6 +4137,9 @@ function renderStatistics() {
             <div class="pipe-col-body">${cards}</div>
         </div>`;
     }).join('');
+    // Both boards get it. Only the visible one is on screen; writing to both
+    // costs nothing and means neither screen can be the empty one.
+    boards.forEach((b) => { b.innerHTML = boardHtml; });
 
     const totalCount = (projectsList || []).length;
     const totalValue = (projectsList || []).reduce((s, p) => s + projectAmount(p), 0);
@@ -4155,13 +4162,14 @@ function renderStatistics() {
 
     // Waiting longer than 30 days since the status changed = late money.
     const lateValue = cols.awaiting.filter(p => projectIdleDays(p) >= 30).reduce((s2, p) => s2 + projectAmount(p), 0);
-    const head = document.getElementById('pipeline-summary');
-    if (head) head.innerHTML = `
+    const heads = Array.from(document.querySelectorAll('.pipe-summary, .pipeline-summary'));
+    const headHtml = `
         <div class="pipe-stat"><span class="pipe-stat-num">${totalCount}</span><span class="pipe-stat-lbl">פרויקטים</span></div>
         <div class="pipe-stat"><span class="pipe-stat-num">${nis(totalValue)}</span><span class="pipe-stat-lbl">שווי צבר כולל</span></div>
         <div class="pipe-stat"><span class="pipe-stat-num" style="color:var(--warn-text)">${nis(openValue)}</span><span class="pipe-stat-lbl">פתוח (טרם שולם)</span></div>
         <div class="pipe-stat"><span class="pipe-stat-num" style="color:var(--ok-text)">${nis(paidValue)}</span><span class="pipe-stat-lbl">שולם</span></div>
         ${lateValue ? `<div class="pipe-stat"><span class="pipe-stat-num" style="color:var(--danger)">${nis(lateValue)}</span><span class="pipe-stat-lbl">מאחר מעל 30 יום</span></div>` : ''}`;
+    heads.forEach((h) => { h.innerHTML = headHtml; });
 }
 
 // One place decides what a column MEANS for a project, so a drag and a button
