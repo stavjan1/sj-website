@@ -29,11 +29,16 @@ const AI_POOLS = ['gemini:primary', 'gemini:backup', 'gemini:paid', 'grok', 'clo
 const SITES = ['site', 'zerem', 'app'];
 const UNIQ_CAP = 4000;          // hashed ids kept per day — a counter, not an audience
 const PATH_CAP = 200;           // distinct paths tracked per day
-// Every counted hit costs one KV write, and this namespace also holds the
-// users' cloud backups and the daily AI quotas. A traffic spike must never be
-// able to starve those, so counting stops at a ceiling and says so rather than
-// eating the write budget. Well above any realistic day for this site.
-const DAILY_HIT_CAP = 3000;
+// Every counted hit costs TWO KV writes, not one: the rate limiter writes its
+// own key for every ACCEPTED call (see rateLimit in _tiers.js) before this
+// counter writes its own. So the old 3,000 ceiling permitted ~6,000 writes a day
+// against a free-tier budget of 1,000 — the ceiling written to protect the
+// budget sat six times above it, which made it a decoration.
+//
+// 300 hits x 2 writes = 600, leaving real headroom for the writes that matter:
+// the users' cloud backups and their AI quotas. Analytics is the thing that
+// should stop first, and now it does.
+const DAILY_HIT_CAP = 300;
 
 const BOT_RE = /bot|crawl|spider|slurp|bingpreview|headless|phantom|puppeteer|playwright|selenium|lighthouse|curl|wget|python-requests|axios|monitoring|uptime|pingdom|gtmetrix|ahrefs|semrush|mj12|dotbot|petal|bytespider|gptbot|claudebot|ccbot|perplexity|applebot/i;
 

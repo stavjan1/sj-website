@@ -15,7 +15,7 @@
 //   GET  /api/stats?admin=1    → admin: full aggregate dashboard + live flag
 //   POST /api/stats            { setLive: true|false }  (admin) → toggle display
 
-import { adminGate, rateLimit, monthKey, jsonResponse } from './_tiers.js';
+import { adminGate, rateLimit, dailyQuota, monthKey, jsonResponse } from './_tiers.js';
 
 const MIN_SAMPLES = 5;        // never show an average built on fewer than this
 const SAMPLES_CAP = 1000;     // rolling window kept per bucket
@@ -28,7 +28,16 @@ const ITEM_SAMPLES_CAP = 400;   // rolling samples kept per item name
 const ITEM_NAME_MAX = 60;
 const ITEM_PRICE_MIN = 1;
 const ITEM_PRICE_MAX = 200000;
-const ITEMS_PER_QUOTE = 40;     // ignore the tail of an absurdly long quote
+// Each accepted item is one KV WRITE, and this endpoint needs no account. At 40
+// the worst case for a single request was ~45 writes (limiter + dedup + bucket +
+// 40 items + 2 counters); at the endpoint's own 20/min that is 900 writes a
+// minute against a namespace whose entire free-tier budget is 1,000 A DAY — and
+// the namespace holding every user's quote backup. One IP could take cloud sync
+// down for everyone in about a minute.
+//
+// Ten items is not a real loss of signal: the value here is what a job charges
+// for its common components, and the eleventh line of a quote is the tail.
+const ITEMS_PER_QUOTE = 10;
 const ITEM_BUCKETS_CAP = 4000;  // safety ceiling on distinct item names per profession
 
 const JOB_TYPES = ['panel', 'points', 'charger', 'solar', 'inspection', 'fault', 'infra', 'other'];
@@ -89,6 +98,12 @@ export async function onRequestPost(context) {
   // Rate-limit BEFORE any branch that makes an outbound Google call, so an
   // unauthenticated flood of {"setLive":true} can't be amplified into one
   // upstream token-verification request per hit.
+  // A day ceiling as well as a minute one. The per-minute limiter is per-IP, so
+  // it bounds one abuser and not a hundred; this bounds the endpoint itself, and
+  // it is deliberately well above any real day for this product's size.
+  if (!(await dailyQuota(env, 'stats:intake', 400))) {
+    return jsonResponse({ ok: false, skipped: 'daily-cap' }, 200);
+  }
   if (!(await rateLimit(env, request, 'stats', 20))) {
     return jsonResponse({ ok: false, skipped: 'rate' }, 200);
   }

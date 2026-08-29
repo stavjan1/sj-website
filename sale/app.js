@@ -1202,7 +1202,8 @@ function getStorageKey(key) {
 // (501) or the network is down, the local copy remains the source of truth.
 // ==========================================================================
 var _cloudSaveTimer = null;
-let _cloudFullWarned = false; // one-time "cloud blob is full" (413) notice
+let _cloudFullWarned = false;
+let _cloudDownWarned = false; // one-time "cloud blob is full" (413) notice
 
 function isGuestUser() {
     return (getActiveUser() || '').toLowerCase() === 'guest';
@@ -1311,7 +1312,23 @@ async function cloudSaveNow() {
             }
             return false;
         }
+        // 503 = the server could not write to KV at all (the daily write budget,
+        // or a transient KV failure). Same reasoning as the 413 above: a backup
+        // that fails invisibly leaves him believing his work is in the cloud
+        // when it is not, and this is the failure most likely to happen to
+        // everyone at once. Warned once per session, with the server's own
+        // wording, and the local copy stays authoritative.
+        if (res.status === 503) {
+            if (!_cloudDownWarned) {
+                _cloudDownWarned = true;
+                const d = await res.json().catch(() => ({}));
+                showToast((d.error && d.error.message)
+                    || 'הגיבוי לענן נכשל כרגע. המידע שמור אצלך במכשיר — נסה שוב בעוד כמה דקות.', 'error');
+            }
+            return false;
+        }
         _cloudFullWarned = false; // a successful save re-arms the warning
+        _cloudDownWarned = false;
         if (!res.ok) return false;
         // The backup always saves now; the server only FLAGS when a free user
         // passed their monthly new-quote allowance so we can nudge once.

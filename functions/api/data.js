@@ -94,7 +94,18 @@ export async function onRequest(context) {
     if (payload.length > 5 * 1024 * 1024) {
       return json({ error: { message: 'הנתונים גדולים מדי לאחסון בענן.' } }, 413);
     }
-    await env.SJ_DATA.put(key, payload);
+    // A failed write must not escape the Function. Unguarded, an exhausted daily
+    // KV write budget (or any transient KV error) threw straight out and the
+    // electrician got Cloudflare's bare 502 — which the app cannot distinguish
+    // from "saved". His work stays in localStorage either way, so the honest
+    // answer is "not saved to the cloud, try again", not a crash and not
+    // silence. Analytics and stats now stop long before this point precisely so
+    // that this write keeps working; this is the backstop for when it does not.
+    try {
+      await env.SJ_DATA.put(key, payload);
+    } catch (e) {
+      return json({ error: { message: 'הגיבוי לענן נכשל כרגע. המידע שמור אצלך במכשיר — נסה שוב בעוד כמה דקות.' } }, 503);
+    }
 
     // Notify AFTER the save succeeded — a rejected first sync (413 below) must
     // not announce a user who has no cloud record. Sent via Resend: web3forms
