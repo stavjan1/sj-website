@@ -1,0 +1,1849 @@
+/* ============================================================================
+   QUOTE TEMPLATES
+   Four looks for the one document a customer ever sees. Stav, 29/08: "הצעת
+   מחיר לא נראית ככה בגדול, לא הרצינות של מורנינג וכאלה. תעשה כמה עיצובים."
+
+   Each is a THEME, not a layout: a class on .quote-sheet and rules under it.
+   The markup never changes, because the PDF exporter walks these ids and the
+   block designer reorders them by data-block — a template that moved an
+   element would break both.
+
+   The class is put on by applyPdfTemplate() in sale/app.js. Without it every
+   rule here matches nothing, which is how these arrived: written, reviewed,
+   and completely inert.
+
+   Each was measured in a browser against the app's own page height
+   (pdfPageHeightPx, sale/market.js) with a realistic 6- and 8-item quote. A
+   template that pushes the company footer alone onto page two is not a style
+   choice, it is an embarrassment sent to somebody's customer.
+   ============================================================================ */
+
+/* ---- classic / קלאסית ---------------------------------------------------- */
+/* For the electrician who is about to send a price to a customer he wants to keep, and cannot afford to look like a hobbyist. It is the document an accountant would send: a ruled letterhead, the business identity top-inline-start and the quote's own number and date boxed at the inline-end with "לכבוד" */
+/* ==========================================================================
+   ZEREM · quote template "קלאסית" — THE SERIOUS ONE
+   A CSS-only theme for the existing sheet markup: add `tpl-classic` to
+   #quote-pdf-sheet (which already carries .a4-sheet) and nothing else moves.
+
+   Rules of the house it has to live in:
+   - No markup changes. Every selector below exists in sale/index.html or is
+     produced by market.js / app.js.
+   - html2canvas is the renderer: borders, backgrounds, spacing and type only.
+     No filter / backdrop-filter / blend modes / gradient text / sticky.
+   - RTL Hebrew: logical properties; number+currency runs are isolated.
+   - The user's own controls still win: --pdf-custom-font / -font-size-body /
+     -line-height / -primary / -secondary, the logo sliders (--logo-*), the
+     watermark toggle and the block designer (order/align/size/bold/underline).
+     This theme sets structure, weight, rules and spacing — not their choices.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Palette and document defaults
+   The shared --pdf-* tokens are re-pointed here (they are defined on :root, so
+   redefining them on the sheet re-colours every existing rule at once) and the
+   accent is read from the user's own colour picker, so the whole document
+   follows it instead of only the title and the total.
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-classic {
+    /* the one accent, used in four places: the letterhead rule, the document
+       title, the table's head rule and the total */
+    --tpl-accent: var(--pdf-custom-primary, #1e3a8a);
+    --tpl-accent-2: var(--pdf-custom-secondary, #3b82f6);
+
+    /* neutral printing ink — not slate-blue: this is paper, not UI. Body copy
+       stays dark enough to survive a photocopy and a builder's laser printer. */
+    --tpl-ink: #14171c;    /* headings, labels, totals */
+    --tpl-ink-2: #333a42;  /* body copy */
+    --tpl-ink-3: #5d646d;  /* secondary lines */
+    --tpl-ink-4: #7a818a;  /* captions and the smallest print */
+    --tpl-rule: #d8dbe0;   /* hairline between rows */
+    --tpl-rule-2: #aeb4bd; /* closing / structural rule */
+    --tpl-band: #f4f5f7;   /* the only fill in the document */
+    --tpl-num: 'Assistant', 'Heebo', 'Rubik', sans-serif;
+
+    /* re-point the shared tokens the base stylesheet already consumes */
+    --pdf-primary: var(--tpl-accent);
+    --pdf-secondary: var(--tpl-accent-2);
+    --pdf-text-main: var(--tpl-ink);
+    --pdf-text-muted: var(--tpl-ink-3);
+    --pdf-border: var(--tpl-rule);
+    --pdf-line: var(--tpl-rule);
+    --pdf-danger: #8c2f2f;
+
+    color: var(--tpl-ink);
+    /* Mirrors of the #quote-pdf-sheet rules, at lower priority. The live sheet
+       keeps its !important values; the full-screen preview clones the sheet
+       WITHOUT its id (app.js: clone.removeAttribute('id')), so those rules
+       stop applying there. Restating them off the class keeps preview, sheet
+       and PDF the same document. */
+    font-family: var(--pdf-custom-font, 'Heebo', sans-serif);
+    line-height: var(--pdf-custom-line-height, 1.4);
+}
+
+/* Same reason: the body size the whole em scale below is measured against. */
+.quote-sheet.tpl-classic .pdf-wrapper {
+    font-size: var(--pdf-custom-font-size-body, 12px);
+}
+
+/* A watermark belongs inside the type area, not bled to the trim. box-sizing
+   is not cosmetic here: the base pads a height:100% layer, so the layer ends
+   up taller than the page and inflates sheet.scrollHeight — the very number
+   renderPageGuides() uses to decide the quote runs to a second page. */
+.quote-sheet.tpl-classic .pdf-watermark {
+    box-sizing: border-box;
+    padding: 130px;
+}
+
+/* --------------------------------------------------------------------------
+   2. Letterhead — the way an Israeli quote is built: business identity at the
+      inline-start, and at the inline-end the document's own details boxed with
+      "לכבוד" beneath them (Morning / iCount put the customer under the document
+      block, not opposite the logo). Two content-width columns, so the three
+      DOM columns keep their order, their ids and the user's logo alignment —
+      and the header stops costing 80px of paper it did not need.
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-classic .pdf-header {
+    margin-bottom: 7px;
+}
+
+.quote-sheet.tpl-classic .pdf-header-grid {
+    grid-template-columns: minmax(0, auto) minmax(0, auto);
+    grid-template-areas:
+        "brand meta"
+        "brand client";
+    justify-content: space-between;
+    align-items: start;
+    align-content: start;
+    gap: 10px 24px;
+}
+
+.quote-sheet.tpl-classic .pdf-logo-column { grid-area: brand; align-self: start; }
+.quote-sheet.tpl-classic .pdf-meta-column { grid-area: meta; }
+.quote-sheet.tpl-classic .pdf-recipient-column { grid-area: client; }
+
+/* Business identity */
+.quote-sheet.tpl-classic .pdf-company-title {
+    font-size: 1.5em;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: 0;
+    color: var(--tpl-accent);
+    margin-bottom: 2px;
+}
+
+.quote-sheet.tpl-classic .pdf-company-subtitle {
+    font-size: 0.95em;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    color: var(--tpl-ink-3);
+    border-bottom: 0;
+    min-width: 0;
+    padding-bottom: 0;
+    margin-bottom: 1px;
+}
+
+.quote-sheet.tpl-classic .pdf-company-owner {
+    font-size: 0.95em;
+    font-weight: 400;
+    color: var(--tpl-ink-3);
+}
+
+/* Document meta — the identity of the paper itself, in a plain ruled box:
+   number first (that is what anyone quotes back at you), date under it. */
+.quote-sheet.tpl-classic .pdf-meta-column {
+    align-items: stretch;
+    text-align: start;
+    gap: 2px;
+    min-width: 168px;
+    padding: 7px 11px;
+    border: 1px solid var(--tpl-rule-2);
+    font-weight: 400;
+}
+
+.quote-sheet.tpl-classic .meta-item {
+    display: block;
+    white-space: nowrap;
+}
+
+.quote-sheet.tpl-classic .meta-item:first-child { order: 2; }
+
+.quote-sheet.tpl-classic .meta-val-number {
+    display: block;
+    font-size: 1.02em;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    color: var(--tpl-accent);
+}
+
+.quote-sheet.tpl-classic .meta-val-number span {
+    font-family: var(--tpl-num);
+    font-variant-numeric: tabular-nums;
+}
+
+.quote-sheet.tpl-classic .meta-val-date {
+    display: block;
+    font-family: var(--tpl-num);
+    font-size: 0.92em;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--tpl-ink-3);
+}
+
+/* Recipient */
+.quote-sheet.tpl-classic .pdf-recipient-column {
+    gap: 1px;
+    max-width: 300px;
+}
+
+.quote-sheet.tpl-classic .recipient-label {
+    font-size: 0.85em;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    color: var(--tpl-ink-3);
+}
+
+.quote-sheet.tpl-classic .recipient-name {
+    font-size: 1.2em;
+    font-weight: 700;
+    color: var(--tpl-ink);
+    text-decoration: none;
+    /* a long business name must wrap, not run off the sheet */
+    white-space: normal;
+}
+
+.quote-sheet.tpl-classic .recipient-sub {
+    font-size: 0.95em;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--tpl-ink-2);
+}
+
+/* --------------------------------------------------------------------------
+   3. The ruled band: heavy rule, document title, hairline. This is the piece
+      that makes the page read as a document at arm's length.
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-classic .pdf-header-divider {
+    height: 2px;
+    background-color: var(--tpl-accent);
+    margin-top: 2px;
+    margin-bottom: 0;
+}
+
+.quote-sheet.tpl-classic .pdf-title-container {
+    margin-bottom: 12px;
+}
+
+.quote-sheet.tpl-classic .pdf-title {
+    display: block;
+    font-size: 1.6em;
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: 0.2px;
+    color: var(--tpl-accent);
+    border-bottom: 0;
+    padding: 7px 0 6px;
+}
+
+/* The empty .underline-bar div, put to work as the band's closing hairline. */
+.quote-sheet.tpl-classic .underline-bar {
+    display: block;
+    width: 100%;
+    height: 1px;
+    background-color: var(--tpl-accent-2);
+}
+
+/* --------------------------------------------------------------------------
+   4. Work items — plain mode (a numbered list of clauses)
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-classic .pdf-items-list {
+    gap: 0;
+    margin-bottom: 12px;
+}
+
+.quote-sheet.tpl-classic .pdf-work-item {
+    gap: 1px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--tpl-rule);
+}
+
+.quote-sheet.tpl-classic .pdf-work-item:first-child { padding-top: 0; }
+
+.quote-sheet.tpl-classic .pdf-work-item:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.quote-sheet.tpl-classic .pdf-item-title {
+    font-size: 1.05em;
+    font-weight: 700;
+    color: var(--tpl-ink);
+    text-decoration: none;
+    margin-bottom: 1px;
+}
+
+.quote-sheet.tpl-classic .pdf-item-desc {
+    font-size: 1em;
+    line-height: 1.55;
+    color: var(--tpl-ink-2);
+    /* the base indents with physical padding-right; zero it first so English
+       (LTR) mode does not end up indented on both sides */
+    padding-right: 0;
+    padding-inline-start: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   5. Work items — itemised mode (the priced table)
+      Horizontal rules only, one light band for the head, tabular figures, and
+      the money column left where it is: in RTL the shekel sign and the units
+      digit both land on the inline-end edge, so the column aligns itself.
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-classic .pdf-table {
+    margin-bottom: 0;
+    font-size: 1em;
+}
+
+.quote-sheet.tpl-classic .pdf-table th {
+    padding: 6px 10px;
+    border: 0;
+    border-top: 1.5px solid var(--tpl-accent);
+    border-bottom: 1.5px solid var(--tpl-rule-2);
+    background-color: var(--tpl-band);
+    color: var(--tpl-ink);
+    font-size: 0.92em;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    vertical-align: middle;
+}
+
+.quote-sheet.tpl-classic .pdf-table td {
+    padding: 6px 10px;
+    border: 0;
+    border-bottom: 1px solid var(--tpl-rule);
+    vertical-align: top;
+}
+
+.quote-sheet.tpl-classic .pdf-table tbody tr:last-child td {
+    border-bottom: 1.5px solid var(--tpl-rule-2);
+}
+
+/* no zebra: rules do the separating, and stripes print as mud */
+.quote-sheet.tpl-classic .pdf-table tbody tr:nth-child(even) {
+    background-color: transparent;
+}
+
+/* The table cells are written with inline styles by market.js (blue underlined
+   titles, a description one size LARGER than its own title, Outfit — a family
+   the page never loads). !important is the only thing that outranks an inline
+   style, so it appears here, and only on the properties that need it. */
+.quote-sheet.tpl-classic .pdf-table td:first-child {
+    font-family: var(--tpl-num) !important;
+    font-size: 0.95em !important;
+    font-weight: 500 !important;
+    color: var(--tpl-ink-3) !important;
+}
+
+.quote-sheet.tpl-classic .pdf-table td [data-item-field="title"] {
+    color: var(--tpl-ink) !important;
+    font-weight: 700 !important;
+    text-decoration: none !important;
+    margin-bottom: 1px !important;
+}
+
+.quote-sheet.tpl-classic .pdf-table td [data-item-field="description"] {
+    color: var(--tpl-ink-2) !important;
+    font-size: 0.94em !important;
+    line-height: 1.5 !important;
+}
+
+.quote-sheet.tpl-classic .pdf-table td:last-child {
+    font-family: var(--tpl-num) !important;
+    font-weight: 700 !important;
+    color: var(--tpl-ink) !important;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* keep the amount one unbreakable run inside the RTL paragraph */
+.quote-sheet.tpl-classic [data-item-field="price"] {
+    unicode-bidi: isolate;
+}
+
+/* --------------------------------------------------------------------------
+   6. Terms · additional notes · exclusions
+      Three blocks that used to be three different-looking web cards. Now: one
+      ruled box, one hairline-topped note, one framed paragraph.
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-classic .pdf-terms-box {
+    margin-block-start: 10px;
+    padding: 6px 11px;
+    border: 1px solid var(--tpl-rule);
+    border-radius: 0;
+    background: transparent;
+    gap: 3px;
+}
+
+.quote-sheet.tpl-classic .pdf-term-row {
+    font-size: 0.95em;
+    line-height: 1.45;
+    gap: 10px;
+}
+
+.quote-sheet.tpl-classic .pdf-term-k {
+    min-width: 82px;
+    font-size: 0.95em;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    color: var(--tpl-ink);
+}
+
+.quote-sheet.tpl-classic .pdf-term-v {
+    color: var(--tpl-ink-2);
+}
+
+/* Additional notes: the base pushes this block to the bottom of the content
+   area with margin-top:auto, which opens a hole in the middle of a short
+   quote. A document flows from the top; the footer is already pinned. */
+.quote-sheet.tpl-classic .pdf-summary-box {
+    margin-top: 11px;
+    margin-bottom: 0;
+    padding: 8px 0 0;
+    border: 0;
+    border-top: 1px solid var(--tpl-rule);
+    border-radius: 0;
+    background-color: transparent;
+    font-size: 1em;
+}
+
+.quote-sheet.tpl-classic .summary-title {
+    font-size: 0.88em;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    color: var(--tpl-ink-3);
+    margin-bottom: 3px;
+}
+
+.quote-sheet.tpl-classic .summary-text {
+    font-size: var(--pdf-custom-font-size-body, 12px);
+    line-height: 1.55;
+    color: var(--tpl-ink-2);
+}
+
+/* What the price does not include: the paragraph that settles arguments. It
+   earns a frame and a band — not a red dashed alarm box. */
+.quote-sheet.tpl-classic .pdf-warning-box {
+    margin-top: 11px;
+    margin-bottom: 0;
+    padding: 7px 12px;
+    border: 1px solid var(--tpl-rule-2);
+    border-radius: 0;
+    background-color: var(--tpl-band);
+    color: var(--tpl-ink);
+    font-size: var(--pdf-custom-font-size-body, 12px);
+    font-weight: 500;
+    line-height: 1.5;
+    text-align: start;
+}
+
+/* An empty box is worse than no box (kept in its own rule — a browser without
+   :has() must not drop the rest of the sheet's styling). */
+.quote-sheet.tpl-classic .pdf-terms-box:empty,
+.quote-sheet.tpl-classic .pdf-warning-box:empty {
+    display: none;
+}
+
+.quote-sheet.tpl-classic:not(.sheet-editing) .pdf-summary-box:has(> .summary-text:empty) {
+    display: none;
+}
+
+.quote-sheet.tpl-classic:not(.sheet-editing) .pdf-warning-box:has(> [data-term-field]:empty) {
+    display: none;
+}
+
+/* --------------------------------------------------------------------------
+   7. Signature row — every declaration here is fighting an inline style in
+      index.html, hence the !important on exactly those properties.
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-classic #pdf-signature-row {
+    margin-top: 18px !important;
+    /* the slot captions hang 18px below their rule (absolute, in index.html),
+       so the block needs clearance under it or they land on the total */
+    margin-bottom: 26px !important;
+    padding-top: 14px !important;
+    border-top: 1px solid var(--tpl-rule-2) !important;
+    gap: 6%;
+}
+
+.quote-sheet.tpl-classic #pdf-signature-row > div > span {
+    font-size: 0.9em !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.2px;
+    color: var(--tpl-ink) !important;
+}
+
+.quote-sheet.tpl-classic #pdf-signature-row > div > div {
+    border-bottom: 1px solid var(--tpl-ink-4) !important;
+}
+
+.quote-sheet.tpl-classic #pdf-signature-row > div > div > span {
+    font-size: 0.75em !important;
+    color: var(--tpl-ink-4) !important;
+}
+
+/* --------------------------------------------------------------------------
+   8. Total and footer
+      The amount goes where an invoice puts it: a ruled band at the inline-end,
+      label and figure held apart. Underlines removed — the rules do that job.
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-classic .pdf-footer-section {
+    align-items: flex-end;
+    padding-top: 10px;
+}
+
+.quote-sheet.tpl-classic .pdf-price-row {
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 24px;
+    min-width: 54%;
+    margin-bottom: 4px;
+    padding: 6px 0 7px;
+    border-top: 1.5px solid var(--tpl-accent);
+    border-bottom: 1px solid var(--tpl-rule-2);
+    font-size: 1em;
+    font-weight: 700;
+    color: var(--tpl-ink);
+}
+
+.quote-sheet.tpl-classic .price-label {
+    font-size: 1.06em;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    color: var(--tpl-ink);
+    text-decoration: none;
+}
+
+.quote-sheet.tpl-classic .price-val {
+    font-family: var(--tpl-num);
+    font-size: 1.6em;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    color: var(--tpl-accent);
+    text-decoration: none;
+    font-variant-numeric: tabular-nums;
+    /* keeps "12,500 ש\"ח" out of the surrounding paragraph's bidi ordering */
+    unicode-bidi: isolate;
+}
+
+.quote-sheet.tpl-classic .price-sub-label {
+    margin-bottom: 10px;
+    font-size: 0.88em;
+    font-weight: 500;
+    color: var(--tpl-ink-3);
+    text-align: end;
+}
+
+.quote-sheet.tpl-classic .pdf-footer-line {
+    height: 1px;
+    background-color: var(--tpl-rule-2);
+    margin-bottom: 7px;
+}
+
+/* Footer type is set in px on purpose: it is boilerplate, so it must not ride
+   the item-size slider, and px keeps the sheet and its id-less clone identical
+   (the base forces 12px on .pdf-company-footer through #quote-pdf-sheet). */
+.quote-sheet.tpl-classic .pdf-company-footer {
+    gap: 2px;
+}
+
+.quote-sheet.tpl-classic .footer-row {
+    gap: 7px;
+    font-size: 9.5px;
+    line-height: 1.5;
+}
+
+.quote-sheet.tpl-classic .footer-row.font-bold {
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    color: var(--tpl-ink);
+}
+
+.quote-sheet.tpl-classic .footer-row.text-secondary {
+    color: var(--tpl-ink-3);
+}
+
+.quote-sheet.tpl-classic .bullet {
+    color: var(--tpl-rule-2);
+}
+
+/* Hebrew has no italic — the browser fakes one by slanting the glyphs. */
+.quote-sheet.tpl-classic .footer-notice {
+    max-width: 88%;
+    margin: 6px auto 0;
+    font-size: 8.5px;
+    font-style: normal;
+    line-height: 1.45;
+    color: var(--tpl-ink-4);
+}
+
+.quote-sheet.tpl-classic .pdf-zerem-credit {
+    margin-top: 6px;
+    font-size: 8px;
+    letter-spacing: 0.4px;
+    color: #9aa1aa;
+}
+
+/* --------------------------------------------------------------------------
+   9. Print fallback (when the html2pdf CDN fails, app.js falls back to
+      window.print()). Browsers drop background colours when printing, which
+      would take the table head band and the exclusions panel with them.
+   -------------------------------------------------------------------------- */
+@media print {
+    .quote-sheet.tpl-classic,
+    .quote-sheet.tpl-classic * {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
+
+/* ---- bold / מודגשת — DESIGNED, MEASURED, NOT SHIPPED ----------------------
+   The roomiest of the four and the best-looking on a phone, which is where
+   most of these are read. It is not here because it does not fit: measured
+   against the app's own page height (1158px), a SIX-item quote came to 1239px
+   and spilled an 8% tail — the company footer alone on page two. Its spacing
+   was tightened (items 10px, list gap 8px, summary 12px) and it still came to
+   1239: the height is in the header band and the footer plate, which are the
+   design. Making it fit would make it a different template.
+   Removed rather than shipped-and-warned, because a quote that splits is an
+   embarrassment sent to somebody's customer, and the electrician choosing a
+   template is not the person who should discover that. It is in git.
+   ---------------------------------------------------------------------- */
+
+/* ---- minimal / נקייה ---------------------------------------------------- */
+/* For the electrician who wants the document to say nothing about itself. It is the quote you send to an architect, an interior designer, a project manager, or any customer who has read a real proposal before — the reader's eye goes to the work and the price, never to the design. Because it carries no */
+/* ==========================================================================
+   ZEREM · quote template "נקייה" — the quiet one.
+   A CSS THEME ONLY. Add `tpl-minimal` to #quote-pdf-sheet; change no markup.
+
+   The idea: no boxes, no tints, no zebra, no coloured labels. Hierarchy comes
+   from size, weight and space alone. Five lines exist on the whole page —
+   under the letterhead, above and below the priced list, above the total and
+   above the colophon — and every one of them is a 1px hairline. Nothing else
+   on the sheet is drawn; the rest is type and air.
+
+   Three things this file works around, all of them existing machinery:
+     a) Several base rules paint with the ROOT --pdf-primary / --pdf-secondary
+        (navy #1e3a8a / blue #3b82f6), which no template ever changed. Those
+        variables are redefined at sheet scope below, so every rule that reads
+        them — including the inline styles market.js writes into the table —
+        lands inside this ramp instead.
+     b) The base sheet mixes rem and em, so the body-size slider moved the body
+        and nothing else (item titles 1.1rem = 17.6px against a 12px body).
+        Everything here is em, so the document scales as one system.
+     c) 'Outfit' is referenced for numerals but is NOT in the Google Fonts
+        link — it silently falls back. Weights are limited to 400/500/700,
+        which is the honest range for Heebo / Rubik / David Libre.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. The ink ramp. One ink, three greys, two hairlines — nothing else.
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-minimal {
+    --q-ink:   #16181c;   /* headings and the words that carry the price   */
+    --q-soft:  #4b5057;   /* descriptions, secondary prose                 */
+    --q-mute:  #85898f;   /* labels, meta, footer                          */
+    --q-faint: #a9adb3;   /* captions                                      */
+    --q-hair:  #dcdee1;   /* the quiet hairline                            */
+    --q-rule:  #b2b6bc;   /* the structural hairline                       */
+
+    /* Re-ink the legacy palette at sheet scope. This one block desaturates
+       the header divider, the company name, the recipient, the item titles,
+       the table head, the summary title, the total row and the footer rule —
+       all of which were hard-wired to the 2019 navy. */
+    --pdf-text-main: var(--q-ink);
+    --pdf-text-muted: var(--q-mute);
+    --pdf-border: var(--q-hair);
+    --pdf-line: var(--q-hair);
+    --pdf-secondary: var(--q-hair);
+    --pdf-danger: var(--q-ink);
+    /* Deliberately NOT --pdf-custom-primary: the user's brand colour is spent
+       on exactly two lines (the title and the total, both already locked to it
+       upstream). Prose stays graphite so the page survives a mono printer. */
+    --pdf-primary: var(--q-ink);
+
+    color: var(--q-ink);
+    /* ~15mm side margins instead of ~13mm. The single cheapest way to make a
+       sheet look like it came off a designer's desk; the vertical is trimmed
+       to pay for it, so the one-page budget survives (see the note at the
+       foot of this file). */
+    padding: 42px 58px 32px;
+}
+
+/* --------------------------------------------------------------------------
+   2. Letterhead. The 1.2fr / 1fr / 1.2fr row with a centred logo is a Word
+      certificate. Re-mapped to the shape an Israeli quote actually has:
+      identity at the start, document meta at the end, "לכבוד" on its own row
+      beneath. Pure grid placement — the DOM order is untouched, and column 1
+      is the start column in RTL and in the English LTR mode alike.
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-minimal .pdf-header { margin-bottom: 0; }
+
+.quote-sheet.tpl-minimal .pdf-header-grid {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    align-items: start;
+    column-gap: 24px;
+    row-gap: 8px;
+}
+
+.quote-sheet.tpl-minimal .pdf-logo-column {
+    grid-column: 1;
+    grid-row: 1;
+    /* Overrides --logo-align: this template owns its letterhead axis. The
+       logo WIDTH slider keeps working. */
+    align-items: flex-start;
+    text-align: start;
+}
+
+.quote-sheet.tpl-minimal .pdf-meta-column {
+    grid-column: 2;
+    grid-row: 1;
+    /* Sits on the same baseline as the business name, not floating at the
+       top of a 75px logo — the letterhead reads as one horizontal band. */
+    align-self: end;
+    align-items: flex-end;
+    text-align: end;
+    gap: 3px;
+    font-weight: 400;
+    padding-bottom: 2px;
+}
+
+.quote-sheet.tpl-minimal .pdf-recipient-column {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    align-items: flex-start;
+    text-align: start;
+    gap: 2px;
+}
+
+.quote-sheet.tpl-minimal .pdf-logo-wrapper {
+    justify-content: flex-start;
+    margin-bottom: 5px;
+}
+
+/* The built-in fallback mark is a blue-on-navy badge. Only users who have not
+   uploaded a logo ever see it; in this template it goes monochrome so the
+   page never has exactly one coloured object on it. An uploaded <img> is
+   untouched. */
+.quote-sheet.tpl-minimal .pdf-logo-svg circle { fill: var(--q-ink); stroke: var(--q-ink); }
+.quote-sheet.tpl-minimal .pdf-logo-svg path   { stroke: #ffffff; }
+
+.quote-sheet.tpl-minimal .pdf-company-title {
+    font-size: 1.32em;
+    font-weight: 500;
+    color: var(--q-ink);
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    margin-bottom: 3px;
+}
+
+/* Was a blue-underlined pill with a 150px floor. Now it is just a line of
+   type under the business name, which is what it says. */
+.quote-sheet.tpl-minimal .pdf-company-subtitle {
+    display: block;
+    font-size: 0.82em;
+    font-weight: 400;
+    color: var(--q-mute);
+    letter-spacing: 0.02em;
+    border-bottom: 0;
+    padding-bottom: 0;
+    margin-bottom: 1px;
+    min-width: 0;
+}
+
+.quote-sheet.tpl-minimal .pdf-company-owner {
+    font-size: 0.82em;
+    font-weight: 400;
+    color: var(--q-mute);
+}
+
+.quote-sheet.tpl-minimal .meta-item { display: block; }
+
+.quote-sheet.tpl-minimal .meta-val-date,
+.quote-sheet.tpl-minimal .meta-val-number {
+    font-size: 0.82em;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    color: var(--q-mute);
+}
+
+/* The quote number is the one thing in the meta column anyone looks up twice. */
+.quote-sheet.tpl-minimal .meta-val-number span {
+    font-weight: 500;
+    color: var(--q-ink);
+}
+
+.quote-sheet.tpl-minimal .recipient-label {
+    font-size: 0.72em;
+    font-weight: 500;
+    color: var(--q-mute);
+    /* Hebrew has no capitals, so tracking is how a label says "I am a label". */
+    letter-spacing: 0.12em;
+    margin-bottom: 3px;
+}
+
+.quote-sheet.tpl-minimal .recipient-name {
+    font-size: 1.15em;
+    font-weight: 500;
+    color: var(--q-ink);
+    text-decoration: none;
+    line-height: 1.3;
+}
+
+.quote-sheet.tpl-minimal .recipient-sub {
+    font-size: 0.88em;
+    font-weight: 400;
+    color: var(--q-soft);
+    line-height: 1.45;
+}
+
+.quote-sheet.tpl-minimal .pdf-header-divider {
+    height: 1px;
+    background-color: var(--q-rule);
+    margin-top: 12px;
+    margin-bottom: 0;
+}
+
+/* --------------------------------------------------------------------------
+   3. The document's name. Big, light, flush to the margin, no box under it.
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-minimal .pdf-title-container {
+    text-align: start;
+    margin-top: 20px;
+    margin-bottom: 16px;
+}
+
+.quote-sheet.tpl-minimal .pdf-title {
+    display: block;
+    font-size: 1.82em;
+    font-weight: 400;
+    line-height: 1.25;
+    letter-spacing: -0.012em;
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+/* The accent bar under the title is the one ornament this template refuses. */
+.quote-sheet.tpl-minimal .underline-bar { display: none; }
+
+/* --------------------------------------------------------------------------
+   4. The work. Two renderers share this section: a plain list, and a priced
+      table whose cells carry INLINE styles from market.js — hence the few
+      !important declarations, which exist only to beat those inline styles.
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-minimal .pdf-content-area { min-height: 0; }
+
+.quote-sheet.tpl-minimal .pdf-items-list {
+    gap: 12px;
+    margin-bottom: 0;
+}
+
+.quote-sheet.tpl-minimal .pdf-work-item { gap: 3px; }
+
+.quote-sheet.tpl-minimal .pdf-item-title {
+    font-size: 1.02em;
+    font-weight: 500;
+    color: var(--q-ink);
+    /* An underlined heading is the single most amateur mark on the old sheet. */
+    text-decoration: none;
+    line-height: 1.4;
+    margin-bottom: 0;
+}
+
+.quote-sheet.tpl-minimal .pdf-item-desc { padding: 0; }
+
+/* Same element in the list renderer, an inline-styled <div> in the table
+   renderer. One rule so both read identically. */
+.quote-sheet.tpl-minimal [data-item-field="title"] {
+    font-weight: 500 !important;
+    text-decoration: none !important;
+    color: var(--q-ink);
+}
+
+.quote-sheet.tpl-minimal [data-item-field="description"] {
+    /* market.js writes 0.9rem inline — 14.4px, LARGER than the 12px body it
+       sits inside. This puts the description back under its own heading. */
+    font-size: 0.92em !important;
+    line-height: 1.5 !important;
+    color: var(--q-soft) !important;
+}
+
+/* --- the priced table: rows, not cells ---------------------------------- */
+.quote-sheet.tpl-minimal .pdf-table {
+    /* was 0.95rem — a root-relative size inside an em document, which is why
+       the head and the body never agreed */
+    font-size: 1em;
+    margin-bottom: 0;
+}
+
+.quote-sheet.tpl-minimal .pdf-table th {
+    background: none;
+    border: 0;
+    border-bottom: 1px solid var(--q-rule);
+    color: var(--q-mute);
+    font-weight: 500;
+    font-size: 0.72em;
+    letter-spacing: 0.1em;
+    padding: 0 12px 7px;
+    text-align: start;
+    vertical-align: bottom;
+}
+
+/* The base sheet locks every th/td to the body size with an id + !important.
+   The live sheet carries the id; the full-screen preview and the designer
+   preview are clones with the id stripped. Stating the size twice is what
+   makes the preview, the live sheet and the PDF agree. */
+.quote-sheet.tpl-minimal#quote-pdf-sheet .pdf-table th {
+    font-size: 0.72em !important;
+}
+
+.quote-sheet.tpl-minimal .pdf-table td {
+    border: 0;
+    border-top: 1px solid var(--q-hair);
+    padding: 6px 12px;
+    vertical-align: top;
+    text-align: start;
+}
+
+.quote-sheet.tpl-minimal .pdf-table tbody tr:first-child td {
+    border-top: 0;
+    padding-top: 8px;
+}
+
+/* The list is bracketed, top and bottom, so the terms below it can never be
+   mistaken for two more rows. These two are the table — there is no grid. */
+.quote-sheet.tpl-minimal .pdf-table tbody tr:last-child td {
+    border-bottom: 1px solid var(--q-rule);
+}
+
+.quote-sheet.tpl-minimal .pdf-table tbody tr:nth-child(even) { background-color: transparent; }
+
+/* Everything hangs on one optical margin: the outer cells lose their padding
+   so the table's edges line up with the title, the terms and the footer. */
+.quote-sheet.tpl-minimal .pdf-table th:first-child,
+.quote-sheet.tpl-minimal .pdf-table td:first-child { padding-inline-start: 0; }
+
+.quote-sheet.tpl-minimal .pdf-table th:last-child,
+.quote-sheet.tpl-minimal .pdf-table td:last-child  { padding-inline-end: 0; }
+
+/* Row number: was centred, bold, and in a font that is not loaded — 'Outfit'
+   is written inline but never linked, so the column rendered in the browser's
+   default sans inside an otherwise Hebrew document. Flush, light, grey. */
+.quote-sheet.tpl-minimal .pdf-table th:first-child,
+.quote-sheet.tpl-minimal .pdf-table td:first-child {
+    text-align: start !important;
+}
+
+.quote-sheet.tpl-minimal .pdf-table td:first-child {
+    font-family: 'Rubik', 'Heebo', sans-serif !important;
+    font-weight: 500 !important;
+    color: var(--q-mute);
+}
+
+/* Money column. `text-align: left` is written inline, which is the outer edge
+   in Hebrew and the WRONG one the moment the sheet flips to English; `end` is
+   the outer edge in both. Isolated so the bidi algorithm cannot reorder
+   "1,250 ₪", and tabular so the figures line up down the column. */
+.quote-sheet.tpl-minimal .pdf-table th:last-child,
+.quote-sheet.tpl-minimal .pdf-table td:last-child {
+    text-align: end !important;
+}
+
+.quote-sheet.tpl-minimal .pdf-table td:last-child {
+    font-weight: 500 !important;
+    unicode-bidi: isolate;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   5. Terms — תוקף ההצעה / תנאי תשלום / מועד ביצוע / אחריות.
+      The four lines a customer reads once and a court reads later. Set as a
+      definition list on a fixed key column: no border, no tint, no radius.
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-minimal .pdf-terms-box {
+    border: 0;
+    background: none;
+    border-radius: 0;
+    padding: 0;
+    margin-block-start: 26px;
+    gap: 2px;
+}
+
+.quote-sheet.tpl-minimal .pdf-term-row {
+    /* was 0.82rem = 13px, i.e. larger than the body it explains */
+    font-size: 0.86em;
+    line-height: 1.4;
+    gap: 0;
+    align-items: baseline;
+}
+
+.quote-sheet.tpl-minimal .pdf-term-k {
+    flex: 0 0 96px;
+    min-width: 96px;
+    font-weight: 400;
+    color: var(--q-mute);
+    letter-spacing: 0.02em;
+}
+
+.quote-sheet.tpl-minimal .pdf-term-v { color: var(--q-ink); }
+
+/* --------------------------------------------------------------------------
+   6. Additional terms and exclusions. The old sheet gave these a tinted card
+      and a red dashed alarm box; both read as a web UI, and the red one is
+      the first thing a customer's eye lands on. They are paragraphs now.
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-minimal .pdf-summary-box {
+    /* `border: 0` is what kills the base rule's physical border-right */
+    background: none;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    /* keeps the base sheet's behaviour: absorbs the slack on a short quote */
+    margin-block-start: auto;
+    margin-block-end: 0;
+    padding-block-start: 14px;
+    font-size: 1em;
+}
+
+.quote-sheet.tpl-minimal .summary-title {
+    font-size: 0.72em;
+    font-weight: 500;
+    color: var(--q-mute);
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+}
+
+.quote-sheet.tpl-minimal .summary-text {
+    color: var(--q-soft);
+    line-height: 1.55;
+}
+
+/* With the card gone, an empty summary would leave a floating label. */
+.quote-sheet.tpl-minimal .summary-text:empty { display: none; }
+.quote-sheet.tpl-minimal .pdf-summary-box:has(.summary-text:empty) .summary-title { display: none; }
+
+.quote-sheet.tpl-minimal .pdf-warning-box {
+    color: var(--q-ink);
+    font-weight: 400;
+    text-align: start;
+    border: 0;
+    background: none;
+    background-color: transparent;
+    border-radius: 0;
+    padding: 0;
+    margin-block: 13px 0;
+    line-height: 1.5;
+}
+
+/* No exclusions typed → no empty block and no stray spacing. */
+.quote-sheet.tpl-minimal .pdf-warning-box:has([data-term-field="exclusions"]:empty) { display: none; }
+
+/* --------------------------------------------------------------------------
+   7. Signatures. Off by default; when it is on, it must not look like a fax
+      form. The dashed rule goes, the space stays, and the only marks left are
+      the two lines people actually sign on.
+      Everything here fights an inline style, hence !important throughout.
+      `display` is never touched — app.js owns it.
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-minimal [data-block="signature"] {
+    border-top: 0 !important;
+    margin-top: 24px !important;
+    /* the captions hang 14px below the row box — this is their room */
+    margin-bottom: 18px !important;
+    padding-top: 0 !important;
+}
+
+.quote-sheet.tpl-minimal [data-block="signature"] > div {
+    width: 42% !important;
+    gap: 0 !important;
+}
+
+.quote-sheet.tpl-minimal [data-block="signature"] > div > span {
+    font-size: 0.72em !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.1em !important;
+    color: var(--q-mute) !important;
+}
+
+/* The signed line. Height is left alone — a captured signature image is
+   absolutely positioned inside it at 44px and would clip. */
+.quote-sheet.tpl-minimal [data-block="signature"] > div > div {
+    border-bottom: 1px solid var(--q-rule) !important;
+    margin-top: 12px !important;
+}
+
+.quote-sheet.tpl-minimal [data-block="signature"] > div > div > span {
+    font-size: 8px !important;
+    color: var(--q-faint) !important;
+    bottom: -14px !important;
+}
+
+/* --------------------------------------------------------------------------
+   8. The total. A centred, double-underlined price is a certificate. An
+      invoice puts the label at the margin and the figure at the opposite
+      edge, on the same axis as the money column above it.
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-minimal .pdf-footer-section { align-items: stretch; }
+
+.quote-sheet.tpl-minimal .pdf-price-row {
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    font-size: 1em;
+    font-weight: 400;
+    border-top: 1px solid var(--q-rule);
+    padding-top: 11px;
+    margin-bottom: 2px;
+}
+
+.quote-sheet.tpl-minimal .price-label {
+    text-decoration: none;
+    font-size: 0.82em;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    color: var(--q-mute);
+}
+
+.quote-sheet.tpl-minimal .price-val {
+    text-decoration: none;
+    font-size: 1.72em;
+    font-weight: 500;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    unicode-bidi: isolate;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    white-space: nowrap;
+}
+
+/* מע"מ / when it is paid — sits under the figure, not under the label. */
+.quote-sheet.tpl-minimal .price-sub-label {
+    text-align: end;
+    font-size: 0.72em;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    color: var(--q-mute);
+    margin-bottom: 16px;
+}
+
+.quote-sheet.tpl-minimal .pdf-footer-line {
+    height: 1px;
+    background-color: var(--q-hair);
+    margin-bottom: 7px;
+}
+
+/* --------------------------------------------------------------------------
+   9. The colophon. Contact details belong at the foot of the page, small and
+      on the same margin as everything above them — not centred at body size,
+      which is what the sheet does today (the id rule pins the footer to 12px,
+      so the size is set on the rows instead).
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-minimal .pdf-company-footer {
+    text-align: start;
+    gap: 2px;
+    line-height: 1.45;
+}
+
+.quote-sheet.tpl-minimal .footer-row {
+    justify-content: flex-start;
+    gap: 6px;
+    font-size: 8.4px;
+    letter-spacing: 0.01em;
+}
+
+.quote-sheet.tpl-minimal .footer-row.font-bold {
+    font-weight: 500;
+    color: var(--q-ink);
+}
+
+.quote-sheet.tpl-minimal .footer-row.text-secondary { color: var(--q-mute); }
+
+.quote-sheet.tpl-minimal .bullet {
+    color: var(--q-hair);
+    font-weight: 400;
+}
+
+/* Hebrew has no true italic — the browser skews the letters. It looked like a
+   typo on a legal sentence, so it is set upright. */
+.quote-sheet.tpl-minimal .footer-notice {
+    font-size: 7.6px;
+    font-style: normal;
+    color: var(--q-mute);
+    line-height: 1.5;
+    margin-top: 7px;
+}
+
+.quote-sheet.tpl-minimal .pdf-zerem-credit {
+    text-align: end;
+    font-size: 7px;
+    letter-spacing: 0.08em;
+    color: var(--q-faint);
+    margin-top: 4px;
+}
+
+/* --------------------------------------------------------------------------
+   10. On-document editing chrome. Never captured — the add-row button is
+       hidden outside edit mode — but it should not shout inside a quiet
+       sheet while he is typing on it.
+   -------------------------------------------------------------------------- */
+.quote-sheet.tpl-minimal .sheet-add-row {
+    margin-top: 12px;
+    font-size: 0.82em;
+    letter-spacing: 0.02em;
+}
+
+/* --------------------------------------------------------------------------
+   The page budget, measured — not guessed.
+   html2pdf maps the sheet's 794px width to 190mm, so one A4 page holds
+   794 x (277/190) = 1158 source px. Rendered against the real markup with the
+   app's border-box reset:
+       6 priced rows + terms + summary + exclusions + colophon → 1123px (1 page)
+       8 priced rows, most with a description             → 1145px (1 page)
+       8 rows in the plain-list renderer                  → 1123px (1 page)
+   The signature block adds ~100px, so it costs the last two rows.
+   Anything added here comes out of 13px of slack at eight items.
+   -------------------------------------------------------------------------- */
+
+/* ---- engineer / הנדסית ---------------------------------------------------- */
+/* For the licensed engineer and the electrician who does inspections, panel work and compliance — the users whose customer is a building committee, a project manager or a contractor, not a homeowner. It reads as a technical submission: a letterhead rule, a boxed title block with labelled field/value p */
+/* ==========================================================================
+   TEMPLATE — "הנדסית" (.tpl-engineer)
+   A technical submission, not a web page: a title block, field/value pairs,
+   a ruled specification grid, and figures set as figures.
+
+   Rules of the house it has to live in:
+   - CSS only. No markup, no ids, no new classes. Every selector below exists
+     in sale/index.html or is produced by market.js updatePreviewFromForm().
+   - html2canvas 1.4.1 (via html2pdf 0.10.1) rasterises this. So: borders,
+     backgrounds, spacing and type only. No filter/backdrop-filter/blend/
+     sticky/gradient-text, and nothing that leans on box-shadow (it is not
+     rendered at all).
+   - RTL Hebrew: logical properties throughout, so English mode (.pdf-english)
+     mirrors correctly. Nothing sets `direction` on a cell that carries money.
+   - Monochrome-first: every division in this document is a rule, a frame or a
+     tint. Colour is decoration on top of a structure that already reads on a
+     builder's black-and-white laser printer.
+   ========================================================================== */
+
+.quote-sheet.tpl-engineer {
+    /* -- ink ------------------------------------------------------------- */
+    --eng-ink: #12161b;        /* body + headings                            */
+    --eng-ink-2: #434a53;      /* labels, secondary text                     */
+    --eng-ink-3: #666e78;      /* captions, fine print                       */
+    --eng-rule: #12161b;       /* structural rules (2px)                     */
+    --eng-grid: #a9b0b8;       /* frames and table grid (1px)                */
+    --eng-hair: #ccd1d7;       /* internal separators                        */
+    --eng-band: #e8eaed;       /* label bands, totals band                   */
+    --eng-band-2: #f4f5f7;     /* quiet fills                                */
+
+    /* The one brand moment: the identity lockup. It follows the customiser's
+       colour, and everything else in the document stays ink — which is what
+       makes the sheet survive a monochrome print. */
+    --eng-brand: var(--pdf-custom-primary, #16324f);
+
+    /* Figures: Rubik is the only loaded family with usable lining digits and a
+       ₪ glyph. Document identifiers (number, date) are pure Latin/digits, so
+       they can safely take a real monospace — that is where the spec-sheet
+       texture belongs, and no Hebrew glyph ever falls through it. */
+    --eng-figures: 'Rubik', 'Assistant', 'Heebo', sans-serif;
+    --eng-docnum: ui-monospace, 'Consolas', 'DejaVu Sans Mono', 'Menlo', monospace;
+
+    /* Re-point the sheet's own tokens. market.js writes inline styles on the
+       table cells (colour: var(--pdf-primary), etc.) — redefining the tokens
+       here re-colours those inline styles without a single !important. */
+    --pdf-primary: var(--eng-ink);
+    --pdf-secondary: var(--eng-ink-3);
+    --pdf-text-main: #191e24;
+    --pdf-text-muted: var(--eng-ink-2);
+    --pdf-border: var(--eng-grid);
+    --pdf-danger: var(--eng-ink);      /* the exclusions block stops shouting */
+    --pdf-line: var(--eng-hair);
+
+    color: var(--pdf-text-main);
+    /* The label bands and the totals band are structure, not decoration. If the
+       browser's own print path is used (the fallback when the PDF engine fails
+       to load), ask for them — and note every band is bordered as well, so it
+       still reads if the printer drops backgrounds anyway. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    /* Block padding only. The inline padding is inside the 794px capture width
+       (border-box), and the PDF scale is derived from that width — leave it. */
+    padding-block: 30px 24px;
+}
+
+/* Fallback family only: --pdf-custom-font is what the user picked in the
+   designer, and this template does not take that choice away from him. */
+.quote-sheet.tpl-engineer .pdf-wrapper {
+    font-family: var(--pdf-custom-font, 'Assistant', 'Heebo', sans-serif);
+}
+
+
+/* ==========================================================================
+   1. Title block — letterhead rule, two field boxes, identity between them
+   ========================================================================== */
+
+.quote-sheet.tpl-engineer .pdf-header {
+    border-block-start: 2.5px solid var(--eng-rule);
+    padding-block-start: 7px;
+    margin-block-end: 7px;
+}
+
+.quote-sheet.tpl-engineer .pdf-header-grid {
+    grid-template-columns: 1.15fr 1fr 1.15fr;
+    gap: 13px;
+    align-items: stretch;   /* the two field boxes match height like a form */
+}
+
+/* -- לכבוד: a labelled field box ------------------------------------------ */
+.quote-sheet.tpl-engineer .pdf-recipient-column,
+.quote-sheet.tpl-engineer .pdf-meta-column {
+    border: 1px solid var(--eng-grid);
+    border-block-start: 2px solid var(--eng-rule);
+    align-items: stretch;
+    text-align: start;
+    gap: 0;
+}
+
+.quote-sheet.tpl-engineer .recipient-label {
+    background: var(--eng-band);
+    border-block-end: 1px solid var(--eng-grid);
+    padding: 3px 8px;
+    font-size: 0.85em;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--eng-ink-2);
+}
+
+.quote-sheet.tpl-engineer .recipient-name {
+    padding: 6px 8px 0;
+    font-size: 1.2em;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--eng-ink);
+    text-decoration: none;
+    /* A long business name used to run out of its column on one nowrap line. */
+    white-space: normal;
+}
+
+.quote-sheet.tpl-engineer .recipient-sub {
+    padding: 2px 8px 6px;
+    font-size: 0.92em;
+    line-height: 1.45;
+    color: var(--eng-ink-2);
+}
+
+/* -- Identity lockup ------------------------------------------------------ */
+.quote-sheet.tpl-engineer .pdf-logo-column { gap: 1px; }
+
+.quote-sheet.tpl-engineer .pdf-company-title {
+    font-size: 1.4em;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: 0.01em;
+    color: var(--eng-brand);
+    margin-block-end: 2px;
+}
+
+.quote-sheet.tpl-engineer .pdf-company-subtitle {
+    font-size: 0.88em;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: 0.05em;
+    color: var(--eng-ink-2);
+    border-block-end: 1px solid var(--eng-grid);
+    padding-block-end: 3px;
+    margin-block-end: 3px;
+    min-width: 0;   /* the rule hugs the words instead of a stray 150px */
+}
+
+.quote-sheet.tpl-engineer .pdf-company-owner {
+    font-size: 0.9em;
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--eng-ink-2);
+}
+
+/* -- Document control block: two field/value rows -------------------------- */
+.quote-sheet.tpl-engineer .pdf-meta-column { font-weight: 400; }
+
+.quote-sheet.tpl-engineer .meta-item {
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 4px 8px;
+}
+
+.quote-sheet.tpl-engineer .meta-item + .meta-item {
+    border-block-start: 1px solid var(--eng-grid);
+}
+
+/* The date row ships without a label of its own — a bare number in a boxed
+   row reads as a stray figure. The label is a pseudo-element on purpose: if a
+   renderer ever drops it, the row degrades to exactly what it is today.
+   Hidden in English mode, where the Hebrew word would be wrong. */
+.quote-sheet.tpl-engineer .meta-item:first-child::before {
+    content: 'תאריך';
+    font-size: 0.85em;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--eng-ink-2);
+}
+.quote-sheet.tpl-engineer.pdf-english .meta-item:first-child::before { content: 'DATE'; }
+
+.quote-sheet.tpl-engineer .meta-val-date {
+    font-family: var(--eng-docnum);
+    font-size: 0.98em;
+    font-weight: 600;
+    color: var(--eng-ink);
+}
+
+/* "הצעת מחיר מס':" is a bare text node beside the number span. Making the
+   wrapper a flex row turns the pair into a proper field/value row that lines
+   up with the date above it. */
+.quote-sheet.tpl-engineer .meta-val-number {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    font-size: 0.85em;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--eng-ink-2);
+}
+
+.quote-sheet.tpl-engineer #pdf-number {
+    font-family: var(--eng-docnum);
+    font-size: 1.18em;      /* back up to the date's size, off the 0.85em label */
+    font-weight: 600;
+    letter-spacing: 0;
+    color: var(--eng-ink);
+}
+
+/* Double rule under the letterhead: heavy, thin, in that order. */
+.quote-sheet.tpl-engineer .pdf-header-divider {
+    height: 2px;
+    background: transparent;
+    border-block-start: 2px solid var(--eng-rule);
+    border-block-end: 1px solid var(--eng-grid);
+    margin-block: 6px 10px;
+}
+
+
+/* ==========================================================================
+   2. Document title — a title bar, not a centred headline
+   ========================================================================== */
+
+.quote-sheet.tpl-engineer .pdf-title-container {
+    text-align: start;
+    margin-block-end: 9px;
+}
+
+.quote-sheet.tpl-engineer .pdf-title {
+    display: block;
+    width: 100%;
+    /* assets/ui.css sets `h1,h2,h3,h4 { font-family: var(--font-display) }`
+       globally, which quietly overrode the document's own font on the one
+       line the customer reads first. The title belongs to the document. */
+    font-family: inherit;
+    padding: 4px 10px;
+    font-size: 1.45em;
+    font-weight: 800;
+    line-height: 1.3;
+    text-align: inherit;    /* still obeys the block designer's alignment */
+    background: var(--eng-band-2);
+    border: 1px solid var(--eng-grid);
+    border-block-start: 2px solid var(--eng-rule);
+    border-block-end: 1px solid var(--eng-grid);
+}
+
+/* The empty <div class="underline-bar"> under the title has never had a size,
+   so it has never drawn anything. It gets one job here: the single accent rule
+   in the document, redundant to the frame above it, so monochrome loses
+   nothing. Its colour is the customiser's secondary and stays his. */
+.quote-sheet.tpl-engineer .underline-bar {
+    height: 2px;
+    width: 100%;
+}
+
+
+/* ==========================================================================
+   3. Scope of work — the specification table
+   ========================================================================== */
+
+.quote-sheet.tpl-engineer .pdf-items-list {
+    gap: 9px;
+    margin-block-end: 12px;
+}
+
+/* No border on <table> itself: html2canvas paints every element's own borders,
+   so a table frame and a cell frame at the same edge draw twice. The frame is
+   carried by the cells. */
+.quote-sheet.tpl-engineer .pdf-table {
+    margin-block-end: 10px;
+    font-size: 1em;
+}
+
+.quote-sheet.tpl-engineer .pdf-table th {
+    padding: 5px 8px;
+    text-align: start;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--eng-ink);
+    background: var(--eng-band);
+    border: 1px solid var(--eng-grid);
+    border-block-start: 2px solid var(--eng-rule);
+    border-block-end: 1.5px solid var(--eng-rule);
+}
+
+.quote-sheet.tpl-engineer .pdf-table td {
+    padding: 5px 8px;
+    border: 1px solid var(--eng-grid);
+    vertical-align: top;
+}
+
+.quote-sheet.tpl-engineer .pdf-table tbody tr:last-child td {
+    border-block-end: 1.5px solid var(--eng-rule);
+}
+
+/* Zebra striping is a screen habit. On a ruled grid it is redundant, and a
+   3% tint is what turns into a dirty band on a cheap laser printer. */
+.quote-sheet.tpl-engineer .pdf-table tbody tr:nth-child(even) {
+    background-color: transparent;
+}
+
+/* Item number: the one place a true monospace belongs — digits only. */
+.quote-sheet.tpl-engineer .pdf-table td:first-child {
+    font-family: var(--eng-docnum) !important;
+    font-weight: 600 !important;
+    color: var(--eng-ink-2) !important;
+}
+
+/* market.js writes these three inline (weight, colour, underline, 0.9rem), so
+   the override has to carry weight. Underlines come off: an underlined line of
+   text inside a ruled table is a link, not a heading. */
+.quote-sheet.tpl-engineer .pdf-table td [data-item-field="title"] {
+    font-weight: 700 !important;
+    color: var(--eng-ink) !important;
+    text-decoration: none !important;
+    margin-block-end: 2px !important;
+    line-height: 1.35;
+}
+
+.quote-sheet.tpl-engineer .pdf-table td [data-item-field="description"] {
+    font-size: 1em !important;
+    line-height: 1.45 !important;
+    color: var(--eng-ink-2) !important;
+}
+
+.quote-sheet.tpl-engineer .pdf-table td:last-child {
+    font-family: var(--eng-figures) !important;
+    font-weight: 700 !important;
+    color: var(--eng-ink) !important;
+    font-variant-numeric: tabular-nums lining-nums;
+    white-space: nowrap;   /* "1,200 ₪" never breaks across two lines */
+}
+
+/* -- Same list, no prices per line ---------------------------------------- */
+.quote-sheet.tpl-engineer .pdf-work-item {
+    gap: 1px;
+    padding-block-end: 6px;
+    border-block-end: 1px solid var(--eng-hair);
+}
+
+.quote-sheet.tpl-engineer .pdf-work-item:last-child {
+    padding-block-end: 0;
+    border-block-end: 0;
+}
+
+.quote-sheet.tpl-engineer .pdf-item-title {
+    font-size: 1.1em;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--eng-ink);
+    text-decoration: none;
+    margin-block-end: 1px;
+}
+
+.quote-sheet.tpl-engineer .pdf-item-desc {
+    font-size: 1em;
+    line-height: 1.45;
+    color: var(--eng-ink-2);
+    /* base ships a physical padding-right; both logical sides are set so the
+       indent follows the text in English mode too. */
+    padding-inline-start: 13px;
+    padding-inline-end: 0;
+}
+
+
+/* ==========================================================================
+   4. Conditions — a 2×2 specification grid (תוקף / תשלום / ביצוע / אחריות)
+   ========================================================================== */
+
+.quote-sheet.tpl-engineer .pdf-terms-box {
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    padding: 0;
+    margin-block: 0 8px;
+    background: transparent;
+    border: 1px solid var(--eng-grid);
+    border-block-start: 2px solid var(--eng-rule);
+    border-radius: 0;
+}
+
+.quote-sheet.tpl-engineer .pdf-term-row {
+    gap: 0;
+    padding: 4px 8px;
+    font-size: 0.92em;
+    line-height: 1.4;
+    align-items: baseline;
+    border-block-start: 1px solid var(--eng-hair);
+}
+
+/* first grid row: no rule above it. odd cells: the internal vertical rule. */
+.quote-sheet.tpl-engineer .pdf-term-row:nth-child(-n + 2) { border-block-start: 0; }
+.quote-sheet.tpl-engineer .pdf-term-row:nth-child(odd) {
+    border-inline-end: 1px solid var(--eng-hair);
+}
+
+.quote-sheet.tpl-engineer .pdf-term-k {
+    flex: 0 0 68px;
+    min-width: 0;
+    white-space: nowrap;   /* the label keeps one line; values stay aligned */
+    padding-inline-end: 6px;
+    font-size: 0.92em;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--eng-ink-2);
+}
+
+.quote-sheet.tpl-engineer .pdf-term-v { color: var(--eng-ink); }
+
+
+/* ==========================================================================
+   5. Notes and exclusions
+   ========================================================================== */
+
+/* The notes block was a grey card with a coloured edge — the web's callout.
+   Here it is a titled field: rule, label, text. `margin-top: auto` also comes
+   off, so the body stays one continuous specification instead of drifting to
+   the bottom of the page on a short quote. */
+.quote-sheet.tpl-engineer .pdf-summary-box {
+    margin-block: 0 8px;
+    padding: 5px 0 0;
+    background: transparent;
+    border: 0;
+    border-block-start: 1px solid var(--eng-grid);
+    border-radius: 0;
+}
+
+.quote-sheet.tpl-engineer .summary-title {
+    font-size: 0.9em;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--eng-ink-2);
+    margin-block-end: 2px;
+}
+
+.quote-sheet.tpl-engineer .summary-text {
+    color: var(--eng-ink);
+    line-height: 1.45;
+}
+
+/* What the price does not include: the most valuable paragraph in the
+   document. It was a red dashed alarm; a quote that shouts at its reader is
+   not a serious quote. It keeps its weight from a frame, a band and bold ink —
+   all of which print. */
+.quote-sheet.tpl-engineer .pdf-warning-box {
+    display: block;
+    padding: 0;
+    margin-block-end: 9px;
+    text-align: start;
+    font-weight: 400;
+    color: var(--eng-ink);
+    background: transparent;
+    border: 1px solid var(--eng-grid);
+    border-block-start: 2px solid var(--eng-rule);
+    border-radius: 0;
+}
+
+/* The block has no heading in the markup, and without one nobody knows what
+   they are reading. Same pseudo-element contract as the date label: if it is
+   ever dropped, what remains is today's paragraph in a frame. */
+.quote-sheet.tpl-engineer .pdf-warning-box::before {
+    content: 'מה לא כלול במחיר';
+    display: block;
+    padding: 3px 8px;
+    background: var(--eng-band);
+    border-block-end: 1px solid var(--eng-grid);
+    font-size: 0.85em;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--eng-ink-2);
+}
+.quote-sheet.tpl-engineer.pdf-english .pdf-warning-box::before { content: 'NOT INCLUDED'; }
+
+.quote-sheet.tpl-engineer .pdf-warning-box > span {
+    display: block;
+    padding: 5px 8px;
+    font-weight: 600;
+    line-height: 1.45;
+}
+
+/* An empty notes block prints its heading over nothing, which reads as an
+   unfinished document. Never hidden while the sheet is being edited — the
+   empty field is what he clicks to type into. */
+.quote-sheet.tpl-engineer:not(.sheet-editing) .pdf-summary-box:has(> .summary-text:empty) { display: none; }
+.quote-sheet.tpl-engineer:not(.sheet-editing) .pdf-warning-box:has(> span:empty) { display: none; }
+
+
+/* ==========================================================================
+   6. Signature block  (the row carries its styling inline in index.html —
+      these have to out-weigh it, hence !important; `display` is never touched
+      because app.js toggles the row on and off with it)
+   ========================================================================== */
+
+.quote-sheet.tpl-engineer #pdf-signature-row {
+    border-block-start: 1px solid var(--eng-grid) !important;
+    padding-block-start: 13px !important;
+    /* The two captions under the rules are positioned at bottom:-18px inline,
+       so they hang outside the row: without clearance they land on top of the
+       total band underneath. */
+    margin-block: 10px 22px !important;
+}
+
+.quote-sheet.tpl-engineer #pdf-signature-row > div > span {
+    font-size: 0.85em !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.03em;
+    color: var(--eng-ink-2) !important;
+}
+
+.quote-sheet.tpl-engineer #pdf-signature-row > div > div {
+    height: 28px !important;
+    border-block-end: 1px solid var(--eng-rule) !important;
+}
+
+.quote-sheet.tpl-engineer #pdf-signature-row > div > div > span {
+    font-size: 0.78em !important;
+    font-weight: 400 !important;
+    letter-spacing: 0;
+    color: var(--eng-ink-3) !important;
+}
+
+
+/* ==========================================================================
+   7. Total and colophon
+   ========================================================================== */
+
+.quote-sheet.tpl-engineer .pdf-footer-section { align-items: stretch; }
+
+/* Two stacked rows that read as one boxed total — the sum, then the VAT
+   statement under it, which is the line an Israeli customer looks for. */
+.quote-sheet.tpl-engineer .pdf-price-row {
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 6px 10px;
+    margin-block-end: 0;
+    font-size: 1em;
+    background: var(--eng-band);
+    border: 1px solid var(--eng-grid);
+    border-block-start: 2px solid var(--eng-rule);
+    border-block-end: 0;
+}
+
+.quote-sheet.tpl-engineer .price-label {
+    font-size: 1.05em;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--eng-ink);
+    text-decoration: none;
+}
+
+.quote-sheet.tpl-engineer .price-val {
+    font-family: var(--eng-figures);
+    font-size: 1.55em;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums lining-nums;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.quote-sheet.tpl-engineer .price-sub-label {
+    padding: 3px 10px;
+    margin-block-end: 12px;
+    font-size: 0.88em;
+    font-weight: 600;
+    text-align: start;
+    color: var(--eng-ink-2);
+    border: 1px solid var(--eng-grid);
+    border-block-start: 0;
+}
+
+/* Double rule again, mirroring the letterhead: thin, then heavy. */
+.quote-sheet.tpl-engineer .pdf-footer-line {
+    height: 2px;
+    background: transparent;
+    border-block-start: 1px solid var(--eng-grid);
+    border-block-end: 2px solid var(--eng-rule);
+    margin-block-end: 6px;
+}
+
+.quote-sheet.tpl-engineer .pdf-company-footer { gap: 1px; }
+
+.quote-sheet.tpl-engineer .footer-row {
+    gap: 5px;
+    font-size: 0.82em;
+    line-height: 1.45;
+}
+
+.quote-sheet.tpl-engineer .footer-row.font-bold {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--eng-ink);
+}
+
+.quote-sheet.tpl-engineer .footer-row.text-secondary { color: var(--eng-ink-2); }
+.quote-sheet.tpl-engineer .bullet { color: var(--eng-grid); font-weight: 400; }
+
+/* Hebrew has no true italic — the browser synthesises a slant, and it prints
+   like a mistake. The validity notice is fine print, so it is set as fine
+   print: upright, small, behind its own rule. */
+.quote-sheet.tpl-engineer .footer-notice {
+    font-style: normal;
+    font-size: 0.8em;
+    line-height: 1.4;
+    color: var(--eng-ink-3);
+    margin-block-start: 5px;
+    padding-block-start: 5px;
+    border-block-start: 1px solid var(--eng-hair);
+}
+
+.quote-sheet.tpl-engineer .pdf-zerem-credit {
+    color: var(--eng-ink-3);
+    letter-spacing: 0.03em;
+    opacity: 0.75;
+}
+
+
+/* ---- Fitting the page, measured -------------------------------------------
+   Every template above was measured in a browser against the app's own page
+   height (pdfPageHeightPx → 1158px at the sheet's 794px width) with realistic
+   6- and 8-item quotes. classic, minimal and engineer fit eight items on one
+   page. "מודגשת" did not: 1251px at eight items, spilling an 8% tail — which
+   is the orphan case, the company footer alone on page two, and exactly the
+   thing this whole redesign exists to prevent.
+   It is a deliberately roomy template, so the room comes off the blocks that
+   have the most and lose the least: the gaps between items and around the
+   summary. The look survives; the second page does not. */

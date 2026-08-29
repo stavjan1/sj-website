@@ -5963,27 +5963,58 @@ async function resetQuoteDesign() {
 // Fine-tuning stays available in פרטי עסק → עיצוב; a preset just sets the
 // same knobs (font, sizes, colors, watermark) and saves them.
 // ==========================================================================
+// A template is now a LOOK, not just a set of slider values. Each carries a
+// `cls` that lands on the sheet and pulls in a theme from
+// sale/css/quote-templates.css — which is what the four designs were missing:
+// they were written, reviewed, and completely inert, because nothing ever put
+// tpl-* on the element.
 const PDF_TEMPLATES = {
     classic: {
-        label: 'קלאסית',
+        label: 'קלאסית', cls: 'tpl-classic',
         font: "'David Libre', serif", size: '12', lh: '1.4',
         primary: '#1e3a8a', secondary: '#3b82f6', watermark: true
     },
-    modern: {
-        label: 'מודרנית',
-        font: "'Heebo', sans-serif", size: '12', lh: '1.5',
-        primary: '#0e7490', secondary: '#22d3ee', watermark: false
-    },
     minimal: {
-        label: 'מינימלית',
+        label: 'נקייה', cls: 'tpl-minimal',
         font: "'Rubik', sans-serif", size: '11', lh: '1.45',
         primary: '#111827', secondary: '#6b7280', watermark: false
+    },
+    engineer: {
+        label: 'הנדסית', cls: 'tpl-engineer',
+        font: "'Heebo', sans-serif", size: '11', lh: '1.4',
+        primary: '#0f172a', secondary: '#0e7490', watermark: false
+    },
+    // Kept, but no longer the one anybody lands on. Measured against the real
+    // page (1158px at the sheet's 794px width): "מודרנית" runs to TWO pages on
+    // a six-item quote and leaves a 6% tail — the company footer, עוסק מורשה
+    // number and all, alone on page two. It is the template that has been
+    // shipping. קלאסית is the default now and fits eight items on one page.
+    modern: {
+        label: 'מודרנית', cls: '',
+        font: "'Heebo', sans-serif", size: '12', lh: '1.45',
+        primary: '#0e7490', secondary: '#22d3ee', watermark: false
     }
 };
+
+const TPL_CLASSES = Object.values(PDF_TEMPLATES).map((t) => t.cls).filter(Boolean);
+
+// One place that decides which theme class the sheet wears, so the sheet, the
+// designer preview and the full preview can never disagree.
+function applySheetTemplateClass(key) {
+    const cls = (PDF_TEMPLATES[key] || {}).cls || '';
+    ['quote-pdf-sheet', 'mini-pdf-sheet'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        TPL_CLASSES.forEach((c) => el.classList.remove(c));
+        if (cls) el.classList.add(cls);
+    });
+}
 
 function applyPdfTemplate(key, silent) {
     const t = PDF_TEMPLATES[key];
     if (!t) return;
+    appState.settings.pdfTemplate = key;
+    applySheetTemplateClass(key);
     // Drive the SAME inputs the design card uses, so both UIs stay in sync.
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
     set('pdf-font-family', t.font);
@@ -6012,6 +6043,10 @@ function applyPdfTemplate(key, silent) {
 
 function markActivePdfTemplate() {
     const cur = appState.settings.pdfTemplate || 'classic';
+    // The picker and the SHEET, together. Highlighting the chosen button while
+    // the paper still wears the previous theme is the same class of bug as a
+    // preview that does not match its PDF.
+    applySheetTemplateClass(cur);
     document.querySelectorAll('.tpl-btn').forEach((b) => {
         b.classList.toggle('active', b.dataset.tpl === cur);
     });
