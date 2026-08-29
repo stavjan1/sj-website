@@ -1000,13 +1000,28 @@ let appState = {
             email: '',
             web: '',
             address: '',
+            // THESE ARE AN ELECTRICIAN'S TERMS NOW, NOT A PLANNING OFFICE'S.
+            // They used to end the job at "מסירת התוכניות הסופיות" and warn
+            // about "שינוי בתוכניות" — milestones a consulting engineer has and
+            // a man wiring a flat does not. Every user who never opened settings
+            // sent a customer a payment schedule tied to drawings that were
+            // never going to exist. The new text is his working reality:
+            // materials up front, balance before the final connection, and the
+            // two exclusions that cause the most arguments on site — builder's
+            // work, and the IEC fees nobody remembers until the bill.
+            //
+            // The validity period lives HERE, in the block he can edit, and the
+            // footer no longer states a second one of its own.
             terms: `תנאי תשלום:
-• 50% מקדמה עם אישור הצעת המחיר ותחילת העבודה.
-• 50% הנותרים עם מסירת התוכניות הסופיות.
+• 30% מקדמה עם אישור ההצעה, לרכישת החומרים.
+• היתרה בסיום העבודה ולפני החיבור הסופי.
+
+תוקף ההצעה: 14 ימים ממועד הוצאתה.
 
 הערות נוספות:
-• כל שינוי בתוכניות לאחר שלב האישור הראשוני עשוי לגרור תוספת תשלום.
-• ליווי מול חברת החשמל אינו כולל את אגרות הבדיקה של חברת החשמל.`
+• המחיר כולל חומר ועבודה כמפורט לעיל. עבודה שאינה מופיעה בהצעה תתומחר בנפרד ובאישור מראש.
+• לא כולל עבודות בנייה, טיח, צבע ושחזור המבנה לאחר העבודה.
+• לא כולל אגרות חברת החשמל ובדיקת בודק מוסמך.`
         }
     },
     currentQuote: {
