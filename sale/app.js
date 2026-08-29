@@ -493,6 +493,29 @@ function tierLimit(name) {
 // gates stay correct offline too.
 async function refreshTierInfo() {
     const cacheKey = getStorageKey('sj_tier_info');
+    // A SIGNED-IN USER MUST NEVER BE TOLD HE IS A GUEST.
+    //
+    // Stav, 30/08: the app showed "אורח" and the plans dialog said "אתה על
+    // אורח" while he was signed in. The cause is here. This function sends the
+    // Authorization header only when googleAccessToken is already in memory —
+    // and on a fresh load it is not, because the token refreshes silently a
+    // moment later. So /api/me was called anonymously, the server correctly
+    // answered "guest" for an anonymous caller, and the answer was written to
+    // localStorage. From then on the cache said guest too.
+    //
+    // If we hold a signed-in identity but no token yet, there is nothing to ask
+    // the server WITH: skip the call, keep whatever is cached, and let the
+    // token's arrival trigger the real one.
+    const signedInNoToken = isSignedIn() && !googleAccessToken;
+    if (signedInNoToken) {
+        try {
+            const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+            if (cached && cached.tier && cached.tier !== 'guest') userTier = cached;
+        } catch (e) {}
+        applyTierGates();
+        updateQuotaUI();
+        return;
+    }
     try {
         const headers = {};
         if (googleAccessToken && !isGuestUser()) headers['Authorization'] = 'Bearer ' + googleAccessToken;
@@ -500,8 +523,12 @@ async function refreshTierInfo() {
         if (res.ok) {
             const data = await res.json();
             if (data && data.tier && data.limits) {
+                // And never PERSIST a guest verdict for someone with an
+                // identity: that is the line that made a transient state stick.
                 userTier = { tier: data.tier, limits: data.limits, usage: data.usage || {} };
-                localStorage.setItem(cacheKey, JSON.stringify(userTier));
+                if (!(data.tier === 'guest' && isSignedIn())) {
+                    localStorage.setItem(cacheKey, JSON.stringify(userTier));
+                }
             }
         } else { throw new Error('me ' + res.status); }
     } catch (e) {
@@ -1713,7 +1740,11 @@ function syncAccountMenuIdentity() {
     if (amName) amName.textContent = name;
     if (amMail) {
         let mail = '';
-        try { mail = isGuestUser() ? 'מצב התנסות, הנתונים נשמרים במכשיר הזה' : (localStorage.getItem('gsi_email') || getActiveUser() || ''); } catch (e) {}
+        // getActiveUser() is the account this app is signed into — the one
+        // completeGoogleLogin wrote. The old code looked first at a 'gsi_email'
+        // key that is read HERE and written NOWHERE in the project, so it was
+        // always null and this line only ever looked like it had two sources.
+        try { mail = isGuestUser() ? 'מצב התנסות, הנתונים נשמרים במכשיר הזה' : (getActiveUser() || ''); } catch (e) {}
         amMail.textContent = mail;
     }
     if (amAvatar && avatarSrc) {
@@ -10293,11 +10324,21 @@ function openPlansDialog() {
 
 // The chip itself, kept in step wherever the plan is applied.
 function syncPlanChip() {
-    const el = document.getElementById('am-plan');
-    if (!el) return;
     const t = (userTier && userTier.tier) || (isGuestUser && isGuestUser() ? 'guest' : 'free');
-    el.textContent = TIER_LABELS[t] || t;
-    el.className = 'am-plan plan-' + t;
+    const label = TIER_LABELS[t] || t;
+    const el = document.getElementById('am-plan');
+    if (el) {
+        el.textContent = label;
+        el.className = 'am-plan plan-' + t;
+    }
+    // The same fact above the tile, where he asked for it — "what am I paying
+    // for" sitting beside "who am I", instead of only inside a menu he has to
+    // open. A guest sees the invitation rather than the word "אורח" twice.
+    const rail = document.getElementById('rail-plan');
+    if (rail) {
+        rail.textContent = t === 'guest' ? 'התחבר · חינם' : `מסלול ${label}`;
+        rail.className = 'rail-plan plan-' + t;
+    }
 }
 
 // ── The guest's three questions ─────────────────────────────────────────────

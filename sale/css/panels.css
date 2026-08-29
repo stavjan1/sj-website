@@ -6063,3 +6063,52 @@ th.pv-price { text-align: end; }
     .waiting-rail { position: static; }
     .wr-item { display: inline-block; margin-inline-end: var(--sp-2); min-width: 210px; vertical-align: top; }
 }
+
+/* The "כל הפרויקטים" filter bar.
+   --------------------------------------------------------------------------
+   It began as a <span> wrapping three block-level controls inside the search
+   row, which was wrong twice over: an inline element is ONE flex item, so the
+   three controls stopped being items of the row; and seven controls on one line
+   wrap wherever the width happens to fall, which is what stranded a single 40px
+   icon on a line of its own and made the row look like it was jumping.
+
+   It is its own row now. Line one answers "what am I looking at", line two "how
+   is it sorted", and line two only exists over the full list. */
+.all-proj-filters {
+    display: flex;
+    align-items: stretch;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+    margin-block-end: var(--sp-3);
+}
+
+/* Every control here is a different element — buttons, a select, a wrapped
+   input — and each sized itself from its own padding, so they came out 44px and
+   39px and sat at different heights. Stretch makes each take the line's height
+   instead of proposing its own, whatever the font does later. */
+#panel-projects .project-search-row > *,
+.all-proj-filters > * { align-self: stretch; }
+/* 44px, not 40: it is the height the buttons beside them already are, so a line
+   holding only the select does not come out shorter than the line above it —
+   and it is the minimum comfortable touch target on a phone. */
+.all-proj-filters .project-filter-select,
+.all-proj-filters #repeat-filter { min-height: 44px; }
+
+@media (max-width: 640px) {
+    /* Three controls do not fit across 375px, so the bar takes two lines. Make
+       that deliberate rather than incidental: the two sort buttons share the
+       first, the repeat filter and the status select share the second, and each
+       pair fills the width instead of leaving one control stranded. */
+    .all-proj-filters .sort-toggles { flex: 1 1 100%; }
+    .all-proj-filters #repeat-filter { flex: 1 1 auto; }
+    .all-proj-filters .project-filter-select { flex: 1 1 auto; min-width: 140px; }
+}
+
+/* On a phone the row is the width of the screen, so the controls wrap. Give the
+   group's members a sensible minimum instead of letting the select collapse. */
+@media (max-width: 640px) {
+    #panel-projects .project-search-row { row-gap: var(--sp-2); }
+    #panel-projects .project-search-row .project-filter-select { flex: 1 1 auto; min-width: 130px; }
+    #panel-projects .project-search-row .sort-toggles { flex: 0 0 auto; }
+    .project-search-input-wrap { flex: 1 1 100%; order: -1; }
+}
