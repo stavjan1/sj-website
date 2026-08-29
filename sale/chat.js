@@ -3726,7 +3726,14 @@ function quoteItemsFromTable(proj) {
                 const qty = matQty(m) > 1 ? ` × ${matQty(m)} ${matUnit(m)}` : '';
                 return `${m.name}${qty}${m.details ? ` (${m.details})` : ''}`;
             }).join('\n'),
-            price: Math.round(mats.reduce((sum, m) => sum + matLineTotal(m), 0)),
+            // matLinePrice, not matLineTotal. matLineTotal is the COST — what he
+            // paid the supplier — and pricingTotals().total (which becomes
+            // basePrice two lines later, and the number in the toast) uses the
+            // marked-up price. Building the line from cost meant the itemised
+            // lines on the customer's page added up to LESS than the total
+            // printed at the bottom of that same page: not merely the lost
+            // margin, but a document a customer can disprove with a calculator.
+            price: Math.round(mats.reduce((sum, m) => sum + matLinePrice(m, matMarkupPct(proj)), 0)),
         });
     }
 

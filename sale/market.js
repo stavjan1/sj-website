@@ -305,7 +305,12 @@ function initNewQuote() {
             { title: 'פרק א\': עבודות הכנה', description: 'ביצוע עבודות הכנה והתארגנות בשטח.', price: 0 }
         ],
         basePrice: 0,
-        vatType: 'exempt',
+        // Same reasoning as the appState default: עוסק מורשה is the common case
+        // and this is a NEW blank quote. The load fallback below deliberately
+        // stays 'exempt' — an old saved quote with no vatType was displayed and
+        // sent as exempt, and re-opening it must not silently add 18% to a
+        // price a customer has already been given.
+        vatType: 'exclude',
         finalPrice: 0,
         summary: appState.settings.businessDetails.terms,
         showItemizedPrices: false

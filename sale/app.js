@@ -1033,12 +1033,20 @@ let appState = {
         subject: '',
         items: [],
         basePrice: 0,
-        // 'plus' (18% added), not 'exempt'. Most licensed electricians are
+        // 'exclude' — the option that ADDS 18%. Most licensed electricians are
         // עוסק מורשה, the app never asked, and the default quietly took 18% off
-        // the FIRST quote a new user sent — which is precisely the loss this
+        // the FIRST quote a new user sent, which is precisely the loss this
         // product exists to prevent. Anyone who really is עוסק פטור changes it
         // once and the choice is remembered per user (rememberQuotePref).
-        vatType: 'plus',
+        //
+        // This said 'plus' until 29.8.2026 and 'plus' IS NOT A VALUE THIS CODE
+        // KNOWS. The only three are exempt / exclude / include (see the select
+        // at sale/index.html and the two comparisons in calculateTotal), so
+        // 'plus' matched neither branch and fell through to the exempt label
+        // and an unchanged price — the exact bug the comment above claimed to
+        // have fixed. A wrong constant with a confident comment beside it is
+        // worse than no fix, because it stops anyone looking again.
+        vatType: 'exclude',
         finalPrice: 0,
         summary: '',
         showItemizedPrices: false
@@ -4837,7 +4845,14 @@ function updateMetricsDashboard() {
 
     jobs.forEach(proj => {
         const status = proj.status || 'טיוטה';
-        const finalPrice = (proj.quote && proj.quote.finalPrice) ? parseFloat(proj.quote.finalPrice) : 0;
+        // proj.quoteData, not proj.quote. `proj.quote` is referenced exactly
+        // once in the whole codebase — here — while `quoteData` is the real
+        // field used everywhere else, so finalPrice was always 0 and the
+        // "value of approved work" tile on the dashboard read 0 ₪ no matter how
+        // much the electrician had closed. A KPI that is always zero is worse
+        // than no KPI: it reads as a true statement about his business.
+        const _q = proj.quoteData || {};
+        const finalPrice = parseFloat(_q.finalPrice || _q.basePrice) || 0;
         
         if (status === 'נשלח') {
             sentCount++;
@@ -7687,8 +7702,16 @@ async function downloadPDF() {
     // not a toast. The mistake is easy to make (prices left in the pricing table
     // and never applied to the document) and it is the kind that reaches the
     // customer before anyone notices, so it asks once rather than blocking.
+    //
+    // The total comes from #form-base-price, NOT from summing the rows. In
+    // itemized mode calculateItemizedTotal() writes the sum into that field and
+    // locks it; in the DEFAULT mode the per-item price input is never rendered
+    // at all (see addWorkItemRow's `isItemized ?` branch), so summing the rows
+    // returns 0 for every quote and this guard would fire on every ordinary
+    // export. That is exactly what it did between 5b0826f and here — one field
+    // reads correctly in both modes, and this is it.
     const _items = getWorkItemsFromForm();
-    const _sum = _items.reduce((a, it) => a + (Number(it.price) || 0), 0);
+    const _sum = parseFloat(document.getElementById('form-base-price')?.value) || 0;
     if (!_items.length) {
         showToast('אין שורות עבודה בהצעה — הוסף לפחות שורה אחת לפני הייצוא', 'error');
         return;
@@ -7696,7 +7719,7 @@ async function downloadPDF() {
     if (_sum <= 0) {
         const go = await askConfirm({
             title: 'ההצעה יוצאת על 0 ₪',
-            body: 'אין מחיר באף אחת מהשורות. אם התמחור נמצא בטבלת התמחור, לחץ "החל על ההצעה" שם — אחרת הלקוח יקבל מסמך שמסתכם באפס.',
+            body: 'שדה המחיר בהצעה ריק. אם התמחור נמצא בטבלת התמחור, לחץ שם "החל על ההצעה" — אחרת הלקוח יקבל מסמך שמסתכם באפס.',
             confirmLabel: 'ייצא בכל זאת',
             cancelLabel: 'חזור ותקן',
             danger: true,

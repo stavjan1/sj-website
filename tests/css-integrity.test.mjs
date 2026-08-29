@@ -65,3 +65,34 @@ for (const file of SHEETS) {
     }
   });
 }
+
+// ── A class the JS invents must exist in a stylesheet ────────────────────────
+//
+// applyReportsLock() builds a .tier-lock-overlay to cover the reports panel for
+// free users. Not one of its class names had a single rule in any stylesheet —
+// grep returned zero across the whole project — so the "lock" was an unstyled
+// div appended below the panel. It covered nothing and blocked nothing: every
+// free user had the Pro reports in full, with the upgrade pitch printed
+// underneath them.
+//
+// The failure is invisible by construction. The JS is correct, the HTML is
+// correct, nothing throws, and the only symptom is a paid feature being free.
+test('the classes JS builds for overlays are actually styled', () => {
+  const all = SHEETS.map((f) => readFileSync(new URL('../' + f, import.meta.url), 'utf8')).join('\n');
+  const app = readFileSync(new URL('../sale/app.js', import.meta.url), 'utf8');
+
+  // Every className string assigned in app.js whose name looks like a cover.
+  const built = new Set();
+  const re = /className\s*=\s*'([^']+)'/g;
+  let m;
+  while ((m = re.exec(app))) {
+    for (const cls of m[1].split(/\s+/)) {
+      if (/(lock|overlay|scrim|backdrop)/i.test(cls)) built.add(cls);
+    }
+  }
+  assert.ok(built.size, 'no overlay classes found — did the selector convention change?');
+
+  const missing = [...built].filter((cls) => !all.includes('.' + cls));
+  assert.deepEqual(missing, [],
+    'JS builds these overlay classes but no stylesheet defines them — they cover nothing');
+});

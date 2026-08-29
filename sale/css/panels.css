@@ -5745,3 +5745,187 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
 }
 .bc-personal > span { display: block; margin-block-end: var(--sp-2); color: var(--text-2); font-size: var(--fs-sm); }
 .bc-personal-btns { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+
+/* ==========================================================================
+   Tier lock overlay
+   --------------------------------------------------------------------------
+   applyReportsLock() has been building a .tier-lock-overlay since reports
+   became a Pro feature, and NOT ONE of these class names had a rule anywhere
+   in the project — grep across every stylesheet returned zero. So the "lock"
+   was an unstyled div appended to the bottom of the panel: it covered nothing,
+   blocked nothing, and every free user had the paid reports in full while
+   being shown a sales pitch underneath them.
+
+   It must cover, and it must intercept clicks. #panel-reports needs a
+   containing block for that, which is why the position rule is here too.
+   ========================================================================== */
+#panel-reports { position: relative; }
+
+.tier-lock-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--sp-4);
+    /* Legible through, not merely dimmed: he should recognise the thing he is
+       being sold, and not be able to read it well enough to use it. */
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    border-radius: inherit;
+}
+
+.tier-lock-box {
+    max-width: 380px;
+    text-align: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    /* The spacing scale is 1,2,3,4,6,8,12,16 — there is no --sp-5, and an
+       undefined token does not fall back, it invalidates the whole
+       declaration and takes the shorthand with it. This is the second time
+       that exact token has been written into this project by hand. */
+    padding: var(--sp-6) var(--sp-4);
+    box-shadow: 0 12px 32px rgb(0 0 0 / 0.14);
+}
+
+.tier-lock-box h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-lg); }
+.tier-lock-box p {
+    margin: 0 0 var(--sp-4);
+    color: var(--text-2);
+    font-size: var(--fs-sm);
+    line-height: 1.5;
+}
+
+.tier-lock-icon {
+    width: 46px; height: 46px;
+    margin: 0 auto var(--sp-3);
+    display: grid; place-items: center;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 1.15rem;
+}
+
+/* Chrome on Android has shipped backdrop-filter for years, but a browser that
+   lacks it must still get an opaque cover rather than a transparent one — the
+   difference between a lock and a decoration. */
+@supports not ((backdrop-filter: blur(3px)) or (-webkit-backdrop-filter: blur(3px))) {
+    .tier-lock-overlay { background: var(--surface); }
+}
+
+/* ==========================================================================
+   Read-only project view (.pv-*)
+   --------------------------------------------------------------------------
+   openProjectView() builds a full modal — backdrop, dialog, header, status
+   badges, the conversation, the materials table, the priced quote — out of a
+   dozen .pv-* class names, and NOT ONE of them had a rule anywhere in the
+   project. Every one of these selectors is new here.
+
+   The feature is reachable: clicking a quote in the ארכיון calls
+   openProjectFromArchive -> openProjectView. So the whole "clean record to
+   review" screen rendered as unstyled text pasted at the end of the document —
+   no backdrop, no box, the close ✕ floating in the flow, tables with no rules.
+   It reads as a broken app rather than a missing stylesheet.
+
+   Matches .upgrade-modal-backdrop above, which is the pattern the app already
+   uses for a JS-built modal.
+   ========================================================================== */
+.pv-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal);
+    background: var(--scrim);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: var(--sp-4);
+    overflow-y: auto;
+}
+.pv-box {
+    position: relative;
+    width: min(760px, 100%);
+    margin-block: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-1);
+    padding: var(--sp-6) var(--sp-4) var(--sp-4);
+}
+.pv-close {
+    position: absolute;
+    /* Logical, not `left`: the dialog is RTL and this must sit in the corner
+       opposite the text, whichever corner that is. */
+    inset-block-start: var(--sp-2);
+    inset-inline-end: var(--sp-2);
+    width: 34px; height: 34px;
+    display: grid; place-items: center;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+    color: var(--text-2);
+    cursor: pointer;
+    font-size: var(--fs-md);
+}
+.pv-close:hover { background: var(--surface); color: var(--text); }
+
+.pv-head { margin-block-end: var(--sp-3); padding-inline-end: 42px; }
+.pv-head h2 { margin: 0 0 var(--sp-1); font-size: var(--fs-xl); }
+.pv-sub { margin: 0; color: var(--text-3); font-size: var(--fs-sm); }
+
+.pv-badges { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-block-end: var(--sp-4); }
+.pv-flag {
+    font-size: var(--fs-xs);
+    padding: 4px 10px;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-2);
+}
+.pv-flag.on   { border-color: var(--ok, #16a34a); color: var(--ok, #16a34a); }
+.pv-flag.warn { border-color: var(--warn, #d97706); color: var(--warn, #d97706); }
+
+.pv-section { margin-block-end: var(--sp-4); }
+.pv-section h3 {
+    margin: 0 0 var(--sp-2);
+    font-size: var(--fs-md);
+    display: flex; align-items: center; gap: var(--sp-2);
+}
+.pv-section h3 .cnt { color: var(--text-3); font-weight: 400; font-size: var(--fs-sm); }
+
+.pv-chat {
+    max-height: 320px;
+    overflow-y: auto;
+    padding: var(--sp-3);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    font-size: var(--fs-sm);
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.pv-items { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.pv-items th {
+    text-align: start;
+    font-size: var(--fs-xs);
+    color: var(--text-3);
+    font-weight: 600;
+    padding: 0 0 var(--sp-1);
+    border-block-end: 1px solid var(--border);
+}
+.pv-items td { padding: var(--sp-2) 0; border-block-end: 1px solid var(--border); vertical-align: top; }
+.pv-items tr:last-child td { border-block-end: 0; }
+/* The money column: tabular figures so a column of prices lines up under
+   itself, and `end` rather than `left` because the table is RTL. */
+.pv-price { text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
+th.pv-price { text-align: end; }
+
+.pv-empty { color: var(--text-3); font-size: var(--fs-sm); padding: var(--sp-2) 0; }
+
+@media (max-width: 640px) {
+    .pv-backdrop { padding: 0; }
+    .pv-box { border-radius: 0; min-height: 100%; }
+}

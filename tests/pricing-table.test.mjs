@@ -128,7 +128,21 @@ test('the quote is built from the rows, in the order a customer reads them', () 
     assert.deepEqual(JSON.parse(JSON.stringify(titles.slice(0, 3))), ['השחלה', 'התקנה', 'לוח']);
     // Then the materials, as one section with the list inside it.
     assert.equal(titles[3], 'חומרים וציוד');
-    assert.equal(items[3].price, 810, 'the materials section is priced by the table');
+    // The cost is 722.5 + 87 = 809.5 (810 only when rounded for display), so
+    // the customer's line is 809.5 x 1.20 = 971.4 -> 971. It carries the selling
+    // price because pricingTotals().total does, and that total becomes basePrice
+    // on the same page.
+    assert.equal(items[3].price, 971, 'the materials line is priced at cost, not at what the customer pays');
+
+    // THE INVARIANT. Whatever the markup, the itemised lines must add up to the
+    // total printed under them. They did not: the material line was built from
+    // matLineTotal (cost) while basePrice came from pricingTotals().total
+    // (marked up), so a customer with a calculator could disprove his own quote.
+    const { pricingTotals } = load();
+    const lineSum = items.reduce((a, x) => a + Number(x.price), 0);
+    const total = Math.round(pricingTotals({ ...proj(), quoteBuild: 'detailed' }).total);
+    assert.ok(Math.abs(lineSum - total) <= items.length,
+        `the itemised lines sum to ${lineSum} but the quote's total is ${total}`);
     assert.match(items[3].description, /כבל 5x10 × 25/, 'quantities belong in the description');
     assert.doesNotMatch(items[3].description, /עמוד/, 'an unticked material must not reach the quote');
     // And each extra as its own line, never folded into the installation price.
@@ -136,8 +150,11 @@ test('the quote is built from the rows, in the order a customer reads them', () 
     assert.equal(items[4].price, 600);
     assert.match(items[4].description, /סעיף נפרד/);
 
+    // 2200 labour + 971 materials (809.5 cost + 20%) + 600 inspector.
+    // This was 3610 while the material line was built from cost — which is the
+    // same defect the invariant above catches, frozen into a constant.
     const sum = items.reduce((s, x) => s + x.price, 0);
-    assert.equal(sum, 3610, 'the sections must add up to the table total');
+    assert.equal(sum, 3771, 'the sections must add up to the table total');
 });
 
 test('an empty section carries no filler text to a customer', () => {
