@@ -17,8 +17,13 @@ export async function onRequestGet(context) {
     if (!env.SJ_DATA) return jsonResponse({ error: { message: 'KV לא מוגדר.' } }, 501);
 
     // Read cap + parallel chunks: the Workers free plan allows ~50 subrequests
-    // per invocation, and each blob is one KV get. 40 newest-listed users per
-    // call keeps headroom for the pdfmo list below; `capped` tells the UI.
+    // per invocation, and each blob is one KV get. 40 users per call keeps
+    // headroom for the pdfmo list below, and `capped` tells the UI — which now
+    // actually prints it, having ignored the flag since it was added.
+    //
+    // NOT "newest". KV list() returns keys in lexicographic order, so this is
+    // the alphabetically-first 40 email addresses. It is a sample, and not even
+    // a random one — which is exactly why the caller has to be told.
     const list = await env.SJ_DATA.list({ prefix: 'user:', limit: 40 });
     const users = [];
     const blobs = [];

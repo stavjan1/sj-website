@@ -38,7 +38,12 @@ const ITEM_PRICE_MAX = 200000;
 // Ten items is not a real loss of signal: the value here is what a job charges
 // for its common components, and the eleventh line of a quote is the tail.
 const ITEMS_PER_QUOTE = 10;
-const ITEM_BUCKETS_CAP = 4000;  // safety ceiling on distinct item names per profession
+// KV list() returns at most 1000 keys per page, so a limit of 4000 could never
+// be reached and this ceiling never fired — the guard existed and did nothing.
+// 900 sits under the page size, so the count is real. It is also plenty: this
+// is distinct ITEM NAMES per profession, and an electrician's vocabulary of
+// billable components is in the low hundreds.
+const ITEM_BUCKETS_CAP = 900;   // safety ceiling on distinct item names per profession
 
 const JOB_TYPES = ['panel', 'points', 'charger', 'solar', 'inspection', 'fault', 'infra', 'other'];
 // Closed list, mirroring PROFESSIONS in sale/app.js. This write path is PUBLIC,

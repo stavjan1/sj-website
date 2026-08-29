@@ -362,6 +362,13 @@ function crPaintTraffic() {
 function crPaintFunnel() {
     const f = _crCache.funnel && _crCache.funnel.funnel;
     if (!f) return;
+    // The server reads at most 40 user blobs per call and has always returned a
+    // `capped` flag saying so. Nothing read it. So every number in this tile —
+    // signups, conversion, drop-off — was computed from the first 40 accounts
+    // KV happened to list and presented as the whole business. A dashboard that
+    // under-reports without saying so is worse than no dashboard: decisions get
+    // made on it.
+    const capped = !!(_crCache.funnel && _crCache.funnel.capped);
     const steps = [
         ['נרשמו', f.signedUp],
         ['פתחו פרויקט', f.openedProject],
@@ -380,7 +387,8 @@ function crPaintFunnel() {
     crMeta('funnel', `${crNum(f.producedQuote)} מתוך ${crNum(f.signedUp)}`);
     crSet('cr-funnel', `<div class="cr-bars">${rows}</div>
         <p class="cr-note">נעצרו אחרי הודעה־שתיים: <b>${crNum(f.oneMessageOnly)}</b> ·
-        ייצאו PDF החודש: <b>${crNum(f.pdfThisMonth)}</b>${f.anonVisitors ? ` · אורחים: <b>${crNum(f.anonVisitors)}</b>` : ''}</p>`);
+        ייצאו PDF החודש: <b>${crNum(f.pdfThisMonth)}</b>${f.anonVisitors ? ` · אורחים: <b>${crNum(f.anonVisitors)}</b>` : ''}</p>
+        ${capped ? `<p class="cr-note" style="color:var(--warn-text)">נקראו 40 חשבונות בלבד (תקרת הקריאה בשרת) — המספרים האמיתיים גבוהים יותר.</p>` : ''}`);
 }
 
 // ---- the AI pools ----------------------------------------------------------

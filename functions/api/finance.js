@@ -23,7 +23,29 @@ import { verifyGoogleEmail, bearerToken, getTierForEmail, jsonResponse, ADMIN_EM
 // PRO feature: every paying account (pro/business) plus the owner gets its OWN
 // record; the owner's key stays 'finance:admin' so nothing he entered moves.
 const PRO_TIERS = ['pro', 'business', 'admin'];
-function keyFor(email) { return email === ADMIN_EMAIL ? 'finance:admin' : `finance:${email}`; }
+// Lower-cased, like every other per-user key in this project (data.js writes
+// 'user:' + email.toLowerCase(), pdf.js and tier.js do the same). This file was
+// the only one keying on the raw address Google returned, and verifyGoogleEmail
+// hands back whatever Google sent — canonical lowercase for gmail.com, but not
+// guaranteed for a Workspace domain. A user whose address came back capitalised
+// differently on a later sign-in would find an empty cash-flow screen, and the
+// admin check below would miss too.
+function keyFor(email) {
+    const e = String(email || '').toLowerCase();
+    return e === ADMIN_EMAIL ? 'finance:admin' : `finance:${e}`;
+}
+// Records written before the line above existed live under the raw address.
+// Read the canonical key first and fall back, so nobody's data disappears on
+// the deploy that fixed the casing.
+function legacyKeyFor(email) {
+    return email === ADMIN_EMAIL ? 'finance:admin' : `finance:${email}`;
+}
+async function readFinanceRecord(env, email) {
+    const raw = await env.SJ_DATA.get(keyFor(email));
+    if (raw) return raw;
+    const legacy = legacyKeyFor(email);
+    return legacy === keyFor(email) ? null : await env.SJ_DATA.get(legacy);
+}
 async function proGate(env, request) {
     const email = await verifyGoogleEmail(bearerToken(request));
     if (!email) return { ok: false, response: jsonResponse({ error: { message: 'נדרשת התחברות.', code: 'auth-expired' } }, 401) };
@@ -45,13 +67,16 @@ export async function onRequestGet(context) {
     const KEY = keyFor(gate.email);
 
     let record;
-    try { record = JSON.parse(await env.SJ_DATA.get(KEY) || 'null') || emptyRecord(); }
+    try { record = JSON.parse(await readFinanceRecord(env, gate.email) || 'null') || emptyRecord(); }
     catch { record = emptyRecord(); }
 
     // Income side for free: the owner's own ZEREM invoices live in the user blob.
     let invoiceIncome = [];
     try {
-        const blob = JSON.parse(await env.SJ_DATA.get(`user:${gate.email}`) || 'null');
+        // data.js writes this key lower-cased. Reading it raw meant this lookup
+        // silently found nothing for any address that was not already lowercase,
+        // and the invoice income simply came back empty with no error.
+        const blob = JSON.parse(await env.SJ_DATA.get(`user:${String(gate.email).toLowerCase()}`) || 'null');
         const invoices = blob && Array.isArray(blob.invoices) ? blob.invoices : [];
         for (const inv of invoices) {
             // Per-invoice guard: one malformed createdAt must not drop ALL income.
@@ -111,7 +136,7 @@ async function savePut(context) {
     // Same guard family as /api/data: an all-empty save never overwrites real data.
     if (!record.accounts.length && !record.entries.length && !record.recurring.length) {
         let existing = null;
-        try { existing = JSON.parse(await env.SJ_DATA.get(KEY) || 'null'); } catch { }
+        try { existing = JSON.parse(await readFinanceRecord(env, gate.email) || 'null'); } catch { }
         const len = (v) => Array.isArray(v) ? v.length : 0;
         if (existing && (len(existing.accounts) || len(existing.entries) || len(existing.recurring))) {
             return jsonResponse({ ok: true, skipped: 'empty-over-nonempty' });
