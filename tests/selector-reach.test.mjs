@@ -209,15 +209,25 @@ test('settings is reachable from the one menu a phone has', () => {
     const chat = readFileSync(join(ROOT, 'sale', 'chat.js'), 'utf8');
     const i = chat.indexOf('function renderDrawerDestinations(');
     const body = chat.slice(i, chat.indexOf('\n}', i));
-    // הגדרות is a real rail button now — Stav asked whether it and the user
-    // chip were even different things, and they were not: the settings screen
-    // already holds פרופיל משתמש and ערכת נושא. Being a rail button
-    // means the drawer gets it through the mirror, not a second list to keep.
-    assert.match(HTML, /id="tab-settings"/, 'הגדרות is not a destination in the rail');
+    // THE ASSERTION IS "REACHABLE ON A PHONE", not "is a rail button". It used to
+    // check for id="tab-settings" in the rail, which was the implementation at
+    // the time. On 30/08 Stav asked for הגדרות and מאגר מחירים to move into the
+    // profile menu, and doing that recreated this exact bug: panels.css hides
+    // .sidebar outright under 768px, so the account menu — and everything moved
+    // into it — does not exist on a phone at all. This test caught it.
+    //
+    // So it now asserts the thing that must stay true however the desktop is
+    // arranged: every screen a phone can only reach through this drawer is
+    // listed in it, and nothing is listed twice.
     assert.match(body, /\.sidebar \.nav-btn/, 'the drawer stopped mirroring the rail');
-    assert.match(body, /tab: 'business'/, 'פרטי העסק is not listed in the drawer');
-    assert.doesNotMatch(body, /tab: 'settings'/,
-        'הגדרות is hard-coded here as well as mirrored from the rail — it would draw twice');
+    for (const [tab, label] of [['business', 'פרטי העסק'], ['catalog', 'מאגר מחירים'], ['settings', 'הגדרות']]) {
+        const inDrawer = body.includes(`tab: '${tab}'`);
+        const inRail = HTML.includes(`id="tab-${tab}"`);
+        assert.ok(inDrawer || inRail,
+            `${label} is reachable from neither the drawer nor the rail — on a phone it does not exist`);
+        assert.ok(!(inDrawer && inRail),
+            `${label} is in both the drawer list and the rail — the phone would draw it twice`);
+    }
 });
 
 test('the thread list belongs to the conversation, not to every screen', () => {

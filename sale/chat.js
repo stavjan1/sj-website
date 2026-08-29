@@ -4753,11 +4753,22 @@ function renderDrawerDestinations() {
     // אין גישה להגיע להגדרות בלשונית שלוש קווים." They are screens like any
     // other, so they are listed like any other, and reaching them no longer
     // depends on scrolling to a control you cannot see.
-    // פרטי העסק only. הגדרות is a real button in the rail now, so it arrives
-    // through the mirror above like every other destination — listing it here
-    // as well would draw it twice, which is the bug this whole sweep is about.
+    // THE PHONE HAS NO SIDEBAR AT ALL. panels.css hides it outright under 768px
+    // — the bottom bar was removed on purpose — so this drawer is the ONLY
+    // navigation a phone has, and anything that is not in the mirror above or in
+    // this list simply does not exist on a phone.
+    //
+    // On 30/08 מאגר מחירים and הגדרות moved out of the rail and into the account
+    // menu, which lives in that hidden sidebar. That quietly recreated the exact
+    // bug Stav reported on 28/08 — "בטלפון רק אין גישה להגיע להגדרות בלשונית
+    // שלוש קווים" — and the test written for it caught the regression before it
+    // reached him. They are listed here explicitly now: the desktop reaches them
+    // through his profile menu, the phone reaches them here, and neither is
+    // drawn twice because neither is a rail button any more.
     const EXTRA = [
         { tab: 'business', label: 'פרטי העסק', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>' },
+        { tab: 'catalog', label: 'מאגר מחירים', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M20.6 13.4 12 22l-9-9V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>' },
+        { tab: 'settings', label: 'הגדרות', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.36.43.65.79.79H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>' },
     ];
 
     box.innerHTML = btns.map((b) => {
