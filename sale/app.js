@@ -9437,3 +9437,106 @@ function showLinkDialog(title, link) {
     setTimeout(() => { try { input.select(); } catch (e) {} }, 30);
 }
 
+// ============================================================================
+// TAKING YOUR DATA OUT, AND DELETING IT
+// zerem/terms.html promises both — "לבקשת עיון או מחיקה" — and until now both
+// were kept by hand, by one person, in a Cloudflare dashboard. That is a
+// promise that works at ten users and quietly stops working at five hundred.
+//
+// The ORDER below is the whole feature, and getting it wrong produces something
+// that looks exactly like success and erases nothing:
+//   1. cancel the pending cloud save. A sync is debounced by 1500ms, so a save
+//      armed by the last thing the user touched is still in flight.
+//   2. delete the cloud record.
+//   3. only then clear local storage — because until this line the browser
+//      still holds a full copy, and any sync that fires writes it back.
+//   4. sign out, so nothing re-arms.
+// Deleting the cloud first and the browser second is a two-second pause, not an
+// erasure.
+// ============================================================================
+
+// עיון — the access half. Everything the cloud holds about you, in the same
+// shape the backup import already understands, so this doubles as a real backup.
+function exportMyData() {
+    const blob = buildDatabaseObject();
+    const name = (getActiveUser() || 'zerem').replace(/[^\w.@-]/g, '_');
+    const url = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(blob, null, 2));
+    const a = document.createElement('a');
+    a.setAttribute('href', url);
+    a.setAttribute('download', `zerem_${name}_${getTodayDateString()}.json`);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    showToast('הנתונים שלך הורדו לקובץ');
+}
+
+// מחיקה — the erasure half.
+async function eraseMyData() {
+    const cloud = isCloudUser();
+
+    if (!await askConfirm({
+        title: 'למחוק את כל הנתונים שלך?',
+        body: 'כל העבודות, ההצעות, הלקוחות, החשבוניות והמחירון שלך יימחקו'
+            + (cloud ? ' — גם מהמכשיר הזה וגם מהגיבוי בענן.' : ' מהמכשיר הזה.')
+            + (cloud ? ' אם יש לך מנוי, גם רישום המנוי יימחק.' : ''),
+        note: 'אי אפשר לשחזר. כדאי להוריד קודם עותק.',
+        confirmLabel: 'המשך למחיקה',
+        danger: true,
+    })) return;
+
+    // A second gate that a thumb cannot pass by accident. Typing the word is
+    // the standard for an action with no undo, and it is the only place in this
+    // product that asks for one.
+    openNamePrompt({
+        title: 'אישור אחרון',
+        label: 'הקלד "מחק" כדי לאשר',
+        placeholder: 'מחק',
+        saveLabel: 'מחק הכול',
+        onSave: (typed) => {
+            if (String(typed).trim() !== 'מחק') { showToast('לא נמחק — המילה לא תאמה', 'error'); return; }
+            _reallyEraseMyData(cloud);
+        },
+    });
+}
+
+async function _reallyEraseMyData(cloud) {
+    // 1. Disarm the pending save FIRST. Everything below is pointless while a
+    //    timer is holding a full copy of the data and a plan to upload it.
+    try { if (_cloudSaveTimer) { clearTimeout(_cloudSaveTimer); _cloudSaveTimer = null; } } catch (e) {}
+
+    // 2. The cloud copy.
+    if (cloud) {
+        try {
+            const token = await ensureGoogleToken();
+            const res = await fetch('/api/data', {
+                method: 'DELETE',
+                headers: { Authorization: 'Bearer ' + token },
+            });
+            if (!res.ok) {
+                const d = await res.json().catch(() => ({}));
+                showToast('המחיקה מהענן נכשלה: ' + ((d.error && d.error.message) || res.status), 'error');
+                return;      // nothing local is touched — a half-erasure is worse than none
+            }
+        } catch (e) {
+            showToast('המחיקה מהענן נכשלה: ' + (e.message || e), 'error');
+            return;
+        }
+    }
+
+    // 3. This device. Every key this app owns for this user, including the
+    //    local backups — a "delete everything" that leaves a restorable
+    //    snapshot behind has not deleted everything.
+    const user = (getActiveUser() || '').toLowerCase();
+    const mine = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        if (k.startsWith('sj_user_' + user + '_') || (!user && k.startsWith('sj_'))) mine.push(k);
+    }
+    mine.forEach((k) => { try { localStorage.removeItem(k); } catch (e) {} });
+    try { sessionStorage.clear(); } catch (e) {}
+
+    // 4. And out, so nothing re-arms and writes a fresh record on the way.
+    showToast('הנתונים נמחקו');
+    setTimeout(() => { location.href = '/'; }, 900);
+}

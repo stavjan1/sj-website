@@ -100,6 +100,42 @@ export async function onRequestGet(context) {
 }
 
 
+// DELETE /api/admin-users?user=<email>  → erase one user's record, on request
+//
+// zerem/terms.html tells a user they can write to info@sj-eng.co.il and have
+// their data deleted. Answering that by hand in the Cloudflare dashboard is how
+// a promise gets broken on a busy week. This is the same erasure the user can
+// perform themselves in Settings, done on their behalf.
+//
+// The target is an explicit parameter, so unlike the user's own DELETE this one
+// CAN name somebody else — which is exactly why it is admin-gated, requires the
+// address in full, and refuses anything that is not shaped like one.
+export async function onRequestDelete(context) {
+  const { request, env } = context;
+
+  const gate = await adminGate(request);
+  if (!gate.ok) return gate.response;
+  if (!env.SJ_DATA) {
+    return jsonResponse({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
+  }
+
+  const target = (new URL(request.url).searchParams.get('user') || '').trim().toLowerCase();
+  // No prefix match, no wildcard, no empty string: one whole address, or nothing.
+  if (!target || target.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target)) {
+    return jsonResponse({ error: { message: 'צריך כתובת מייל מלאה של המשתמש.' } }, 400);
+  }
+  if (target === ADMIN_EMAIL) {
+    return jsonResponse({ error: { message: 'אי אפשר למחוק את חשבון המנהל מכאן.' } }, 400);
+  }
+
+  const existed = !!(await env.SJ_DATA.get(USER_PREFIX + target));
+  await env.SJ_DATA.delete(USER_PREFIX + target);
+  try { await env.SJ_DATA.delete('tier:' + target); } catch { /* no tier is the normal case */ }
+
+  return jsonResponse({ ok: true, deleted: target, existed });
+}
+
+
 // POST /api/admin-users  { test: 'mail' }  → send a real test email to the admin
 //
 // Exists because the only honest way to know outbound mail works is to send

@@ -137,6 +137,28 @@ export async function onRequest(context) {
     return json({ ok: true, updatedAt: Date.now(), quotaSoftExceeded });
   }
 
+  // ---- DELETE: erasure, and it means erasure ------------------------------
+  // zerem/terms.html promises a user can ask for their data to be deleted. Until
+  // now that promise was kept by hand, in the Cloudflare dashboard, by one
+  // person — which is a promise that works at ten users and not at five hundred.
+  //
+  // Authenticated by the user's OWN Google token, so nobody can erase anybody
+  // else: the key is derived from the verified email, never from a parameter.
+  //
+  // What goes: the data blob, and the tier record, which is the other place the
+  // address is written. What stays: the monthly quota counter, which carries no
+  // content and expires by itself in about forty days.
+  //
+  // The client must cancel its pending sync BEFORE calling this and clear its
+  // own storage after — otherwise the browser still holds everything and the
+  // next save writes the whole record straight back. That ordering is the
+  // difference between an erasure and a two-second pause.
+  if (method === 'DELETE') {
+    await env.SJ_DATA.delete(key);
+    try { await env.SJ_DATA.delete('tier:' + email.toLowerCase()); } catch { /* no tier is the normal case */ }
+    return json({ ok: true, deleted: true });
+  }
+
   return json({ error: { message: 'מתודה לא נתמכת.' } }, 405);
 }
 
@@ -167,7 +189,7 @@ function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
 function cors() {
   return {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, PUT, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, PUT, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
 }
