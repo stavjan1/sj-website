@@ -74,3 +74,16 @@ test('the landing page sells the plans the app actually gives', () => {
     assert.ok(/3 עבודות פתוחות/.test(land),
         'the free plan is sold without naming its limit');
 });
+
+test('a paid capability is enforced where it cannot be edited — on the server', () => {
+    // The browser hides the camera button when chatPhotos is false, and that was
+    // the whole enforcement: functions/api/chat.js never mentioned the flag, so a
+    // request carrying images was served to any tier. A vision call costs
+    // meaningfully more than a text one, on a quota everybody shares, and the
+    // browser is the one place a user can edit.
+    const chat = readFileSync(new URL('../functions/api/chat.js', import.meta.url), 'utf8');
+    assert.match(chat, /limits\.chatPhotos/,
+        'the chat endpoint does not consult chatPhotos — the photo gate is browser-only again');
+    assert.match(chat, /images: undefined/,
+        'images are no longer stripped for a tier that may not send them');
+});

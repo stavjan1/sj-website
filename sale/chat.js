@@ -4154,18 +4154,23 @@ function renderEstimateTotal() {
     if (!box) return;
     const proj = projectsList.find((p) => p.id === activeProjectId);
     if (!proj) { box.hidden = true; return; }
-    const mats = (proj.materials || []).filter((m) => m && m.checked)
-        .reduce((sum, m) => sum + matLineTotal(m), 0);
-    const labor = laborSummary(proj).total;
+    // Derived from pricingTotals, not recomputed. This block used matLineTotal —
+    // the COST — while the pricing table's strip a thousand lines up shows
+    // t.total, which carries the material markup. Two screens, the same label
+    // "סה\"כ לפני מע\"מ", two different numbers, and no way for the electrician
+    // to know which one he is about to quote. One source settles it.
+    const t = pricingTotals(proj);
+    const mats = t.materialsPrice;
+    const labor = t.labor;
     const extras = QUOTE_EXTRAS.filter((x) => extraState(proj, x.key).on);
-    const extrasSum = extras.reduce((sum, x) => sum + extraLineTotal(proj, x), 0);
+    const extrasSum = t.extras;
     if (!mats && !labor && !extrasSum) { box.hidden = true; return; }
     box.hidden = false;
     box.innerHTML = `
-        <div class="et-row"><span>חומרים מסומנים</span><b>${heNum(Math.round(mats))} ₪</b></div>
+        <div class="et-row"><span>חומרים מסומנים</span><b>${heNum(Math.round(mats))} ₪</b>${t.markup ? `<small class="pt-cost-note"> (עלות ${heNum(Math.round(t.materials))} + ${Math.round(t.markup)}%)</small>` : ''}</div>
         <div class="et-row"><span>עבודה</span><b>${heNum(labor)} ₪</b></div>
         ${extras.length ? `<div class="et-row"><span>תוספות (${extras.map((x) => escapeHtml(x.label)).join(', ')})</span><b>${heNum(extrasSum)} ₪</b></div>` : ''}
-        <div class="et-row et-sum"><span>סה"כ לפני מע"מ</span><b>${heNum(Math.round(mats + labor + extrasSum))} ₪</b></div>`;
+        <div class="et-row et-sum"><span>סה"כ לפני מע"מ</span><b>${heNum(Math.round(t.total))} ₪</b></div>`;
 }
 
 // ==========================================================================

@@ -156,9 +156,25 @@ async function handleChat(context) {
   const turnText = lastUserText(body.messages);
   const fullMap = await getPricingMap(env);
   const pricingMap = isTrivialTurn(turnText) ? '' : trimPricingMap(fullMap, turnText);
+  // PHOTOS ARE A PAID CAPABILITY, AND THIS IS THE ONLY PLACE THAT CAN SAY SO.
+  // The browser has a chatPhotos flag in its own tier table and hides the camera
+  // button — and that was the entire enforcement. The server never looked, so a
+  // request carrying images was served for any tier, and a vision call costs
+  // meaningfully more than a text one on a quota everybody shares.
+  //
+  // Stripped rather than refused: the electrician typed a real question and
+  // attaching a photo should not lose it. He gets his answer about the text, and
+  // the upgrade prompt he already sees in the browser explains the rest.
+  const photosAllowed = isAdmin || limits.chatPhotos !== false;
+  const incoming = photosAllowed
+    ? body.messages
+    : body.messages.map((m) => (m && Array.isArray(m.images) && m.images.length)
+        ? { ...m, images: undefined }
+        : m);
+
   const messages = pricingMap
-    ? [...body.messages, { role: 'system', content: pricingMap }]
-    : [...body.messages];
+    ? [...incoming, { role: 'system', content: pricingMap }]
+    : [...incoming];
 
   // Characterization stage only: the equipment kit for this job family, so the
   // product list comes back complete down to the glands and the labels. Sent
