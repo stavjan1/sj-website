@@ -987,6 +987,14 @@ let appState = {
         businessDetails: {
             name: '',
             owner: '',
+            // The line under the business name on the sheet. It used to be
+            // hardcoded "תכנון ויעוץ חשמל" in the markup with no field behind
+            // it, which described a planning office rather than the electrician
+            // holding the phone. Now it is his to write, and empty means the
+            // line is simply not printed.
+            tagline: '',
+            // The one credential an Israeli customer can actually check.
+            license: '',
             id: '',
             phone: '',
             email: '',
@@ -5181,6 +5189,8 @@ function loadSettings() {
             if (biz) {
                 document.getElementById('set-biz-name').value = biz.name || '';
                 document.getElementById('set-biz-owner').value = biz.owner || '';
+                document.getElementById('set-biz-tagline').value = biz.tagline || '';
+                document.getElementById('set-biz-license').value = biz.license || '';
                 document.getElementById('set-biz-id').value = biz.id || '';
                 document.getElementById('set-biz-phone').value = biz.phone || '';
                 document.getElementById('set-biz-email').value = biz.email || '';
@@ -5212,7 +5222,12 @@ function loadSettings() {
             _setVal('pdf-primary-color', appState.settings.pdfPrimaryColor || '#1e3a8a');
             _setVal('pdf-secondary-color', appState.settings.pdfSecondaryColor || '#3b82f6');
             _setCheck('pdf-show-watermark', appState.settings.pdfShowWatermark ?? true);
-            _setCheck('pdf-show-signature', appState.settings.pdfShowSignature ?? false);
+            // Default ON, not off. The footer of every sheet states that the
+            // document becomes a binding agreement "עם אישור וחתימת הלקוח" —
+            // and the page it was printed on had nowhere to sign. The promise
+            // and the paper disagreed on every quote anyone had ever sent.
+            // ?? keeps an explicit false the electrician chose himself.
+            _setCheck('pdf-show-signature', appState.settings.pdfShowSignature ?? true);
 
             // Apply saved theme (explicit user choice wins; otherwise follow the OS)
             applySystemTheme(themePref());
@@ -5476,7 +5491,7 @@ function updatePdfCustomStyles() {
     // decision, and two controls for one decision can disagree. Read from the
     // choice itself.
     const showWatermark = (appState.settings.pdfWatermarkKind || 'bolt') !== 'none';
-    const showSignature = document.getElementById('pdf-show-signature')?.checked ?? false;
+    const showSignature = document.getElementById('pdf-show-signature')?.checked ?? true;
 
     // Update UI slider labels
     const fontLabel = document.getElementById('val-pdf-font-size-body');
@@ -6350,6 +6365,8 @@ function saveBusinessSettings() {
     appState.settings.businessDetails = {
         name: document.getElementById('set-biz-name').value,
         owner: document.getElementById('set-biz-owner').value,
+        tagline: document.getElementById('set-biz-tagline').value,
+        license: document.getElementById('set-biz-license').value,
         id: document.getElementById('set-biz-id').value,
         phone: document.getElementById('set-biz-phone').value,
         email: document.getElementById('set-biz-email').value,
@@ -6368,7 +6385,7 @@ function saveBusinessSettings() {
     appState.settings.pdfPrimaryColor = document.getElementById('pdf-primary-color')?.value || '#1e3a8a';
     appState.settings.pdfSecondaryColor = document.getElementById('pdf-secondary-color')?.value || '#3b82f6';
     appState.settings.pdfShowWatermark = document.getElementById('pdf-show-watermark')?.checked ?? true;
-    appState.settings.pdfShowSignature = document.getElementById('pdf-show-signature')?.checked ?? false;
+    appState.settings.pdfShowSignature = document.getElementById('pdf-show-signature')?.checked ?? true;
 
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
     localStorage.setItem(getStorageKey('sj_db_last_updated'), Date.now().toString());
@@ -7648,6 +7665,28 @@ async function downloadPDF() {
     if (gate && gate.allow === false) {
         showUpgradeModal(gate.reason === 'quota' ? 'pdfQuota' : 'guestPdf');
         return;
+    }
+
+    // A quote is a number. Reviewers exported a finished-looking A4 whose total
+    // read "0 ₪" and nothing anywhere objected -- not the button, not a hint,
+    // not a toast. The mistake is easy to make (prices left in the pricing table
+    // and never applied to the document) and it is the kind that reaches the
+    // customer before anyone notices, so it asks once rather than blocking.
+    const _items = getWorkItemsFromForm();
+    const _sum = _items.reduce((a, it) => a + (Number(it.price) || 0), 0);
+    if (!_items.length) {
+        showToast('אין שורות עבודה בהצעה — הוסף לפחות שורה אחת לפני הייצוא', 'error');
+        return;
+    }
+    if (_sum <= 0) {
+        const go = await askConfirm({
+            title: 'ההצעה יוצאת על 0 ₪',
+            body: 'אין מחיר באף אחת מהשורות. אם התמחור נמצא בטבלת התמחור, לחץ "החל על ההצעה" שם — אחרת הלקוח יקבל מסמך שמסתכם באפס.',
+            confirmLabel: 'ייצא בכל זאת',
+            cancelLabel: 'חזור ותקן',
+            danger: true,
+        });
+        if (!go) return;
     }
 
     ensureQuoteNumber();

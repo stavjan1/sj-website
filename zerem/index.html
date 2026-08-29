@@ -76,7 +76,11 @@
         .z-step .num { color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 700; }
         .z-step p { color: var(--text-2); font-size: var(--fs-sm); margin: 0; }
         .z-aud { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
-        .z-price-card { max-width: 440px; margin-inline: auto; text-align: center; border-color: var(--accent); }
+        .z-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--sp-4); align-items: start; }
+        .z-price-card { text-align: center; }
+        .z-price-card.is-featured { border-color: var(--accent); }
+        .z-plan-tag { display: inline-block; color: var(--accent); font-size: var(--fs-xs); font-weight: 700; }
+        .z-plan-line { color: var(--text-3); font-size: var(--fs-sm); margin-block: var(--sp-1) 0; }
         .z-price-card .amount { font-size: var(--fs-3xl); font-weight: 700; font-variant-numeric: tabular-nums; }
         .z-price-card .amount small { font-size: var(--fs-sm); color: var(--text-3); font-weight: 400; }
         .z-price-card ul { list-style: none; padding: 0; margin: var(--sp-4) 0; display: grid; gap: var(--sp-2); color: var(--text-2); font-size: var(--fs-sm); }
@@ -280,19 +284,58 @@
 
         <section class="section">
             <div class="wrap">
-                <div class="card z-price-card rv">
-                    <span style="color: var(--accent); font-size: var(--fs-xs); font-weight: 700;">תקופת השקה</span>
-                    <h3>מתחילים חינם</h3>
-                    <div class="amount">₪0 <small>/ עכשיו</small></div>
-                    <ul>
-                        <li>תכנון + תמחור + הצעות PDF, ללא הגבלת פרויקטים</li>
-                        <li>מאגר מחירים אישי עם ייבוא מאקסל</li>
-                        <li>גיבוי ענן עם חשבון Google</li>
-                        <li>מצב אורח להתנסות בלי הרשמה</li>
-                    </ul>
-                    <a href="/sale/" class="btn btn-primary btn-lg" style="width:100%;">פותחים פרויקט ראשון</a>
-                    <p class="note">גרסת Pro עם יכולות מתקדמות, בקרוב. מצטרפי תקופת ההשקה יקבלו תנאים מועדפים.</p>
+                <!-- THE PRICE SECTION SAID SOMETHING THE APP DOES NOT DO.
+                     It advertised "ללא הגבלת פרויקטים" on the free plan while the
+                     app gives a signed-in electrician three, and it promised a Pro
+                     tier "בקרוב" that has been live for a while under three names.
+                     A landing page that oversells by one number is not a marketing
+                     choice, it is the first broken promise a new user meets — he
+                     opens the fourth job and finds a wall nobody warned him about.
+                     These three cards are the same three in PLAN_CARDS in
+                     sale/app.js; if that list changes, this changes with it. -->
+                <div class="z-plans">
+                    <div class="card z-price-card rv">
+                        <span class="z-plan-tag">חינם, לתמיד</span>
+                        <h3>סילבר</h3>
+                        <div class="amount">₪0 <small>/ לחודש</small></div>
+                        <p class="z-plan-line">להתחיל, ולראות שזה עובד.</p>
+                        <ul>
+                            <li>מספר שאלות מוגבל ליום</li>
+                            <li>עד 3 עבודות פתוחות</li>
+                            <li>3 הצעות מחיר בחודש</li>
+                            <li>גיבוי ענן עם חשבון Google</li>
+                        </ul>
+                        <a href="/sale/" class="btn btn-secondary btn-lg" style="width:100%;">פותחים עבודה ראשונה</a>
+                    </div>
+                    <div class="card z-price-card is-featured rv">
+                        <span class="z-plan-tag">הנפוץ ביותר</span>
+                        <h3>גולד ⚡</h3>
+                        <div class="amount">₪19 <small>/ לחודש</small></div>
+                        <p class="z-plan-line">למי שמתמחר כל שבוע.</p>
+                        <ul>
+                            <li>עבודות והצעות ללא הגבלה</li>
+                            <li>שאלות ללא הגבלה מעשית</li>
+                            <li>תמונות מהשטח בתוך השיחה</li>
+                            <li>קישור אישור ללקוח</li>
+                            <li>דוחות, תזכורות והמודל המתקדם</li>
+                        </ul>
+                        <a href="/sale/" class="btn btn-primary btn-lg" style="width:100%;">מתחילים</a>
+                    </div>
+                    <div class="card z-price-card rv">
+                        <span class="z-plan-tag">לעסק מסודר</span>
+                        <h3>דיימונד 💎</h3>
+                        <div class="amount">₪49 <small>/ לחודש</small></div>
+                        <p class="z-plan-line">כשהחשבוניות והכסף גם בפנים.</p>
+                        <ul>
+                            <li>כל מה שבגולד</li>
+                            <li>חיבור למערכת החשבוניות שלך</li>
+                            <li>תזרים מזומנים וחיבור בנקים</li>
+                            <li>מאגר מחירים אישי גדול</li>
+                        </ul>
+                        <a href="/sale/" class="btn btn-secondary btn-lg" style="width:100%;">מתחילים</a>
+                    </div>
                 </div>
+                <p class="note" style="text-align:center; margin-block-start: var(--sp-4);">אפשר להתנסות גם בלי הרשמה — מצב אורח, בלי כרטיס אשראי.</p>
             </div>
         </section>
 

@@ -46,3 +46,31 @@ test('the plan names agree too, and the stored values never move', () => {
     assert.match(SERVER, /TIER_NAMES = \['guest', 'free', 'pro', 'business'\]/,
         'the stored tier values changed — every existing customer just moved plan');
 });
+
+test('the landing page sells the plans the app actually gives', () => {
+    // The price section advertised "ללא הגבלת פרויקטים" on the free plan while
+    // the app gives three, and promised a Pro tier "בקרוב" that had been live
+    // for months. A landing page that oversells by one number is not marketing,
+    // it is the first broken promise a new user meets: he opens the fourth job
+    // and hits a wall nobody warned him about.
+    const raw = readFileSync(new URL('../zerem/index.html', import.meta.url), 'utf8');
+    // Scan the PAGE, not the notes about it. A comment explaining which claim
+    // was removed contains that claim, and a test that reads it fails on the
+    // very fix it is guarding.
+    const land = raw.replace(/<!--[\s\S]*?-->/g, '');
+
+    for (const label of ['סילבר', 'גולד', 'דיימונד']) {
+        assert.ok(land.includes(label), `the landing page lost the ${label} plan`);
+    }
+    // The two prices Stav set. If they move in the app they must move here.
+    for (const price of ['19', '49']) {
+        assert.ok(land.includes('₪' + price), `the landing page does not show the ₪${price} plan`);
+    }
+    assert.ok(!/ללא הגבלת פרויקטים/.test(land),
+        'the landing page promises unlimited projects on a plan capped at 3');
+    assert.ok(!/גרסת Pro[^<]*בקרוב/.test(land),
+        'the landing page still calls the paid tier "coming soon"');
+    // The free plan's cap must be stated where the free plan is sold.
+    assert.ok(/3 עבודות פתוחות/.test(land),
+        'the free plan is sold without naming its limit');
+});

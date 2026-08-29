@@ -578,10 +578,10 @@
 .quote-sheet.tpl-classic .footer-notice {
     max-width: 88%;
     margin: 6px auto 0;
-    font-size: 8.5px;
+    font-size: 11px;          /* legally binding — see pdf.css .footer-notice */
     font-style: normal;
     line-height: 1.45;
-    color: var(--tpl-ink-4);
+    color: var(--tpl-ink-2);
 }
 
 .quote-sheet.tpl-classic .pdf-zerem-credit {
@@ -1176,9 +1176,9 @@
 /* Hebrew has no true italic — the browser skews the letters. It looked like a
    typo on a legal sentence, so it is set upright. */
 .quote-sheet.tpl-minimal .footer-notice {
-    font-size: 7.6px;
+    font-size: 11px;          /* legally binding — see pdf.css .footer-notice */
     font-style: normal;
-    color: var(--q-mute);
+    color: var(--q-ink);
     line-height: 1.5;
     margin-top: 7px;
 }
@@ -1822,9 +1822,9 @@
    print: upright, small, behind its own rule. */
 .quote-sheet.tpl-engineer .footer-notice {
     font-style: normal;
-    font-size: 0.8em;
+    font-size: 11px;          /* legally binding — see pdf.css .footer-notice */
     line-height: 1.4;
-    color: var(--eng-ink-3);
+    color: var(--eng-ink-2);
     margin-block-start: 5px;
     padding-block-start: 5px;
     border-block-start: 1px solid var(--eng-hair);

@@ -443,6 +443,18 @@ function updateRowIndices() {
     });
 }
 
+// Cut at a space, not at a letter. The exclusion preset read
+// "לא כולל עבודות בנייה, טיח, צבע ושחז…" with the last word sliced through
+// the middle, which reads as a rendering fault rather than as an abbreviation.
+// The full text goes in the tooltip, so nothing is actually hidden.
+function clipWords(t, max) {
+    const str = String(t || '');
+    if (str.length <= max) return str;
+    const cut = str.slice(0, max);
+    const sp = cut.lastIndexOf(' ');
+    return (sp > max * 0.6 ? cut.slice(0, sp) : cut).replace(/[\s,.;־-]+$/, '') + '…';
+}
+
 function getWorkItemsFromForm(includeEmpty) {
     const items = [];
     const container = document.getElementById('work-items-container');
@@ -615,7 +627,7 @@ function renderQuoteDefaults() {
         <div class="form-group">
             <label for="qd-pay">תנאי תשלום</label>
             <div class="qd-presets">
-                ${PAYMENT_PRESETS.map((t, i) => `<button type="button" class="chip" onclick="pickPaymentPreset(${i})">${escapeHtml(t.length > 34 ? t.slice(0, 34) + '…' : t)}</button>`).join('')}
+                ${PAYMENT_PRESETS.map((t, i) => `<button type="button" class="chip" title="${escapeHtml(t)}" onclick="pickPaymentPreset(${i})">${escapeHtml(clipWords(t, 34))}</button>`).join('')}
             </div>
             <textarea id="qd-pay" rows="2" onchange="setQuoteDefault('paymentTerms', this.value)">${escapeHtml(d.paymentTerms)}</textarea>
         </div>
@@ -904,28 +916,50 @@ function updatePreviewFromForm() {
     document.getElementById('pdf-subject').textContent = subject;
     document.getElementById('pdf-summary').textContent = summary;
     
+    // THE MASTHEAD. These three fields had ZERO writers anywhere in the codebase
+    // -- verified by grep -- so they printed whatever was typed into the markup,
+    // forever, while the footer six inches below them printed the real business.
+    // One A4, two different companies, and the prominent one was the placeholder.
+    // A reviewer: "זה לא באג עיצובי, זה נראה כמו הצעה מזויפת."
+    const setTxt = (id, v) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = v || '';
+        // An empty line still takes its leading and still leaves a gap that
+        // reads as something missing. No text, no line.
+        el.hidden = !v;
+    };
+    setTxt('pdf-comp-title', (biz && biz.name) || 'שם העסק שלך');
+    setTxt('pdf-comp-sub', biz && biz.tagline);
+    setTxt('pdf-comp-owner', biz && biz.owner);
+
     const footerTextElement = document.querySelector('.pdf-company-footer');
     if (footerTextElement && biz) {
         footerTextElement.innerHTML = `
-            <div class="footer-row font-bold">
-                <span>${biz.name}</span>
-                <span class="bullet">|</span>
-                <span>${biz.owner}</span>
-                <span class="bullet">|</span>
-                <span>${biz.id}</span>
-            </div>
-            <div class="footer-row text-secondary">
-                <span>אימייל: ${biz.email}</span>
-                <span class="bullet">|</span>
-                <span>סלולרי: ${biz.phone}</span>
-                <span class="bullet">|</span>
-                <span>אתר: ${biz.web}</span>
-            </div>
-            <div class="footer-row text-secondary">
-                <span>כתובת: ${biz.address}</span>
-            </div>
+            ${(() => {
+                const row = (cls, parts) => {
+                    const bits = parts.filter(Boolean);
+                    if (!bits.length) return '';
+                    return `<div class="footer-row ${cls}">` + bits.map((b, i) =>
+                        `${i ? '<span class="bullet">|</span>' : ''}<span>${b}</span>`).join('') + '</div>';
+                };
+                return [
+                    row('font-bold', [biz.name, biz.owner, biz.id]),
+                    // The licence number belongs beside the identity, not buried.
+                    // It is the one credential an Israeli customer can verify, and
+                    // for most of the work in this app it is a legal requirement
+                    // that the tradesman holds it.
+                    row('text-secondary', [biz.license && `רישיון חשמלאי: ${biz.license}`]),
+                    row('text-secondary', [
+                        biz.email && `אימייל: ${biz.email}`,
+                        biz.phone && `סלולרי: ${biz.phone}`,
+                        biz.web && `אתר: ${biz.web}`,
+                    ]),
+                    row('text-secondary', [biz.address && `כתובת: ${biz.address}`]),
+                ].join('');
+            })()}
             <div class="footer-notice">
-                הצעת מחיר זו תקפה לשלושה חודשים. עם אישור וחתימת הלקוח תשמש כהסכם לביצוע העבודה בהתאם לאמור בה.
+                עם אישור וחתימת הלקוח תשמש הצעה זו כהסכם לביצוע העבודה בהתאם לאמור בה.
             </div>
             ${zeremCreditHtml()}
         `;

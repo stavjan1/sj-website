@@ -472,10 +472,15 @@
 }
 
 .footer-notice {
-    font-size: 0.65rem;
-    color: var(--pdf-text-muted);
+    /* This is the sentence that turns the page into a binding agreement, and it
+       was set at 0.65rem (~7.8pt) in muted italic -- the second-smallest and
+       second-palest thing on an A4 whose largest item was the logo. A reviewer
+       put it plainly: the lines with legal consequences are the ones you can
+       least read. Small is fine for a footer; unreadable is not, and italic at
+       that size in Hebrew is worse still. */
+    font-size: 0.72rem;
+    color: var(--pdf-text-main);
     margin-top: 6px;
-    font-style: italic;
 }
 
 /* PDF credit line (free/guest plans) */

@@ -1810,7 +1810,7 @@ async function runPlanningAgent(activeProject) {
         addWeightedUsage(effectiveModel, responseText.length, performance.now() - _t0);
     } catch (e) {
         showTypingIndicator(false);
-        showToast(e.message || 'שגיאה בשיחה עם סוכן האפיון', 'error');
+        showToast(humanAiError(e), 'error');
     } finally {
         setQuotaCharging(false);
     }
@@ -2063,7 +2063,7 @@ async function runPricingAgent(activeProject, promptChars) {
         console.error(err);
         showTypingIndicator(false);
         setQuotaCharging(false);
-        showToast('אירעה שגיאה בצ\'אט: ' + err.message, 'error');
+        showToast(humanAiError(err), 'error');
     }
 }
 
@@ -3173,6 +3173,34 @@ function matQty(m) {
     const q = Number(m && m.qty);
     return q > 0 ? q : 1;
 }
+// What the electrician is told when the AI does not answer.
+//
+// Every catch in this file used to show err.message straight through, and that
+// message comes from the upstream vendor: reviewers were shown "GEMINI_API_KEY
+// not configured" and a Cloudflare 1101 while standing in a customer's kitchen.
+// A tradesman reading that has no action available to him and no idea whether
+// his own work was lost. He needs to know two things -- is this me, and should
+// I try again -- and nothing else.
+//
+// /ask/ already answered it this way; this is the same answer, in one place.
+function humanAiError(e) {
+    // Read .message even when it is empty, or String(errorObject) hands the
+    // user the bare Latin word "Error" in the middle of a Hebrew app.
+    const raw = String((e && typeof e === 'object' && 'message' in e) ? (e.message || '') : (e || '')).trim();
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        return 'אין חיבור לאינטרנט כרגע. מה שכתבת נשמר — ברגע שהחיבור יחזור אפשר לשלוח שוב.';
+    }
+    // Anything naming a vendor, a key, a model or an env var is ours, not his.
+    if (/API|KEY|GEMINI|CLOUDFLARE|WORKER|ENV|TOKEN|MODEL|HTTP|fetch|network|[45]\d\d/i.test(raw)) {
+        if (/429|quota|rate|limit|exceed/i.test(raw)) {
+            return 'יש עומס על המערכת כרגע. נסה שוב בעוד דקה — מה שכתבת נשמר.';
+        }
+        return 'המערכת לא הגיבה כרגע. זה בדרך כלל חולף תוך כמה שניות — נסה לשלוח שוב.';
+    }
+    // A message written for a human (the server writes those too) passes through.
+    return raw || 'משהו השתבש. נסה לשלוח שוב.';
+}
+
 function matLineTotal(m) {
     return matQty(m) * (Number(m && m.price) || 0);
 }
@@ -3618,8 +3646,18 @@ function setQuoteBuildMode(mode) {
 // The one-line version: the job in a sentence, at the price the table came to.
 // The wording is his, and it is remembered per job type so the next charger
 // installation opens with the sentence he wrote last time.
+// A project the agent has not titled yet is called "פרויקט חדש". That is an
+// internal placeholder, and it was reaching the customer's document as the
+// single line item describing the work -- a reviewer read a quote whose only
+// item said "פרויקט חדש" for 4,200 ₪. The name is only usable when it is a
+// real one, so the fallback skips it.
+function jobTitleOf(proj) {
+    const n = String((proj && proj.name) || '').trim();
+    if (!n || n === 'פרויקט חדש' || (proj && proj.autoName)) return '';
+    return n;
+}
 function kompletTitle(proj) {
-    return String((proj.quoteData && proj.quoteData.kompletTitle) || proj.name || 'ביצוע העבודה').trim();
+    return String((proj.quoteData && proj.quoteData.kompletTitle) || jobTitleOf(proj) || 'ביצוע העבודה').trim();
 }
 function kompletText(proj) {
     const stored = (proj.quoteData && proj.quoteData.kompletText);
@@ -3734,7 +3772,7 @@ async function ptToQuote() {
     const days = totals.lab && totals.lab.hours ? hoursToDays(totals.lab.hours) : 0;
     if (days) proj.quoteData.durationDays = days;
     proj.quoteData.basePrice = Math.round(totals.total);
-    if (!String(proj.quoteData.subject || '').trim()) proj.quoteData.subject = proj.name;
+    if (!String(proj.quoteData.subject || '').trim()) proj.quoteData.subject = jobTitleOf(proj) || 'הצעת מחיר';
 
     // The engine and the table must never disagree about what the materials cost.
     try {
@@ -4276,7 +4314,7 @@ ${extrasText ? `תוספות שסתיו סימן (כל אחת סעיף נפרד 
         showToast('סוכן הניסוח הפיק את הצעת המחיר המלאה בהצלחה!');
     } catch (err) {
         console.error(err);
-        showToast('שגיאה בניסוח על ידי AI: ' + err.message, 'error');
+        showToast(humanAiError(err), 'error');
     } finally {
         setQuotaCharging(false);
         btn.disabled = false;
@@ -4387,7 +4425,7 @@ async function runAskAgent(proj) {
         addWeightedUsage(effectiveModel, responseText.length, performance.now() - _t0);
     } catch (e) {
         showTypingIndicator(false);
-        showToast(e.message || 'שגיאה בשיחה', 'error');
+        showToast(humanAiError(e), 'error');
     } finally {
         setQuotaCharging(false);
     }
