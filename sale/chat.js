@@ -1909,6 +1909,7 @@ function openProjectStage(projectId, step, e) {
 // AI Pricing Chat (סוכן תמחור מומחה)
 // ==========================================================================
 async function sendChatMessage() {
+    try { noteGuestAsk(); } catch (e) {}   // the guest's three, counted for the nudge
     stopChatDictation();   // never leave the mic listening behind a sent message
     // Typing into the box was the one thing that could not start a thread: with
     // nothing open it bounced you to the work list and told you to create a

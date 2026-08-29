@@ -636,6 +636,24 @@ export function categoryStats(db, query, max = 4) {
 // wrong basis is worse than no price: these are ERCO's retail list prices
 // before VAT, not a contractor's buying price, and the unit is sometimes
 // inferred rather than stated by the supplier.
+// A price ladder, not a fixed number of decimals. Stav, 29/08: "את שעון שבת
+// 141.משהו תעשה 140 אבל כבל ב-5.56 למשל תשנה ל-5.5 וכו'. בורג אם עולה 0.22 אז תעשה 0.2."
+//
+// Two reasons, and the second is the important one. A price of 5.56 ₪ pretends
+// to a precision that does not survive contact with a trade discount of 10-35%,
+// so the extra digits are noise that makes the quote look calculated rather
+// than judged. And these are one supplier's list prices: a rounded number is a
+// market estimate, an exact one is a copy of somebody's price list.
+export function roundPrice(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v) || v <= 0) return v;
+  const step = v >= 100 ? 10        // 141.4 → 140
+    : v >= 10 ? 1                   //  45.8 → 46
+    : v >= 1 ? 0.5                  //   5.56 → 5.5
+    : 0.1;                          //   0.22 → 0.2
+  return Number((Math.round(v / step) * step).toFixed(2));
+}
+
 export function renderMaterialsBlock(db, hits, stats, forgotten = []) {
   if (!hits.length && !stats.length && !forgotten.length) return '';
   const lines = [];
@@ -647,6 +665,7 @@ export function renderMaterialsBlock(db, hits, stats, forgotten = []) {
   lines.push('• "מטר" = המחיר הוא למטר אחד. "יחידה" = לפריט. אם יחידת המידה נראית לא הגיונית לפריט, אמור זאת במקום לנחש.');
   lines.push('• **מחיר למטר אינו אומר שאפשר לקנות מטר.** חלק מהפריטים (צינור שרשורי, מריכף, כבלים) נמכרים רק בגליל/חבילה שלמה, לרוב 50 או 100 מ\'. אם הכמות שהעבודה צריכה קטנה מאריזה, תמחר את האריזה השלמה ואמור זאת במפורש; אל תכפיל מטרים במחיר-למטר ותציג את זה כעלות הקנייה.');
   lines.push('• פריט שאינו ברשימה, אמוד כרגיל וציין במפורש שזו הערכה ולא מחירון.');
+  lines.push('• המחירים מעוגלים. הם אומדן לסדר גודל, לא ציטוט מדויק — אל תציג אותם כמחיר רשמי של ספק.');
   // No SKUs in the quote for now: Stav has not agreed the catalog with ארכה
   // yet, and a part number in a customer's hands is a commitment to a specific
   // supplier line. Goes back in when he says so — the SKUs are still in the
@@ -658,7 +677,7 @@ export function renderMaterialsBlock(db, hits, stats, forgotten = []) {
     lines.push('## פריטים תואמים לשאלה');
     for (const it of hits) {
       const attrs = it.attrs ? ` [${it.attrs}]` : '';
-      lines.push(`• ${it.name}${attrs}, ${it.price} ₪ / ${it.unit} (מק"ט ${it.sku}${it.cat ? '; ' + it.cat : ''})`);
+      lines.push(`• ${it.name}${attrs}, ${roundPrice(it.price)} ₪ / ${it.unit} (מק"ט ${it.sku}${it.cat ? '; ' + it.cat : ''})`);
     }
   }
 
@@ -668,7 +687,7 @@ export function renderMaterialsBlock(db, hits, stats, forgotten = []) {
     lines.push('הלקוח לא מבקש את אלה כי הוא לא יודע עליהם, והם בדיוק מה שנשכח מהצעות. עבור על הרשימה והחלט לגבי כל אחד: נכנס לכתב הכמויות, או לא רלוונטי לעבודה הזו. אל תשמיט בשתיקה.');
     for (const it of forgotten) {
       const attrs = it.attrs ? ` [${it.attrs}]` : '';
-      lines.push(`• ${it.name}${attrs} · ${it.price} ₪ / ${it.unit} (מק"ט ${it.sku})`);
+      lines.push(`• ${it.name}${attrs} · ${roundPrice(it.price)} ₪ / ${it.unit} (מק"ט ${it.sku})`);
     }
   }
 

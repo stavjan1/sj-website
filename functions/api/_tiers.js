@@ -27,7 +27,12 @@ export const TIER_DEFAULTS = {
     // a cost lever as much as a limit: the per-minute burst guard in chat.js
     // still caps abuse, but the daily ceiling is what bounds a bad day. Easy to
     // walk back, and without a deploy: set `config:tiers` in KV.
-    aiDaily: 100, projects: 1, quotesPerMonth: 0, catalogItems: 10,
+    // 3, not 100. An unlimited anonymous product cannot be measured, cannot be
+    // followed up, and cannot be beaten by anything you charge for. Three is
+    // enough to ask a real question and see a real price — which is the whole
+    // job of the guest tier. Stav, 29/08: nudge after the second, lock after
+    // the third. Tunable from KV without a deploy.
+    aiDaily: 3, projects: 1, quotesPerMonth: 0, catalogItems: 10,
     reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true,
   },
   free: {
@@ -51,6 +56,18 @@ export const TIER_DEFAULTS = {
 };
 
 export const TIER_NAMES = ['guest', 'free', 'pro', 'business'];
+
+// What each plan is CALLED to the user. The internal names are load-bearing —
+// they are written into every tier:<email> key already sitting in KV, and
+// renaming them would reassign every existing customer — so the display name is
+// a separate map and the storage never changes. Stav, 29/08.
+export const TIER_LABELS = {
+  guest:    'אורח',
+  free:     'סילבר',
+  pro:      'גולד',
+  business: 'דיימונד',
+  admin:    'ניהול',
+};
 
 // Model classes the client is allowed to ask for. Real model names never leave
 // the server — the client only speaks "basic" / "advanced".

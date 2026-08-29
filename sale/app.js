@@ -463,9 +463,16 @@ function setQuotaCharging(on) {
 // The server (/api/me) is the source of truth for the plan and its limits;
 // this mirror only drives the UI gates. If the server can't be reached
 // (offline / local testing) we fall back to sane defaults by login state.
-const TIER_LABELS = { guest: 'אורח', free: 'חינם', pro: 'Pro ⚡', business: 'עסקי', admin: 'מנהל מערכת' };
+// Silver, Gold, Diamond. Stav, 29/08 — and סילבר is the free one, so a signed-in
+// user is always on a NAMED plan rather than on "nothing". The stored values
+// stay 'free'/'pro'/'business': they are written into every tier:<email> key
+// already in KV, and renaming them would reassign every existing customer.
+const TIER_LABELS = { guest: 'אורח', free: 'סילבר', pro: 'גולד ⚡', business: 'דיימונד 💎', admin: 'מנהל מערכת' };
 const TIER_FALLBACK = {
-    guest:    { aiDaily: 100,  projects: 1,  quotesPerMonth: 0,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true },
+    // 3 — kept in step with functions/api/_tiers.js by hand, because the client
+    // needs a number before the server has answered anything. The SERVER is the
+    // authority: this copy only decides what the UI says, never what is allowed.
+    guest:    { aiDaily: 3,   projects: 1,  quotesPerMonth: 0,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true },
     free:     { aiDaily: 20,  projects: 3,  quotesPerMonth: 3,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true },
     pro:      { aiDaily: 150, projects: -1, quotesPerMonth: -1, catalogItems: 1000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  chatPhotos: true,   pdfCredit: false },
     business: { aiDaily: 300, projects: -1, quotesPerMonth: -1, catalogItems: 2000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  chatPhotos: true,   pdfCredit: false },
@@ -518,6 +525,7 @@ async function refreshTierInfo() {
 // Reflect the plan everywhere the UI shows or hides something by plan.
 function applyTierGates() {
     try { refreshChatPhotoGate(); } catch (e) {}
+    try { syncPlanChip(); } catch (e) {}
     // Model-class pills: lock "advanced" for plans without it.
     syncModelClass();
 
@@ -622,42 +630,18 @@ function showUpgradeModal(reason) {
                 <h2>${title}</h2>
                 ${isGuest ? '<p class="upgrade-sub">קודם כל, התחברות עם Google היא חינם, שומרת את העבודה בענן ומכפילה את מכסת ה-AI.</p>' : ''}
             </div>
+            <!-- Rendered from PLAN_CARDS, which is the one place the plans
+                 are described. This modal used to carry its own copy — a second
+                 list of the same three plans, free to drift from the first the
+                 moment either changed. -->
             <div class="upgrade-tiers">
-                <div class="upgrade-tier">
-                    <div class="ut-name">חינם</div>
-                    <div class="ut-price">0 ₪</div>
-                    <ul>
-                        <li>20 בקשות AI ביום</li>
-                        <li>עד 3 פרויקטים</li>
-                        <li>3 הורדות PDF בחודש</li>
-                        <li>מאגר אישי: 10 פריטים</li>
-                        <li>חתימת לקוח על המסך</li>
-                    </ul>
-                </div>
-                <div class="upgrade-tier featured">
-                    <div class="ut-flag">הכי משתלם</div>
-                    <div class="ut-name">Pro ⚡</div>
-                    <div class="ut-price">בקרוב</div>
-                    <ul>
-                        <li>150 בקשות AI ביום</li>
-                        <li>פרויקטים והצעות: ללא הגבלה</li>
-                        <li>מודל מתקדם ⚡ לחשיבה עמוקה</li>
-                        <li>דוחות שטח ממותגים</li>
-                        <li>תזכורות מעקב חכמות</li>
-                        <li>קישור אישי ללקוח</li>
-                        <li>PDF נקי: בלי קרדיט זרם</li>
-                    </ul>
-                </div>
-                <div class="upgrade-tier">
-                    <div class="ut-name">עסקי</div>
-                    <div class="ut-price">בקרוב</div>
-                    <ul>
-                        <li>כל מה שב-Pro</li>
-                        <li>300 בקשות AI ביום</li>
-                        <li>מאגר אישי: 2,000 פריטים</li>
-                        <li>קדימות בתמיכה</li>
-                    </ul>
-                </div>
+                ${PLAN_CARDS.map((p, n) => `
+                <div class="upgrade-tier${n === 1 ? ' featured' : ''}">
+                    ${n === 1 ? '<div class="ut-flag">הכי משתלם</div>' : ''}
+                    <div class="ut-name">${escapeHtml(p.name)}</div>
+                    <div class="ut-price">${escapeHtml(p.price || 'בקרוב')}</div>
+                    <ul>${p.has.map((h) => `<li>${escapeHtml(h)}</li>`).join('')}</ul>
+                </div>`).join('')}
             </div>
             <div class="upgrade-actions">
                 ${isGuest ? '<button class="btn btn-accent" onclick="closeUpgradeModal(); switchTab(\'settings\');"><i class="fa-brands fa-google"></i> התחברות חינם עם Google</button>' : ''}
@@ -9539,4 +9523,106 @@ async function _reallyEraseMyData(cloud) {
     // 4. And out, so nothing re-arms and writes a fresh record on the way.
     showToast('הנתונים נמחקו');
     setTimeout(() => { location.href = '/'; }, 900);
+}
+
+
+// ============================================================================
+// THE THREE PLANS
+// Stav, 29/08: סילבר · גולד · דיימונד, and סילבר is the free one — so a
+// signed-in electrician is always ON a named plan rather than on "nothing",
+// which is the difference between a floor and an absence.
+//
+// The internal names never change: 'free' / 'pro' / 'business' are written into
+// every tier:<email> key already in KV, and renaming them would silently
+// reassign every existing customer. Only the label moves.
+// ============================================================================
+const PLAN_CARDS = [
+    {
+        tier: 'free', name: 'סילבר', price: 'חינם',
+        line: 'להתחיל, ולראות שזה עובד.',
+        has: ['מספר שאלות מוגבל ליום', 'עד 3 עבודות פתוחות', '3 הצעות מחיר בחודש', 'תמונה או שתיים ביום'],
+    },
+    {
+        tier: 'pro', name: 'גולד ⚡', price: '',
+        line: 'למי שמתמחר כל שבוע.',
+        has: ['שאלות ללא הגבלה מעשית', 'עבודות והצעות ללא הגבלה', 'תמונות מהשטח בשיחה', 'קישור אישור ללקוח', 'דוחות ותזכורות', 'המודל המתקדם'],
+    },
+    {
+        tier: 'business', name: 'דיימונד 💎', price: '',
+        line: 'כשהחשבוניות והכסף גם בפנים.',
+        has: ['כל מה שבגולד', 'חיבור למערכת החשבוניות שלך', 'תזרים מזומנים וחיבור בנקים', 'מאגר מחירים אישי גדול'],
+    },
+];
+
+function openPlansDialog() {
+    const old = document.getElementById('plans-dialog');
+    if (old) old.remove();
+    const mine = (userTier && userTier.tier) || 'free';
+
+    const dlg = document.createElement('dialog');
+    dlg.id = 'plans-dialog';
+    dlg.className = 'ck-dialog plans-dialog';
+    dlg.innerHTML = `
+        <h3>המסלולים</h3>
+        <p class="input-help">אתה על ${escapeHtml(TIER_LABELS[mine] || mine)}.</p>
+        <div class="plan-grid">
+            ${PLAN_CARDS.map((p) => `
+                <div class="plan-card${p.tier === mine ? ' is-mine' : ''}">
+                    <div class="pc-head">
+                        <span class="pc-name">${escapeHtml(p.name)}</span>
+                        ${p.price ? `<span class="pc-price">${escapeHtml(p.price)}</span>` : ''}
+                        ${p.tier === mine ? '<span class="pc-mine">המסלול שלך</span>' : ''}
+                    </div>
+                    <p class="pc-line">${escapeHtml(p.line)}</p>
+                    <ul class="pc-has">${p.has.map((h) => `<li>${escapeHtml(h)}</li>`).join('')}</ul>
+                </div>`).join('')}
+        </div>
+        <p class="input-help">המחירים של גולד ודיימונד עוד לא נקבעו. בינתיים אפשר לכתוב לסתיו ולקבל גישה.</p>
+        <div class="ck-dlg-actions">
+            <button type="button" class="btn btn-secondary" data-a="close">סגירה</button>
+        </div>`;
+    document.body.appendChild(dlg);
+    const close = () => { try { dlg.close(); } catch (e) {} dlg.remove(); };
+    dlg.querySelector('[data-a="close"]').onclick = close;
+    dlg.addEventListener('cancel', close);
+    if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
+}
+
+// The chip itself, kept in step wherever the plan is applied.
+function syncPlanChip() {
+    const el = document.getElementById('am-plan');
+    if (!el) return;
+    const t = (userTier && userTier.tier) || (isGuestUser && isGuestUser() ? 'guest' : 'free');
+    el.textContent = TIER_LABELS[t] || t;
+    el.className = 'am-plan plan-' + t;
+}
+
+// ── The guest's three questions ─────────────────────────────────────────────
+// Stav, 29/08: "אורח זה 3 שאלות ואחרי שאלה שניה זה אומר לו להתחבר כדי לחוות את
+// עוצמת המערכת ואחרי השלישי זה ינעל אותו."
+//
+// The LOCK is the server's job and always was — /api/chat refuses past the
+// daily quota and the client already answers a QUOTA_AI with the upgrade
+// screen. What was missing is the warning BEFORE the wall. A guest who is told
+// "one question left" can decide what to spend it on; a guest stopped
+// mid-thought has just lost the answer he came for, and that is the moment he
+// closes the tab rather than the moment he signs in.
+//
+// Counted locally on purpose: this is a nudge, not enforcement. If someone
+// clears their storage they get another nudge, and the server still stops them
+// at three.
+function _guestAskKey() { return 'sj_guest_asks_' + new Date().toISOString().slice(0, 10); }
+
+function noteGuestAsk() {
+    if (typeof isGuestUser !== 'function' || !isGuestUser()) return;
+    let n = 0;
+    try { n = parseInt(localStorage.getItem(_guestAskKey()) || '0', 10) || 0; } catch (e) {}
+    n += 1;
+    try { localStorage.setItem(_guestAskKey(), String(n)); } catch (e) {}
+
+    const limit = (tierLimits && tierLimits().aiDaily) || 3;
+    if (n === Math.max(1, limit - 1)) {
+        // One left. Say what signing in BUYS, not what it prevents.
+        showToast('נשארה לך שאלה אחת כאורח · התחברות עם Google פותחת את המערכת המלאה, חינם', 'error');
+    }
 }
