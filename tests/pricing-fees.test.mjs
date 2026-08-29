@@ -67,8 +67,11 @@ test('applying to a quote turns each fee into its own visible line', () => {
   // number breaks it just as thoroughly as a fee that was never counted. The
   // total keeps the fee (the customer really does pay it) and the fee also
   // becomes a work item, so it can be seen and defended.
-  const apply = APP.slice(APP.indexOf('function pricingApplyToQuote('),
-                          APP.indexOf('function pricingApplyToQuote(') + 1800);
+  // The whole function, not a fixed window. A 1,800-character slice broke the
+  // moment the function grew a confirmation step — the property was still true,
+  // the ruler had just run out.
+  const start = APP.indexOf('function pricingApplyToQuote(');
+  const apply = APP.slice(start, APP.indexOf(String.fromCharCode(10) + '}', start));
   assert.ok(/addWorkItemRow\(/.test(apply), 'fees never become quote line items');
   assert.ok(/existing\.has\(f\.name\)/.test(apply),
     'applying twice would duplicate the fee rows');

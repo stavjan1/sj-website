@@ -1010,7 +1010,12 @@ let appState = {
         subject: '',
         items: [],
         basePrice: 0,
-        vatType: 'exempt',
+        // 'plus' (18% added), not 'exempt'. Most licensed electricians are
+        // עוסק מורשה, the app never asked, and the default quietly took 18% off
+        // the FIRST quote a new user sent — which is precisely the loss this
+        // product exists to prevent. Anyone who really is עוסק פטור changes it
+        // once and the choice is remembered per user (rememberQuotePref).
+        vatType: 'plus',
         finalPrice: 0,
         summary: '',
         showItemizedPrices: false
@@ -3190,7 +3195,7 @@ function createNewProject(opts) {
             ],
             basePrice: 0,
             // New quotes inherit the user's LAST choices (sticky preferences).
-            vatType: lastQuotePref('vatType', 'exempt'),
+            vatType: lastQuotePref('vatType', 'plus'),
             finalPrice: 0,
             summary: appState.settings.businessDetails.terms,
             showItemizedPrices: lastQuotePref('showItemizedPrices', false)
@@ -6620,11 +6625,33 @@ function pricingRefreshMaterials() {
     renderPricingEngine();
     showToast('עלות החומרים עודכנה מהרשימה');
 }
-function pricingApplyToQuote() {
+async function pricingApplyToQuote() {
     const proj = projectsList.find(x => x.id === activeProjectId);
     if (!proj) return;
     const c = pricingCalc(proj);
     const price = Math.round(Number(proj.pricing.finalPrice) || c.hi);
+
+    // ASK, when there is something to lose. Measured by a reviewer pricing a
+    // real job: the table came to 4,884 ₪, this engine had "עלות חומרים: 0"
+    // (its own materials figure had not tracked the list), computed 1,500, and
+    // offered it behind a large accent-coloured button. One click, no warning,
+    // no undo — and 1,500 is below that electrician's labour alone.
+    // The button is not the bug; replacing somebody's finished number without
+    // showing them both is.
+    const current = Math.round(Number((proj.quoteData || {}).finalPrice)
+        || Number((document.getElementById('form-base-price') || {}).value) || 0);
+    if (current > 0 && Math.abs(current - price) > Math.max(50, current * 0.02)) {
+        const drop = price < current;
+        if (!await askConfirm({
+            title: 'להחליף את המחיר בהצעה?',
+            body: `בהצעה כרגע ${heNum(current)} ₪, ומנוע התמחור מציע ${heNum(price)} ₪.`,
+            note: drop
+                ? 'שים לב: המחיר החדש נמוך יותר. ודא שהוא מכסה את העבודה והחומרים.'
+                : 'המחיר שבהצעה יוחלף.',
+            confirmLabel: 'החלף',
+            danger: drop,
+        })) return;
+    }
     proj.pricing.finalPrice = price;
     const base = document.getElementById('form-base-price');
     if (base) { base.value = price; if (typeof calculateTotal === 'function') calculateTotal(); }
@@ -7606,7 +7633,7 @@ function shareWhatsApp() {
     
     const biz = (appState.settings && appState.settings.businessDetails) || {};
     const signName = [biz.owner, biz.name].filter(Boolean).join(' - ') || 'SJ הנדסת חשמל';
-    const msg = `שלום ${clientName},\n\nהפקתי עבורך הצעת מחיר מפורטת בנושא: *${subject}*.\nסה"כ לתשלום: *${finalPrice}* (${vatLabel}).\n\nשלחתי לך את קובץ ה-PDF המפורט במייל. אשמח לעבור עליו יחד איתך.\n\nבברכה,\n*${signName}*`;
+    const msg = `שלום ${clientName},\n\nהפקתי עבורך הצעת מחיר מפורטת בנושא: *${subject}*.\nסה"כ לתשלום: *${finalPrice}* (${vatLabel}).\n\nמצורף קובץ ה-PDF המפורט. אשמח לעבור עליו יחד איתך.\n\nבברכה,\n*${signName}*`;
     const encodedMsg = encodeURIComponent(msg);
     
     window.open(`https://api.whatsapp.com/send?text=${encodedMsg}`, '_blank');
