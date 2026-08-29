@@ -5388,8 +5388,15 @@ function updatePdfCustomStyles() {
     const fontSizeBody = document.getElementById('pdf-font-size-body')?.value || '12';
     const lineHeight = document.getElementById('pdf-line-height')?.value || '1.4';
     const primaryColor = document.getElementById('pdf-primary-color')?.value || '#1e3a8a';
+    // Once he has chosen, a template stops overriding it.
+    if (document.activeElement && /^pdf-(primary|secondary)-color$/.test(document.activeElement.id || '')) {
+        appState.settings._brandColorsSet = true;
+    }
     const secondaryColor = document.getElementById('pdf-secondary-color')?.value || '#3b82f6';
-    const showWatermark = document.getElementById('pdf-show-watermark')?.checked ?? true;
+    // The on/off checkbox is gone — the background picker's "ללא" IS that
+    // decision, and two controls for one decision can disagree. Read from the
+    // choice itself.
+    const showWatermark = (appState.settings.pdfWatermarkKind || 'bolt') !== 'none';
     const showSignature = document.getElementById('pdf-show-signature')?.checked ?? false;
 
     // Update UI slider labels
@@ -5443,7 +5450,13 @@ function updatePdfCustomStyles() {
         
         const watermark = document.getElementById('pdf-watermark-bg');
         if (watermark) {
-            watermark.style.opacity = showWatermark ? '0.04' : '0';
+            // 0.04 is not faint, it is absent. Stav picked the bolt and the map
+            // of Israel and reported "לא מופיעים" — they were applied correctly
+            // every time, at an opacity nobody can see, in a dark navy on white.
+            // A watermark has to be visible enough to read as a deliberate mark
+            // and quiet enough not to fight the text; 0.10 is that, and it
+            // survives the print path where 0.04 rounds away to nothing.
+            watermark.style.opacity = showWatermark ? '0.10' : '0';
             watermark.style.color = primaryColor;
         }
 
@@ -6091,16 +6104,14 @@ const PDF_TEMPLATES = {
         font: "'Heebo', sans-serif", size: '11', lh: '1.4',
         primary: '#0f172a', secondary: '#0e7490', watermark: false
     },
-    // Kept, but no longer the one anybody lands on. Measured against the real
-    // page (1158px at the sheet's 794px width): "מודרנית" runs to TWO pages on
-    // a six-item quote and leaves a 6% tail — the company footer, עוסק מורשה
-    // number and all, alone on page two. It is the template that has been
-    // shipping. קלאסית is the default now and fits eight items on one page.
-    modern: {
-        label: 'מודרנית', cls: '',
-        font: "'Heebo', sans-serif", size: '12', lh: '1.45',
-        primary: '#0e7490', secondary: '#22d3ee', watermark: false
-    }
+    // "מודרנית" REMOVED. It had no theme at all — cls: '' — so choosing it
+    // stripped the class and left the sheet on the bare base styling, where a
+    // reviewer found the fields rendering as blue underlined text "like broken
+    // links on a price quote", while the app announced in a green toast that
+    // the template had been applied. Their verdict, and it is right: "כפתור
+    // שמודיע 'הוחלה בהצלחה' ולא עושה כלום הוא הגרוע מכל." It also ran to two
+    // pages on a six-item quote. Three templates that work beat four with a
+    // trap in the middle.
 };
 
 const TPL_CLASSES = Object.values(PDF_TEMPLATES).map((t) => t.cls).filter(Boolean);
@@ -6127,10 +6138,21 @@ function applyPdfTemplate(key, silent) {
     set('pdf-font-family', t.font);
     set('pdf-font-size-body', t.size);
     set('pdf-line-height', t.lh);
-    set('pdf-primary-color', t.primary);
-    set('pdf-secondary-color', t.secondary);
-    const wm = document.getElementById('pdf-show-watermark');
-    if (wm) wm.checked = t.watermark;
+    // The BRAND COLOURS are not the template's to take. A reviewer put it
+    // plainly: choosing a template silently wiped the font and the two colours
+    // he had set — "the only two controls that make the document his, destroyed
+    // by the control next to them". A template proposes a look; the colours a
+    // business has chosen outrank it. Only a user who never picked one gets the
+    // template's.
+    if (!appState.settings._brandColorsSet) {
+        set('pdf-primary-color', t.primary);
+        set('pdf-secondary-color', t.secondary);
+    }
+    if (t.watermark === false && (appState.settings.pdfWatermarkKind || 'bolt') !== 'none') {
+        // A template may prefer no background, but it must not silently throw
+        // away a picture the user chose. Only the default is overridden.
+        if (!appState.settings.pdfWatermarkKind) appState.settings.pdfWatermarkKind = 'none';
+    }
 
     appState.settings.pdfTemplate = key;
     appState.settings.pdfFontFamily = t.font;
@@ -9878,7 +9900,11 @@ function applyWatermarkChoice(key, silent) {
     if (choice === 'upload') {
         const saved = appState.settings.uploadedBg || localStorage.getItem(getStorageKey('sj_uploaded_bg'));
         if (!saved) {
-            if (!silent) showToast('עוד לא העלית תמונה — בחר קובץ ואז הרקע יופיע', 'error');
+            // Pressing "התמונה שלי" with no image is a request for one. It used
+            // to answer with a toast telling him to go and find the upload
+            // field himself, which is the button refusing to do its own job.
+            const input = document.getElementById('settings-bg-file');
+            if (input && !silent) { input.click(); return; }
             renderWatermark(null);
         } else {
             renderWatermark(saved);

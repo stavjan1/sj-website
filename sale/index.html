@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=462">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=463">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,15 +26,15 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=462">
-    <link rel="stylesheet" href="../assets/ui.css?v=462">
-    <link rel="stylesheet" href="css/shell.css?v=462">
-    <link rel="stylesheet" href="css/panels.css?v=462">
-    <link rel="stylesheet" href="controlroom.css?v=462">
-    <link rel="stylesheet" href="periodic.css?v=462">
-    <link rel="stylesheet" href="nextstep.css?v=462">
-    <link rel="stylesheet" href="css/pdf.css?v=462">
-    <link rel="stylesheet" href="css/quote-templates.css?v=462">
+    <link rel="stylesheet" href="../assets/tokens.css?v=463">
+    <link rel="stylesheet" href="../assets/ui.css?v=463">
+    <link rel="stylesheet" href="css/shell.css?v=463">
+    <link rel="stylesheet" href="css/panels.css?v=463">
+    <link rel="stylesheet" href="controlroom.css?v=463">
+    <link rel="stylesheet" href="periodic.css?v=463">
+    <link rel="stylesheet" href="nextstep.css?v=463">
+    <link rel="stylesheet" href="css/pdf.css?v=463">
+    <link rel="stylesheet" href="css/quote-templates.css?v=463">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -923,8 +923,8 @@
                         <div class="pdf-template-row" id="pdf-template-row">
                             <span class="tpl-label"><i class="fa-solid fa-palette text-accent"></i> תבנית עיצוב:</span>
                             <button type="button" class="tpl-btn" data-tpl="classic" onclick="applyPdfTemplate('classic')">קלאסית</button>
-                            <button type="button" class="tpl-btn" data-tpl="modern" onclick="applyPdfTemplate('modern')">מודרנית</button>
-                            <button type="button" class="tpl-btn" data-tpl="minimal" onclick="applyPdfTemplate('minimal')">מינימלית</button>
+                            <button type="button" class="tpl-btn" data-tpl="minimal" onclick="applyPdfTemplate('minimal')">נקייה</button>
+                            <button type="button" class="tpl-btn" data-tpl="engineer" onclick="applyPdfTemplate('engineer')">הנדסית</button>
                             <span class="input-help tpl-hint">כיוונון עדין · בפרטי עסק → עיצוב</span>
                         </div>
 
@@ -1330,25 +1330,12 @@
                                                 <input type="color" id="pdf-secondary-color" value="#3b82f6" onchange="updatePdfCustomStyles()" style="padding:0; height:36px; cursor:pointer;">
                                             </div>
                                         </div>
-                                        <!-- What sits behind the text. An electrician with no
-                                             logo had no choice at all, so every quote the product
-                                             produced looked exactly like every other one. -->
-                                        <div class="form-group">
-                                            <label>רקע עמום מאחורי הטקסט</label>
-                                            <div class="wm-picker">
-                                                <button type="button" class="wm-choice" data-wm="bolt" onclick="applyWatermarkChoice('bolt')">⚡ ברק</button>
-                                                <button type="button" class="wm-choice" data-wm="israel" onclick="applyWatermarkChoice('israel')">🗺️ מפת ישראל</button>
-                                                <button type="button" class="wm-choice" data-wm="upload" onclick="applyWatermarkChoice('upload')">🖼️ התמונה שלי</button>
-                                                <button type="button" class="wm-choice" data-wm="none" onclick="applyWatermarkChoice('none')">ללא</button>
-                                            </div>
-                                            <p class="input-help" style="margin:6px 0 0;">"התמונה שלי" משתמשת בקובץ שהעלית למטה.</p>
-                                        </div>
-                                        <div class="form-group">
-                                            <label class="toggle-container" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; font-size:0.88rem;">
-                                                <input type="checkbox" id="pdf-show-watermark" checked onchange="updatePdfCustomStyles()" style="width:16px; height:16px;">
-                                                <span>הצג לוגו רקע עמום (סימן מים) מאחורי הטקסט</span>
-                                            </label>
-                                         </div>
+                                        <!-- The background picker and its on/off checkbox both lived here.
+                                             The picker moved into the design screen, beside the paper it
+                                             changes; the checkbox went entirely, because the picker's "ללא"
+                                             already is that decision and two controls for one decision can
+                                             disagree. Stav: "יש טוגל לבחור אם רוצים את הרקע בכלל, אז תוריד
+                                             את זה זה כבר בבחירה." -->
                                          <div class="form-group" style="margin-top:-6px;">
                                              <label class="toggle-container" style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; font-size:0.88rem;">
                                                  <input type="checkbox" id="pdf-show-signature" onchange="updatePdfCustomStyles()" style="width:16px; height:16px;">
@@ -2805,29 +2792,29 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/checkups-core.js?v=462"></script>
-    <script src="/assets/listcards.js?v=462"></script>
+    <script src="/assets/checkups-core.js?v=463"></script>
+    <script src="/assets/listcards.js?v=463"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=462"></script>
-    <script src="app.js?v=462"></script>
+    <script src="coverage.js?v=463"></script>
+    <script src="app.js?v=463"></script>
     <!-- app.js was 18,760 lines — a quarter of the repo in one file, and the
          file every parallel session collided in. These five are lifts out of
          it, byte for byte, and they load AFTER it because that is where the
          state they read is declared. -->
-    <script src="chat.js?v=462"></script>
-    <script src="checkups.js?v=462"></script>
-    <script src="market.js?v=462"></script>
-    <script src="reports.js?v=462"></script>
-    <script src="admin.js?v=462"></script>
+    <script src="chat.js?v=463"></script>
+    <script src="checkups.js?v=463"></script>
+    <script src="market.js?v=463"></script>
+    <script src="reports.js?v=463"></script>
+    <script src="admin.js?v=463"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=462"></script>
+    <script src="finance.js?v=463"></script>
     <!-- The guide that points at the screen (first-run tour + milestone hints) -->
-    <script src="coach.js?v=462"></script>
-    <script src="nextstep.js?v=462"></script>
+    <script src="coach.js?v=463"></script>
+    <script src="nextstep.js?v=463"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="/track.js?v=462" defer></script>
+    <script src="/track.js?v=463" defer></script>
 </body>
 </html>
