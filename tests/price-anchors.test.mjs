@@ -61,3 +61,35 @@ test('a service with no price is named, never priced at zero', () => {
     assert.match(body, /אל תמציא להם מחיר/,
         'the instruction not to invent a price for them is gone');
 });
+
+test('the panel anchor distinguishes single-phase from three-phase', () => {
+    // One number, ~2,000-2,500, covered both. Two independent consumer price
+    // lists (מדרג, המקצוענים) put a single-phase apartment panel at 1,200-1,500
+    // and a three-phase one at 2,000-2,500 — so the single number was right for
+    // one job and about 50% too expensive for the other. An electrician quoting
+    // the high one on a single-phase flat loses the job and never learns why.
+    const line = (MAP.match(/- החלפת לוח בלבד[^\n]*/) || [])[0];
+    assert.ok(line, 'the panel anchor is gone from the pricing map');
+    assert.match(line, /חד-פאזי/, 'the panel anchor no longer names the single-phase price');
+    assert.match(line, /תלת-פאזי/, 'the panel anchor no longer names the three-phase price');
+});
+
+test('moving an existing point has its own anchor, below the per-metre chiselling rate', () => {
+    // This anchor earns its place by what it PREVENTS. Without it the only
+    // nearby number is "חציבה ~700 ₪ למטר", and a customer asking to move a
+    // socket two metres gets quoted 1,400 for the chase alone when the market
+    // price for the whole job is 350-450.
+    const line = (MAP.match(/- \*\*הזזת נקודת חשמל[^\n]*/) || [])[0];
+    assert.ok(line, 'the point-move anchor is gone — the per-metre rate is now the only nearby number');
+    const nums = (line.match(/\d{3}/g) || []).map(Number);
+    assert.ok(nums.length && Math.max(...nums) < 700,
+        'the point-move anchor drifted up into per-metre chiselling territory');
+});
+
+test('the market cross-check says whose prices these are', () => {
+    // מדרג and המקצוענים report what a CONSUMER paid, material and often VAT
+    // included; our own anchors are before VAT and usually labour only. Without
+    // that sentence the next person to compare them "fixes" a correct number.
+    assert.match(MAP, /לפני מע"מ ולרוב עבודה בלבד/,
+        'the note explaining why the two sources differ has been removed');
+});
