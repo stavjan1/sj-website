@@ -5721,3 +5721,8 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
 .dz-coach p { margin: 0 0 var(--sp-3); line-height: 1.6; }
 .dz-coach-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
 .dz-coach-foot span { color: var(--text-3); font-size: var(--fs-xs); }
+
+/* The cost behind the price, said quietly. The margin on materials is the one
+   number an electrician makes his living on, and it used not to exist in the
+   model at all — so now that it does, it is shown rather than implied. */
+.pt-cost-note { color: var(--text-3); font-size: var(--fs-xs); font-weight: 400; }

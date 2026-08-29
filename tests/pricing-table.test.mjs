@@ -66,13 +66,24 @@ test('a quantity multiplies, and a missing one means one', () => {
     assert.equal(matLineTotal({ price: 28.9, qty: 25 }), 722.5);
 });
 
-test('only what is ticked reaches the total', () => {
+test('only what is ticked reaches the total, and materials carry a margin', () => {
     const { pricingTotals } = load();
     const t = pricingTotals(proj());
+    // COST is what he paid. It stays a cost, because the pricing engine reads
+    // this field into materialsCost and a field named cost must hold one.
     assert.equal(Math.round(t.materials), 810, 'the unticked stand should not be in there');
+    // PRICE is what the customer pays. Materials used to reach the quote at
+    // cost, which made the electrician a delivery service for his supplier:
+    // "אני לא מוכר פחת ב-168 ₪, זה מה ששילמתי עליו." The markup rule already
+    // existed (materialMarkup, 20%) and was simply never applied on this path.
+    assert.equal(Math.round(t.materialsPrice), 971, 'materials reach the quote at cost again');
+    assert.equal(t.markup, 20, 'the default materials markup is gone');
     assert.equal(t.labor, 2200);
     assert.equal(t.extras, 600, 'the inspector is on, at its suggested price');
-    assert.equal(Math.round(t.total), 3610);
+    // The customer is quoted the PRICE; `cost` is kept alongside so the margin
+    // is a number the product can show rather than one it hides.
+    assert.equal(Math.round(t.total), 3771);
+    assert.equal(Math.round(t.cost), 3610);
 });
 
 test('an extra priced by him beats the suggestion, everywhere', () => {

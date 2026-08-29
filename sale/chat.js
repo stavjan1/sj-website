@@ -3177,6 +3177,28 @@ function matLineTotal(m) {
     return matQty(m) * (Number(m && m.price) || 0);
 }
 
+// What the customer pays for a material, which is NOT what it cost.
+//
+// A reviewer with two employees put it exactly: "אני לא מוכר פחת ב-168 ₪, זה מה
+// ששילמתי עליו" — and concluded "המאגר לא מחליף את הגיליון, הוא רק חצי ממנו."
+// He was right. The table added materials at catalogue price and stopped, so
+// the one number an electrician makes his living on — the margin between what
+// he buys at and what he sells at — did not exist in the model at all.
+//
+// The RULE already existed: getPricingRules().materialMarkup, default 20%, set
+// in the pricing engine's own defaults and quoted to the AI as "the habit he
+// has set for himself". It was simply never applied on this path.
+function matMarkupPct(proj) {
+    if (proj && proj.pricing && proj.pricing.markup != null) return Number(proj.pricing.markup) || 0;
+    try { return Number(getPricingRules().materialMarkup) || 0; } catch (e) { return 0; }
+}
+
+function matLinePrice(m, pct) {
+    const cost = matLineTotal(m);
+    const up = Number(pct) || 0;
+    return cost * (1 + up / 100);
+}
+
 // Labour used to be one number. A real job has lines — pulling the cable,
 // mounting the stand, working in the panel — so it is a list now, and
 // proj.laborPrice stays as its sum so everything downstream keeps working.
@@ -3205,11 +3227,23 @@ function tradeDiscountNote() {
 }
 
 function pricingTotals(proj) {
-    const materials = (proj.materials || []).filter((m) => m && m.checked)
-        .reduce((sum, m) => sum + matLineTotal(m), 0);
+    const ticked = (proj.materials || []).filter((m) => m && m.checked);
+    // `materials` stays the COST, because the pricing engine reads it into
+    // materialsCost and a field named cost must hold a cost. What the customer
+    // pays is its own number, and it is the one that reaches the quote.
+    const materials = ticked.reduce((sum, m) => sum + matLineTotal(m), 0);
+    const markup = matMarkupPct(proj);
+    const materialsPrice = ticked.reduce((sum, m) => sum + matLinePrice(m, markup), 0);
     const lab = laborSummary(proj);
     const extras = QUOTE_EXTRAS.reduce((sum, x) => sum + extraLineTotal(proj, x), 0);
-    return { materials, labor: lab.total, extras, total: materials + lab.total + extras, lab };
+    return {
+        materials, materialsPrice, markup,
+        labor: lab.total, extras,
+        // The total the customer is quoted uses the PRICE of the materials.
+        total: materialsPrice + lab.total + extras,
+        cost: materials + lab.total + extras,
+        lab,
+    };
 }
 
 function openPricingTable() {
@@ -3360,7 +3394,7 @@ function renderPricingTable() {
         const t = pricingTotals(proj);
         foot.innerHTML = `
             <div class="ptf-nums">
-                <span>חומרים <b>${heNum(Math.round(t.materials))} ₪</b></span>
+                <span>חומרים <b>${heNum(Math.round(t.materialsPrice))} ₪</b>${t.markup ? `<small class="pt-cost-note"> (עלות ${heNum(Math.round(t.materials))} + ${Math.round(t.markup)}%)</small>` : ''}</span>
                 <span>עבודה <b>${heNum(Math.round(t.labor))} ₪</b>${t.lab && t.lab.mode !== 'sum' && t.lab.hours
                     ? `<em class="ptf-time">${heNum(t.lab.hours)} שעות${t.lab.mode === 'days' ? `, ${heNum(t.lab.days)} ימים` : ''}</em>` : ''}</span>
                 <span>תוספות <b>${heNum(Math.round(t.extras))} ₪</b></span>
@@ -3705,7 +3739,7 @@ async function ptToQuote() {
     // The engine and the table must never disagree about what the materials cost.
     try {
         const p = ensureProjectPricing(proj);
-        p.materialsCost = totals.materials;
+        p.materialsCost = totals.materials;   // cost, deliberately — the engine adds its own markup
     } catch (e) { /* the engine is optional */ }
 
     if (quoteBuildMode(proj) === 'komplet') {
