@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=469">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=470">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,15 +26,15 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=469">
-    <link rel="stylesheet" href="../assets/ui.css?v=469">
-    <link rel="stylesheet" href="css/shell.css?v=469">
-    <link rel="stylesheet" href="css/panels.css?v=469">
-    <link rel="stylesheet" href="controlroom.css?v=469">
-    <link rel="stylesheet" href="periodic.css?v=469">
-    <link rel="stylesheet" href="nextstep.css?v=469">
-    <link rel="stylesheet" href="css/pdf.css?v=469">
-    <link rel="stylesheet" href="css/quote-templates.css?v=469">
+    <link rel="stylesheet" href="../assets/tokens.css?v=470">
+    <link rel="stylesheet" href="../assets/ui.css?v=470">
+    <link rel="stylesheet" href="css/shell.css?v=470">
+    <link rel="stylesheet" href="css/panels.css?v=470">
+    <link rel="stylesheet" href="controlroom.css?v=470">
+    <link rel="stylesheet" href="periodic.css?v=470">
+    <link rel="stylesheet" href="nextstep.css?v=470">
+    <link rel="stylesheet" href="css/pdf.css?v=470">
+    <link rel="stylesheet" href="css/quote-templates.css?v=470">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -427,13 +427,23 @@
                     <div id="maint-arrive"></div>
 
                     <!-- Search + filter — only above the list -->
+                    <!-- THE DOOR TO EVERYTHING ELSE. The screen shows the open work;
+                         this is how you reach the rest. It is a toggle, not a
+                         separate page, because "where did my finished jobs go" must
+                         have an answer you can see from here. -->
                     <div class="project-search-row" style="margin-bottom:12px;">
+                        <button type="button" class="sort-toggle tap-all" id="toggle-all-projects"
+                                onclick="toggleAllProjects()" title="הצג את כל הפרויקטים, כולל שהסתיימו">
+                            <i class="fa-solid fa-layer-group"></i> <span class="tap-label">כל הפרויקטים</span>
+                        </button>
                         <div class="project-search-input-wrap">
                             <i class="fa-solid fa-magnifying-glass"></i>
                             <input type="text" id="project-search-q" placeholder="חפש שם..." oninput="filterProjectsList()">
                         </div>
-                        <!-- Two sort toggles: click to sort, click again to flip direction.
-                             The active one is highlighted and shows its arrow. -->
+                        <!-- Sorting and filtering are for the full list. Over six open
+                             jobs they are furniture; over two hundred they are the
+                             point. Hidden until "כל הפרויקטים" is on. -->
+                        <span id="all-projects-filters" class="all-proj-filters" hidden>
                         <div class="sort-toggles" id="sort-toggles">
                             <button type="button" class="sort-toggle active" data-field="date" onclick="toggleProjectSort('date')">
                                 תאריך <i class="fa-solid fa-arrow-down-long sort-arrow"></i>
@@ -453,6 +463,7 @@
                             <option value="נשלח">נשלח</option>
                             <option value="הושלם">הושלם</option>
                         </select>
+                        </span>
                         <!-- Layout toggle: list rows vs. a compact grid of cards -->
                         <div class="view-toggles" id="view-toggles">
                             <button type="button" class="view-toggle active" data-view="list" onclick="setProjectsView('list')" title="תצוגת רשימה"><i class="fa-solid fa-list"></i></button>
@@ -468,8 +479,14 @@
                          instead of one sub-view away. Silent when nothing is due. -->
                     <div id="maint-due-strip"></div>
                     <nav class="projects-cats" id="projects-cats" aria-label="סינון לפי קטגוריה"></nav>
+                    <!-- The list and the waiting rail, side by side. The rail hides
+                         itself when empty, and on a phone it stacks above the list
+                         rather than squeezing beside it. -->
+                    <div class="work-split">
                     <div id="projects-list-container" class="projects-list">
                         <!-- Dynamically loaded by script -->
+                    </div>
+                    <aside id="waiting-rail" class="waiting-rail" hidden></aside>
                     </div>
                     <p class="projects-history-link" id="projects-history-link" hidden>
                         <a href="#" onclick="switchTab('history'); return false;">כל ההצעות שהופקו · היסטוריה ←</a>
@@ -2831,29 +2848,29 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/checkups-core.js?v=469"></script>
-    <script src="/assets/listcards.js?v=469"></script>
+    <script src="/assets/checkups-core.js?v=470"></script>
+    <script src="/assets/listcards.js?v=470"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=469"></script>
-    <script src="app.js?v=469"></script>
+    <script src="coverage.js?v=470"></script>
+    <script src="app.js?v=470"></script>
     <!-- app.js was 18,760 lines — a quarter of the repo in one file, and the
          file every parallel session collided in. These five are lifts out of
          it, byte for byte, and they load AFTER it because that is where the
          state they read is declared. -->
-    <script src="chat.js?v=469"></script>
-    <script src="checkups.js?v=469"></script>
-    <script src="market.js?v=469"></script>
-    <script src="reports.js?v=469"></script>
-    <script src="admin.js?v=469"></script>
+    <script src="chat.js?v=470"></script>
+    <script src="checkups.js?v=470"></script>
+    <script src="market.js?v=470"></script>
+    <script src="reports.js?v=470"></script>
+    <script src="admin.js?v=470"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=469"></script>
+    <script src="finance.js?v=470"></script>
     <!-- The guide that points at the screen (first-run tour + milestone hints) -->
-    <script src="coach.js?v=469"></script>
-    <script src="nextstep.js?v=469"></script>
+    <script src="coach.js?v=470"></script>
+    <script src="nextstep.js?v=470"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="/track.js?v=469" defer></script>
+    <script src="/track.js?v=470" defer></script>
 </body>
 </html>

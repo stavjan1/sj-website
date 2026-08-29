@@ -1229,7 +1229,17 @@ function renderProjectsList(list) {
         const shown = so >= 2 ? 2 : 0;
         const stepCls = (i) => i < shown ? 'done' : (i === shown ? 'current' : 'locked');
         const card = document.createElement('div');
-        card.className = `project-card ${isActive ? 'active' : ''}`;
+        // is-stale pulses the whole tile red. Stav asked for exactly this and he
+        // was right to: a quiet marker is something you have to be looking for,
+        // and the whole problem is that he is not looking — he is remembering.
+        // Something that moves in the corner of your eye does not need reading.
+        // NOT named `stale`: this function already has a `stale` array in scope,
+        // used after the loop. Shadowing it here would be legal and unreadable.
+        const goneQuiet = typeof isStaleProject === 'function' && isStaleProject(p);
+        const closed = p.closedAs;
+        card.className = `project-card ${isActive ? 'active' : ''}` +
+            (goneQuiet ? ' is-stale' : '') + (closed ? ' is-closed' : '');
+        card.dataset.pid = p.id;
         card.onclick = () => loadProject(p.id);
 
         // An auto-named work is still called "פרויקט חדש" until the agent titles
@@ -1241,7 +1251,11 @@ function renderProjectsList(list) {
                 <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg>
             </button>
             <div class="project-info">
-                <div class="project-title">${escapeHtml(cardTitle)}</div>
+                <div class="project-title">${escapeHtml(cardTitle)}${closed ? `<span class="closed-tag">${escapeHtml(CLOSE_LABELS[closed] || '')}</span>` : ''}</div>
+                ${goneQuiet ? `<div class="stale-strip">
+                    <span><i class="fa-solid fa-bell"></i> נשלחה הצעה לפני ${staleDays(p)} ימים ואין תשובה</span>
+                    <button type="button" class="btn btn-secondary btn-small" onclick="ackStaleProject('${p.id}', event)">אישור, אני יודע</button>
+                </div>` : ''}
                 <div class="project-meta">
                     <span><i class="fa-solid fa-calendar"></i> ${formatHebrewDate(p.created)}</span>
                     ${p.approvedAt ? `<span class="approved-badge" title="${escapeHtml('אושרה בקישור' + (p.approvedBy ? ' על ידי ' + p.approvedBy : ''))}"><i class="fa-solid fa-circle-check"></i> אושרה על ידי הלקוח</span>` : ''}
@@ -1268,6 +1282,13 @@ function renderProjectsList(list) {
                 </button>
             </div>
             <div class="project-endcap">
+                ${closed
+                    ? `<button class="btn btn-secondary btn-small pc-reopen" onclick="reopenProject('${p.id}', event)"
+                               title="החזר לרשימת העבודה"><i class="fa-solid fa-rotate-left"></i> החזר לעבודה</button>`
+                    : `<button class="btn btn-secondary btn-small pc-close pc-done" onclick="closeProject('${p.id}','done',event)"
+                               title="הסתיים · יורד מרשימת העבודה"><i class="fa-solid fa-check"></i> הסתיים</button>
+                       <button class="btn btn-secondary btn-small pc-close pc-lost" onclick="closeProject('${p.id}','lost',event)"
+                               title="הלקוח לא חזר · יורד מרשימת העבודה"><i class="fa-solid fa-ban"></i> לא חזר</button>`}
                 <span class="project-status-badge row-status status-badge-${status}"
                       onclick="cycleProjectStatus('${p.id}', event)"
                       title="לחץ לשינוי סטטוס">${status}</span>

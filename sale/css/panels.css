@@ -5884,7 +5884,7 @@ body.quota-low .chat-toolbar .quota-meter { max-width: none; width: 100%; }
     background: var(--surface-2);
     color: var(--text-2);
 }
-.pv-flag.on   { border-color: var(--ok, #16a34a); color: var(--ok, #16a34a); }
+.pv-flag.on   { border-color: var(--ok-btn); color: var(--ok-btn); }
 .pv-flag.warn { border-color: var(--warn, #d97706); color: var(--warn, #d97706); }
 
 .pv-section { margin-block-end: var(--sp-4); }
@@ -5928,4 +5928,138 @@ th.pv-price { text-align: end; }
 @media (max-width: 640px) {
     .pv-backdrop { padding: 0; }
     .pv-box { border-radius: 0; min-height: 100%; }
+}
+
+/* ==========================================================================
+   THE WORKING LIST — the open jobs, what is waiting on a customer, and the
+   ones that have gone quiet.
+   ========================================================================== */
+
+/* The list and its rail. auto-fit collapses the rail's column to nothing when
+   the aside is hidden, so an empty rail costs no width. */
+.work-split { display: grid; grid-template-columns: 1fr; gap: var(--sp-4); align-items: start; }
+@media (min-width: 1080px) {
+    .work-split:has(> .waiting-rail:not([hidden])) { grid-template-columns: 1fr 290px; }
+}
+
+.waiting-rail {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: var(--sp-3);
+    position: sticky;
+    inset-block-start: var(--sp-3);
+}
+.wr-head { margin: 0 0 2px; font-size: var(--fs-sm); display: flex; align-items: center; gap: var(--sp-2); }
+.wr-count {
+    background: var(--accent-soft); color: var(--accent);
+    border-radius: var(--r-pill); padding: 1px 8px; font-size: var(--fs-xs); font-weight: 700;
+}
+.wr-sub { margin: 0 0 var(--sp-3); color: var(--text-3); font-size: var(--fs-xs); }
+
+.wr-item {
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--r-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    margin-block-end: var(--sp-2);
+    cursor: pointer;
+}
+.wr-item:hover { border-color: var(--accent); }
+.wr-name { font-size: var(--fs-sm); font-weight: 600; }
+.wr-when { font-size: var(--fs-xs); color: var(--text-3); margin-block-start: 2px; }
+.wr-actions { display: flex; gap: var(--sp-2); margin-block-start: var(--sp-2); flex-wrap: wrap; }
+.wr-item.is-stale { border-color: var(--danger); }
+
+/* THE PULSE. Stav's design, and the reason it is the whole tile rather than a
+   badge: he is not scanning the list, he is trying to remember what is on it.
+   Something that moves at the edge of vision does not need to be read.
+   Deliberately slow and low-contrast — a fast flash is an error state, and this
+   is not an error, it is a job waiting for a phone call. */
+@keyframes zerem-stale-pulse {
+    0%, 100% { box-shadow: inset 0 0 0 9999px rgb(220 38 38 / 0); border-color: var(--border); }
+    50%      { box-shadow: inset 0 0 0 9999px rgb(220 38 38 / 0.13); border-color: var(--danger); }
+}
+.project-card.is-stale { animation: zerem-stale-pulse 2.6s ease-in-out infinite; }
+
+.stale-strip {
+    display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
+    margin-block-start: var(--sp-2);
+    font-size: var(--fs-xs); color: var(--danger); font-weight: 600;
+}
+
+/* A pulsing tile is exactly what a vestibular disorder or a photosensitivity
+   cannot have. The information must survive without the motion, so the card
+   keeps a solid red edge and the strip still says the number of days. */
+@media (prefers-reduced-motion: reduce) {
+    .project-card.is-stale {
+        animation: none;
+        border-color: var(--danger);
+        box-shadow: inset 0 0 0 9999px rgb(220 38 38 / 0.08);
+    }
+}
+
+/* A closed job, seen only under "כל הפרויקטים" — present, legible, and clearly
+   not asking for anything. */
+.project-card.is-closed { opacity: 0.62; }
+.project-card.is-closed:hover { opacity: 1; }
+.closed-tag {
+    margin-inline-start: var(--sp-2);
+    font-size: var(--fs-xs); font-weight: 600;
+    color: var(--text-3); border: 1px solid var(--border);
+    border-radius: var(--r-pill); padding: 1px 8px;
+}
+
+/* SWIPE. The colour and the word live BEHIND the card and are uncovered as it
+   moves, so the outcome is readable before you let go — which is what makes
+   commit-on-release safe enough to use. */
+.projects-list .project-card { position: relative; touch-action: pan-y; }
+.project-card.swiping { transition: none; z-index: 2; }
+.project-card::before,
+.project-card::after {
+    position: absolute; inset-block: 0; width: 50%;
+    display: none; align-items: center;
+    padding-inline: var(--sp-4);
+    font-weight: 700; font-size: var(--fs-sm); color: #fff;
+    border-radius: var(--r-md);
+    pointer-events: none;
+}
+.project-card::before { content: 'הסתיים'; inset-inline-start: 0; background: var(--ok-btn); justify-content: flex-start; }
+.project-card::after  { content: 'לא חזר אליי'; inset-inline-end: 0; background: var(--text-3); justify-content: flex-end; }
+.project-card.swiping::before,
+.project-card.swiping::after { display: flex; z-index: -1; }
+.project-card.will-done::before { background: var(--ok-btn); filter: brightness(1.1); }
+.project-card.will-lost::after  { background: var(--danger); }
+
+/* The undo toast. Every close is reversible for six seconds, which is the other
+   half of choosing the fast gesture. */
+.undo-toast {
+    position: fixed;
+    inset-block-end: calc(var(--sp-6) + env(safe-area-inset-bottom, 0px));
+    inset-inline: 0;
+    margin-inline: auto;
+    width: max-content; max-width: min(92vw, 520px);
+    display: flex; align-items: center; gap: var(--sp-4);
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: var(--r-pill);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.22);
+    padding: var(--sp-2) var(--sp-2) var(--sp-2) var(--sp-4);
+    font-size: var(--fs-sm);
+    z-index: calc(var(--z-modal) + 5);
+    opacity: 0; transform: translateY(14px);
+    transition: opacity .2s ease, transform .2s ease;
+}
+.undo-toast.in { opacity: 1; transform: translateY(0); }
+.ut-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ut-undo {
+    flex: none;
+    background: var(--accent); color: #fff; border: 0;
+    border-radius: var(--r-pill); padding: 6px 16px;
+    font-weight: 700; font-size: var(--fs-sm); cursor: pointer;
+}
+
+/* On a phone the rail is a strip above the list, not a column beside it. */
+@media (max-width: 1079px) {
+    .waiting-rail { position: static; }
+    .wr-item { display: inline-block; margin-inline-end: var(--sp-2); min-width: 210px; vertical-align: top; }
 }

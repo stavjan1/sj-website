@@ -1165,6 +1165,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (vatSel) vatSel.addEventListener('change', () => rememberQuotePref('vatType', vatSel.value));
         markActivePdfTemplate(); // highlight the saved design template pill
         setProjectsView(localStorage.getItem('sj_projects_view') || 'list'); // restore list/grid choice
+        // The working list is the default every time the app opens. "כל הפרויקטים"
+        // is a look, not a setting: coming back tomorrow to the full pile would
+        // undo the whole point of the screen.
+        showAllProjects = false;
         setTimeout(showWelcomeOnboarding, 900); // first-run walkthrough (once)
         setTimeout(checkAskHandoff, 1100); // continue a job from the /ask/ quick-chat
     }
@@ -3712,6 +3716,272 @@ function setProjectsView(view) {
     filterProjectsList();
 }
 
+// ============================================================================
+// THE WORKING LIST
+// ----------------------------------------------------------------------------
+// Stav, 30/08, from the shower: "וואי כמה דברים אני מקווה שלא אשכח מישהו" — and
+// then he listed them. At Avi's, work a few hours. At Yossi Sadeh's, find some
+// things out and brief his electrician. At Shlomo Bartan's, only wait for him to
+// approve the quote.
+//
+// He was doing in his head what this screen should have been doing for him. The
+// list showed every project he had ever opened, forever, in one flat pile — so
+// the six live ones were mixed with sixty finished ones and the only way to know
+// what was still on him was to remember it.
+//
+// Three ideas, and they are all his:
+//   1. The main screen shows only what is OPEN. Everything else is one button
+//      away, not gone.
+//   2. What you are waiting on somebody ELSE for is not the same as what you owe
+//      them. It sits in its own small rail, present but not shouting.
+//   3. A job that has gone quiet does not get a tidy marker. It PULSES red until
+//      you look at it and press the button that says you know.
+// ============================================================================
+
+// Fourteen days of silence after the quote went out. quoteOutAt is stamped by
+// markQuoteOut when the PDF is actually exported, which is the only moment the
+// app can honestly call "it left".
+const STALE_AFTER_MS = 14 * 24 * 60 * 60 * 1000;
+
+// Still on the board. A job leaves only two ways: you closed it by hand, or it
+// was paid — and being paid is the end of the linear status chain, so it means
+// the work was done and the money arrived.
+function isWorkingProject(p) {
+    if (!p || !isJob(p)) return false;
+    if (p.closedAs) return false;
+    return (p.status || 'טיוטה') !== 'שולם';
+}
+
+// The ball is with the customer. Derived from the status rather than stored, so
+// it is right without anybody maintaining a second thing.
+function isWaitingOnClient(p) {
+    return isWorkingProject(p) && (p.status || '') === 'נשלח';
+}
+
+// Quiet for two weeks. staleAckAt is the "I know, leave it" button: it silences
+// this specific project until the next time the quote moves.
+function isStaleProject(p) {
+    if (!p || !isWorkingProject(p)) return false;
+    const out = Number(p.quoteOutAt) || 0;
+    if (!out) return false;
+    if (Number(p.staleAckAt) >= out) return false;
+    return (Date.now() - out) > STALE_AFTER_MS;
+}
+
+function staleDays(p) {
+    const out = Number(p.quoteOutAt) || 0;
+    return out ? Math.floor((Date.now() - out) / 86400000) : 0;
+}
+
+// "I know about this one." Deliberately does NOT change the status: the job is
+// still open and still waiting, it just stops flashing. Tied to quoteOutAt so
+// that sending a NEW quote re-arms the alarm.
+function ackStaleProject(id, ev) {
+    if (ev) ev.stopPropagation();
+    const p = (projectsList || []).find((x) => x.id === id);
+    if (!p) return;
+    p.staleAckAt = Date.now();
+    touchProject(p);
+    saveProjects();
+    filterProjectsList();
+    showToast('סומן. הפרויקט נשאר ברשימה, בלי ההתראה.');
+}
+
+// Off the board — but never deleted and never sent to the bin. A finished job is
+// business history: the repeat customer, the warranty, who paid and when.
+const CLOSE_LABELS = { done: 'הסתיים', lost: 'לא חזר אליי' };
+function closeProject(id, how, ev) {
+    if (ev) ev.stopPropagation();
+    const p = (projectsList || []).find((x) => x.id === id);
+    if (!p || !CLOSE_LABELS[how]) return;
+    const prev = { closedAs: p.closedAs || null, closedAt: p.closedAt || null };
+    p.closedAs = how;
+    p.closedAt = Date.now();
+    touchProject(p);
+    saveProjects();
+    filterProjectsList();
+    // Undo, because he chose the fast gesture over the safe one and a swipe on a
+    // phone in a van is going to be wrong sometimes.
+    showUndoToast(`${escapeHtml(p.name)} · ${CLOSE_LABELS[how]}`, () => {
+        p.closedAs = prev.closedAs;
+        p.closedAt = prev.closedAt;
+        touchProject(p);
+        saveProjects();
+        filterProjectsList();
+    });
+}
+
+function reopenProject(id, ev) {
+    if (ev) ev.stopPropagation();
+    const p = (projectsList || []).find((x) => x.id === id);
+    if (!p) return;
+    p.closedAs = null;
+    p.closedAt = null;
+    touchProject(p);
+    saveProjects();
+    filterProjectsList();
+    showToast('הפרויקט חזר לרשימת העבודה');
+}
+
+// Everything, with the filters. The main screen is the open work; this is the
+// door to the rest, and it is one press away rather than gone.
+// Deliberately NOT persisted. "כל הפרויקטים" is a look, not a setting — opening
+// the app tomorrow to the full pile again would undo the entire point of the
+// screen. It resets to the working list on every load.
+let showAllProjects = false;
+function toggleAllProjects() {
+    showAllProjects = !showAllProjects;
+    filterProjectsList();
+}
+
+// SWIPE, on the list container rather than on each card — the list re-renders
+// constantly and per-card listeners would be re-attached hundreds of times.
+//
+// Stav picked commit-on-release over reveal-buttons, knowing it is the faster
+// and less safe one. Two things make that survivable: the label and the colour
+// appear UNDER the card as you drag, so you read the outcome before you let go
+// and never have to remember which side is which (which was my objection to it);
+// and every close is undoable for six seconds.
+//
+// Right = הסתיים. Left = לא חזר אליי. Those are the directions he agreed to.
+const SWIPE_COMMIT_PX = 96;     // past this, releasing closes the project
+const SWIPE_START_PX = 12;      // below this it is a tap or a vertical scroll
+
+function initProjectSwipe() {
+    const list = document.getElementById('projects-list-container');
+    if (!list || list.dataset.swipeReady) return;
+    list.dataset.swipeReady = '1';
+
+    let card = null, startX = 0, startY = 0, dx = 0, active = false, decided = false;
+
+    const clear = () => {
+        if (card) {
+            card.style.transform = '';
+            card.style.transition = '';
+            card.classList.remove('swiping', 'will-done', 'will-lost');
+        }
+        card = null; active = false; decided = false; dx = 0;
+    };
+
+    list.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'mouse') return;          // the desktop has buttons
+        const t = e.target.closest('.project-card');
+        // Never start a drag on a control: the card is covered in them.
+        if (!t || e.target.closest('button, a, input, select, textarea')) return;
+        if (t.classList.contains('is-closed')) return;  // nothing to close twice
+        card = t; startX = e.clientX; startY = e.clientY; dx = 0;
+        active = true; decided = false;
+    }, { passive: true });
+
+    list.addEventListener('pointermove', (e) => {
+        if (!active || !card) return;
+        const mx = e.clientX - startX;
+        const my = e.clientY - startY;
+        if (!decided) {
+            if (Math.abs(mx) < SWIPE_START_PX && Math.abs(my) < SWIPE_START_PX) return;
+            // A vertical intent is a scroll, and stealing it makes the list feel
+            // broken. Decide once, then honour the decision for the whole drag.
+            if (Math.abs(my) > Math.abs(mx)) { clear(); return; }
+            decided = true;
+            card.classList.add('swiping');
+        }
+        dx = mx;
+        card.style.transform = `translateX(${dx}px)`;
+        const past = Math.abs(dx) >= SWIPE_COMMIT_PX;
+        card.classList.toggle('will-done', past && dx > 0);
+        card.classList.toggle('will-lost', past && dx < 0);
+    }, { passive: true });
+
+    const finish = () => {
+        if (!card || !decided) { clear(); return; }
+        const id = card.dataset.pid;
+        const how = dx >= SWIPE_COMMIT_PX ? 'done' : (dx <= -SWIPE_COMMIT_PX ? 'lost' : null);
+        const el = card;
+        el.style.transition = 'transform .18s ease';
+        el.style.transform = how ? `translateX(${how === 'done' ? 520 : -520}px)` : '';
+        card = null; active = false; decided = false;
+        setTimeout(() => {
+            el.style.transform = ''; el.style.transition = '';
+            el.classList.remove('swiping', 'will-done', 'will-lost');
+            if (how && id) closeProject(id, how);
+        }, how ? 170 : 0);
+    };
+    list.addEventListener('pointerup', finish);
+    list.addEventListener('pointercancel', () => clear());
+    list.addEventListener('pointerleave', () => { if (active) finish(); });
+}
+
+// The small rail beside the list: what is sitting with the customer. It renders
+// only when it has something in it — an empty box that explains it is empty is
+// still a box taking up a fifth of the screen.
+function renderWaitingRail(jobs) {
+    const rail = document.getElementById('waiting-rail');
+    if (!rail) return;
+    const waiting = (jobs || []).filter(isWaitingOnClient)
+        .sort((a, b) => (Number(b.quoteOutAt) || 0) - (Number(a.quoteOutAt) || 0));
+    if (!waiting.length || showAllProjects) { rail.hidden = true; rail.innerHTML = ''; return; }
+    rail.hidden = false;
+    rail.innerHTML = `
+        <h3 class="wr-head"><i class="fa-solid fa-hourglass-half"></i> ממתין ללקוח
+            <span class="wr-count">${waiting.length}</span></h3>
+        <p class="wr-sub">שלחת הצעה, הכדור אצלם.</p>
+        ${waiting.map((p) => {
+            const stale = isStaleProject(p);
+            const days = staleDays(p);
+            return `
+            <div class="wr-item ${stale ? 'is-stale' : ''}" onclick="loadProject('${p.id}')">
+                <div class="wr-name">${escapeHtml(projectDisplayName(p))}</div>
+                <div class="wr-when">${p.quoteOutAt ? `נשלח לפני ${days} ימים` : 'נשלח'}</div>
+                ${stale ? `<div class="wr-actions">
+                    <button type="button" class="btn btn-secondary btn-small"
+                            onclick="event.stopPropagation(); loadProject('${p.id}')">תזכורת ללקוח</button>
+                    <button type="button" class="btn btn-secondary btn-small"
+                            onclick="closeProject('${p.id}','lost',event)">סגור כמת</button>
+                </div>` : ''}
+            </div>`;
+        }).join('')}`;
+}
+
+// An auto-named draft is still called "פרויקט חדש"; show what he actually typed.
+function projectDisplayName(p) {
+    return (p.autoName && p.name === 'פרויקט חדש') ? draftPreview(p) : p.name;
+}
+
+function syncAllProjectsToggle(seeAll) {
+    const btn = document.getElementById('toggle-all-projects');
+    if (!btn) return;
+    btn.classList.toggle('active', !!seeAll);
+    const lbl = btn.querySelector('.tap-label');
+    if (lbl) lbl.textContent = seeAll ? 'רק בעבודה' : 'כל הפרויקטים';
+    // The filter row is only meaningful over the full list.
+    const row = document.getElementById('all-projects-filters');
+    if (row) row.hidden = !seeAll;
+}
+
+// One toast with a way back. Used by every action that removes something from
+// in front of him, because he chose the fast gesture over the safe one.
+let _undoTimer = null;
+function showUndoToast(text, undo) {
+    const old = document.getElementById('undo-toast');
+    if (old) old.remove();
+    clearTimeout(_undoTimer);
+    const el = document.createElement('div');
+    el.id = 'undo-toast';
+    el.className = 'undo-toast';
+    el.innerHTML = `<span class="ut-text"></span>
+        <button type="button" class="ut-undo">בטל</button>`;
+    el.querySelector('.ut-text').textContent = text;
+    el.querySelector('.ut-undo').onclick = () => {
+        clearTimeout(_undoTimer);
+        el.remove();
+        try { undo(); } catch (e) {}
+        showToast('בוטל');
+    };
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('in'));
+    _undoTimer = setTimeout(() => { el.classList.remove('in'); setTimeout(() => el.remove(), 250); }, 6000);
+}
+
 function filterProjectsList() {
     const q = (document.getElementById('project-search-q')?.value || '').trim().toLowerCase();
     const statusFilter = document.getElementById('project-status-filter')?.value || 'all';
@@ -3719,6 +3989,14 @@ function filterProjectsList() {
     // Conversations live in the conversations list, not on the work board. A
     // question you asked on the way to the van is not a job you are running.
     let filtered = projectsList.filter(isJob);
+
+    // THE DEFAULT IS THE OPEN WORK. Everything else is behind "כל הפרויקטים",
+    // one press away. The search box overrides it — if you are typing a name you
+    // are looking for a specific job, and finding nothing because it finished
+    // last month is the app being clever at your expense.
+    const seeAll = showAllProjects || !!q;
+    if (!seeAll) filtered = filtered.filter(isWorkingProject);
+    syncAllProjectsToggle(seeAll);
 
     // Search what is on the card, not only the stored name: a work the agent
     // has not titled yet is called "פרויקט חדש", so searching for the words you
@@ -3735,7 +4013,11 @@ function filterProjectsList() {
     if (projectSort.field === 'name') filtered.sort((a, b) => dir * a.name.localeCompare(b.name, 'he'));
     else filtered.sort((a, b) => dir * (new Date(a.created) - new Date(b.created)));
 
+    // The waiting rail takes its projects from the same source, so the two can
+    // never disagree about what is open.
+    renderWaitingRail(projectsList.filter(isJob));
     renderProjectsList(filtered);
+    try { initProjectSwipe(); } catch (e) { /* the buttons still work */ }
     updateMetricsDashboard();
     renderFollowupReminders();
     try { renderMaintDueStrip(); } catch (e) {}
