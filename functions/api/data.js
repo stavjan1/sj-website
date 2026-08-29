@@ -77,6 +77,37 @@ export async function onRequest(context) {
       }
     }
 
+    // LAST-WRITER-WINS WAS LOSING WORK. The two guards above stop a collection
+    // being emptied, but not a SHORTER one overwriting a longer one: device A
+    // holding 5 projects saves over device B's 6, and the sixth — the job
+    // created on the phone an hour ago — is gone with nothing said.
+    //
+    // A union by id fixes it and is safe here for one specific reason: deleting
+    // a project does not remove it, it moves it to `trash` with a _deletedAt
+    // (sale/app.js deleteProject). So an id that is absent from the incoming
+    // blob AND absent from its trash was never deleted — it is simply something
+    // this device has not heard about yet, and keeping it is correct. An id in
+    // the incoming trash stays deleted, which is what stops the old
+    // "resurrected a just-deleted project" bug.
+    //
+    // This is the same union-by-id the client already does on load
+    // (mergeCloudIntoLocal); doing it on the server too means it holds even when
+    // the other device never reloads.
+    if (existing) {
+      const trashIds = new Set(
+        (Array.isArray(incoming.trash) ? incoming.trash : [])
+          .map((t) => t && t.id).filter(Boolean)
+      );
+      for (const coll of ['projects', 'clients', 'invoices']) {
+        const inArr = Array.isArray(incoming[coll]) ? incoming[coll] : null;
+        const exArr = Array.isArray(existing[coll]) ? existing[coll] : null;
+        if (!inArr || !exArr || !exArr.length) continue;
+        const haveIds = new Set(inArr.map((x) => x && x.id).filter(Boolean));
+        const missed = exArr.filter((x) => x && x.id && !haveIds.has(x.id) && !trashIds.has(x.id));
+        if (missed.length) incoming[coll] = inArr.concat(missed);
+      }
+    }
+
     // New-user detection: first-ever cloud write for this email. Legacy users
     // (existing blob without the field) keep NO firstSeen rather than a fake
     // one — the admin shows "—" instead of a wrong signup date.
