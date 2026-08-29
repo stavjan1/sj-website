@@ -30,3 +30,14 @@ data/materials/erco.json
 # Python bytecode from the supplier scripts
 __pycache__/
 *.pyc
+
+# Local secrets. Wrangler reads .dev.vars for local dev and it holds the same
+# keys as the Cloudflare dashboard — Gemini, Resend, Telegram, the invoicing
+# providers. Nothing here is committed today; this exists so that stays true
+# the first time anyone runs the functions locally.
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+!.env.example
+.wrangler/
