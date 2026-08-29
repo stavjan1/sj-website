@@ -1022,6 +1022,10 @@ let appState = {
             tagline: '',
             // The one credential an Israeli customer can actually check.
             license: '',
+            // '' = never asked, 'none' = עוסק פטור (no periodic report at all),
+            // 'monthly' / 'bimonthly' = how often he files. Drives the VAT
+            // deadline reminder; see vatReminderItem.
+            vatReporting: '',
             id: '',
             phone: '',
             email: '',
@@ -3942,6 +3946,103 @@ function initProjectSwipe() {
     list.addEventListener('pointerleave', () => { if (active) finish(); });
 }
 
+// ============================================================================
+// THE VAT DEADLINE
+// ----------------------------------------------------------------------------
+// Stav, 30/08: "לעוסק מורשה שצריך לדווח... זה יתן לו תזכורת לשלוח הכל לפני כל 15
+// לחודש... אפילו בראשון: הסתיים לו חודש, זו תזכורת לשלוח למנהל החשבונות שלך את
+// כל הקבלות והחשבוניות :)"
+//
+// It is the strongest notification in the product for one reason: it is the only
+// one with a legal deadline and a fine behind it, and it needs no AI, no data
+// quality and no guessing — only a calendar. Free on every plan, because a
+// product that lets a man miss a tax deadline he is paying it to remember has
+// not earned the 19 ₪.
+//
+// CHECKED, NOT ASSUMED (30.8.2026): the periodic VAT report is due by the 15th
+// of the following month, and online filing extends that to the 19th. Reporting
+// is monthly or bi-monthly by turnover. An עוסק פטור files no periodic report at
+// all — only an annual declaration — which is why "לא רלוונטי" is a real answer
+// here and not a way of switching the feature off.
+//
+// Stav wrote the bi-monthly months as "פברואר אפריל". The standard Israeli
+// cycle is the other half: periods are Jan-Feb, Mar-Apr, May-Jun … each reported
+// in the month AFTER it ends, so the filing months are the odd ones — March,
+// May, July, September, November, January. The reminder always names the period
+// it is about, so if his accountant runs him on a different cycle he can see it
+// is wrong the first time rather than trusting it silently.
+// ============================================================================
+const VAT_DUE_DAY = 15;        // the deadline itself
+const VAT_ONLINE_GRACE_DAY = 19; // online filing; after this the reminder is moot
+
+// Which period is due to be reported during month `m` (0-11) of `y`.
+// Returns null when nothing is due in that month (bi-monthly, off month).
+function vatPeriodDue(mode, y, m) {
+    if (mode === 'monthly') {
+        const prev = m === 0 ? { y: y - 1, m: 11 } : { y, m: m - 1 };
+        return { label: HE_MONTHS[prev.m] + ' ' + prev.y, key: `${prev.y}-${String(prev.m + 1).padStart(2, '0')}` };
+    }
+    if (mode === 'bimonthly') {
+        // Filing months are the odd ones: a period ending in an even month
+        // (Feb, Apr, …) is reported in the month after it.
+        const endsPrev = m === 0 ? { y: y - 1, m: 11 } : { y, m: m - 1 };
+        if (endsPrev.m % 2 !== 1) return null;          // period must END in Feb/Apr/Jun/Aug/Oct/Dec
+        const startsPrev = { y: endsPrev.y, m: endsPrev.m - 1 };
+        return {
+            label: HE_MONTHS[startsPrev.m] + '–' + HE_MONTHS[endsPrev.m] + ' ' + endsPrev.y,
+            key: `${endsPrev.y}-${String(endsPrev.m + 1).padStart(2, '0')}-bi`,
+        };
+    }
+    return null;
+}
+
+const HE_MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+                   'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+
+function vatReportingMode() {
+    const biz = (appState.settings && appState.settings.businessDetails) || {};
+    const m = biz.vatReporting;
+    return (m === 'monthly' || m === 'bimonthly' || m === 'none') ? m : '';
+}
+
+function _vatAckKey(periodKey) { return getStorageKey('sj_vat_ack_' + periodKey); }
+
+// "I have sent it." Silences THIS period only — the next one arms itself.
+function ackVatPeriod(periodKey, e) {
+    if (e) e.stopPropagation();
+    try { localStorage.setItem(_vatAckKey(periodKey), '1'); } catch (err) {}
+    try { renderReminderBell(); } catch (err) {}
+    showToast('סומן כנשלח. אזכיר שוב בתקופה הבאה.');
+}
+
+// The bell's VAT entry, or null. Live from the 1st of the filing month — his
+// idea, and the right one: the useful moment is when the month CLOSED, not the
+// day before the deadline when the paperwork still has to be gathered.
+function vatReminderItem(now) {
+    const mode = vatReportingMode();
+    if (!mode || mode === 'none') return null;
+    const d = now ? new Date(now) : new Date();
+    const day = d.getDate();
+    if (day > VAT_ONLINE_GRACE_DAY) return null;        // this month's window has passed
+    const period = vatPeriodDue(mode, d.getFullYear(), d.getMonth());
+    if (!period) return null;
+    try { if (localStorage.getItem(_vatAckKey(period.key))) return null; } catch (e) {}
+    const left = VAT_DUE_DAY - day;
+    const why = left > 0
+        ? `דיווח ${period.label} · נותרו ${left} ימים עד ה-15`
+        : (day <= VAT_DUE_DAY
+            ? `דיווח ${period.label} · היום ה-15, המועד האחרון`
+            : `דיווח ${period.label} · עבר ה-15, בדיווח מקוון עד ה-${VAT_ONLINE_GRACE_DAY}`);
+    return {
+        kind: 'vat', id: 'vat-' + period.key, name: 'דיווח מע"מ',
+        why,
+        // Sorts with the latest things first, and grows more urgent by the day.
+        lateness: day,
+        periodKey: period.key, periodLabel: period.label,
+        overdue: day > VAT_DUE_DAY,
+    };
+}
+
 // The small rail beside the list: what is sitting with the customer. It renders
 // only when it has something in it — an empty box that explains it is empty is
 // still a box taking up a fifth of the screen.
@@ -5559,6 +5660,8 @@ function loadSettings() {
                 document.getElementById('set-biz-owner').value = biz.owner || '';
                 document.getElementById('set-biz-tagline').value = biz.tagline || '';
                 document.getElementById('set-biz-license').value = biz.license || '';
+                const vatSel = document.getElementById('set-biz-vat-reporting');
+                if (vatSel) vatSel.value = biz.vatReporting || '';
                 document.getElementById('set-biz-id').value = biz.id || '';
                 document.getElementById('set-biz-phone').value = biz.phone || '';
                 document.getElementById('set-biz-email').value = biz.email || '';
@@ -6735,6 +6838,7 @@ function saveBusinessSettings() {
         owner: document.getElementById('set-biz-owner').value,
         tagline: document.getElementById('set-biz-tagline').value,
         license: document.getElementById('set-biz-license').value,
+        vatReporting: (document.getElementById('set-biz-vat-reporting') || {}).value || '',
         id: document.getElementById('set-biz-id').value,
         phone: document.getElementById('set-biz-phone').value,
         email: document.getElementById('set-biz-email').value,

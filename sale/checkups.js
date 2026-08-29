@@ -666,6 +666,13 @@ function ckEnsureLocal() {
 // Both sources, flattened into one shape and sorted by how late they are.
 function getReminderItems() {
     const items = [];
+    // The tax deadline first — it is the only item here with a fine behind it,
+    // and the only one that is not about a customer. Wrapped like the rest so a
+    // missing helper can never empty the whole bell.
+    try {
+        const v = typeof vatReminderItem === 'function' ? vatReminderItem() : null;
+        if (v) items.push(v);
+    } catch (e) { /* settings not loaded yet */ }
     try {
         getDueFollowups().forEach((p) => {
             const since = p.statusChangedAt || new Date(p.created).getTime() || Date.now();
@@ -801,12 +808,28 @@ function renderReminderPopover() {
     // were, so a free plan still gets its checkup rows in full.
     const locked = !tierAllows('reminders');
     const followups = items.filter((i) => i.kind === 'followup');
-    const shown = locked ? items.filter((i) => i.kind === 'checkup') : items;
+    // 'vat' joins 'checkup' on the free side. It is a legal deadline with a fine
+    // behind it, and a product that lets a man miss it because he is on the free
+    // plan has not earned the 19 ₪ from him later.
+    const shown = locked ? items.filter((i) => i.kind === 'checkup' || i.kind === 'vat') : items;
 
     const rows = shown.slice(0, 8).map((i) => {
         // Ids are generated locally, but they land inside a quoted attribute —
         // the same sink that produced this project's stored-XSS bug once.
         const id = escapeHtml(i.id);
+        // The VAT row's action is not a message to anybody — it is "I sent it",
+        // which is the only thing that should stop it coming back.
+        if (i.kind === 'vat') {
+            return `<div class="rp-row${i.overdue ? ' is-late' : ''}">
+                <button class="rp-main" onclick="reminderAction('vat','${escapeHtml(i.periodKey)}','open')">
+                    <span class="rp-name">${escapeHtml(i.name)}</span>
+                    <span class="rp-why">${escapeHtml(i.why)}</span>
+                </button>
+                <span class="rp-acts">
+                    <button class="rp-act" title="שלחתי" onclick="reminderAction('vat','${escapeHtml(i.periodKey)}','done')"><i class="fa-solid fa-check"></i></button>
+                </span>
+            </div>`;
+        }
         const wa = i.phone
             ? `<button class="rp-act rp-wa" title="וואטסאפ" onclick="reminderAction('${i.kind}','${id}','wa')"><i class="fa-brands fa-whatsapp"></i></button>` : '';
         const mail = i.email
@@ -831,6 +854,14 @@ function renderReminderPopover() {
 }
 
 function reminderAction(kind, id, what) {
+    if (kind === 'vat') {
+        if (what === 'done') { ackVatPeriod(id); return; }
+        // Opening it goes to the money screen, which is where the receipts and
+        // invoices he has to send actually are.
+        closeReminderPopover();
+        switchTab('money');
+        return;
+    }
     if (kind === 'checkup') {
         if (what === 'wa') return ckWhatsapp(id);
         if (what === 'mail') return ckMailto(id);
