@@ -104,7 +104,44 @@ export async function onRequestGet(context) {
         }
     } catch { /* blob unreadable — dashboard still works from manual data */ }
 
-    return jsonResponse({ data: record, invoiceIncome });
+    return jsonResponse({ data: redactFinancy(record), invoiceIncome });
+}
+
+// The Financy credentials never leave the server.
+//
+// financy.js stores the user's clientId, clientSecret, userId and the minted
+// bearer token inside settings.financy, and builds a publicStatus() helper
+// precisely so they are not echoed — then this endpoint returned the whole raw
+// record, secret and live token included. It is the user's own credential going
+// to the user's own browser over TLS, so nobody else's data is exposed; but it
+// is a read credential for his BANK, sitting in a page response where any XSS,
+// any browser extension and any intermediate cache can reach it. billing.js
+// answers the same class of question with `hasCredentials: true`.
+//
+// The client only ever reads connected / dataDate / lastSync / lastError, so
+// nothing on screen changes.
+const FINANCY_SECRETS = ['clientSecret', 'token', 'tokenExp'];
+function redactFinancy(record) {
+    const fz = record && record.settings && record.settings.financy;
+    if (!fz || typeof fz !== 'object') return record;
+    const safe = { ...fz };
+    for (const k of FINANCY_SECRETS) delete safe[k];
+    safe.hasCredentials = !!(fz.clientId && fz.clientSecret && fz.userId);
+    return { ...record, settings: { ...record.settings, financy: safe } };
+}
+
+// ...which means a save cannot be allowed to write the redacted copy back.
+// The browser PUTs the whole blob, so without this the first save after any load
+// would erase the credentials it was never sent.
+function keepFinancySecrets(incoming, existing) {
+    const prev = existing && existing.settings && existing.settings.financy;
+    if (!prev) return incoming;
+    const next = (incoming.settings && incoming.settings.financy) || {};
+    const merged = { ...next };
+    for (const k of FINANCY_SECRETS) {
+        if (merged[k] === undefined && prev[k] !== undefined) merged[k] = prev[k];
+    }
+    return { ...incoming, settings: { ...incoming.settings, financy: merged } };
 }
 
 export async function onRequestPut(context) { return savePut(context); }
@@ -130,7 +167,12 @@ async function savePut(context) {
         lastUpdated: Date.now(),
     };
 
-    const raw = JSON.stringify(record);
+    // Re-attach anything the browser was never given. Must happen before the
+    // size check and before the write.
+    let prevRec = null;
+    try { prevRec = JSON.parse(await readFinanceRecord(env, gate.email) || 'null'); } catch { }
+    const merged = keepFinancySecrets(record, prevRec);
+    const raw = JSON.stringify(merged);
     if (raw.length > MAX_BYTES) return jsonResponse({ error: { message: 'הנתונים גדולים מדי (מעל 2MB).' } }, 413);
 
     // Same guard family as /api/data: an all-empty save never overwrites real data.
