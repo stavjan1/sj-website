@@ -1912,3 +1912,114 @@
     border-inline-start: 2px solid var(--pdf-custom-secondary, #0e7490);
     padding-inline-start: 8px;
 }
+
+/* ============================================================================
+   THE VARIATIONS, ALL THE WAY
+   Stav: "תעשה את הוריאציות ברמה הכי גבוהה ונועזת." The previous pass gave each
+   template one idea; this one commits. Three documents that a person could tell
+   apart from across a room, still with no markup change and still inside the
+   rules that keep them exportable: borders, backgrounds, spacing and weight
+   only — nothing html2canvas mishandles, nothing that depends on colour to be
+   readable in black and white, and none of them spilling to a second page.
+   ============================================================================ */
+
+/* ── קלאסית · THE INVOICE ───────────────────────────────────────────────────
+   What an accountant sends. Ruled, banded, and numbered like a ledger. The eye
+   is meant to go down the left rule to the total and stop there. */
+.quote-sheet.tpl-classic .pdf-title-container {
+    border-block: 1px solid var(--pdf-custom-primary, #1e3a8a);
+    padding-block: 6px;
+    margin-block: 10px 12px;
+}
+.quote-sheet.tpl-classic .pdf-items-list { border-block-start: 1px solid #d7dbe2; }
+.quote-sheet.tpl-classic .pdf-work-item {
+    border-block-end: 1px solid #e7e9ee;
+    padding-block: 6px 7px;
+}
+.quote-sheet.tpl-classic .pdf-item-title {
+    font-weight: 700;
+    color: var(--pdf-custom-primary, #1e3a8a);
+}
+.quote-sheet.tpl-classic .pdf-table th {
+    background: var(--pdf-custom-primary, #1e3a8a);
+    color: #fff;
+    font-weight: 700;
+    padding: 5px 8px;
+}
+.quote-sheet.tpl-classic .pdf-table tr:nth-child(even) td { background: #f5f7fa; }
+.quote-sheet.tpl-classic .pdf-table td { padding: 5px 8px; border-block-end: 1px solid #e7e9ee; }
+.quote-sheet.tpl-classic .pdf-footer-section {
+    border: 2px solid var(--pdf-custom-primary, #1e3a8a);
+    padding: 9px 12px;
+    margin-block-start: 12px;
+}
+.quote-sheet.tpl-classic .price-val { font-weight: 700; }
+
+/* ── נקייה · THE LETTER ─────────────────────────────────────────────────────
+   Nothing is drawn. Every boundary is space. The total is the largest thing on
+   the page and the only thing that carries colour, so it is found instantly by
+   a customer holding three quotes. */
+.quote-sheet.tpl-minimal .pdf-header,
+.quote-sheet.tpl-minimal .pdf-header-divider,
+.quote-sheet.tpl-minimal .pdf-title-container,
+.quote-sheet.tpl-minimal .pdf-items-list,
+.quote-sheet.tpl-minimal .pdf-work-item,
+.quote-sheet.tpl-minimal .pdf-terms-box,
+.quote-sheet.tpl-minimal .pdf-summary-box,
+.quote-sheet.tpl-minimal .pdf-footer-section,
+.quote-sheet.tpl-minimal .pdf-table td,
+.quote-sheet.tpl-minimal .pdf-table th { border: none !important; background: transparent !important; }
+.quote-sheet.tpl-minimal .pdf-title {
+    font-weight: 300;
+    letter-spacing: .10em;
+    color: var(--pdf-custom-primary, #111827);
+    margin-block-end: 14px;
+}
+.quote-sheet.tpl-minimal .pdf-work-item { padding-block-end: 13px; }
+.quote-sheet.tpl-minimal .pdf-item-title { font-weight: 600; letter-spacing: .01em; }
+.quote-sheet.tpl-minimal .pdf-item-desc { color: #5b6270; }
+.quote-sheet.tpl-minimal .pdf-table td { padding-block: 6px; }
+.quote-sheet.tpl-minimal .price-label { color: #7b8291; font-weight: 400; letter-spacing: .06em; }
+.quote-sheet.tpl-minimal .price-val {
+    font-size: 1.7em;
+    font-weight: 700;
+    color: var(--pdf-custom-primary, #111827);
+}
+.quote-sheet.tpl-minimal .pdf-company-footer { color: #8b909b; }
+
+/* ── הנדסית · THE SUBMISSION ────────────────────────────────────────────────
+   A document that looks like it was issued, not written: a grey masthead band,
+   every block in a box, labels in spaced small type, and figures set tabular so
+   a column of numbers lines up under itself. */
+.quote-sheet.tpl-engineer .pdf-header {
+    background: #eef1f5;
+    border: 1px solid #c3cbd6;
+    padding: 10px 12px;
+}
+.quote-sheet.tpl-engineer .pdf-title-container {
+    background: var(--pdf-custom-primary, #0f172a);
+    padding: 7px 12px;
+    margin-block: 10px;
+}
+.quote-sheet.tpl-engineer .pdf-title { color: #fff; font-weight: 800; letter-spacing: .04em; }
+.quote-sheet.tpl-engineer .pdf-work-item {
+    border: 1px solid #d5dce5;
+    border-inline-start: 3px solid var(--pdf-custom-secondary, #0e7490);
+    padding: 6px 9px;
+    margin-block-end: 5px;
+}
+.quote-sheet.tpl-engineer .pdf-table th {
+    background: #eef1f5; border: 1px solid #c3cbd6; padding: 5px 8px;
+    letter-spacing: .06em; font-size: .86em;
+}
+.quote-sheet.tpl-engineer .pdf-table td { border: 1px solid #d5dce5; padding: 5px 8px; }
+.quote-sheet.tpl-engineer .recipient-label,
+.quote-sheet.tpl-engineer .meta-item,
+.quote-sheet.tpl-engineer .pdf-term-k,
+.quote-sheet.tpl-engineer .price-label { letter-spacing: .09em; font-size: .82em; color: #46536a; }
+.quote-sheet.tpl-engineer .price-val,
+.quote-sheet.tpl-engineer .pdf-table td { font-variant-numeric: tabular-nums; }
+.quote-sheet.tpl-engineer .pdf-footer-section {
+    border: 1px solid #c3cbd6; background: #f7f9fb; padding: 9px 12px; margin-block-start: 10px;
+}
+.quote-sheet.tpl-engineer .pdf-terms-box { border: 1px solid #d5dce5; padding: 8px 10px; }

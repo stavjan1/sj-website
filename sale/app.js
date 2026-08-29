@@ -2016,10 +2016,76 @@ function upcomingHolidays(days = 30, from = new Date()) {
 // early rather than late, and disappears the day after.
 const HOLIDAY_LEAD_DAYS = 14;
 
-function holidayGreetingText(h) {
+// Six ways to say it, and one is picked at random each time you press the dice.
+//
+// The point is not variety for its own sake. A customer who gets the identical
+// sentence from four tradespeople reads it as a mailshot; the one that sounds
+// like a person wrote it is the one that gets a reply. And the electrician
+// pressing the button is not a copywriter — he wants a different sentence, not
+// a blank box.
+const GREETING_BODIES = [
+    'מאחל לכם חג שמח ושקט, ואם צריך משהו בחשמל אני כאן.',
+    'שיהיה חג נעים, בבית מואר ובטוח. אני כאן לכל דבר.',
+    'חג שמח לכם ולמשפחה. שתהיה שנה בלי תקלות, ואם כבר — אתם יודעים למי לצלצל.',
+    'מאחל לכם חג של מנוחה. תודה שאתם נותנים בי אמון לאורך השנה.',
+    'חג שמח! שיהיה שקט, בטוח ומואר אצלכם בבית.',
+    'חג שמח מכל הלב. אם משהו יקרה בחג — אני זמין.',
+];
+
+function _greetingBody(seed) {
+    const i = seed == null
+        ? Math.floor(Math.random() * GREETING_BODIES.length)
+        : (Math.abs(seed) % GREETING_BODIES.length);
+    return GREETING_BODIES[i];
+}
+
+function holidayGreetingText(h, body) {
     const biz = (appState.settings && appState.settings.businessDetails) || {};
     const who = [biz.owner, biz.name].filter(Boolean).join(', ');
-    return `${h.greet}!\nמאחל לכם חג שמח ושקט, ואם צריך משהו בחשמל אני כאן.\n${who}`;
+    const sign = who ? `\n${who}` : '';
+    return `${h.greet}!\n${body || _greetingBody(0)}${sign}`;
+}
+
+// Re-roll the wording, keeping the greeting and the signature. Never returns
+// the same line twice in a row — a dice that repeats itself feels broken.
+let _lastGreetIdx = 0;
+function rerollGreeting() {
+    const ta = document.getElementById('bc-text');
+    if (!ta) return;
+    let i = _lastGreetIdx;
+    for (let n = 0; n < 8 && i === _lastGreetIdx; n++) i = Math.floor(Math.random() * GREETING_BODIES.length);
+    _lastGreetIdx = i;
+    const h = HOLIDAYS.find((x) => x.key === _bcCampaign);
+    const upcoming = h ? (upcomingHolidays(400).find((x) => x.key === _bcCampaign) || h) : null;
+    ta.value = upcoming
+        ? holidayGreetingText(upcoming, GREETING_BODIES[i])
+        : GREETING_BODIES[i];
+    ta.focus();
+}
+
+// The one greeting he will forget to send. Stav's idea, and his words:
+// "מאחורי כל עסק מצליח כנראה עומדת אישה תומכת 😉". It writes the message into
+// the same box, so the next tap is the same WhatsApp share he already knows —
+// no new screen, no new button to learn.
+const PERSONAL_GREETINGS = {
+    partner: [
+        'לאשתי היקרה — חג שמח. תודה על הסבלנות לכל השעות המוזרות, לטלפונים בשבת ולארגזי הכלים בסלון. בלעדייך העסק הזה לא היה זז. אוהב אותך ❤️',
+        'חג שמח לאישה שמחזיקה אותי ואת העסק. על כל ערב שחיכית, על כל פעם שאמרת "לך, אני מסתדרת" — תודה. ❤️',
+    ],
+    family: [
+        'חג שמח למשפחה האהובה! מאחל לכולנו בריאות, שמחה, והרבה רגעים ביחד סביב השולחן. נתראה בחג ❤️',
+        'חג שמח לכולם! שנהיה כולנו בריאים ושמחים, ושנמשיך להיפגש בשמחות. אוהב אתכם ❤️',
+    ],
+};
+
+function personalGreeting(kind) {
+    const list = PERSONAL_GREETINGS[kind] || PERSONAL_GREETINGS.family;
+    const ta = document.getElementById('bc-text');
+    if (!ta) return;
+    ta.value = list[Math.floor(Math.random() * list.length)];
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+    showToast(kind === 'partner' ? 'ניסחתי — תרגיש חופשי לשנות' : 'ניסחתי ברכה למשפחה');
 }
 
 function _broadcastDoneKey(campaign) { return getStorageKey('sj_broadcast_' + campaign); }
@@ -2120,6 +2186,19 @@ function openBroadcast(campaignKey) {
         <p class="input-help">בוחרים למי, כותבים פעם אחת, ושולחים אחד-אחד בוואטסאפ. אין כאן שליחה אוטומטית בשמך.</p>
         <div class="bc-aud" id="bc-aud"></div>
         <textarea id="bc-text" class="bc-text" rows="5">${escapeHtml(upcoming ? holidayGreetingText(upcoming) : '')}</textarea>
+        <div class="bc-reroll">
+            <button type="button" class="btn btn-secondary btn-small" onclick="rerollGreeting()">
+                🎲 ניסוח אחר
+            </button>
+            <span class="input-help">כל לחיצה מנסחת מחדש. לקוח שקיבל את אותו משפט מארבעה בעלי מקצוע קורא אותו כדיוור.</span>
+        </div>
+        <div class="bc-personal">
+            <span>מאחורי כל עסק מצליח כנראה עומדת אישה תומכת 😉</span>
+            <div class="bc-personal-btns">
+                <button type="button" class="btn btn-secondary btn-small" onclick="personalGreeting('partner')">נסח ברכה בשבילה</button>
+                <button type="button" class="btn btn-secondary btn-small" onclick="personalGreeting('family')">ברכה לקבוצה המשפחתית</button>
+            </div>
+        </div>
         <div class="bc-actions">
             <button type="button" class="btn btn-secondary btn-small" onclick="copyBroadcastText()">העתקת ההודעה</button>
             <button type="button" class="btn btn-secondary btn-small" onclick="broadcastMailto()">פתיחת מייל לכולם</button>
@@ -6423,7 +6502,7 @@ ${unpriced.join('\n')}` : ''}`;
 function getPricingInstinctPromptBlock() {
     const r = getPricingRules();
     const calibration = `\n\n# מראת כיול, התעריפים הרגילים של החשמלאי
-ברירות המחדל שהחשמלאי קבע לעצמו: תוספת חומרים ${r.materialMarkup}%, תעריף ${r.defaultRate} ₪/שעה, רווח יעד ${r.defaultDailyTarget} ₪/יום. אלה ה"הרגל" שלו. השווה את ההערכה מבוססת-הערך/שוק שלך אל ההרגל הזה עבור העבודה הספציפית:
+ברירות המחדל שהחשמלאי קבע לעצמו: תוספת רווח על חומרים ${r.materialMarkup}% (זו התוספת שהוא גובה מהלקוח מעל עלות החומר, ולא הנחת הסוחר שהוא מקבל מהספק), תעריף ${r.defaultRate} ₪/שעה, רווח יעד ${r.defaultDailyTarget} ₪/יום. אלה ה"הרגל" שלו. השווה את ההערכה מבוססת-הערך/שוק שלך אל ההרגל הזה עבור העבודה הספציפית:
 • אם העבודה שווה בשוק יותר ממה שהתעריפים שלו מניבים (עבודת מומחיות/נדירה, חירום, לקוח אמיד, סיכון), אמור לו במפורש: "לעבודה כזו אתה מתמחר מתחת לערך: שקול להעלות, וכך למה".
 • אם הוא מעל השווי (עבודה פשוטה, לקוח חוזר שכדאי לשמר), התרֵה בעדינות שלא ישרוף קשר.
 • אם הוא בול על השוק, חזק אותו ("התמחור שלך תואם-שוק לעבודה הזו").
@@ -6761,7 +6840,10 @@ function renderPricingDefaults() {
     box.innerHTML = `
         <div class="pe-def-title">ברירות מחדל (נשמר לכל ההצעות)</div>
         <div class="pe-def-grid">
-            <label>תוספת חומרים %<input type="number" id="pd-markup" value="${r.materialMarkup}"></label>
+            <label>תוספת רווח על חומרים %
+                <input type="number" id="pd-markup" min="0" max="35" step="1" value="${r.materialMarkup}">
+                <small class="pe-hint">0-35%. זה מה שאתה <b>מוסיף</b> ללקוח מעל מה ששילמת — לא הנחת הסוחר שאתה מקבל מהספק.</small>
+            </label>
             <label>תעריף ברירת מחדל<input type="number" id="pd-rate" value="${r.defaultRate}"></label>
             <label>תעריפים מהירים (פסיקים)<input type="text" id="pd-presets" dir="ltr" value="${r.ratePresets.join(',')}"></label>
             <label>רווח יעד ליום ₪<input type="number" id="pd-daily" value="${r.defaultDailyTarget}"></label>
@@ -6799,7 +6881,12 @@ function savePricingDefaults() {
     const num = (id, def) => { const v = parseFloat(document.getElementById(id)?.value); return Number.isFinite(v) ? v : def; };
     const presets = (document.getElementById('pd-presets')?.value || '').split(',').map(s => parseInt(s.trim(), 10)).filter(n => n > 0);
     appState.settings.pricingRules = {
-        materialMarkup: num('pd-markup', 20),
+        // Clamped 0-35. Stav asked for that range, and a markup is not a
+        // discount: the trade discount is what the SUPPLIER gives him off the
+        // list price (5-35%), this is what he ADDS on top when he sells it on.
+        // Two numbers that move in opposite directions and are easy to confuse,
+        // so the field says which one it is and the value cannot leave its range.
+        materialMarkup: Math.max(0, Math.min(35, num('pd-markup', 20))),
         defaultRate: num('pd-rate', 300),
         ratePresets: presets.length ? presets : [200, 300, 500],
         defaultDailyTarget: num('pd-daily', 1500),
