@@ -6137,3 +6137,20 @@ th.pv-price { text-align: end; }
 }
 .prov-locked-note > span { flex: 1 1 200px; }
 .prov-locked-note .fa-gem { color: var(--accent); }
+
+/* "Coming" providers, behind one line.
+   --------------------------------------------------------------------------
+   Stav asked to cover every Israeli invoicing company, which is right — an
+   electrician has to find HIS software on the list — but twenty-two cards is a
+   directory, not a decision. The five with a working adapter are the screen;
+   the rest are one summary away. */
+.prov-more { margin-block-start: var(--sp-3); }
+.prov-more > summary {
+    cursor: pointer;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text-2);
+    padding: var(--sp-2) 0;
+}
+.prov-more > summary:hover { color: var(--accent); }
+.prov-more[open] > summary { margin-block-end: var(--sp-2); }

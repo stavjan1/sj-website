@@ -5261,7 +5261,16 @@ function acctRenderProvider(current) {
     const root = document.getElementById('acct-provider-root');
     if (!root) return;
     const locked = !invoicingAllowed();
-    const cards = (_acctProviders || []).map(p => {
+    // TWENTY-TWO COMPANIES IS A LIST, NOT A CHOICE. The five with a working
+    // adapter come first; the rest are real, researched and coming, and they sit
+    // behind one line so the screen stays a decision instead of a directory.
+    // An electrician still finds his own software — that was the point of
+    // covering the whole market — he just does not have to read 22 cards to
+    // discover that the common five are ready today.
+    const _all = _acctProviders || [];
+    const _live = _all.filter(p => p.status === 'active');
+    const _soon = _all.filter(p => p.status !== 'active');
+    const cardHtml = (p) => {
         const sel = !locked && p.id === _acctProviderSel;
         const soon = p.status !== 'active' ? ' <span class="prov-soon">בקרוב</span>' : '';
         const badge = p.badge ? ` <span class="prov-badge">${escapeHtml(p.badge)}</span>` : '';
@@ -5269,7 +5278,15 @@ function acctRenderProvider(current) {
             <span class="prov-name">${escapeHtml(p.name)}${soon}${badge}</span>
             <span class="prov-note">${escapeHtml(p.note || '')}</span>
         </button>`;
-    }).join('');
+    };
+    const cards = _live.map(cardHtml).join('');
+    const soonCards = _soon.length
+        ? `<details class="prov-more">
+             <summary>עוד ${_soon.length} תוכנות חשבוניות ישראליות · בדרך</summary>
+             <p class="input-help">כולן נבדקו מול התיעוד של החברה עצמה. אם התוכנה שלך כאן — היא בדרך, ואפשר להגיד לנו שהיא דחופה.</p>
+             <div class="prov-cards">${_soon.map(cardHtml).join('')}</div>
+           </details>`
+        : '';
     const selMeta = (_acctProviders || []).find(p => p.id === _acctProviderSel);
     const isSecret = (k) => /secret|token|key|pass|pin/i.test(k);
     const fields = ((selMeta && selMeta.fields) || []).map(f => {
@@ -5284,6 +5301,7 @@ function acctRenderProvider(current) {
             <div class="acct-sub">חיבור לספק החשבוניות שלך</div>
             <p class="input-help">מחברים את התוכנה שכבר יש לך, וזרם מפיק דרכה חשבוניות אמיתיות — ישירות מהפרויקט, בלי להקליד פעמיים.</p>
             <div class="prov-cards">${cards}</div>
+            ${soonCards}
             <div class="prov-locked-note">
                 <i class="fa-solid fa-gem" aria-hidden="true"></i>
                 <span>הפקת חשבוניות וחיבור לספק — במסלול דיימונד 💎</span>
@@ -5294,7 +5312,10 @@ function acctRenderProvider(current) {
     root.innerHTML = `
         <div class="acct-sub">בחר ספק חשבוניות</div>
         <div class="prov-cards">${cards}</div>
-        ${selMeta ? `<div class="acct-sub" style="margin-top:14px;">פרטי חיבור, ${escapeHtml(selMeta.name)}</div>${fields || '<p class="input-help">אין צורך בפרטים, משתמשים בחשבון המערכת.</p>'}` : ''}
+        ${soonCards}
+        ${selMeta ? `<div class="acct-sub" style="margin-top:14px;">פרטי חיבור, ${escapeHtml(selMeta.name)}</div>
+            ${selMeta.docs ? `<p class="input-help"><a href="${escapeHtml(selMeta.docs)}" target="_blank" rel="noopener noreferrer">תיעוד ה-API של ${escapeHtml(selMeta.name)} ↗</a> — שם מוצאים את המפתחות.</p>` : ''}
+            ${fields || '<p class="input-help">אין צורך בפרטים, משתמשים בחשבון המערכת.</p>'}` : ''}
         ${current && current.hasCredentials ? '<p class="input-help" style="color:var(--ok-text);margin-top:6px;">✓ פרטי חיבור שמורים</p>' : ''}
         <button class="btn btn-accent btn-small" style="margin-top:12px;" onclick="acctSaveProvider()"><i class="fa-solid fa-check"></i> שמור ספק</button>`;
 }
