@@ -375,18 +375,22 @@ export const DEFAULT_PRICING_MAP = `
 // Hebrew on every single call. Ninety-two questions spent roughly 1.7 million
 // tokens, which is why a "1,500 requests a day" allowance ran out after ninety.
 //
-// So the map is no longer sent whole to everyone. Two cuts, both conservative,
-// because a block wrongly withheld makes the answer worse and that costs more
-// than the tokens ever will:
+// The map body alone is ~23KB — about 8,700 tokens — and only 7% of it is
+// universal. The other 93% is a board question carrying the EV tables, the
+// utility fees, the industrial controller and the tender rules along with it.
 //
-//   · the חח"י fee tables (1.6KB) go only to turns that mention the utility,
-//     a connection change or a meter — nothing else can use them;
-//   · a turn with no work in it at all (a greeting, "תודה", "כן") gets no map,
-//     because there is nothing in it to price.
+// So the map is routed by topic. Three rules, in order of how much they matter:
 //
-// Everything else still gets everything.
-
-const UTILITY_WORDS = /חח"?י|חברת החשמל|אגרה|אגרות|הגדלת חיבור|הגדלה של החיבור|מונה|פלומבה|תלת.?פאזי|חד.?פאזי|לוח פיצול|לוח משנה|ניתוק|חיבור חדש/;
+//   1. A turn with no work in it (a greeting, "תודה") gets no map at all.
+//   2. A turn whose words match NO topic gets the WHOLE map. Not a guess, not a
+//      default topic — everything. If the router did not understand the
+//      question it has no business deciding what the answer may not see.
+//   3. Otherwise the turn gets the universal blocks, every block belonging to a
+//      topic it named, and every block the router could not label at all.
+//
+// The governing asymmetry, unchanged: a block wrongly withheld makes the answer
+// worse, and that costs far more than the tokens ever will. Every choice here
+// resolves toward keeping.
 
 // A turn that cannot be about a job: short, no numbers, and nothing that names
 // work or material. Deliberately narrow — "כמה זה עולה" must NOT match.
@@ -400,16 +404,131 @@ export function isTrivialTurn(text) {
   return TRIVIAL.test(t);
 }
 
-// The map, trimmed to what this turn can actually use.
-export function trimPricingMap(map, userText) {
-  const t = String(userText || '');
-  if (UTILITY_WORDS.test(t)) return map;
-  // Drop the utility-fee section only. Split on the heading so a future edit to
-  // the tables cannot leave half of them behind.
-  const parts = String(map).split(/\n(?=## )/);
-  const kept = parts.filter((p) => !/^## אגרות חברת החשמל/.test(p));
-  return kept.length === parts.length ? map : kept.join('\n');
+// ONE lexicon, and it is used TWICE — that is the whole design. The same table
+// picks this turn's topics out of the electrician's words, and labels every
+// block in the map by reading the block's own text.
+//
+// The obvious alternative was a heading -> topic lookup table. It reads better
+// and it rots: the first time somebody adds a "### " block to the map and does
+// not register it here, that block is still in the file, still correct, and
+// silently unreachable forever. Nothing fails, no test goes red, the answers
+// just quietly get worse. Deriving the label from the block's own words means a
+// new block is routed the moment it is written — and a block matching nothing
+// is sent on EVERY turn rather than lost, so the failure direction is "too much
+// context" instead of "the number you needed was withheld".
+//
+// Adding a word here is the supported way to tune routing. Over-matching only
+// costs tokens; under-matching costs an answer.
+const TOPIC_WORDS = {
+  boards: ["להחליף לוח", "לוחות חשמל", "ארון חשמל", "החלפת לוח", "לוח פיצול", "מפסק ראשי", "סידור לוח", "גבס אדום", "גבס ורוד", "לוח משנה", "ממסר פחת", "12 מקום", "ברייקר", "מאובזר", "מקומות", "ביטון", "בריקר", "הורדת", "העתקת", "חיווט", "לוחות", "לחווט", "מיושן", "פיצול", "ארון", "לבטן", "מא\"ז", "משנה", "עה\"ט", "פילר", "שדות", "תה\"ט", "TMD", "גבס", "לוח", "מאז", "פחת", "פקט", "שדה"],
+  points: ["נקודת חשמל", "נקודת מאור", "טלוויזיה", "בית תקע", "מוליכים", "קופסאות", "כיריים", "מעגלים", "מרירון", "נקודות", "תקשורת", "השחלה", "חדרים", "חיווט", "מוליך", "מתגים", "נקודה", "נקודת", "קופסה", "שקעים", "דירה", "מדיח", "מטבח", "מעגל", "מפסק", "סלון", "תנור", "OSB", "דוד", "מתג", "נק'", "שקע"],
+  chiselling: ["דירה מאוכלסת", "פתיחת קיר", "להעביר", "להשחיל", "מרירון", "שרשורי", "העברה", "השחלה", "חציבה", "להזיז", "לחצוב", "מטרים", "מריכף", "סגירה", "סיתות", "קירות", "שיפוץ", "תעלות", "בטון", "בלוק", "הזזה", "הזזת", "חוצב", "חצוב", "לסתת", "מזיז", "תעלה", "תקרה", "גבס", "טיח", "מטר", "קיר"],
+  lighting: ["מאוורר תקרה", "גוף מדרגות", "גופי תאורה", "נקודת מאור", "תנור מקלחת", "מתג הדלקה", "צמוד תקרה", "שעון שבת", "תקרת גבס", "מאוורר", "מדרגות", "מנורות", "ספוטים", "פרגולה", "שנדליר", "גופים", "הדלקה", "מגורה", "מגורת", "מנורה", "מקלחת", "נברשת", "פס לד", "תאורה", "גופי", "דימר", "מאור", "מראה", "נורה", "ספוט", "צמוד", "שקוע", "תקרה", "LED", "led", "osb", "ג\"ת", "גבס", "גוף", "לד"],
+  accessories: ["תלת-פאזי לכיריים", "החלפת שקע", "מפסק ראשי", "מוגן מים", "שעון שבת", "אביזרים", "ברייקר", "כיריים", "מפסקים", "סוויץ'", "אביזר", "בריקר", "גוויס", "ניסקו", "סוויץ", "קופסה", "שקעים", "מא\"ז", "מגען", "ממסר", "מפסק", "פלנג", "תריס", "abb", "tmd", "דוד", "מתג", "פחת", "פקט", "שקע"],
+  earthing: ["השוואת פוטנציאלים", "מוליך הארקה", "לולאת תקלה", "מקור הארקה", "אלקטרודות", "פס השוואה", "צינור מים", "אלקטרודה", "צנרת מים", "התנגדות", "הארקות", "מריכון", "מרירון", "הארקה", "הארקת", "מוארק", "שוחה"],
+  ev: ["עמדת טעינה", "עמוד טעינה", "מטען לרכב", "רכב חשמלי", "ווליבוקס", "wallbox", "ווטבוקס", "וולבוקס", "משתלבות", "מטענים", "חניון", "טעינה", "עמדות", "11kW", "11kw", "22kW", "22kw", "חניה", "טסלה", "מטען", "עמדה", "עמדת", "פילר", "7kw", "פיר", "רכב"],
+  utility: ["הגדלת חיבור", "חברת החשמל", "חיבור חדש", "לוח פיצול", "לוח משנה", "תלת פאזי", "תלת-פאזי", "חד פאזי", "חד-פאזי", "להגדיל", "מחשבון", "פלומבה", "3X100", "3X125", "3x100", "3x125", "אגרות", "הגדלה", "חיבור", "חפירה", "ניתוק", "תיאום", "1X25", "1X40", "1x40", "3X25", "3X40", "3X63", "3X80", "3x25", "3x40", "3x63", "3x80", "אגרה", "אמפר", "חח\"י", "לנתק", "מונה", "פילר", "שעון", "חחי", "פיר"],
+  inspection: ["סימון מעגלים", "דוח ליקויים", "חשמלאי בודק", "בדיקת מתקן", "ליקויים", "חוקיות", "טופס 4", "מעגלים", "אישור", "בדיקה", "הסמכה", "מאושר", "מוסמך", "מיפוי", "סוג 2", "סוג 3", "סימון", "תסקיר", "תעודה", "בודק", "טופס", "מתקן", "דוח", "תקן"],
+  faults: ["קריאת שירות", "חשמל בקיר", "אין חשמל", "לא עובד", "רטיבות", "איתור", "ביקור", "הקפצה", "מהבהב", "מפסיק", "מתחמם", "סופ\"ש", "קריאה", "שירות", "תקלות", "דחוף", "לאתר", "מריח", "נופל", "נשרף", "קופץ", "שרוף", "תקלה", "נפל", "קצר"],
+  feeders: ["סולם כבלים", "תעלת כבלים", "כבל ראשי", "מטר אורך", "סייקונים", "תעלת רשת", "מוליכים", "קו הזנה", "מרירון", "סייקון", "שרשורי", "3x2.5", "3x240", "5x2.5", "כבלים", "לפרוס", "מוליך", "מריכף", "נחושת", "פריסה", "פריסת", "תעלות", "5x10", "גליל", "הזנה", "מזגן", "מנוף", "סולם", "תעלה", "240", "5x4", "5x6", "חתך", "כבל", "מ\"א"],
+  industrial: ["מבנה ציבורי", "עבודת לילה", "רכוש משותף", "לוח פיקוד", "ועד בית", "תעשייתי", "מכונות", "ציבורי", "תעשייה", "בניין", "בקרים", "מכונה", "מסחרי", "משמרת", "פיגום", "פיקוד", "3X63", "אולם", "בקרה", "מגען", "מחסן", "מנוע", "מנוף", "מסחר", "מפעל", "משרד", "עסקי", "PLC", "plc", "בקר"],
+  project: ["תמחור פרויקט", "הצעה מפורטת", "כתב כמויות", "הצעת מחיר", "בית פרטי", "מטר רבוע", "יחידות", "כמויות", "מכרזים", "סעיפים", "פרויקט", "תוכנית", "בנייה", "בניין", "מהנדס", "מסחרי", "פיקוח", "קומות", "שיפוץ", "תכנית", "הצעה", "וילה", "מכרז", "מפקח", "סעיף", "קבלן", "קומה", "יזם", "שלד"],
+  renovation: ["החלפת מוליכים", "קבלן שיפוצים", "3 חדרים", "4 חדרים", "5 חדרים", "כל הבית", "מוליכים", "אמבטיה", "הדירה", "חידוש", "מקלחת", "עיצוב", "ריצוף", "שיפוץ", "ארון", "דירה", "מחדש", "מטבח", "משפץ", "סלון"],
+};
+
+const esc = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const TOPIC_RE = Object.entries(TOPIC_WORDS).map(([t, ws]) => [t, new RegExp(ws.map(esc).join('|'))]);
+const TOPIC_STEMS = Object.entries(TOPIC_WORDS).map(([t, ws]) => [t, ws.map((w) => new RegExp(esc(w)))]);
+
+// Blocks whose usefulness is invisible in the user's wording. These are the
+// rules that govern how every OTHER number in the map is read — before or after
+// VAT, labour-only versus including material, the questions to ask before
+// quoting, the price-per-metre caveat. No trigger word can summon them, because
+// a man asking about a board does not type "how should I read your numbers".
+// They are never routed. They always go.
+const ALWAYS_KEEP = [
+  "## כללי-על",
+  "## חוקי כבלים",
+  "## תמחור לפי אורך",
+  "## עוגני עבודה נוספים",
+  "### הערת מקור, לא מספר",
+  "### מחיר למטר אינו אומר",
+  "### מה מקצוענים שואלים",
+  "### הכלל שחזר על עצמו",
+  "### כללי מקצוע שעלו שם"
+];
+
+// The turn side is deliberately generous: one word is enough to activate a
+// topic, because the cost of activating one too many is tokens and the cost of
+// missing one is the answer.
+function topicsIn(text) {
+  const t = String(text || '');
+  const found = new Set();
+  for (const [topic, re] of TOPIC_RE) if (re.test(t)) found.add(topic);
+  return found;
 }
+
+// The BLOCK side cannot be that generous, and this is the asymmetry that makes
+// the whole thing work. Matching the heading is enough — the headings here are
+// written to describe their contents. But in the body one word is not: a board
+// block that says "מטבח" once is not a kitchen block, and if it were labelled
+// one, every question naming a room would drag the entire map back in. Measured:
+// single-word body matching kept 67% of the map on a typical question, which is
+// barely a saving at all. Two DISTINCT stems is the line between "this block is
+// about X" and "this block mentions X in passing".
+//
+// A block that still matches nothing is not a failure — it is kept on every
+// turn. That is where the provenance headers land ("anchors from the pricing
+// group, July-August 2026"), and they should always go.
+function blockTopics(block, heading) {
+  const found = topicsIn(heading);
+  for (const [topic, stems] of TOPIC_STEMS) {
+    if (found.has(topic)) continue;
+    let n = 0;
+    for (const re of stems) { if (re.test(block)) n++; if (n >= 2) break; }
+    if (n >= 2) found.add(topic);
+  }
+  return found;
+}
+
+// The map, routed to what this turn can actually use.
+export function trimPricingMap(map, userText) {
+  const active = topicsIn(userText);
+  if (!active.size) return map;   // understood nothing -> withhold nothing
+
+  const src = String(map);
+  const blocks = src.split(/\n(?=#{1,3} )/);
+  const heads = blocks.map((b) => b.split('\n')[0]);
+
+  const keep = blocks.map((b, i) => {
+    const h = heads[i];
+    if (!h.startsWith('#')) return true;                       // preamble
+    if (/^# /.test(h)) return true;                            // the map's own title
+    if (ALWAYS_KEEP.some((a) => h.startsWith(a))) return true;
+    const mine = blockTopics(b, h);
+    if (!mine.size) return true;                               // unlabelled -> always
+    for (const t of mine) if (active.has(t)) return true;
+    return false;
+  });
+
+  // A "## " heading is not decoration, it is the provenance of everything under
+  // it — which group, which date, and in one case "these override conflicting
+  // numbers above". Keeping a "### " child while dropping its parent strips the
+  // ruling that tells the model how much to trust the child. So a kept child
+  // pulls its parent back in.
+  let parent = -1;
+  for (let i = 0; i < blocks.length; i++) {
+    if (/^## /.test(heads[i])) parent = i;
+    else if (/^### /.test(heads[i]) && keep[i] && parent >= 0) keep[parent] = true;
+  }
+
+  const out = blocks.filter((_, i) => keep[i]);
+  return out.length === blocks.length ? src : out.join('\n');
+}
+
+// Exported for the tests, which assert real questions keep the blocks that
+// answer them — the only check that can catch a lexicon gap.
+export const __router = { TOPIC_WORDS, ALWAYS_KEEP, topicsIn, blockTopics };
 
 export async function getPricingMap(env) {
   try {

@@ -154,8 +154,16 @@ async function handleChat(context) {
   // per day, not requests per day, and this block is the one thing that went
   // out on every single call — including "שלום", which cannot use a word of it.
   const turnText = lastUserText(body.messages);
+  // Routing reads a WIDER window than the triviality check does, and that gap is
+  // deliberate. "וכמה זה עם חציבה?" is a complete question to anyone who watched
+  // you ask about a board three turns ago; a router seeing only the last two
+  // messages would hand back the chiselling blocks and drop every board one,
+  // which is the exact failure this whole mechanism must not have. A wider
+  // window can only ever activate MORE topics, never fewer, so it costs a little
+  // context and cannot cost an answer.
+  const routeText = recentUserText(body.messages, 4);
   const fullMap = await getPricingMap(env);
-  const pricingMap = isTrivialTurn(turnText) ? '' : trimPricingMap(fullMap, turnText);
+  const pricingMap = isTrivialTurn(turnText) ? '' : trimPricingMap(fullMap, routeText);
   // PHOTOS ARE A PAID CAPABILITY, AND THIS IS THE ONLY PLACE THAT CAN SAY SO.
   // The browser has a chatPhotos flag in its own tier table and hides the camera
   // button — and that was the entire enforcement. The server never looked, so a
@@ -271,13 +279,20 @@ async function handleChat(context) {
 // ("כמה מקום צריך?"), not just by naming the board.
 const PANEL_JOB = /לוח חשמל|לוח דירתי|החלפת לוח|ארון חשמל|מודול|מקומות בלוח|מא"ז|מאז|ממסר פחת|מגען|שעון שבת|תלת פאזי|תלת-פאזי/;
 
-function lastUserText(messages) {
+function recentUserText(messages, turns) {
   return (messages || [])
     .filter((m) => m && m.role === 'user' && typeof m.content === 'string')
-    .slice(-2)
+    .slice(-turns)
     .map((m) => m.content)
     .join(' ')
-    .slice(0, 2000);
+    .slice(0, 4000);
+}
+
+// Two turns, for deciding whether this turn is a greeting. Kept narrow on
+// purpose: a thread that has been running for ten messages is still allowed to
+// end with "תודה" and get no map.
+function lastUserText(messages) {
+  return recentUserText(messages, 2).slice(0, 2000);
 }
 
 function json(obj, status) {

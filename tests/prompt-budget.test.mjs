@@ -38,9 +38,14 @@ test('anything that could be a job keeps everything', () => {
 
 test('the utility fee tables go only where they can be used', () => {
   const full = DEFAULT_PRICING_MAP;
-  // A turn about the utility keeps them.
+  // A turn about the utility keeps them. This used to assert the whole map came
+  // back, because the trim's only job was removing these tables. It is a topic
+  // router now, so a utility turn gets the utility blocks and drops the lighting
+  // and industrial ones — what must still hold is that the TABLES are there.
   for (const t of ['הגדלת חיבור מ-1x40 ל-3x25', 'לוח פיצול', 'צריך להזמין את חח"י', 'מונה נפרד']) {
-    assert.equal(trimPricingMap(full, t).length, full.length, `dropped the fee tables on: ${t}`);
+    const out = trimPricingMap(full, t);
+    assert.ok(out.includes('## אגרות חברת החשמל'), `dropped the fee tables on: ${t}`);
+    assert.ok(out.includes('### הגדלת חיבור · מגורים'), `dropped a fee table body on: ${t}`);
   }
   // A turn that cannot use them does not carry them.
   const trimmed = trimPricingMap(full, 'התקנת 6 גופי תאורה בתקרת גבס');
@@ -49,21 +54,39 @@ test('the utility fee tables go only where they can be used', () => {
 });
 
 test('trimming never damages the rest of the map', () => {
-  // The parts that carry Stav's own corrections must survive every trim, or the
-  // saving costs a wrong price.
+  // Stav's own corrections must survive, but "survive" now means something more
+  // precise than it did. Under the old trim every block outside the fee tables
+  // came back on every turn, so listing four load-bearing strings was a fair
+  // check. A topic router is allowed — required — to drop the inspector's fee
+  // from a lighting question. What may NEVER be dropped is the universal layer
+  // and the provenance heading that gives a kept block its standing.
   const trimmed = trimPricingMap(DEFAULT_PRICING_MAP, 'התקנת גופי תאורה');
-  for (const must of ['תיקוני שטח מסתיו', 'חוקי כבלים', 'בלוק: ~700', 'חשמלאי בודק']) {
-    assert.ok(trimmed.includes(must), `the trim removed something load-bearing: ${must}`);
+  for (const must of ['## חוקי כבלים', '## כללי-על', '## עוגני עבודה נוספים']) {
+    assert.ok(trimmed.includes(must), `the trim removed something universal: ${must}`);
   }
+  // The lighting block was kept, so the heading that says these numbers OVERRIDE
+  // the conflicting ones above it has to come with it.
+  assert.ok(trimmed.includes('### התקנת גופי תאורה'), 'precondition: the lighting block is kept');
+  assert.ok(trimmed.includes('## תיקוני שטח מסתיו'), 'kept a subsection but dropped its ruling parent');
   // And the section boundary is respected — no half-table left behind.
   assert.ok(!/### הגדלת חיבור/.test(trimmed), 'half a fee section survived');
 });
 
-test('the חח"י call-out fee survives, because it is not a utility TABLE', () => {
-  // Stav's 300-per-visit rule lives above the fee tables and applies to any
-  // panel job. Losing it with the tables would re-open the 600 ₪ hole he found.
-  const trimmed = trimPricingMap(DEFAULT_PRICING_MAP, 'התקנת גופי תאורה');
-  assert.ok(trimmed.includes('~300 ₪'), 'the call-out fee was trimmed away with the tables');
+test('the חח"י call-out fee reaches every job that can incur it', () => {
+  // Stav's 300-per-visit rule applies to any PANEL job, and losing it re-opens
+  // the 600 ₪ hole he found. It lives in "### הזמנת חח"י לניתוק ולחיבור",
+  // which the router labels boards + utility + project — so every turn that
+  // could actually incur the fee still carries it.
+  for (const t of ['החלפת לוח דירתי', 'הגדלת חיבור', 'לוח חדש בדירה', 'צריך לנתק את המונה']) {
+    assert.ok(trimPricingMap(DEFAULT_PRICING_MAP, t).includes('~300 ₪'),
+      `the call-out fee did not reach: ${t}`);
+  }
+  // It is legitimately absent from a job that cannot incur it. Under the old
+  // binary trim this block came back on every turn including this one; that was
+  // never a decision, it was just what "drop only the fee tables" happened to do.
+  const lighting = trimPricingMap(DEFAULT_PRICING_MAP, 'התקנת גופי תאורה');
+  assert.ok(!lighting.includes('הזמנת חח"י לניתוק ולחיבור'),
+    'a pure lighting turn does not need the IEC disconnect-and-reconnect fee');
 });
 
 // ── The catalogue index, ranked against the job ──────────────────────────────
