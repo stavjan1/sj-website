@@ -3684,6 +3684,13 @@ const ISSUE_STATUS_AFTER = {
     InvoiceReceipt: 'שולם',
 };
 
+// Set by issueDocFromQuote, consumed once when a document is actually created.
+// Declared BEFORE its writer: `let` hoists into a temporal dead zone, so having
+// the assignment above the declaration is legal only because neither runs until
+// the script has finished loading — which is exactly the kind of thing that
+// reads like a bug to the next person.
+let _pendingIssueStatus = null;
+
 function issueDocFromQuote(docType) {
     if (!invoicingAllowed()) { showUpgradeModal('invoicing'); return; }
     const id = activeProjectId;
@@ -3695,8 +3702,6 @@ function issueDocFromQuote(docType) {
     openAccountingForProject(id, docType);
 }
 
-// Set by issueDocFromQuote, consumed once by the create flow on success.
-let _pendingIssueStatus = null;
 function applyIssueStatusIfPending(projectId) {
     if (!_pendingIssueStatus || !projectId) return;
     const status = _pendingIssueStatus;
@@ -5174,11 +5179,25 @@ async function acctSubmitDocument() {
         };
         invoicesList.unshift(doc);
         saveInvoices();
+        // THE JOB MOVED, SO THE BOARD MOVES. Issuing a document is the moment an
+        // electrician tells you the work advanced — making him then go and set a
+        // status by hand is how the board goes stale, and a stale board is the
+        // whole problem the working list was built to solve.
+        //
+        // Here and not in issueDocFromQuote: the status must follow the DOCUMENT
+        // being created, not the form being opened. Someone who opens the form
+        // and closes it has not billed anybody.
+        //
+        // doc.projectId, captured above before acctDraftProjectId is cleared.
+        try { applyIssueStatusIfPending(doc.projectId); } catch (e) {}
         acctItems = []; acctDraftProjectId = ''; acctVatBasis = 'exclude';
         switchAcctSection('documents');
         showToast(synchronous ? 'המסמך הופק' : 'המסמך נשלח להפקה · ממתין לאישור הספק');
         if (!synchronous && doc.apiMessageId) setTimeout(() => acctPollDocument(doc.id), 2500);
     } catch (e) {
+        // A failed issue must not leave the intent armed: the next document
+        // created for any reason would inherit this one's status change.
+        _pendingIssueStatus = null;
         showToast('שגיאה: ' + e.message, 'error');
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> הפק ב-SmartBee'; }
     }
