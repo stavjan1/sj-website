@@ -1097,6 +1097,23 @@
                                     <i class="fa-solid fa-floppy-disk"></i>
                                     <span>שמור פרויקט</span>
                                 </button>
+                                <!-- THE LINE FROM THE QUOTE TO THE MONEY. Stav, 30/08:
+                                     "בפרויקט ילחצו 'הנפקת חשבון עסקה' זה אוטומטית ישנה
+                                     סטטוס לביצוע וגם ינפיק על ידי הAPI שלו."
+                                     Here, not in the money screen, because this is where the
+                                     job ENDS — you have just made the quote, and the next
+                                     honest question is what you send when he says yes.
+                                     Visible to everyone; the click explains diamond. -->
+                                <button class="btn btn-secondary btn-issue" onclick="issueDocFromQuote('DealInvoice')"
+                                        title="חשבון עסקה · לפני התשלום, מסמך שאינו חשבונית מס">
+                                    <i class="fa-solid fa-file-signature"></i>
+                                    <span>הנפקת חשבון עסקה</span>
+                                </button>
+                                <button class="btn btn-secondary btn-issue" onclick="issueDocFromQuote('Invoice')"
+                                        title="חשבונית מס">
+                                    <i class="fa-solid fa-file-invoice"></i>
+                                    <span>הנפקת חשבונית</span>
+                                </button>
                                 <!-- The inspection report left the project rail (three steps is
                                      three steps); it is reached from here, where someone
                                      actually thinks of it. -->

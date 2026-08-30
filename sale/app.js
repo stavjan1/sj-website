@@ -3665,6 +3665,47 @@ const PROJECT_RAIL_DOCS = [
 ];
 
 
+// THE ONE PRESS THAT MOVES A JOB FROM "QUOTED" TO "BILLED".
+//
+// Stav, 30/08: "בפרויקט ילחצו 'הנפקת חשבון עסקה' זה אוטומטית ישנה סטטוס לביצוע
+// וגם ינפיק על ידי הAPI שלו." Both halves matter and the second is the one that
+// is usually missed: an electrician who issues a document has, in that moment,
+// told you the job moved — and making him then go and update a status by hand is
+// how the board goes stale.
+//
+// PROJECT_RAIL_DOCS was declared for this months ago and referenced from nowhere
+// — dead code, which is why no such button ever existed.
+const ISSUE_STATUS_AFTER = {
+    // חשבון עסקה is sent BEFORE the money arrives: it means he took the job.
+    DealInvoice: 'הושלם',
+    Invoice: 'הושלם',
+    // A receipt is money in hand.
+    Receipt: 'שולם',
+    InvoiceReceipt: 'שולם',
+};
+
+function issueDocFromQuote(docType) {
+    if (!invoicingAllowed()) { showUpgradeModal('invoicing'); return; }
+    const id = activeProjectId;
+    if (!id) { showToast('אין פרויקט פעיל', 'error'); return; }
+    // The status moves when the DOCUMENT IS ACTUALLY CREATED, not when the form
+    // opens — otherwise closing the form without issuing leaves a job marked as
+    // billed. acctCreateDocument reports success back through here.
+    _pendingIssueStatus = ISSUE_STATUS_AFTER[docType] || null;
+    openAccountingForProject(id, docType);
+}
+
+// Set by issueDocFromQuote, consumed once by the create flow on success.
+let _pendingIssueStatus = null;
+function applyIssueStatusIfPending(projectId) {
+    if (!_pendingIssueStatus || !projectId) return;
+    const status = _pendingIssueStatus;
+    _pendingIssueStatus = null;
+    const proj = (projectsList || []).find((p) => p.id === projectId);
+    if (!proj || proj.status === status) return;
+    setProjectStatus(projectId, status);
+}
+
 // Jump from a project straight into the accounting create form, prefilled.
 function openAccountingForProject(projectId, docType) {
     acctDraftProjectId = projectId;
