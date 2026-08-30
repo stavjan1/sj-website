@@ -469,11 +469,11 @@ const TIER_FALLBACK = {
     // 3 — kept in step with functions/api/_tiers.js by hand, because the client
     // needs a number before the server has answered anything. The SERVER is the
     // authority: this copy only decides what the UI says, never what is allowed.
-    guest:    { aiDaily: 3,   projects: 1,  quotesPerMonth: 0,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true },
-    free:     { aiDaily: 20,  projects: 3,  quotesPerMonth: 3,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true },
-    pro:      { aiDaily: 150, projects: -1, quotesPerMonth: -1, catalogItems: 1000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  chatPhotos: true,   pdfCredit: false },
-    business: { aiDaily: 300, projects: -1, quotesPerMonth: -1, catalogItems: 2000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  chatPhotos: true,   pdfCredit: false },
-    admin:    { aiDaily: -1,  projects: -1, quotesPerMonth: -1, catalogItems: 5000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  chatPhotos: true,   pdfCredit: false }
+    guest:    { aiDaily: 3,   projects: 1,  quotesPerMonth: 0,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true , invoicing: false },
+    free:     { aiDaily: 20,  projects: 3,  quotesPerMonth: 3,  catalogItems: 10,   reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true , invoicing: false },
+    pro:      { aiDaily: 150, projects: -1, quotesPerMonth: -1, catalogItems: 1000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  chatPhotos: true,   pdfCredit: false , invoicing: false },
+    business: { aiDaily: 300, projects: -1, quotesPerMonth: -1, catalogItems: 2000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  chatPhotos: true,   pdfCredit: false , invoicing: true },
+    admin:    { aiDaily: -1,  projects: -1, quotesPerMonth: -1, catalogItems: 5000, reports: true,  reminders: true,  shareLink: true,  advancedModel: true,  chatPhotos: true,   pdfCredit: false, invoicing: true }
 };
 let userTier = { tier: 'guest', limits: TIER_FALLBACK.guest, usage: { aiToday: 0, quotesThisMonth: 0 } };
 let selectedModelClass = 'basic'; // 'basic' | 'advanced' — the only model vocabulary the browser knows
@@ -624,6 +624,9 @@ function applyReportsLock() {
 
 // ---- Upgrade screen ----
 const UPGRADE_REASONS = {
+    // Diamond, not Pro: gold is how well you PRICE, diamond is what happens
+    // after they say yes — invoices, providers, cash flow, banks.
+    invoicing: 'הפקת חשבוניות וחיבור לספק שלך, במסלול דיימונד 💎',
     general:  'כל היכולות של זרם, במסלול אחד פשוט',
     projects: 'הגעת למכסת הפרויקטים של המסלול החינמי',
     quotes:   'הגעת למכסת ההצעות שנשמרות בענן החודש',
@@ -5213,7 +5216,22 @@ let _acctProviderSel = null;
 async function acctLoadProvider() {
     const root = document.getElementById('acct-provider-root');
     if (!root) return;
-    if (!googleAccessToken) { root.innerHTML = '<p class="input-help">מתחבר… נסה שוב עוד רגע.</p>'; return; }
+    // EVERYONE SEES THE COMPANIES. Stav, 30/08: "שהכפתורים יופיעו לכולם ולחיצה
+    // עליהם תגיד שזה למשתמשי דיימונד." A locked feature you cannot see is a
+    // feature nobody upgrades for — he has to recognise his own accounting
+    // software in the list before "דיימונד" means anything to him.
+    //
+    // /api/billing needs a token to know WHOSE credentials are stored, so
+    // without one we still draw the grid from the registry the server publishes,
+    // just with nothing selected.
+    if (!googleAccessToken) {
+        // _acctProviders starts as null, not [] — reading .length on it threw,
+        // silently, inside an async function, and left the grid empty for
+        // exactly the signed-out visitor this branch exists to serve.
+        _acctProviders = (_acctProviders && _acctProviders.length) ? _acctProviders : PROVIDER_FALLBACK;
+        acctRenderProvider(null);
+        return;
+    }
     try {
         const res = await fetch('/api/billing', { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
         const d = await res.json();
@@ -5225,14 +5243,29 @@ async function acctLoadProvider() {
         root.innerHTML = `<p class="input-help" style="color:var(--danger);">שגיאה: ${e.message}</p>`;
     }
 }
+// Drawn from the server's own registry when we cannot ask for it — the names
+// only, so the grid is never empty for someone who has not signed in yet.
+const PROVIDER_FALLBACK = [
+    { id: 'smartbee', name: 'SmartBee', status: 'active', note: 'ברירת המחדל של זרם.' },
+    { id: 'greeninvoice', name: 'Green Invoice (morning)', status: 'active', note: 'החיבור העצמי הנפוץ ביותר.' },
+    { id: 'ezcount', name: 'EZcount (חשבונית אונליין)', status: 'active', note: 'החיסכוני.' },
+    { id: 'sumit', name: 'SUMIT', status: 'active', note: 'עם בונוס סוכן וואטסאפ להוצאות.' },
+    { id: 'icount', name: 'iCount', status: 'active', note: 'ותיק ונפוץ אצל רואי חשבון.' },
+];
+
+function invoicingAllowed() {
+    try { return isAdmin() || tierAllows('invoicing'); } catch (e) { return false; }
+}
+
 function acctRenderProvider(current) {
     const root = document.getElementById('acct-provider-root');
     if (!root) return;
+    const locked = !invoicingAllowed();
     const cards = (_acctProviders || []).map(p => {
-        const sel = p.id === _acctProviderSel;
+        const sel = !locked && p.id === _acctProviderSel;
         const soon = p.status !== 'active' ? ' <span class="prov-soon">בקרוב</span>' : '';
         const badge = p.badge ? ` <span class="prov-badge">${escapeHtml(p.badge)}</span>` : '';
-        return `<button class="prov-card ${sel ? 'sel' : ''}" onclick="acctSelectProvider('${p.id}')">
+        return `<button class="prov-card ${sel ? 'sel' : ''}${locked ? ' is-locked' : ''}" onclick="acctSelectProvider('${p.id}')">
             <span class="prov-name">${escapeHtml(p.name)}${soon}${badge}</span>
             <span class="prov-note">${escapeHtml(p.note || '')}</span>
         </button>`;
@@ -5243,6 +5276,21 @@ function acctRenderProvider(current) {
         if (f.type === 'checkbox') return `<label class="prov-field prov-check"><input type="checkbox" id="prov-${f.key}"> ${escapeHtml(f.label)}</label>`;
         return `<label class="prov-field">${escapeHtml(f.label)}<input id="prov-${f.key}" type="${isSecret(f.key) ? 'password' : 'text'}" dir="ltr" placeholder="${f.optional ? 'לא חובה' : ''}"></label>`;
     }).join('');
+    if (locked) {
+        // The whole grid, readable, and one sentence saying what opens it. No
+        // credential fields: there is nothing useful to type yet, and an input
+        // that discards what you put in it is worse than no input.
+        root.innerHTML = `
+            <div class="acct-sub">חיבור לספק החשבוניות שלך</div>
+            <p class="input-help">מחברים את התוכנה שכבר יש לך, וזרם מפיק דרכה חשבוניות אמיתיות — ישירות מהפרויקט, בלי להקליד פעמיים.</p>
+            <div class="prov-cards">${cards}</div>
+            <div class="prov-locked-note">
+                <i class="fa-solid fa-gem" aria-hidden="true"></i>
+                <span>הפקת חשבוניות וחיבור לספק — במסלול דיימונד 💎</span>
+                <button class="btn btn-accent btn-small" onclick="showUpgradeModal('invoicing')">מה יש בדיימונד</button>
+            </div>`;
+        return;
+    }
     root.innerHTML = `
         <div class="acct-sub">בחר ספק חשבוניות</div>
         <div class="prov-cards">${cards}</div>
@@ -5250,7 +5298,14 @@ function acctRenderProvider(current) {
         ${current && current.hasCredentials ? '<p class="input-help" style="color:var(--ok-text);margin-top:6px;">✓ פרטי חיבור שמורים</p>' : ''}
         <button class="btn btn-accent btn-small" style="margin-top:12px;" onclick="acctSaveProvider()"><i class="fa-solid fa-check"></i> שמור ספק</button>`;
 }
-function acctSelectProvider(id) { _acctProviderSel = id; acctRenderProvider(null); }
+function acctSelectProvider(id) {
+    // Pressing a company you recognise is the moment the plan means something,
+    // so that press is what opens the upgrade — not a disabled card that does
+    // nothing and teaches you the screen is broken.
+    if (!invoicingAllowed()) { showUpgradeModal('invoicing'); return; }
+    _acctProviderSel = id;
+    acctRenderProvider(null);
+}
 async function acctSaveProvider() {
     const selMeta = (_acctProviders || []).find(p => p.id === _acctProviderSel);
     const credentials = {};

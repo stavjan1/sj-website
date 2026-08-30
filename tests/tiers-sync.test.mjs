@@ -87,3 +87,29 @@ test('a paid capability is enforced where it cannot be edited — on the server'
     assert.match(chat, /images: undefined/,
         'images are no longer stripped for a tier that may not send them');
 });
+
+test('invoicing is a diamond capability, enforced on the server and named in both tables', () => {
+    // Stav, 30/08: "לחיצה עליהם תגיד שזה למשתמשי דיימונד." Invoicing moved out of
+    // gold on that call, and the server used to decide it with a hardcoded
+    // `tier !== 'pro' && tier !== 'business'` — two places to change, one of
+    // which would have been missed.
+    const inv = readFileSync(new URL('../functions/api/invoice.js', import.meta.url), 'utf8');
+    assert.match(inv, /limits\.invoicing !== true/,
+        'the invoice endpoint no longer gates on the capability');
+    assert.doesNotMatch(inv, /tier !== 'pro'/,
+        'the invoice endpoint is naming tiers again instead of reading the flag');
+
+    // business true, pro/free/guest false — on BOTH sides.
+    const seg = (src, from, to) => src.slice(src.indexOf(from), src.indexOf(to));
+    for (const [label, src, pro, biz] of [
+        ['server', SERVER, 'pro: {', 'business: {'],
+        ['client', APP, 'pro:      {', 'business: {'],
+    ]) {
+        assert.match(seg(src, pro, biz), /invoicing: false/,
+            `${label}: gold still has invoicing`);
+    }
+    assert.match(SERVER.slice(SERVER.indexOf('business: {')), /invoicing: true/,
+        'server: diamond lost invoicing');
+    assert.match(APP.slice(APP.indexOf('business: {')), /invoicing: true/,
+        'client: diamond lost invoicing');
+});

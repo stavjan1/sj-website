@@ -6112,3 +6112,28 @@ th.pv-price { text-align: end; }
     #panel-projects .project-search-row .sort-toggles { flex: 0 0 auto; }
     .project-search-input-wrap { flex: 1 1 100%; order: -1; }
 }
+
+/* The provider grid, seen by everyone and openable by Diamond.
+   --------------------------------------------------------------------------
+   Stav, 30/08: "שהכפתורים יופיעו לכולם ולחיצה עליהם תגיד שזה למשתמשי דיימונד."
+   A locked feature nobody can see is a feature nobody upgrades for — he has to
+   find HIS accounting software in this list before the word דיימונד means
+   anything to him. So the cards stay legible and only lose their affordance. */
+.prov-card.is-locked { opacity: 0.72; cursor: pointer; }
+.prov-card.is-locked:hover { opacity: 1; border-color: var(--accent); }
+
+.prov-locked-note {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--sp-3);
+    margin-block-start: var(--sp-4);
+    padding: var(--sp-3) var(--sp-4);
+    border: 1px solid var(--accent);
+    border-radius: var(--r-md);
+    background: var(--accent-soft);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+}
+.prov-locked-note > span { flex: 1 1 200px; }
+.prov-locked-note .fa-gem { color: var(--accent); }

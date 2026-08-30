@@ -20,6 +20,13 @@ export const ADMIN_EMAIL = 'stavjan19989@gmail.com';
 //   shareLink      — public share-link for quotes
 //   advancedModel  — access to the "advanced ⚡" model class
 //   pdfCredit      — whether PDFs carry the "הופק באמצעות זרם" credit line
+//   invoicing      — connect your own invoicing provider and issue real tax
+//                    documents through its API. DIAMOND ONLY, on Stav's call
+//                    (30/08): "לחיצה עליהם תגיד שזה למשתמשי דיימונד".
+//                    The line the plans draw: gold is how well you PRICE
+//                    (photos, the better model, unlimited questions); diamond is
+//                    what happens after they say yes — invoices, providers,
+//                    cash flow, banks.
 export const TIER_DEFAULTS = {
   guest: {
     // 10 → 25 (21.8.2026) → 100 (22.8.2026), both at Stav's request. This is
@@ -33,25 +40,25 @@ export const TIER_DEFAULTS = {
     // job of the guest tier. Stav, 29/08: nudge after the second, lock after
     // the third. Tunable from KV without a deploy.
     aiDaily: 3, projects: 1, quotesPerMonth: 0, catalogItems: 10,
-    reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true,
+    reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true, invoicing: false,
   },
   free: {
     // quotesPerMonth = distinct PDF exports allowed per month (monthly-renewing,
     // server-enforced per Google account; guests can't export at all).
     aiDaily: 20, projects: 3, quotesPerMonth: 3, catalogItems: 10,
-    reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true,
+    reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true, invoicing: false,
   },
   pro: {
     aiDaily: 150, projects: -1, quotesPerMonth: -1, catalogItems: 1000,
-    reports: true, reminders: true, shareLink: true, advancedModel: true, chatPhotos: true, pdfCredit: false,
+    reports: true, reminders: true, shareLink: true, advancedModel: true, chatPhotos: true, pdfCredit: false, invoicing: false,
   },
   business: {
     aiDaily: 300, projects: -1, quotesPerMonth: -1, catalogItems: 2000,
-    reports: true, reminders: true, shareLink: true, advancedModel: true, chatPhotos: true, pdfCredit: false,
+    reports: true, reminders: true, shareLink: true, advancedModel: true, chatPhotos: true, pdfCredit: false, invoicing: true,
   },
   admin: {
     aiDaily: -1, projects: -1, quotesPerMonth: -1, catalogItems: 5000,
-    reports: true, reminders: true, shareLink: true, advancedModel: true, chatPhotos: true, pdfCredit: false,
+    reports: true, reminders: true, shareLink: true, advancedModel: true, chatPhotos: true, pdfCredit: false, invoicing: true,
   },
 };
 

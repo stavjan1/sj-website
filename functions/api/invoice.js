@@ -10,7 +10,7 @@
 // a real per-user cost) and is capped at ₪5,000/doc for now (see _smartbee.js).
 
 import {
-  ADMIN_EMAIL, adminGate, getTierForEmail, verifyGoogleEmail, bearerToken, jsonResponse,
+  ADMIN_EMAIL, adminGate, getTierForEmail, loadTierConfig, verifyGoogleEmail, bearerToken, jsonResponse,
 } from './_tiers.js';
 import { smartbeeAuth, smartbeeCall, sbVatOption, SB_MAX_DOC } from './_smartbee.js';
 import { getUserBilling, isProviderActive, providerMeta } from './_providers.js';
@@ -24,8 +24,13 @@ async function requirePayingUser(context) {
   if (!email) return { error: jsonResponse({ error: { message: 'נדרשת התחברות.' } }, 401) };
   const isAdmin = email.toLowerCase() === ADMIN_EMAIL;
   const tier = await getTierForEmail(context.env, email);
-  if (!isAdmin && tier !== 'pro' && tier !== 'business') {
-    return { error: jsonResponse({ error: { message: 'הפקת חשבוניות זמינה במסלול Pro/עסקי.', code: 'TIER' } }, 403) };
+  // Reads the capability rather than naming tiers: invoicing moved from
+  // "pro or business" to diamond only on 30/08, and a hardcoded pair of tier
+  // names is how one of the two places that decide this gets missed.
+  const cfg = await loadTierConfig(context.env);
+  const limits = (cfg && (cfg[tier] || cfg.free)) || {};
+  if (!isAdmin && limits.invoicing !== true) {
+    return { error: jsonResponse({ error: { message: 'הפקת חשבוניות זמינה במסלול דיימונד.', code: 'TIER', need: 'business' } }, 403) };
   }
   return { email, isAdmin, tier };
 }
