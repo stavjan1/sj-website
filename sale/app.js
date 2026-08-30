@@ -4029,7 +4029,7 @@ const VAT_ONLINE_GRACE_DAY = 19; // online filing; after this the reminder is mo
 function vatPeriodDue(mode, y, m) {
     if (mode === 'monthly') {
         const prev = m === 0 ? { y: y - 1, m: 11 } : { y, m: m - 1 };
-        return { label: HE_MONTHS[prev.m] + ' ' + prev.y, key: `${prev.y}-${String(prev.m + 1).padStart(2, '0')}` };
+        return { label: VAT_MONTHS[prev.m] + ' ' + prev.y, key: `${prev.y}-${String(prev.m + 1).padStart(2, '0')}` };
     }
     if (mode === 'bimonthly') {
         // Filing months are the odd ones: a period ending in an even month
@@ -4038,15 +4038,21 @@ function vatPeriodDue(mode, y, m) {
         if (endsPrev.m % 2 !== 1) return null;          // period must END in Feb/Apr/Jun/Aug/Oct/Dec
         const startsPrev = { y: endsPrev.y, m: endsPrev.m - 1 };
         return {
-            label: HE_MONTHS[startsPrev.m] + '–' + HE_MONTHS[endsPrev.m] + ' ' + endsPrev.y,
+            label: VAT_MONTHS[startsPrev.m] + '–' + VAT_MONTHS[endsPrev.m] + ' ' + endsPrev.y,
             key: `${endsPrev.y}-${String(endsPrev.m + 1).padStart(2, '0')}-bi`,
         };
     }
     return null;
 }
 
-const HE_MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
-                   'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+// VAT_MONTHS, not HE_MONTHS: sale/admin.js already declares a top-level
+// `const HE_MONTHS` (abbreviated forms, for its charts), and every sale/*.js
+// shares ONE global scope. Two top-level consts with the same name is a
+// SyntaxError, and a SyntaxError does not fail the line — it kills the WHOLE
+// FILE. This shipped in c30d9c1 and took the entire admin panel down with it;
+// nothing on screen said so, because the file that died was the other one.
+const VAT_MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+                    'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
 
 function vatReportingMode() {
     const biz = (appState.settings && appState.settings.businessDetails) || {};
