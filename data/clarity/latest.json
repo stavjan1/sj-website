@@ -1,13 +1,13 @@
 {
   "ok": true,
-  "fetchedAt": 1787924223554,
-  "cached": true,
+  "fetchedAt": 1788161697121,
+  "cached": false,
   "data": [
     {
       "metricName": "DeadClickCount",
       "information": [
         {
-          "sessionsCount": 3,
+          "sessionsCount": 10,
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
           "pagesViews": 0,
@@ -19,7 +19,7 @@
       "metricName": "ExcessiveScroll",
       "information": [
         {
-          "sessionsCount": 3,
+          "sessionsCount": 10,
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
           "pagesViews": 0,
@@ -31,7 +31,7 @@
       "metricName": "RageClickCount",
       "information": [
         {
-          "sessionsCount": "3",
+          "sessionsCount": "10",
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
           "pagesViews": "0",
@@ -43,7 +43,7 @@
       "metricName": "QuickbackClick",
       "information": [
         {
-          "sessionsCount": "3",
+          "sessionsCount": "10",
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
           "pagesViews": "0",
@@ -55,7 +55,7 @@
       "metricName": "ScriptErrorCount",
       "information": [
         {
-          "sessionsCount": 3,
+          "sessionsCount": 10,
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
           "pagesViews": 0,
@@ -67,11 +67,11 @@
       "metricName": "ErrorClickCount",
       "information": [
         {
-          "sessionsCount": "3",
+          "sessionsCount": 10,
           "sessionsWithMetricPercentage": 0,
           "sessionsWithoutMetricPercentage": 100,
-          "pagesViews": "0",
-          "subTotal": "0"
+          "pagesViews": 0,
+          "subTotal": 0
         }
       ]
     },
@@ -79,7 +79,7 @@
       "metricName": "ScrollDepth",
       "information": [
         {
-          "averageScrollDepth": null
+          "averageScrollDepth": 16
         }
       ]
     },
@@ -87,10 +87,10 @@
       "metricName": "Traffic",
       "information": [
         {
-          "totalSessionCount": "3",
-          "totalBotSessionCount": "1",
-          "distinctUserCount": "3",
-          "pagesPerSessionPercentage": 2.5
+          "totalSessionCount": 10,
+          "totalBotSessionCount": 5,
+          "distinctUserCount": 6,
+          "pagesPerSessionPercentage": 2
         }
       ]
     },
@@ -98,8 +98,8 @@
       "metricName": "EngagementTime",
       "information": [
         {
-          "totalTime": "8",
-          "activeTime": "0"
+          "totalTime": "69",
+          "activeTime": "3"
         }
       ]
     },
@@ -108,7 +108,11 @@
       "information": [
         {
           "name": "Chrome",
-          "sessionsCount": "3"
+          "sessionsCount": 8
+        },
+        {
+          "name": "ChromeMobile",
+          "sessionsCount": 2
         }
       ]
     },
@@ -117,7 +121,11 @@
       "information": [
         {
           "name": "PC",
-          "sessionsCount": "3"
+          "sessionsCount": "8"
+        },
+        {
+          "name": "Mobile",
+          "sessionsCount": "2"
         }
       ]
     },
@@ -126,7 +134,11 @@
       "information": [
         {
           "name": "Windows",
-          "sessionsCount": "3"
+          "sessionsCount": "8"
+        },
+        {
+          "name": "Android",
+          "sessionsCount": "2"
         }
       ]
     },
@@ -135,7 +147,7 @@
       "information": [
         {
           "name": "Israel",
-          "sessionsCount": "3"
+          "sessionsCount": "10"
         }
       ]
     },
@@ -144,7 +156,11 @@
       "information": [
         {
           "name": "SJ הנדסת חשמל | תכנון, ייעוץ ושרטוט מערכות חשמל",
-          "sessionsCount": 3
+          "sessionsCount": "9"
+        },
+        {
+          "name": "זרם · תוכנת הצעות המחיר לאנשי חשמל | תכנון, תמחור והצעה ב-PDF",
+          "sessionsCount": "2"
         }
       ]
     },
@@ -153,7 +169,7 @@
       "information": [
         {
           "name": null,
-          "sessionsCount": "3"
+          "sessionsCount": "10"
         }
       ]
     },
@@ -162,19 +178,31 @@
       "information": [
         {
           "url": "http://localhost:8099/",
-          "visitsCount": 3
-        },
-        {
-          "url": "http://127.0.0.1:8099/certificates.html",
-          "visitsCount": 1
+          "visitsCount": "10"
         },
         {
           "url": "http://127.0.0.1:8099/index.html",
-          "visitsCount": 1
+          "visitsCount": "4"
+        },
+        {
+          "url": "http://127.0.0.1:8099/certificates.html",
+          "visitsCount": "1"
+        },
+        {
+          "url": "http://localhost:8099/zerem/",
+          "visitsCount": "1"
+        },
+        {
+          "url": "http://127.0.0.1:8099/services.html",
+          "visitsCount": "1"
         },
         {
           "url": "http://127.0.0.1:8099/about.html",
-          "visitsCount": 1
+          "visitsCount": "1"
+        },
+        {
+          "url": "http://localhost:8099/zerem/index.html",
+          "visitsCount": "1"
         }
       ]
     }
