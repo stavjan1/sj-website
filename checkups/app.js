@@ -44,54 +44,21 @@ function init() {
 
 // ---------- dates ----------
 
-function todayStr() {
-    const d = new Date();
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-}
-function pad(n) { return String(n).padStart(2, '0'); }
-
-// Add months to YYYY-MM-DD, clamping the day (31.1 + 1mo → 28.2, not 3.3).
-function addMonths(dateStr, months) {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    const t = new Date(y, m - 1 + months, 1);
-    const lastDay = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
-    t.setDate(Math.min(d, lastDay));
-    return t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate());
-}
-
-// The date the next checkup is due: explicit override wins, else last + interval.
-function nextDue(c) {
-    if (c.next) return c.next;
-    if (c.last && c.months) return addMonths(c.last, c.months);
-    return null;
-}
-
-function daysUntil(dateStr) {
-    return Math.round((new Date(dateStr + 'T00:00:00') - new Date(todayStr() + 'T00:00:00')) / 86400000);
-}
-
-function fmtDate(dateStr) {
-    const [y, m, d] = dateStr.split('-');
-    return d + '.' + m + '.' + y;
-}
-
-function intervalLabel(months) {
-    if (months === 12) return 'כל שנה';
-    if (months === 24) return 'כל שנתיים';
-    if (months % 12 === 0) return 'כל ' + (months / 12) + ' שנים';
-    return 'כל ' + months + ' חודשים';
-}
+// The arithmetic and the file formats are shared with the same feature inside
+// /sale/ (assets/checkups-core.js). Two copies of "when is this due" is a
+// missed visit waiting to happen; the screens keep their own words and their
+// own rendering, and agree on the dates.
+function todayStr() { return SJ_CK.today(); }
+function pad(n) { return SJ_CK.pad(n); }
+function addMonths(dateStr, months) { return SJ_CK.addMonths(dateStr, months); }
+function nextDue(c) { return SJ_CK.nextDue(c); }
+function daysUntil(dateStr) { return SJ_CK.daysUntil(dateStr); }
+function fmtDate(dateStr) { return SJ_CK.fmtDate(dateStr); }
+function intervalLabel(months) { return SJ_CK.intervalLabel(months); }
 
 // ---------- rendering ----------
 
-function statusOf(c) {
-    const due = nextDue(c);
-    if (!due) return 'missing';
-    const days = daysUntil(due);
-    if (days < 0) return 'overdue';
-    if (days <= SOON_DAYS) return 'soon';
-    return 'ok';
-}
+function statusOf(c) { return SJ_CK.statusOf(c, SOON_DAYS); }
 
 function render() {
     const q = (document.getElementById('search').value || '').trim().toLowerCase();
@@ -146,11 +113,11 @@ function render() {
             <div class="interval">${intervalLabel(c.months)}${c.last ? `<br><small>אחרונה: ${fmtDate(c.last)}</small>` : ''}</div>
             <div class="due">${dueHtml}</div>
             <div class="actions">
-                <button class="icon-btn cal ${c.eventId ? 'synced' : ''}" title="${c.eventId ? 'מסונכרן ליומן Google — לחץ לעדכון' : 'הוסף תזכורת ליומן Google'}" onclick="syncCalendar('${c.id}')">📅</button>
+                <button class="icon-btn cal ${c.eventId ? 'synced' : ''}" title="${c.eventId ? 'מסונכרן ליומן Google · לחץ לעדכון' : 'הוסף תזכורת ליומן Google'}" onclick="syncCalendar('${c.id}')">📅</button>
                 <button class="icon-btn" title="הורדת תזכורת לאייפון / Apple Calendar (קובץ ICS)" onclick="downloadIcs('${c.id}')">⬇</button>
                 ${c.phone ? `<button class="icon-btn" title="וואטסאפ ללקוח" style="color:#25d366" onclick="whatsapp('${c.id}')">💬</button>` : ''}
                 ${c.email ? `<button class="icon-btn" title="טיוטת מייל ללקוח" onclick="mailto('${c.id}')">✉</button>` : ''}
-                <button class="icon-btn" title="הבדיקה בוצעה — קדם לתאריך הבא" onclick="markDone('${c.id}')">✔</button>
+                <button class="icon-btn" title="הבדיקה בוצעה · קדם לתאריך הבא" onclick="markDone('${c.id}')">✔</button>
                 <button class="icon-btn" title="עריכה" onclick="openEditor('${c.id}')">✏</button>
                 <button class="icon-btn danger" title="מחיקה" onclick="removeClient('${c.id}')">✕</button>
             </div>
@@ -225,7 +192,7 @@ function markDone(id) {
     c.updatedAt = Date.now();
     persist();
     render();
-    toast('עודכן — הבדיקה הבאה: ' + fmtDate(nextDue(c)) +
+    toast('עודכן · הבדיקה הבאה: ' + fmtDate(nextDue(c)) +
         (c.eventId ? '. כדאי ללחוץ 📅 לעדכן גם את היומן' : ''));
 }
 
@@ -271,7 +238,7 @@ async function cloudSave() {
             headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
             body: JSON.stringify({ data: { clients } }),
         });
-        if (res.status === 401) { logoutLocal(); toast('פג תוקף החיבור ל-Google — התחבר שוב'); }
+        if (res.status === 401) { logoutLocal(); toast('פג תוקף החיבור ל-Google, התחבר שוב'); }
     } catch { /* offline — local copy is intact, next change retries */ }
 }
 
@@ -299,7 +266,7 @@ async function cloudLoad() {
 
 function loginGoogle() {
     if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
-        toast('Google עדיין נטען — נסה שוב עוד רגע');
+        toast('Google עדיין נטען · נסה שוב עוד רגע');
         return;
     }
     const tc = google.accounts.oauth2.initTokenClient({
@@ -370,44 +337,9 @@ function ensureCalendarToken() {
     });
 }
 
-function rruleFor(months) {
-    return months % 12 === 0
-        ? 'RRULE:FREQ=YEARLY;INTERVAL=' + (months / 12)
-        : 'RRULE:FREQ=MONTHLY;INTERVAL=' + months;
-}
-
-function eventBody(c) {
-    const due = nextDue(c);
-    return {
-        summary: '⚡ ' + (c.type || 'בדיקה תקופתית') + ' — ' + c.name,
-        location: c.site || undefined,
-        description: [
-            c.phone ? 'טלפון: ' + c.phone : '',
-            'תדירות: ' + intervalLabel(c.months),
-            c.notes || '',
-            '(נוצר אוטומטית ממעקב הבדיקות של SJ הנדסת חשמל)',
-        ].filter(Boolean).join('\n'),
-        start: { date: due },
-        end: { date: addDays(due, 1) },
-        recurrence: [rruleFor(c.months)],
-        // Calendar does the reminding: email a month ahead (to book the visit),
-        // then email a week ahead, then a popup the day before.
-        reminders: {
-            useDefault: false,
-            overrides: [
-                { method: 'email', minutes: 28 * 1440 },
-                { method: 'email', minutes: 7 * 1440 },
-                { method: 'popup', minutes: 1440 },
-            ],
-        },
-    };
-}
-
-function addDays(dateStr, n) {
-    const d = new Date(dateStr + 'T00:00:00');
-    d.setDate(d.getDate() + n);
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
-}
+function rruleFor(months) { return SJ_CK.rrule(months); }
+function eventBody(c) { return SJ_CK.eventBody(c, '(נוצר אוטומטית ממעקב הבדיקות של SJ הנדסת חשמל)'); }
+function addDays(dateStr, n) { return SJ_CK.addDays(dateStr, n); }
 
 async function syncCalendar(id) {
     const c = clients.find((x) => x.id === id);
@@ -417,67 +349,154 @@ async function syncCalendar(id) {
     try { token = await ensureCalendarToken(); }
     catch { toast('נדרש אישור גישה ליומן Google'); return; }
 
+    const res = await pushToGoogle(c, token);
+    if (res.ok) {
+        persist();
+        render();
+        toast('תזכורת חוזרת נקבעה ביומן Google (' + fmtDate(nextDue(c)) + ')');
+        return;
+    }
+    toast(res.reason === 'auth' ? 'ההרשאה ליומן פגה · לחץ שוב על 📅' : 'הוספת התזכורת ליומן נכשלה, נסה שוב');
+}
+
+// The calendar half without a word of UI in it, so the bulk run can call it in
+// a loop behind one consent and one report. Patches an existing event and falls
+// back to creating it when the user deleted it by hand — which is what stops a
+// second run leaving two of the same visit in the calendar.
+async function pushToGoogle(c, token) {
     const base = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
     const body = JSON.stringify(eventBody(c));
     const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
     try {
-        let res;
+        let res = null;
         if (c.eventId) {
             res = await fetch(base + '/' + c.eventId, { method: 'PATCH', headers, body });
-            if (res.status === 404 || res.status === 410) res = null; // event was deleted by hand — recreate
+            if (res.status === 404 || res.status === 410) res = null; // deleted by hand — recreate
         }
         if (!res) res = await fetch(base, { method: 'POST', headers, body });
         if (res.status === 401 || res.status === 403) {
             localStorage.removeItem(CAL_TOKEN_KEY);
-            toast('ההרשאה ליומן פגה — לחץ שוב על 📅');
-            return;
+            return { ok: false, reason: 'auth' };
         }
         const ev = await res.json();
-        if (!res.ok || !ev.id) throw new Error('calendar-error');
+        if (!res.ok || !ev.id) return { ok: false, reason: 'error' };
         c.eventId = ev.id;
         c.updatedAt = Date.now();
-        persist();
-        render();
-        toast('תזכורת חוזרת נקבעה ביומן Google (' + fmtDate(nextDue(c)) + ')');
-    } catch {
-        toast('הוספת התזכורת ליומן נכשלה — נסה שוב');
+        return { ok: true, reason: '' };
+    } catch (e) {
+        return { ok: false, reason: 'error' };
     }
+}
+
+// ---------- "הוסף הכל ליומן" ----------
+//
+// The same rules as the one inside the app: everything that is inside its
+// reminder window AND not in the calendar yet. A record that already carries an
+// event id is skipped — re-pushing it is how a calendar ends up with two of
+// every visit — and a date far out is not booked today, because a calendar full
+// of next year is a calendar nobody opens.
+
+function bulkQueue() {
+    return liveClients()
+        .filter((c) => { const d = nextDue(c); return d && daysUntil(d) <= 28 && !c.eventId; })
+        .sort((a, b) => nextDue(a).localeCompare(nextDue(b)));
+}
+
+function bulkReason(reason) {
+    return reason === 'auth' ? 'ההרשאה ליומן פגה'
+        : reason === 'skipped' ? 'לא נוסה, ההרשאה פגה לפני כן'
+        // A failure on the way back from Google is not proof that nothing was
+        // created there, and "failed" would send him to press it again and book
+        // the visit twice.
+        : 'שגיאה מול היומן · ייתכן שכן נוצר, שווה לבדוק';
+}
+
+function bulkOpen() {
+    const list = bulkQueue();
+    if (!list.length) { toast('אין מה להוסיף · כל מה שקרוב כבר ביומן'); return; }
+    const dlg = document.getElementById('bulk-cal');
+    if (!dlg) return;
+    document.getElementById('bulk-body').innerHTML =
+        `<p class="bulk-sum">${list.length} לקוחות ← <b>${list.length}</b> תזכורות חוזרות ביומן</p>
+         <ul class="bulk-list">${list.map((c) => `<li><span>${esc(c.name)}</span><small>${fmtDate(nextDue(c))}</small></li>`).join('')}</ul>
+         <p class="bulk-note">מה שכבר יושב ביומן לא נוגעים בו. בדיקה שהמועד שלה רחוק תיכנס כשתתקרב.</p>`;
+    document.getElementById('bulk-foot').innerHTML =
+        `<button type="button" class="btn" onclick="bulkClose()">ביטול</button>
+         <button type="button" class="btn primary" onclick="bulkRun()">הוסף ${list.length} ליומן</button>`;
+    dlg.showModal();
+}
+
+function bulkClose() { const d = document.getElementById('bulk-cal'); if (d) d.close(); }
+
+async function bulkRun() {
+    const list = bulkQueue();
+    if (!list.length) return;
+    // ONE consent for the whole run: Google's popup only survives inside the
+    // click that opened it, so a token minted mid-loop is a blocked popup and a
+    // run that dies halfway with no explanation.
+    let token;
+    try { token = await ensureCalendarToken(); }
+    catch { toast('אין הרשאה ליומן · מוריד קובץ אחד עם הכל'); bulkIcs(list); return; }
+
+    document.getElementById('bulk-foot').innerHTML = '';
+    const results = [];
+    for (let i = 0; i < list.length; i++) {
+        const c = list[i];
+        const prog = document.getElementById('bulk-body');
+        if (prog) prog.innerHTML = `<p class="bulk-sum">מוסיף ${i + 1} מתוך ${list.length} · ${esc(c.name)}</p>`;
+        const r = await pushToGoogle(c, token);
+        results.push({ c: c, ok: !!r.ok, reason: r.reason || '' });
+        if (r.reason === 'auth') {
+            for (let j = i + 1; j < list.length; j++) results.push({ c: list[j], ok: false, reason: 'skipped' });
+            break;
+        }
+    }
+    // One write for the run, not one per client.
+    persist();
+    render();
+    bulkResult(results);
+}
+
+function bulkResult(results) {
+    const ok = results.filter((r) => r.ok);
+    const bad = results.filter((r) => !r.ok);
+    document.getElementById('bulk-body').innerHTML =
+        `${ok.length ? `<p class="bulk-sum ok">נוספו ליומן (${ok.length})</p>
+            <ul class="bulk-list">${ok.map((r) => `<li><span>${esc(r.c.name)}</span><small>${fmtDate(nextDue(r.c))}</small></li>`).join('')}</ul>` : ''}
+         ${bad.length ? `<p class="bulk-sum bad">לא נוספו (${bad.length})</p>
+            <ul class="bulk-list">${bad.map((r) => `<li><span>${esc(r.c.name)}</span><small>${esc(bulkReason(r.reason))}</small></li>`).join('')}</ul>` : ''}`;
+    document.getElementById('bulk-foot').innerHTML =
+        `<button type="button" class="btn primary" onclick="bulkClose()">סגור</button>`;
+    if (ok.length && !bad.length) toast('נוספו ' + ok.length + ' תזכורות ליומן');
+}
+
+// No Google account, or consent refused: the whole queue as ONE calendar file.
+// Concatenating single files would produce several BEGIN:VCALENDAR headers,
+// which no calendar will open.
+function bulkIcs(list) {
+    const ics = SJ_CK.icsWrap((list || []).map((c) => SJ_CK.icsVevent(c)), 'Periodic');
+    if (!ics) { toast('אין מה לייצא'); return; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+    a.download = 'periodic-service.ics';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    bulkClose();
+    toast('ירד קובץ אחד עם ' + (list || []).length + ' תזכורות');
 }
 
 // ---------- ICS (iPhone / Apple Calendar / Outlook) ----------
 
 // RFC 5545 TEXT escaping — raw newlines/commas/semicolons in a property value
 // make the whole file unparseable for Apple Calendar/Outlook.
-function icsText(s) {
-    return String(s || '').replace(/\\/g, '\\\\').replace(/[,;]/g, (m) => '\\' + m).replace(/\r?\n/g, '\\n');
-}
+function icsText(s) { return SJ_CK.icsText(s); }
 
 function downloadIcs(id) {
     const c = clients.find((x) => x.id === id);
     if (!c) return;
     const due = nextDue(c);
     if (!due) { toast('קודם קבע תאריך בדיקה (עריכה ✏)'); return; }
-    const dt = due.replace(/-/g, '');
-    const summary = icsText((c.type || 'בדיקה תקופתית') + ' — ' + c.name);
-    const desc = icsText([c.phone ? 'טלפון: ' + c.phone : '', c.notes || ''].filter(Boolean).join('\n'));
-    const ics = [
-        'BEGIN:VCALENDAR',
-        'VERSION:2.0',
-        'PRODID:-//SJ Electrical Engineering//Checkups//HE',
-        'BEGIN:VEVENT',
-        'UID:' + c.id + '@sj-eng.co.il',
-        'DTSTAMP:' + dt + 'T000000Z',
-        'DTSTART;VALUE=DATE:' + dt,
-        'DTEND;VALUE=DATE:' + addDays(due, 1).replace(/-/g, ''),
-        rruleFor(c.months),
-        'SUMMARY:' + summary,
-        c.site ? 'LOCATION:' + icsText(c.site) : '',
-        desc ? 'DESCRIPTION:' + desc : '',
-        'BEGIN:VALARM', 'TRIGGER:-P28D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
-        'BEGIN:VALARM', 'TRIGGER:-P7D', 'ACTION:DISPLAY', 'DESCRIPTION:' + summary, 'END:VALARM',
-        'END:VEVENT',
-        'END:VCALENDAR',
-    ].filter(Boolean).join('\r\n');
+    const ics = SJ_CK.icsFile(c);
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
     a.download = 'checkup-' + (c.name || 'client').replace(/[^\w֐-׿-]+/g, '_') + '.ics';
@@ -495,7 +514,7 @@ function whatsapp(id) {
     if (digits.startsWith('0')) digits = '972' + digits.slice(1);
     const due = nextDue(c);
     const msg = 'שלום, כאן סתיו מ-SJ הנדסת חשמל. מתקרב מועד הבדיקה התקופתית למתקן החשמל אצלכם' +
-        (due ? ' (' + fmtDate(due) + ')' : '') + ' — אשמח שנתאם מועד שנוח לכם.';
+        (due ? ' (' + fmtDate(due) + ')' : '') + ' · אשמח שנתאם מועד שנוח לכם.';
     window.open('https://wa.me/' + digits + '?text=' + encodeURIComponent(msg), '_blank');
 }
 
@@ -580,7 +599,7 @@ function renderDueStrip() {
     if (due.length === 0) { el.innerHTML = ''; return; }
     el.innerHTML = `
         <div class="strip">
-            <div class="strip-title">🔔 תזכורות לשליחה — הבדיקה מתקרבת</div>
+            <div class="strip-title">🔔 תזכורות לשליחה · הבדיקה מתקרבת</div>
             <div class="strip-chips">
                 ${due.slice(0, 8).map((c) => {
                     const days = daysUntil(nextDue(c));
@@ -599,13 +618,13 @@ function renderDueStrip() {
 function reminderText(c) {
     const due = nextDue(c);
     return 'שלום, כאן סתיו מ-SJ הנדסת חשמל. מתקרב מועד הבדיקה התקופתית למתקן החשמל אצלכם' +
-        (due ? ' (' + fmtDate(due) + ')' : '') + ' — אשמח שנתאם מועד שנוח לכם.';
+        (due ? ' (' + fmtDate(due) + ')' : '') + ' · אשמח שנתאם מועד שנוח לכם.';
 }
 
 function mailto(id) {
     const c = clients.find((x) => x.id === id);
     if (!c || !c.email) return;
-    const subject = 'תיאום ' + (c.type || 'בדיקה תקופתית') + ' — מתקן החשמל';
+    const subject = 'תיאום ' + (c.type || 'בדיקה תקופתית') + ' · מתקן החשמל';
     const body = reminderText(c) + '\n\nבברכה,\nSJ הנדסת חשמל';
     // Opens the mail app with a ready draft — review and send manually.
     window.location.href = 'mailto:' + encodeURIComponent(c.email) +

@@ -104,7 +104,7 @@
 
   function asText(data, job) {
     const lines = [];
-    lines.push('🛒 ציוד וחומרים' + (job ? ' — ' + job : '') + ':');
+    lines.push('🛒 ציוד וחומרים' + (job ? ', ' + job : '') + ':');
     for (const e of data.equipment) {
       lines.push('• ' + e.item + (e.qty ? ' — ' + e.qty : '') + (e.note ? ' (' + e.note + ')' : ''));
     }

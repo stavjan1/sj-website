@@ -6,7 +6,12 @@
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://www.sj-eng.co.il/services.html</loc>
+    <loc>https://www.sj-eng.co.il/pricing-guide</loc>
+    <priority>0.9</priority>
+    <changefreq>monthly</changefreq>
+  </url>
+  <url>
+    <loc>https://www.sj-eng.co.il/services</loc>
     <priority>0.9</priority>
     <changefreq>monthly</changefreq>
   </url>
@@ -21,32 +26,32 @@
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://www.sj-eng.co.il/about.html</loc>
+    <loc>https://www.sj-eng.co.il/about</loc>
     <priority>0.8</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://www.sj-eng.co.il/contact.html</loc>
+    <loc>https://www.sj-eng.co.il/contact</loc>
     <priority>0.8</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://www.sj-eng.co.il/articles.html</loc>
+    <loc>https://www.sj-eng.co.il/articles</loc>
     <priority>0.9</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://www.sj-eng.co.il/certificates.html</loc>
+    <loc>https://www.sj-eng.co.il/certificates</loc>
     <priority>0.8</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://www.sj-eng.co.il/projects.html</loc>
+    <loc>https://www.sj-eng.co.il/projects</loc>
     <priority>0.8</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://www.sj-eng.co.il/calculator.html</loc>
+    <loc>https://www.sj-eng.co.il/calculator</loc>
     <priority>0.5</priority>
     <changefreq>monthly</changefreq>
   </url>

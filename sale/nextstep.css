@@ -1,0 +1,80 @@
+/* ============================================================
+   "מה עכשיו?" — the next-step card.
+   ------------------------------------------------------------
+   Its own file, like controlroom.css and periodic.css: sale/css/**
+   belongs to the parallel session under COORDINATION.md.
+
+   Deliberately quieter than .plan-action-bar. The bar is the
+   invitation to the next stage and should carry weight; this is
+   the thing that speaks when the bar has nothing to say, and a
+   second loud element on the same stack would read as two
+   competing calls to action. Hence: no fill, one accent edge.
+
+   It also does NOT reuse .plan-action-bar, on purpose — that
+   class hides its secondary buttons under 768px, which would
+   delete the "not now" escape on every phone.
+   ============================================================ */
+
+.next-step {
+    display: block;
+    margin: var(--sp-2) var(--sp-3);
+    padding: var(--sp-3);
+    border: 1px solid var(--border);
+    border-inline-start: 3px solid var(--accent);
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+}
+/* [hidden] loses to display:block on specificity, and the card would sit there
+   forever with its content emptied — the same trap the spec strip already hit. */
+.next-step[hidden] { display: none !important; }
+
+.ns-title {
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    color: var(--text);
+    margin-block-end: 4px;
+}
+.ns-body {
+    font-size: var(--fs-xs);
+    line-height: var(--lh-body);
+    color: var(--text-2);
+}
+.ns-btns {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-block-start: var(--sp-3);
+}
+/* "Not now" is an escape, not an action: it must be findable and must not
+   compete with the thing the card is actually recommending. */
+.ns-quiet, .ns-mute {
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    font: 500 var(--fs-xs)/1 var(--font-ui);
+    color: var(--text-3);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+.ns-quiet:hover, .ns-mute:hover { color: var(--text-2); }
+/* The permanent opt-out sits at the far end, away from the two buttons a user
+   presses on purpose. */
+.ns-mute { margin-inline-start: auto; }
+
+/* On a phone the card and the conversation share one height budget, and the
+   conversation is the product. Measured at 320×693: the first version stood
+   248px tall against a 287px message log — a hint the size of the thing it
+   interrupts. The title carries the point, so the elaboration is what gives. */
+@media (max-width: 480px) {
+    .next-step { margin-inline: var(--sp-2); padding: var(--sp-2) var(--sp-3); }
+    .ns-btns { margin-block-start: var(--sp-2); }
+    .ns-mute { margin-inline-start: 0; }
+    .ns-body {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+}

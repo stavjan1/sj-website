@@ -6,7 +6,9 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 
-const ROOT = '/home/user/sj-website';
+// Resolved from this file, not hardcoded: the original absolute path meant
+// the script only ran on the one machine it was written on.
+const ROOT = require('path').resolve(__dirname, '..', '..');
 const PORT = 8931;
 
 // Pull the candidate policy straight out of _headers so we test what ships.
@@ -36,7 +38,7 @@ const server = http.createServer((req, res) => {
   fs.createReadStream(file).pipe(res);
 });
 
-const PAGES = ['/', '/sale/', '/ask/', '/q/?t=abcdefghij', '/contact.html', '/zerem/', '/services.html', '/calculator.html'];
+const PAGES = ['/', '/sale/', '/ask/', '/q/?t=abcdefghij', '/contact.html', '/zerem/', '/checkups/', '/thanks.html', '/privacy.html', '/accessibility.html', '/404.html'];
 
 (async () => {
   await new Promise((r) => server.listen(PORT, r));

@@ -1,0 +1,321 @@
+/* ============================================================
+   ZEREM V3 — app shell: icon rail, more-drawer (desktop side sheet),
+   context header, mobile bottom bar, theme bridge.
+   Loads after assets/tokens.css + assets/ui.css.
+   Content panels live in panels.css; PDF sheets in pdf.css.
+   ============================================================ */
+
+/* ---------- theme bridge ----------
+   app.js applies body classes (light-theme / mid-theme / dark-theme) via its
+   settings system, and an inline pre-paint script sets light/dark from the OS.
+   Tokens follow the body class; 'mid' collapses into dark. */
+/* The values below MUST track assets/tokens.css. They are repeated (not
+   inherited) because the app switches theme by body class while the marketing
+   pages switch by [data-theme]; when the palette moved to the sign's navy and
+   green, this copy was the reason /sale stayed amber. */
+body.light-theme {
+  --bg: #F7F6F3; --surface: #FFFFFF; --surface-2: #EFEEE9;
+  --text: #131A24; --text-2: #4A5566; --text-3: #5D6A7C;
+  --border: #E4E1DA; --border-strong: #D2CEC5;
+  --accent: #1B4B8F; --accent-strong: #133766; --accent-soft: #E6EDF7; --on-accent: #FFFFFF;
+  --action: #6ABF3C; --action-strong: #5CAE30; --on-action: #0B1A2E;
+  --ok-text: #15803D; --ok-btn: #0D7A4A; --danger: #DC2626; --danger-strong: #B91C1C; --warn-text: #9A5B06;
+  --shadow-1: 0 1px 2px rgb(19 26 36 / 0.06), 0 4px 14px rgb(19 26 36 / 0.07);
+  --scrim: rgb(8 17 31 / 0.55); --whatsapp: #1FAF5A; --whatsapp-btn: #0F7A40;
+}
+body.dark-theme, body.mid-theme {
+  --bg: #08111F; --surface: #0F1E35; --surface-2: #16294A;
+  --text: #EAF1FB; --text-2: #C2D0E4; --text-3: #93A5BF;
+  --border: #1B3055; --border-strong: #2C4571;
+  --accent: #6ABF3C; --accent-strong: #86D95B; --accent-soft: #14301A; --on-accent: #08111F;
+  --action: #6ABF3C; --action-strong: #86D95B; --on-action: #08111F;
+  --ok-text: #34D399; --ok-btn: #15803D; --danger: #F87171; --danger-strong: #EF4444; --warn-text: #FCD34D;
+  --shadow-1: 0 0 0 1px rgb(255 255 255 / 0.05);
+  --scrim: rgb(0 0 0 / 0.62); --whatsapp: #25D366; --whatsapp-btn: #0F7A40;
+}
+/* legacy box-theme classes are harmless no-ops in V3 */
+body.boxes-light, body.boxes-dark { }
+
+/* ---------- app frame ---------- */
+html, body { height: 100%; }
+body {
+  overflow: hidden; /* the shell is height-locked; panels scroll inside */
+  background: var(--bg); color: var(--text);
+}
+.app-container {
+  display: flex;
+  height: var(--appvh, 100dvh);
+}
+.main-content {
+  flex: 1; min-width: 0;
+  /* A flex column, which panels.css §20 assumes and V3 forgot to declare: the
+     wizard panel flex-fills what is left under the context bar, so the chat
+     scrolls inside itself and its composer stays on screen. Everything else
+     keeps its natural height and scrolls the page as before. */
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--sp-6);
+}
+.main-content > .ctx-bar,
+.main-content > .active-project-banner { flex: none; }
+.content-panel.active { flex: 0 0 auto; }
+
+/* ---------- icon rail (the old .sidebar, reborn) ---------- */
+.sidebar {
+  display: flex; flex-direction: column; align-items: stretch;
+  width: 76px; flex: none;
+  background: var(--surface);
+  border-inline-end: 1px solid var(--border);
+  padding: var(--sp-3) var(--sp-1);
+  overflow-y: auto; overflow-x: hidden;
+  scrollbar-width: none;
+}
+.sidebar::-webkit-scrollbar { display: none; }
+
+.sidebar-logo {
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--sp-2) 0 var(--sp-4);
+  color: var(--accent);
+}
+.sidebar-logo svg { width: 26px; height: 26px; }
+
+.nav-menu { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+
+
+.nav-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  min-height: 54px; padding: var(--sp-2) 2px;
+  background: none; border: none; border-radius: var(--r-sm);
+  color: var(--text-3); font: 500 10px/1.2 var(--font-ui);
+  cursor: pointer; text-align: center;
+  transition: color var(--t-fast), background-color var(--t-fast);
+  position: relative;
+}
+.nav-btn svg { width: 22px; height: 22px; flex: none; }
+.nav-btn:hover { color: var(--text); background: var(--surface-2); }
+.nav-btn.active { color: var(--text); }
+.nav-btn.active::before {
+  content: ''; position: absolute; inset-block: 10px; inset-inline-start: -4px;
+  width: 3px; border-radius: 2px; background: var(--accent);
+}
+
+/* project-step group: visible only with an open project (body.in-project) */
+body:not(.in-project) .proj-tab { display: none !important; }
+.nav-proj-label {
+  padding: var(--sp-3) var(--sp-1) var(--sp-1);
+  font-size: 9px; color: var(--text-3); text-align: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border-block-start: 1px solid var(--border); margin-block-start: var(--sp-2);
+}
+.step-num {
+  position: absolute; inset-block-start: 4px; inset-inline-end: 10px;
+  font-size: 9px; color: var(--text-3); font-variant-numeric: tabular-nums;
+}
+
+/* reminder badge on the bell */
+.nav-badge {
+  position: absolute; inset-block-start: 4px; inset-inline-end: 12px;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: var(--r-pill); background: var(--danger); color: #fff;
+  font: 700 10px/16px var(--font-ui); text-align: center;
+}
+
+/* rail footer: theme, user, logout */
+.sidebar-footer {
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-2);
+  padding-block-start: var(--sp-3); border-block-start: 1px solid var(--border);
+}
+.sidebar-footer .nav-btn { width: 100%; min-height: 44px; }
+/* The admin door: same shape as a rail button, marked as its own thing. */
+.nav-admin { color: var(--accent); }
+.nav-admin svg { color: var(--accent); }
+.nav-admin.active, .nav-admin:hover { background: var(--accent-soft); }
+#sidebar-user-chip { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: var(--sp-1); }
+#user-chip-avatar {
+  width: 30px; height: 30px; border-radius: var(--r-pill);
+  /* center/cover, like the menu's avatar: without it the Google photo was
+     painted at its own 96px size inside a 30px circle, so the rail showed a
+     zoomed corner of the face while the menu showed the picture. */
+  background: var(--surface-2) center/cover no-repeat; color: var(--text-2);
+  display: flex; align-items: center; justify-content: center;
+  font: 700 12px var(--font-ui); overflow: hidden;
+}
+#user-chip-avatar img { width: 100%; height: 100%; object-fit: cover; }
+#user-chip-name {
+  font-size: 9px; color: var(--text-3); max-width: 68px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#user-chip-role { display: none; }
+
+/* ---------- context header (in-project banner) ---------- */
+#project-banner {
+  display: none;
+  align-items: center; gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--surface); border-block-end: 1px solid var(--border);
+  font-size: var(--fs-sm);
+}
+/* Only on the project's own screens: coming back to the home screen with a
+   project still open used to leave its title bar sitting on top of the
+   greeting. `in-project-stage` is set by the rail and means exactly "you are
+   inside one of the project's screens". */
+body.in-project.in-project-stage #project-banner { display: flex; }
+#active-project-name { font-weight: 700; }
+#active-project-status { color: var(--text-3); }
+#banner-sync-indicator { margin-inline-start: auto; color: var(--text-3); font-size: var(--fs-xs); }
+
+/* main column wraps banner + scrolling panels */
+.main-column { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+
+/* The "עוד" drawer was deleted with waves B–C: four destinations fit both the
+   rail and a phone's bottom bar, so the sheet, its backdrop and their two
+   breakpoints of rules have nothing left to open. */
+
+/* ---------- mobile: rail becomes the bottom bar ---------- */
+@media (max-width: 768px) {
+  .app-container { flex-direction: column; }
+  .sidebar {
+    position: fixed; inset-block-end: 0; inset-inline: 0;
+    width: auto; height: calc(60px + env(safe-area-inset-bottom));
+    flex-direction: row; align-items: stretch;
+    padding: 0 var(--sp-1) env(safe-area-inset-bottom);
+    border-inline-end: none; border-block-start: 1px solid var(--border);
+    z-index: var(--z-nav);
+    overflow: visible;
+  }
+  .sidebar-logo, .nav-proj-label { display: none; }
+  .nav-menu { flex-direction: row; justify-content: space-around; gap: 0; width: 100%; }
+  .nav-btn { flex: 1; min-height: 60px; border-radius: 0; }
+  .nav-btn.active::before {
+    inset-block: auto; inset-block-start: 0; inset-inline: 25%;
+    width: auto; height: 3px;
+  }
+  .step-num { display: none; }
+  /* only the field-core tabs + "more" live in the bar */
+  /* Four destinations fit a phone's bottom bar, which is exactly why the
+     drawer could go. Project-scoped tabs still appear only inside a project
+     (.proj-tab is toggled by the app), so the bar never holds more than five. */
+  .nav-btn.mobile-hide { display: none; }
+  /* The account lives in the bar as your photo alone — the name and role are
+     in the menu it opens, and a phone bar has no room to say them twice. */
+  .sidebar-footer { display: flex; align-items: center; padding: 0 var(--sp-1); }
+  .sidebar-footer .user-chip { width: auto; padding: var(--sp-1); }
+  .sidebar-footer .user-chip-info { display: none; }
+  .main-content { padding: var(--sp-4) var(--sp-4) calc(76px + env(safe-area-inset-bottom)); }
+  #project-banner { padding-inline: var(--sp-4); }
+}
+@media (min-width: 769px) {
+  .nav-more-btn { display: flex; } /* "more" now exists on desktop too */
+}
+
+/* The three project steps had two homes at once: the floating rail and this
+   sidebar. Stav, 22/08: "עדין נפתחים ה3 תמחור וזה בלשונית צד… תבטל את
+   ההופעה של הדבר הזה." His objection was the DUPLICATION, and the fix
+   then was to silence the sidebar wherever the rail existed. The rail no
+   longer exists, so the duplication is gone at the source and the sidebar is
+   the one home the steps have — at every width, which is also the only way
+   an open project can still be navigated once the thread column stops
+   mirroring the sidebar's destinations. */
+
+/* ---- The open project's three steps are a sub-group, not three destinations --
+   Deleting the floating rail gave the steps back to the sidebar, which took it
+   from six labelled buttons to nine plus a name label. Measured at 1017×560 —
+   a 1525px Windows laptop at 150% scaling, which is what Stav is actually
+   using — the column then needed 689px of a 560px screen, and `.sidebar` is
+   `overflow-y:auto` with `scrollbar-width:none`: it scrolls with no scrollbar,
+   no fade, nothing. "מאגר מחירים" simply was not there, and nothing on screen
+   said to scroll for it.
+   They are steps INSIDE the thing you already opened, not places beside it, so
+   they are drawn as steps: shorter, dimmer, and marked as belonging to the
+   project above them. That is 66px back, and it is also the more honest
+   drawing. */
+.nav-btn.proj-tab {
+    min-height: 34px; flex-direction: row; justify-content: center; gap: var(--sp-1);
+    font-size: 10px; opacity: .85;
+}
+.nav-btn.proj-tab svg { width: 15px; height: 15px; }
+.nav-btn.proj-tab .step-num { font-size: 9px; }
+
+/* The name of the open project is on the banner, two inches to the side, in a
+   larger type. Saying it again in an 76px column costs a row and reads as a
+   second thing. */
+.nav-proj-label { display: none; }
+
+/* Above 1100px the thread column is on screen and carries the steps itself, so
+   the sidebar goes back to being six destinations. */
+@media (min-width: 1100px) {
+    .nav-btn.proj-tab { display: none; }
+}
+
+/* And when it still does not fit — a 448px-tall window will defeat any vertical
+   list — the column must at least LOOK scrollable. An invisible scroll is how
+   "מאגר מחירים" went missing without a symptom. */
+.sidebar { scrollbar-width: thin; }
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border-strong, var(--border)); border-radius: 4px; }
+
+/* ---- A short laptop is the common laptop -----------------------------------
+   1525×672 device pixels at Windows' default 150% scaling is 1017×448 CSS —
+   and that is the machine the owner of this product is using. A 76px column of
+   ten labelled destinations needs 644px. It scrolls, so nothing is lost in the
+   sense that a bug loses it; but the last destination is simply not on the
+   screen, and nobody scrolls a navigation column they cannot see a scrollbar
+   on. Below 700px of viewport the rail trades padding for rows: the labels
+   stay, because a non-technical user reads them, and the air goes. */
+@media (max-height: 700px) {
+    .nav-btn { min-height: 44px; padding-block: 2px; gap: 1px; }
+    .nav-btn svg { width: 19px; height: 19px; }
+    .nav-btn.proj-tab { min-height: 30px; }
+    .sidebar { padding-block: var(--sp-2); }
+    .sidebar-logo { height: 34px; }
+    .sidebar-footer .nav-btn, .sidebar-footer .user-chip { min-height: 40px; }
+}
+
+/* Shorter still, and the logo goes: it is a link back to the marketing site,
+   which is the one thing in this column that is not navigation inside the app.
+   Below this height every row has to earn its place. */
+@media (max-height: 540px) {
+    .sidebar-logo { display: none; }
+    .nav-btn { min-height: 40px; }
+    .nav-btn.proj-tab { min-height: 26px; }
+}
+
+/* The plan, above the account tile.
+   --------------------------------------------------------------------------
+   Stav, 30/08: "שה'מסלול סילבר' יופיע מעל הקוביה של המשתמש." The tile answers
+   "who am I"; this answers "what am I paying for", which is the question every
+   upgrade depends on — so it should not be reachable only by opening a menu.
+   Quiet by default and coloured only for a paid plan: a permanent badge that
+   shouts at a free user every time he looks at the rail is nagging, not
+   information. */
+.rail-plan {
+    display: block;
+    width: 100%;
+    margin-block-end: var(--sp-2);
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-pill);
+    background: transparent;
+    color: var(--text-3);
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.rail-plan:hover { color: var(--text); border-color: var(--accent); }
+.rail-plan.plan-pro,
+.rail-plan.plan-business { color: var(--accent); border-color: var(--accent); }
+/* A guest is being invited, not labelled. */
+.rail-plan.plan-guest { color: var(--accent); border-color: var(--accent); }
+
+@media (max-width: 768px) {
+    /* The rail is a 60px bottom bar on a phone — there is no room for a line of
+       text above the avatar, and the plan is already in the menu the avatar
+       opens. */
+    .rail-plan { display: none; }
+}

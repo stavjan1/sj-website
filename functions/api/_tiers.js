@@ -20,39 +20,95 @@ export const ADMIN_EMAIL = 'stavjan19989@gmail.com';
 //   shareLink      — public share-link for quotes
 //   advancedModel  — access to the "advanced ⚡" model class
 //   pdfCredit      — whether PDFs carry the "הופק באמצעות זרם" credit line
+//   invoicing      — connect your own invoicing provider and issue real tax
+//                    documents through its API. DIAMOND ONLY, on Stav's call
+//                    (30/08): "לחיצה עליהם תגיד שזה למשתמשי דיימונד".
+//                    The line the plans draw: gold is how well you PRICE
+//                    (photos, the better model, unlimited questions); diamond is
+//                    what happens after they say yes — invoices, providers,
+//                    cash flow, banks.
 export const TIER_DEFAULTS = {
   guest: {
-    aiDaily: 10, projects: 1, quotesPerMonth: 0, catalogItems: 10,
-    reports: false, reminders: false, shareLink: false, advancedModel: false, pdfCredit: true,
+    // 10 → 25 (21.8.2026) → 100 (22.8.2026), both at Stav's request. This is
+    // the quota every anonymous visitor gets, counted per IP per day, so it is
+    // a cost lever as much as a limit: the per-minute burst guard in chat.js
+    // still caps abuse, but the daily ceiling is what bounds a bad day. Easy to
+    // walk back, and without a deploy: set `config:tiers` in KV.
+    // 3, not 100. An unlimited anonymous product cannot be measured, cannot be
+    // followed up, and cannot be beaten by anything you charge for. Three is
+    // enough to ask a real question and see a real price — which is the whole
+    // job of the guest tier. Stav, 29/08: nudge after the second, lock after
+    // the third. Tunable from KV without a deploy.
+    aiDaily: 3, projects: 1, quotesPerMonth: 0, catalogItems: 10,
+    reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true, invoicing: false,
   },
   free: {
     // quotesPerMonth = distinct PDF exports allowed per month (monthly-renewing,
     // server-enforced per Google account; guests can't export at all).
     aiDaily: 20, projects: 3, quotesPerMonth: 3, catalogItems: 10,
-    reports: false, reminders: false, shareLink: false, advancedModel: false, pdfCredit: true,
+    reports: false, reminders: false, shareLink: false, advancedModel: false, chatPhotos: false, pdfCredit: true, invoicing: false,
   },
   pro: {
     aiDaily: 150, projects: -1, quotesPerMonth: -1, catalogItems: 1000,
-    reports: true, reminders: true, shareLink: true, advancedModel: true, pdfCredit: false,
+    reports: true, reminders: true, shareLink: true, advancedModel: true, chatPhotos: true, pdfCredit: false, invoicing: false,
   },
   business: {
     aiDaily: 300, projects: -1, quotesPerMonth: -1, catalogItems: 2000,
-    reports: true, reminders: true, shareLink: true, advancedModel: true, pdfCredit: false,
+    reports: true, reminders: true, shareLink: true, advancedModel: true, chatPhotos: true, pdfCredit: false, invoicing: true,
   },
   admin: {
     aiDaily: -1, projects: -1, quotesPerMonth: -1, catalogItems: 5000,
-    reports: true, reminders: true, shareLink: true, advancedModel: true, pdfCredit: false,
+    reports: true, reminders: true, shareLink: true, advancedModel: true, chatPhotos: true, pdfCredit: false, invoicing: true,
   },
 };
 
 export const TIER_NAMES = ['guest', 'free', 'pro', 'business'];
 
+// What each plan is CALLED to the user. The internal names are load-bearing —
+// they are written into every tier:<email> key already sitting in KV, and
+// renaming them would reassign every existing customer — so the display name is
+// a separate map and the storage never changes. Stav, 29/08.
+export const TIER_LABELS = {
+  guest:    'אורח',
+  free:     'סילבר',
+  pro:      'גולד',
+  business: 'דיימונד',
+  admin:    'ניהול',
+};
+
 // Model classes the client is allowed to ask for. Real model names never leave
 // the server — the client only speaks "basic" / "advanced".
+// The shipped defaults. Changing which model serves customers used to require a
+// deploy, which is why the app sat two generations behind without anyone
+// deciding to: nobody wants to redeploy on a hunch. `config:models` in KV
+// overrides these, so the switch is an admin action taken AFTER the trap suite
+// has been run against the candidate — evidence first, then one click.
+// 2026-08-21: gemini-2.5-flash began returning 404 "no longer available to new
+// users", and because 404 was not a retriable status the pricing chat answered
+// every question with a Google error string instead of falling back. Google's
+// own message named gemini-3.6-flash as the replacement, so that is what this
+// is — the version Google pointed at, not a guess at the newest number.
 export const MODEL_CLASS = {
-  basic: { provider: 'gemini', model: 'gemini-2.5-flash' },
+  basic: { provider: 'gemini', model: 'gemini-3.6-flash' },
   advanced: { provider: 'gemini', model: 'gemini-2.5-pro' },
 };
+
+export async function loadModelClass(env) {
+  const merged = JSON.parse(JSON.stringify(MODEL_CLASS));
+  if (!env || !env.SJ_DATA) return merged;
+  try {
+    const raw = await env.SJ_DATA.get('config:models');
+    if (!raw) return merged;
+    const cfg = JSON.parse(raw);
+    for (const cls of ['basic', 'advanced']) {
+      if (cfg[cls] && typeof cfg[cls].model === 'string') {
+        merged[cls].model = cfg[cls].model;
+        if (typeof cfg[cls].provider === 'string') merged[cls].provider = cfg[cls].provider;
+      }
+    }
+  } catch { /* a broken override must never take the AI down */ }
+  return merged;
+}
 
 // Merge the admin-editable KV config over the shipped defaults.
 export async function loadTierConfig(env) {
@@ -156,6 +212,31 @@ export function bearerToken(request) {
   return (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
 }
 
+// The admin gate, with the two failures kept apart.
+//
+// They were one answer before — "אין הרשאה", 403 — for both "your token
+// expired" and "you are not the admin". A Google access token lives an hour,
+// so the everyday case is the first one, and it read on screen as the second:
+// the owner of the account being told he has no permission on his own admin
+// panel, with nothing suggesting that signing in again would fix it. 401 means
+// "prove who you are again" and the client silently re-mints on it; 403 means
+// "we know who you are, and it isn't you".
+//
+// Returns { ok: true, email } on success. On failure it hands back a ready
+// `response` plus the raw `status`/`body`, so an endpoint that serialises its
+// own replies (catalog.js adds CORS headers) can re-wrap instead of losing them.
+export async function adminGate(request) {
+  const email = await verifyGoogleEmail(bearerToken(request));
+  const deny = (status, body) => ({ ok: false, status, body, response: jsonResponse(body, status) });
+  if (!email) {
+    return deny(401, { error: { message: 'ההתחברות פגה, התחבר שוב לגוגל.', code: 'auth-expired' } });
+  }
+  if (email.toLowerCase() !== ADMIN_EMAIL) {
+    return deny(403, { error: { message: 'אין הרשאה.' } });
+  }
+  return { ok: true, email };
+}
+
 export function monthKey(d) {
   return (d || new Date()).toISOString().slice(0, 7); // "2026-07"
 }
@@ -188,6 +269,29 @@ export async function rateLimit(env, request, bucket, maxPerMinute) {
     return true;
   } catch {
     return true; // never let the limiter itself take the endpoint down
+  }
+}
+
+// A counter with a window measured in days rather than minutes, for the things
+// where "3 per minute per IP" is not the question. An open endpoint that sends
+// SJ-branded mail to an address the caller chooses is the example: one IP
+// sending three a minute is rate-limited already, and a botnet sending one each
+// is not — what bounds the damage there is "how many can this address receive"
+// and "how many can go out at all today".
+//
+// Same failure posture as rateLimit: if KV is unavailable the guard opens, since
+// a limiter that takes the endpoint down with it is worse than no limiter.
+export async function dailyQuota(env, key, max) {
+  if (!env || !env.SJ_DATA) return true;
+  const day = new Date().toISOString().slice(0, 10);
+  const k = `dq:${key}:${day}`;
+  try {
+    const used = parseInt((await env.SJ_DATA.get(k)) || '0', 10);
+    if (used >= max) return false;
+    await env.SJ_DATA.put(k, String(used + 1), { expirationTtl: 172800 });
+    return true;
+  } catch {
+    return true;
   }
 }
 

@@ -7,6 +7,8 @@
 // POST (owner only — verified Google token): body { data: {...quote fields} }
 //   → stores under KV key `share:<token>` and returns { token }.
 // GET ?t=<token> (public): returns { data } for the viewer page (/q/).
+// PUT ?t=<token> (public): the customer approving the quote from that page.
+//   Body { name?, note? } → stamps `approved` once and returns it.
 
 import { ADMIN_EMAIL, verifyGoogleEmail, loadTierConfig, getTierForEmail } from './_tiers.js';
 
@@ -37,6 +39,14 @@ function sanitizeQuote(d) {
     subject: str(d.subject, 300),
     vatLabel: str(d.vatLabel, 120),
     summary: str(d.summary, 5000),
+    // The terms a customer needs in front of him while deciding, and that
+    // decide the argument if there is one later.
+    validityDays: Number(d.validityDays) || 0,
+    paymentTerms: str(d.paymentTerms, 600),
+    startWithinDays: Number(d.startWithinDays) || 0,
+    durationDays: Number(d.durationDays) || 0,
+    warranty: str(d.warranty, 600),
+    exclusions: str(d.exclusions, 1200),
     finalPrice: Number(d.finalPrice) || 0,
     showItemizedPrices: d.showItemizedPrices === true,
     logo: img(d.logo),
@@ -70,12 +80,37 @@ export async function onRequest(context) {
     const token = new URL(request.url).searchParams.get('t') || '';
     if (!/^[a-z0-9]{8,20}$/i.test(token)) return json({ error: { message: 'קישור לא תקין.' } }, 400);
     const stored = await env.SJ_DATA.get('share:' + token);
-    if (!stored) return json({ error: { message: 'ההצעה לא נמצאה — ייתכן שהקישור שגוי.' } }, 404);
+    if (!stored) return json({ error: { message: 'ההצעה לא נמצאה, ייתכן שהקישור שגוי.' } }, 404);
     // Public endpoint: never expose the owner's Google account email (internal
     // bookkeeping only) to whoever holds the link.
     const data = safeParse(stored);
     if (data && typeof data === 'object') delete data.owner;
     return json({ data });
+  }
+
+  // Approval, by whoever holds the link. No account, no login: the customer
+  // presses a button on the page he was sent. The token IS the authorisation,
+  // exactly as it is for reading the quote, and an approval can only be given
+  // once — a second press returns the first one rather than overwriting it.
+  if (method === 'PUT') {
+    const token = new URL(request.url).searchParams.get('t') || '';
+    if (!/^[a-z0-9]{8,20}$/i.test(token)) return json({ error: { message: 'קישור לא תקין.' } }, 400);
+    const key = 'share:' + token;
+    const stored = await env.SJ_DATA.get(key);
+    if (!stored) return json({ error: { message: 'ההצעה לא נמצאה.' } }, 404);
+    const data = safeParse(stored);
+    if (!data || typeof data !== 'object') return json({ error: { message: 'ההצעה פגומה.' } }, 500);
+    if (data.approved && data.approved.at) return json({ ok: true, approved: data.approved });
+
+    let body = {};
+    try { body = await request.json(); } catch { /* an empty body still approves */ }
+    data.approved = {
+      at: Date.now(),
+      name: str(body && body.name, 120),
+      note: str(body && body.note, 500),
+    };
+    await env.SJ_DATA.put(key, JSON.stringify(data));
+    return json({ ok: true, approved: data.approved });
   }
 
   if (method === 'POST') {
@@ -129,7 +164,7 @@ function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
 function cors() {
   return {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
 }

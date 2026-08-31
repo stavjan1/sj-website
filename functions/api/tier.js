@@ -8,13 +8,14 @@
 //   POST /api/tier {config: {...}}   → save limit overrides to KV `config:tiers`
 
 import {
-  ADMIN_EMAIL, TIER_DEFAULTS, TIER_NAMES, loadTierConfig,
-  verifyGoogleEmail, bearerToken, jsonResponse,
+  TIER_DEFAULTS, TIER_NAMES, loadTierConfig, adminGate, jsonResponse,
 } from './_tiers.js';
 
+// Kept as a thin shim over the shared gate so an expired sign-in comes back as
+// 401 ("התחבר שוב") rather than 403 ("אין הרשאה") here too.
 async function requireAdmin(request) {
-  const email = await verifyGoogleEmail(bearerToken(request));
-  return email && email.toLowerCase() === ADMIN_EMAIL ? email : null;
+  const gate = await adminGate(request);
+  return gate.ok ? gate.email : null;
 }
 
 export async function onRequestGet(context) {

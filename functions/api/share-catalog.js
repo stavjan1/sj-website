@@ -1,17 +1,25 @@
 // Cloudflare Pages Function — POST /api/share-catalog
 // A user offers their personal price catalog to the shared "system" catalog.
-// We email it to SJ for review (web3forms — no setup, works across devices). If
-// the prices check out, they can be promoted into the shared catalog manually.
+// This function validates and formats the submission, then returns a ready-to-post
+// web3forms payload that the browser sends (see the note below). If the prices
+// check out, they can be promoted into the shared catalog manually.
+//
+// Why the browser posts it: on the web3forms free plan, server-to-server
+// submissions are rejected with 403 "This method is not allowed. Use our API in
+// client side", so a Worker calling it directly always fails. The key is public
+// by design (already a hidden input in the contact forms).
 //
 // Note on contact details: Google sign-in only exposes name + email (userinfo
 // scopes). A phone number is never available from Google, so the client asks for
 // it optionally and passes it through here.
 
 // Read the web3forms key from the environment (Cloudflare → Settings → Env vars,
-// name WEB3FORMS_KEY). The literal fallback keeps lead capture working until the
-// env var is set — but it lives in a PUBLIC repo, so it must be rotated: set the
-// new key as WEB3FORMS_KEY and the exposed one below becomes dead.
+// name WEB3FORMS_KEY); the literal below is the fallback until that is set.
+// The key is handed to the browser on purpose: web3forms access keys are public
+// by design, and its free plan rejects server-to-server submissions outright.
+// See lead.js for why rotating it is a five-file change, not an env var.
 const WEB3FORMS_KEY_FALLBACK = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
+const WEB3FORMS_ENDPOINT = 'https://api.web3forms.com/submit';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -46,33 +54,27 @@ export async function onRequestPost(context) {
 
   const lines = items.length
     ? items.map((it) => `• ${it.name} — ${it.price}₪${it.unit ? ' / ' + it.unit : ''}`).join('\n')
-    : (fileText ? `קובץ מצורף (${fileName}):\n${'-'.repeat(20)}\n${fileText}` : `נשלח שם קובץ בלבד: ${fileName} — יש ליצור קשר עם השולח להעברתו.`);
+    : (fileText ? `קובץ מצורף (${fileName}):\n${'-'.repeat(20)}\n${fileText}` : `נשלח שם קובץ בלבד: ${fileName}, יש ליצור קשר עם השולח להעברתו.`);
   const contact = [
     `שם: ${name}`,
-    email ? `אימייל: ${email}` : 'אימייל: (אורח — לא מחובר)',
+    email ? `אימייל: ${email}` : 'אימייל: (אורח · לא מחובר)',
     phone ? `טלפון: ${phone}` : 'טלפון: לא סופק',
     profession ? `תחום: ${profession}` : null,
   ].filter(Boolean).join('\n');
 
-  try {
-    const r = await fetch('https://api.web3forms.com/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        access_key: WEB3FORMS_KEY,
-        subject: `מחירון שהתקבל לשיתוף — ${name}` + (items.length ? ` (${items.length} פריטים)` : ` (קובץ: ${fileName})`),
-        from_name: 'שיתוף מאגר מחירים — SJ',
-        email: email || 'info@sj-eng.co.il',
-        name,
-        message: `התקבל מחירון לשיתוף עם המערכת.\n\nפרטי השולח:\n${contact}\n\n${'='.repeat(30)}\n${items.length ? `מחירון (${items.length} פריטים):\n` : ''}${lines}`,
-      }),
-    });
-    if (!r.ok) throw new Error('web3forms ' + r.status);
-  } catch (e) {
-    return json({ error: { message: 'השליחה נכשלה כרגע. נסה שוב מאוחר יותר.' } }, 502);
-  }
+  const notify = {
+    endpoint: WEB3FORMS_ENDPOINT,
+    payload: {
+      access_key: WEB3FORMS_KEY,
+      subject: `מחירון שהתקבל לשיתוף, ${name}` + (items.length ? ` (${items.length} פריטים)` : ` (קובץ: ${fileName})`),
+      from_name: 'שיתוף מאגר מחירים · SJ',
+      email: email || 'info@sj-eng.co.il',
+      name,
+      message: `התקבל מחירון לשיתוף עם המערכת.\n\nפרטי השולח:\n${contact}\n\n${'='.repeat(30)}\n${items.length ? `מחירון (${items.length} פריטים):\n` : ''}${lines}`,
+    },
+  };
 
-  return json({ ok: true, count: items.length });
+  return json({ ok: true, count: items.length, notify });
 }
 
 function json(obj, status) {

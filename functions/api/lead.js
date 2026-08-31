@@ -1,28 +1,48 @@
 // Cloudflare Pages Function — "email me this conversation" for the assistant.
 // Takes the chat transcript + the visitor's name/email, has the AI draft a warm,
 // personalised follow-up in SJ's voice (a light, accurate knowledge demo), then:
-//   1) always emails SJ the lead + draft + transcript (web3forms — no setup), and
+//   1) hands the browser a ready-to-post web3forms payload so SJ gets the lead, and
 //   2) if RESEND_API_KEY is configured, also emails the visitor FROM SJ (Resend).
 // So it works today as lead capture, and upgrades to true auto-send once a Resend
 // key + verified domain (sj-eng.co.il) are added.
+//
+// Why the browser posts to web3forms instead of this function: on the web3forms
+// free plan, server-to-server submissions are rejected with
+// 403 "This method is not allowed. Use our API in client side" — a Worker calling
+// it directly always fails. The key is public by design (it is already a hidden
+// input in the contact forms), so relaying it to the client costs nothing and
+// keeps a single definition of it here.
 
 import { generate } from './_ai.js';
-import { rateLimit } from './_tiers.js';
+import { rateLimit, dailyQuota } from './_tiers.js';
+import { sendMail, SJ_FROM } from './_mail.js';
 
 // web3forms key: prefer the env var (Cloudflare → Settings → Env vars,
-// WEB3FORMS_KEY). The literal fallback keeps this working until the env var is
-// set, but it's committed in a PUBLIC repo — rotate the key and set the new one
-// as WEB3FORMS_KEY so the exposed value below stops working.
+// WEB3FORMS_KEY). The literal below is the fallback until that is set.
+//
+// It being in a public repo is NOT a leak: web3forms access keys are public by
+// design — the contact forms carry one in a hidden input, and the free plan
+// only accepts client-side submissions. What a public key costs you is form
+// spam, and the fix for that is web3forms' own captcha/domain settings, not
+// rotation.
+//
+// If you do rotate it, rotate all FIVE places or leads go missing silently:
+//   functions/api/lead.js          (here — or set WEB3FORMS_KEY and skip it)
+//   functions/api/share-catalog.js (same)
+//   contact.html, index.html, zerem/index.html
+// Those three hardcode the key in the form itself and never reach a Function,
+// so setting the env var alone leaves them posting a dead key — no error, no
+// bounce, the lead just never arrives. A test pins all five together.
 const WEB3FORMS_KEY_FALLBACK = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
-const SJ_FROM = 'SJ הנדסת חשמל <info@sj-eng.co.il>';
+const WEB3FORMS_ENDPOINT = 'https://api.web3forms.com/submit';
 
 const DRAFT_PROMPT = `אתה כותב בשם SJ הנדסת חשמל מייל קצר, חם ומקצועי בעברית אל מתעניין שדיבר עם העוזר ההנדסי באתר. בהתבסס על תמלול השיחה:
 - פתח בשלום אישי לפי השם.
 - ציין שאתה מצרף את שיחתו עם העוזר.
-- סכם במשפט-שניים את הנושא שהעלה, ואת הכיוון שבו SJ יכולים לעזור לפתור אותו — הדגמת ידע קצרה, מדויקת וענווה, בלי להמציא נתונים, תקנים או מחירים, ובלי להבטיח הבטחות. אם אינך בטוח בפרט — נסח בזהירות.
+- סכם במשפט-שניים את הנושא שהעלה, ואת הכיוון שבו SJ יכולים לעזור לפתור אותו, הדגמת ידע קצרה, מדויקת וענווה, בלי להמציא נתונים, תקנים או מחירים, ובלי להבטיח הבטחות. אם אינך בטוח בפרט, נסח בזהירות.
 - ציין שביצענו עבודות דומות בעבר.
 - הזמן אותו לפנות בכל שאלה, בנימה של עובד מצטיין ושירותי.
-כתוב 4–6 משפטים, מקצועי וחם, בלי כותרות ובלי Markdown. אם לא עולה נושא חשמלי ברור מהשיחה — כתוב מייל כללי, נעים ומזמין. חתום בשורה נפרדת: "בברכה, SJ הנדסת חשמל". החזר אך ורק את גוף המייל.`;
+כתוב 4–6 משפטים, מקצועי וחם, בלי כותרות ובלי Markdown. אם לא עולה נושא חשמלי ברור מהשיחה, כתוב מייל כללי, נעים ומזמין. חתום בשורה נפרדת: "בברכה, SJ הנדסת חשמל". החזר אך ורק את גוף המייל.`;
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -45,16 +65,56 @@ export async function onRequestPost(context) {
     .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
     .slice(-20);
   if (turns.length === 0) return json({ error: { message: 'אין שיחה לשלוח.' } }, 400);
+  // A real "email me this conversation" has a conversation behind it: the
+  // visitor asked something and the assistant answered. One fabricated turn is
+  // the cheapest possible way to use this endpoint as a mailer.
+  if (!turns.some((m) => m.role === 'user') || !turns.some((m) => m.role === 'assistant')) {
+    return json({ error: { message: 'אין שיחה לשלוח.' } }, 400);
+  }
 
+  // The abuse this endpoint is exposed to once RESEND_API_KEY exists is not
+  // volume from one IP — the per-minute limiter above already answers that. It
+  // is that ANYONE can make SJ's domain send mail to an address they choose,
+  // carrying text they wrote. Two ceilings bound that without asking a real
+  // visitor for anything: how many times one address can be mailed, and how
+  // many can go out in a day at all. Both are checked before the AI call, so a
+  // flood costs no tokens either.
+  const addrKey = 'lead:' + email.toLowerCase().replace(/[^\w@.+-]/g, '');
+  if (!(await dailyQuota(env, addrKey, 2))) {
+    return json({ error: { message: 'כבר נשלח סיכום לכתובת הזאת היום.' } }, 429);
+  }
+  if (!(await dailyQuota(env, 'lead:all', 60))) {
+    return json({ error: { message: 'נשלחו היום הרבה סיכומים. נסו שוב מחר או פנו אלינו ישירות.' } }, 429);
+  }
+
+  // The last thing the caller controls that leaves this building. The ceilings
+  // above bound HOW MANY mails go out; this bounds what one can carry.
+  //
+  // The mail is sent from SJ's verified domain, and in the abuse case the
+  // visitor-authored turns are attacker-authored — so a working link inside
+  // them is a phishing payload wearing SJ's return address. Defanged in the
+  // USER turns only: the assistant’s own replies come from our model and may
+  // legitimately link to the site. The text still reads; the link no longer
+  // clicks.
+  const defang = (t) => t.replace(/https?:\/\/\S+|www\.\S+/gi, '[קישור הוסר]');
   const transcript = turns
-    .map((m) => (m.role === 'user' ? 'מתעניין: ' : 'העוזר של SJ: ') + m.content.trim())
+    // Each turn is bounded like /api/assistant does it: this endpoint is public
+    // and feeds an AI call, so message size cannot be attacker-chosen.
+    .map((m) => {
+      const text = m.content.trim().slice(0, 2000);
+      return m.role === 'user'
+        ? 'מתעניין: ' + defang(text)
+        : 'העוזר של SJ: ' + text;
+    })
     .join('\n\n');
 
   // 1) AI-drafted personalised follow-up (non-streaming).
   let draft = '';
   try {
     const res = await generate(env, {
-      provider: (body.provider || 'gemini').toLowerCase(),
+      // Pinned, not body.provider: an endpoint that needs no account does not
+      // choose which model it spends the product's key on.
+      provider: 'gemini',
       messages: [
         { role: 'system', content: DRAFT_PROMPT },
         { role: 'user', content: `שם המתעניין: ${name}\n\nתמלול השיחה:\n${transcript}` },
@@ -70,55 +130,35 @@ export async function onRequestPost(context) {
   } catch (e) { /* fall through to generic */ }
 
   if (!draft) {
-    draft = `שלום ${name},\nמצרפים את שיחתך עם העוזר ההנדסי של SJ. נשמח לעזור ולהתעמק יחד בנושא — דבר איתנו חופשי בכל שאלה.\n\nבברכה, SJ הנדסת חשמל`;
+    draft = `שלום ${name},\nמצרפים את שיחתך עם העוזר ההנדסי של SJ. נשמח לעזור ולהתעמק יחד בנושא, דבר איתנו חופשי בכל שאלה.\n\nבברכה, SJ הנדסת חשמל`;
   }
 
-  const fullBody = `${draft}\n\n— — —\nתמלול השיחה המלא:\n\n${transcript}`;
+  const fullBody = `${draft}\n\n— · —\nתמלול השיחה המלא:\n\n${transcript}`;
 
-  // 2a) Always notify SJ (lead capture) via web3forms — needs no setup.
-  let sjNotified = false;
-  try {
-    const r = await fetch('https://api.web3forms.com/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        access_key: (env && env.WEB3FORMS_KEY) || WEB3FORMS_KEY_FALLBACK,
-        subject: `ליד חדש מהעוזר באתר — ${name}`,
-        from_name: 'עוזר ה-AI של SJ',
-        email,
-        name,
-        message: `מתעניין/ת: ${name} <${email}>\n\nטיוטת מייל מענה (מוכנה לשליחה):\n${draft}\n\n${'='.repeat(30)}\nתמלול השיחה:\n${transcript}`,
-      }),
-    });
-    sjNotified = r.ok;
-  } catch (e) { /* non-fatal */ }
+  // 2a) Lead capture for SJ — composed here, posted by the browser (see header).
+  const notify = {
+    endpoint: WEB3FORMS_ENDPOINT,
+    payload: {
+      access_key: (env && env.WEB3FORMS_KEY) || WEB3FORMS_KEY_FALLBACK,
+      subject: `ליד חדש מהעוזר באתר, ${name}`,
+      from_name: 'עוזר ה-AI של SJ',
+      email,
+      name,
+      message: `מתעניין/ת: ${name} <${email}>\n\nטיוטת מייל מענה (מוכנה לשליחה):\n${draft}\n\n${'='.repeat(30)}\nתמלול השיחה:\n${transcript}`,
+    },
+  };
 
-  // 2b) If Resend is configured, send the email straight to the visitor FROM SJ.
-  let sentToVisitor = false;
-  if (env.RESEND_API_KEY) {
-    try {
-      const r = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.RESEND_API_KEY}` },
-        body: JSON.stringify({
-          from: env.RESEND_FROM || SJ_FROM,
-          to: [email],
-          reply_to: 'info@sj-eng.co.il',
-          subject: 'סיכום שיחתך עם SJ הנדסת חשמל',
-          text: fullBody,
-        }),
-      });
-      sentToVisitor = r.ok;
-    } catch (e) { /* non-fatal */ }
-  }
-
-  if (!sjNotified && !sentToVisitor) {
-    return json({ error: { message: 'השליחה נכשלה כרגע. אפשר לפנות ישירות: 053-530-2887.' } }, 502);
-  }
+  // 2b) If Resend is configured, send the summary straight to the visitor FROM SJ.
+  const sentToVisitor = (await sendMail(env, {
+    to: email,
+    subject: 'סיכום שיחתך עם SJ הנדסת חשמל',
+    text: fullBody,
+  })).ok;
 
   return json({
     ok: true,
     sentToVisitor,
+    notify,
     message: sentToVisitor
       ? 'הסיכום נשלח אליך למייל ✓ נשמח לעזור בכל שאלה.'
       : 'קיבלנו את הפנייה ✓ ניצור איתך קשר בהקדם.',

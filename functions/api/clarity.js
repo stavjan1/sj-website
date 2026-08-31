@@ -12,7 +12,7 @@
 // The GET returns aggregate UX metrics only (session counts, popular pages,
 // rage clicks — no PII), cached 6h in KV: Clarity allows ~10 API calls/day.
 
-import { ADMIN_EMAIL, verifyGoogleEmail, bearerToken, rateLimit, jsonResponse } from './_tiers.js';
+import { adminGate, rateLimit, jsonResponse } from './_tiers.js';
 
 const TOKEN_KEY = 'config:clarity_token';
 const CACHE_KEY = 'clarity:cache';
@@ -20,10 +20,8 @@ const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const email = await verifyGoogleEmail(bearerToken(request));
-  if (!email || email.toLowerCase() !== ADMIN_EMAIL) {
-    return jsonResponse({ error: { message: 'אין הרשאה.' } }, 403);
-  }
+  const gate = await adminGate(request);
+  if (!gate.ok) return gate.response;
   if (!env.SJ_DATA) return jsonResponse({ error: { message: 'KV לא מוגדר.' } }, 501);
 
   let body;
@@ -40,12 +38,23 @@ export async function onRequestPost(context) {
 
 export async function onRequestGet(context) {
   const { request, env } = context;
+  // The POST beside this one has had adminGate since it was written; this GET
+  // never did. It returns the BUSINESS's own Clarity analytics — sessions,
+  // pages, where visitors drop off — to anyone who asks. Not customer data, but
+  // Stav's traffic figures were public, and a rate limit is not an
+  // authorisation check.
+  const gate = await adminGate(request);
+  if (!gate.ok) return gate.response;
   if (!env.SJ_DATA) return jsonResponse({ ok: false, error: 'KV לא מוגדר' }, 501);
   if (!(await rateLimit(env, request, 'clarity', 5))) {
     return jsonResponse({ ok: false, error: 'rate-limited' }, 429);
   }
 
-  const token = await env.SJ_DATA.get(TOKEN_KEY);
+  // Either place works, and neither is more correct: the admin card writes the
+  // token to KV, and CLARITY_API_TOKEN is where a Cloudflare secret naturally
+  // goes. Accepting only one of them is how this stayed unplugged — the token
+  // existed, went to the other place, and nothing said so.
+  const token = (await env.SJ_DATA.get(TOKEN_KEY)) || env.CLARITY_API_TOKEN;
   if (!token) return jsonResponse({ ok: false, error: 'token-not-set' });
 
   // Serve the cache while fresh — Clarity caps API calls per day.

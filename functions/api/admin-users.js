@@ -9,8 +9,9 @@
 // without shipping every user's full quote blob to the browser.
 
 import {
-  ADMIN_EMAIL, verifyGoogleEmail, bearerToken, jsonResponse, getTierForEmail,
+  ADMIN_EMAIL, adminGate, jsonResponse, getTierForEmail,
 } from './_tiers.js';
+import { sendMailTracked } from './_mail.js';
 
 const USER_PREFIX = 'user:';
 
@@ -23,10 +24,8 @@ function projectAmount(p) {
 export async function onRequestGet(context) {
   const { request, env } = context;
 
-  const email = await verifyGoogleEmail(bearerToken(request));
-  if (!email || email.toLowerCase() !== ADMIN_EMAIL) {
-    return jsonResponse({ error: { message: 'אין הרשאה.' } }, 403);
-  }
+  const gate = await adminGate(request);
+  if (!gate.ok) return gate.response;
   if (!env.SJ_DATA) {
     return jsonResponse({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
   }
@@ -69,7 +68,107 @@ export async function onRequestGet(context) {
     }
   } while (cursor && users.length < 500);
 
-  // Most recently active first.
+  // The plan each of them is on. Not a getTierForEmail per user — that is one
+  // KV read each, and this list runs every time the panel opens. Only people
+  // who were GIVEN a plan have a tier: key at all, and paid users are few, so
+  // the whole picture costs one list plus a read per paying customer.
+  const tiers = new Map();
+  try {
+    let tc;
+    do {
+      const res = await env.SJ_DATA.list({ prefix: 'tier:', cursor: tc, limit: 1000 });
+      tc = res.list_complete ? null : res.cursor;
+      const vals = await Promise.all(res.keys.map((k) => env.SJ_DATA.get(k.name)));
+      res.keys.forEach((k, i) => { if (vals[i]) tiers.set(k.name.slice(5), vals[i]); });
+    } while (tc);
+  } catch { /* a missing tier map is a list of free users, not an error page */ }
+  users.forEach((u) => {
+    u.tier = u.email === ADMIN_EMAIL ? 'admin' : (tiers.get(u.email) || 'free');
+  });
+
+  // Most recently active first, and paying customers first within that.
   users.sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
-  return jsonResponse({ ok: true, count: users.length, users });
+
+  // Delivery state of the signup notification. Shown next to the counter so a
+  // broken key is visible where it matters — the old notification failed
+  // silently for months while the UI claimed it was working.
+  let mail = null;
+  try { mail = safeParse((await env.SJ_DATA.get('mail:last:signup')) || 'null'); } catch { /* optional */ }
+  const mailConfigured = !!(env.RESEND_API_KEY);
+
+  return jsonResponse({ ok: true, count: users.length, users, mail, mailConfigured });
+}
+
+
+// DELETE /api/admin-users?user=<email>  → erase one user's record, on request
+//
+// zerem/terms.html tells a user they can write to info@sj-eng.co.il and have
+// their data deleted. Answering that by hand in the Cloudflare dashboard is how
+// a promise gets broken on a busy week. This is the same erasure the user can
+// perform themselves in Settings, done on their behalf.
+//
+// The target is an explicit parameter, so unlike the user's own DELETE this one
+// CAN name somebody else — which is exactly why it is admin-gated, requires the
+// address in full, and refuses anything that is not shaped like one.
+export async function onRequestDelete(context) {
+  const { request, env } = context;
+
+  const gate = await adminGate(request);
+  if (!gate.ok) return gate.response;
+  if (!env.SJ_DATA) {
+    return jsonResponse({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
+  }
+
+  const target = (new URL(request.url).searchParams.get('user') || '').trim().toLowerCase();
+  // No prefix match, no wildcard, no empty string: one whole address, or nothing.
+  if (!target || target.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target)) {
+    return jsonResponse({ error: { message: 'צריך כתובת מייל מלאה של המשתמש.' } }, 400);
+  }
+  if (target === ADMIN_EMAIL) {
+    return jsonResponse({ error: { message: 'אי אפשר למחוק את חשבון המנהל מכאן.' } }, 400);
+  }
+
+  const existed = !!(await env.SJ_DATA.get(USER_PREFIX + target));
+  await env.SJ_DATA.delete(USER_PREFIX + target);
+  try { await env.SJ_DATA.delete('tier:' + target); } catch { /* no tier is the normal case */ }
+
+  return jsonResponse({ ok: true, deleted: target, existed });
+}
+
+
+// POST /api/admin-users  { test: 'mail' }  → send a real test email to the admin
+//
+// Exists because the only honest way to know outbound mail works is to send
+// one. Verifying that needed a second Google account and a signup; this makes
+// it a button, and it exercises the exact path a real signup takes —
+// sendMailTracked, same channel key, same recording — so a pass here means a
+// signup would have arrived too.
+export async function onRequestPost(context) {
+  const { request, env } = context;
+
+  const gate = await adminGate(request);
+  if (!gate.ok) return gate.response;
+
+  const body = await request.json().catch(() => ({}));
+  if (body.test !== 'mail') return jsonResponse({ error: { message: 'בקשה לא מוכרת.' } }, 400);
+
+  if (!env.RESEND_API_KEY) {
+    return jsonResponse({
+      ok: false,
+      reason: 'לא הוגדר RESEND_API_KEY במשתני הסביבה של Cloudflare, בלעדיו לא נשלח דבר.',
+    });
+  }
+
+  const result = await sendMailTracked(env, 'signup', {
+    to: ADMIN_EMAIL,
+    subject: '⚡ בדיקת מייל מזרם',
+    text: `זו הודעת בדיקה שנשלחה מפאנל הניהול של זרם.
+
+אם היא הגיעה, ההתראה על נרשם חדש תגיע גם היא, דרך אותו נתיב בדיוק.`,
+  });
+
+  return jsonResponse({
+    ok: !!result.ok,
+    reason: result.ok ? null : (result.error || result.skipped || 'שגיאה לא ידועה'),
+  });
 }

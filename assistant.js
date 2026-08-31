@@ -49,18 +49,34 @@
         var bar = document.createElement('div');
         bar.id = 'sj-cookie-bar';
         bar.setAttribute('dir', 'rtl');
-        bar.style.cssText = 'position:fixed;bottom:0;right:0;left:0;z-index:9998;' +
-          'background:rgba(20,20,25,0.97);border-top:1px solid rgba(255,255,255,0.1);' +
-          'color:#e4e4e7;font-size:13px;padding:10px 16px;display:flex;gap:12px;' +
-          'align-items:center;justify-content:center;flex-wrap:wrap;font-family:inherit;';
+        // z-index stays under --z-modal (1000): the notice must never sit on top of
+        // an open dialog (the reservist certificate) and swallow its buttons.
+        // Every colour comes from #sj-cookie-bar in styles.css. It used to be
+        // painted here inline in V2's blue, which is why one blue button kept
+        // appearing on a page with no blue in it.
         bar.innerHTML =
           '<span>האתר משתמש בעוגיות ובמדידה אנונימית לשיפור החוויה. ' +
-          '<a href="/privacy.html" style="color:#4ea8ff">למדיניות הפרטיות ולביטול המדידה</a></span>' +
-          '<button id="sj-cookie-ok" style="background:#2b74db;color:#fff;border:none;' +
-          'border-radius:8px;padding:6px 16px;font-size:13px;cursor:pointer;font-family:inherit">הבנתי</button>';
+          '<a href="/privacy.html">למדיניות הפרטיות ולביטול המדידה</a></span>' +
+          '<button id="sj-cookie-ok">הבנתי</button>';
         document.body.appendChild(bar);
+
+        // The bar spans the bottom of the screen, and the two floating buttons
+        // live there too — on a phone it covered the chat launcher completely,
+        // so the one control that opens the assistant could not be tapped
+        // until the notice was dismissed. Publish the bar's real height and
+        // let the buttons sit above it.
+        var lift = function () {
+          document.body.style.setProperty('--sj-cookie-h', bar.offsetHeight + 'px');
+        };
+        lift();
+        document.body.classList.add('sj-has-cookiebar');
+        window.addEventListener('resize', lift);
+
         document.getElementById('sj-cookie-ok').onclick = function () {
           try { localStorage.setItem('sj_cookie_ok', '1'); } catch (e) {}
+          window.removeEventListener('resize', lift);
+          document.body.classList.remove('sj-has-cookiebar');
+          document.body.style.removeProperty('--sj-cookie-h');
           bar.remove();
         };
       });
@@ -82,17 +98,17 @@
   var COPY = MODE === 'sale' ? {
     title: 'עוזר המערכת',
     subtitle: 'איך משתמשים בכלי?',
-    welcome: 'היי! אני העוזר של מערכת הצעות המחיר של SJ. אשמח להסביר איך לעבוד עם הכלי — זרימת העבודה (תכנון ← תמחור ← הכנת טיוטה), ניהול פרויקטים, מאגר המחירים, ייצוא PDF וגיבוי הענן. מה תרצה לדעת?',
+    welcome: 'היי! אני העוזר של מערכת הצעות המחיר של SJ. אשמח להסביר איך לעבוד עם הכלי: זרימת העבודה (תכנון ← תמחור ← הכנת טיוטה), ניהול פרויקטים, מאגר המחירים, ייצוא PDF וגיבוי הענן. מה תרצה לדעת?',
     suggestions: ['איך יוצרים הצעת מחיר חדשה?', 'איך מוסיפים מחירים למאגר?', 'איך מייצאים PDF?'],
     placeholder: 'שאלה על השימוש במערכת…',
     disclaimer: 'עוזר להפעלת המערכת. לשאלות חשבונאיות/משפטיות התייעצו עם איש מקצוע.',
   } : {
     title: 'העוזר ההנדסי של SJ',
-    subtitle: 'שאלות חשמל — תשובה מיידית',
-    welcome: 'שלום וברוכים הבאים 🙂 אני העוזר ההנדסי של SJ הנדסת חשמל. אשמח לעזור בכל שאלה על חשמל — תקלות בבית, פחת ומאמ"תים, עמדות טעינה, לוחות, הארקה ובטיחות. שאלות שתלויות בחוק או ברישוי אפנה ישירות ל-SJ. אז במה אפשר לעזור?',
-    suggestions: ['הפחת קפץ ולא עולה, מה לעשות?', 'השקע מתחמם — זה מסוכן?', 'מה לבדוק לפני התקנת עמדת טעינה?'],
+    subtitle: 'שאלות חשמל · תשובה מיידית',
+    welcome: 'שלום וברוכים הבאים 🙂 אני העוזר ההנדסי של SJ הנדסת חשמל. אשמח לעזור בכל שאלה על חשמל: תקלות בבית, פחת ומאמ"תים, עמדות טעינה, לוחות, הארקה ובטיחות. שאלות שתלויות בחוק או ברישוי אפנה ישירות ל-SJ. אז במה אפשר לעזור?',
+    suggestions: ['הפחת קפץ ולא עולה, מה לעשות?', 'השקע מתחמם, זה מסוכן?', 'מה לבדוק לפני התקנת עמדת טעינה?'],
     placeholder: 'כתבו שאלה על חשמל…',
-    disclaimer: 'תשובות כלליות בלבד. במצב חירום נתקו את המפסק הראשי; אש — 102.',
+    disclaimer: 'תשובות כלליות בלבד. במצב חירום נתקו את המפסק הראשי; אש, 102.',
   };
 
   var selectedModel = CONFIG.defaultModel;
@@ -157,8 +173,7 @@
     launcher.id = 'sj-assist-launcher';
     launcher.setAttribute('aria-label', 'פתיחת העוזר ההנדסי של SJ');
     launcher.innerHTML =
-      '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>' +
-      '<span class="sj-assist-bolt">⚡</span>';
+      '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>';
     launcher.addEventListener('click', toggle);
 
     // Panel
@@ -187,9 +202,9 @@
       '<div class="sj-assist-log" id="sj-assist-log" aria-live="polite"></div>' +
       '<div class="sj-assist-suggest" id="sj-assist-suggest"></div>' +
       (MODE === 'public'
-        ? '<div class="sj-assist-escalate" id="sj-assist-escalate" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 14px;border-top:1px solid rgba(255,255,255,0.07);">' +
-            '<span style="font-size:12px;color:#9aa6c0;">לא מרוצה מהתשובה?</span>' +
-            '<button type="button" id="sj-assist-tosj" style="background:rgba(43,116,219,0.16);color:#7fb0ff;border:1px solid rgba(43,116,219,0.45);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">שלח הודעה אל SJ ✉️</button>' +
+        ? '<div class="sj-assist-escalate" id="sj-assist-escalate">' +
+            '<span>לא מרוצה מהתשובה?</span>' +
+            '<button type="button" class="sj-assist-tosj" id="sj-assist-tosj">שליחת הודעה אל SJ</button>' +
           '</div>'
         : '') +
       '<div class="sj-assist-inputbar">' +
@@ -297,7 +312,7 @@
     if (!from || !used || from === used) return;
     var fl = CONFIG.providerLabels[from] || from;
     var ul = CONFIG.providerLabels[used] || used;
-    els.log.appendChild(el('div', 'sj-assist-note', 'עברנו אוטומטית ל-' + ul + ' ⚡'));
+    els.log.appendChild(el('div', 'sj-assist-note', 'עברנו אוטומטית ל-' + ul));
     scrollDown();
   }
 
@@ -307,13 +322,13 @@
     if (!messages.some(function (m) { return m.role === 'user'; })) {
       addBubble('bot', toSJ
         ? 'בשמחה! ספרו לי קודם במשפט במה מדובר, ואז נעביר את הפנייה ל-SJ ונחזור אליכם.'
-        : 'אשמח לשלוח לך סיכום! ספרו לי קודם במה אפשר לעזור, ואז נשלח לכם את השיחה למייל.');
+        : 'אשמח לשלוח לכם סיכום! ספרו לי קודם במה אפשר לעזור, ואז נשלח את השיחה למייל.');
       return;
     }
     clearSuggestions();
     var form = el('div', 'sj-assist-emailform');
     form.innerHTML =
-      '<div class="sj-assist-ef-title">' + (toSJ ? '✉️ נעביר את שיחתך ל-SJ — נחזור אליך בהקדם' : '✉️ נשמח לשלוח לך את סיכום השיחה למייל') + '</div>' +
+      '<div class="sj-assist-ef-title">' + (toSJ ? 'נעביר את השיחה ל-SJ ונחזור אליכם בהקדם' : 'נשמח לשלוח לכם את סיכום השיחה למייל') + '</div>' +
       '<input type="text" class="sj-assist-ef-name" placeholder="שם מלא" autocomplete="name">' +
       '<input type="email" class="sj-assist-ef-email" placeholder="כתובת מייל" autocomplete="email">' +
       '<div class="sj-assist-ef-row">' +
@@ -330,6 +345,13 @@
     form.querySelector('.sj-assist-ef-send').addEventListener('click', function () { submitEmail(form, nameI, emailI, msg); });
     emailI.addEventListener('keydown', function (e) { if (e.key === 'Enter') submitEmail(form, nameI, emailI, msg); });
     setTimeout(function () { nameI.focus(); }, 60);
+  }
+
+  // SJ's copy of the lead didn't go out. If Resend still delivered the summary to
+  // the visitor their request was fulfilled; otherwise nothing was delivered.
+  function notifyFailed(res) {
+    if (res.d && res.d.sentToVisitor) return res;
+    return { ok: false, d: { error: { message: 'השליחה נכשלה. נסו שוב או התקשרו 053-530-2887.' } } };
   }
 
   function submitEmail(form, nameI, emailI, msg) {
@@ -349,9 +371,23 @@
     })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (res) {
+        // /api/lead composes the lead mail but cannot post it itself — web3forms
+        // rejects server-to-server calls on the free plan — so the browser does it.
+        if (res.ok && res.d && res.d.ok && res.d.notify) {
+          return fetch(res.d.notify.endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify(res.d.notify.payload),
+          })
+            .then(function (r2) { return r2.ok ? res : notifyFailed(res); })
+            .catch(function () { return notifyFailed(res); });
+        }
+        return res;
+      })
+      .then(function (res) {
         if (res.ok && res.d && res.d.ok) {
           form.remove();
-          addBubble('bot', res.d.message || 'נשלח! נחזור אליך בהקדם.');
+          addBubble('bot', res.d.message || 'נשלח! נחזור אליכם בהקדם.');
         } else {
           btn.disabled = false; btn.textContent = 'שליחה';
           msg.textContent = (res.d && res.d.error && res.d.error.message) || 'השליחה נכשלה. נסו שוב.';

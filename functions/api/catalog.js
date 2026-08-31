@@ -13,7 +13,7 @@
 // path, so an admin signed in via FedCM couldn't publish at all, and (b) never
 // checked the token's audience, so a token minted for another OAuth app was
 // accepted. One implementation only, so hardening it can never miss a caller.
-import { ADMIN_EMAIL, verifyGoogleEmail } from './_tiers.js';
+import { adminGate } from './_tiers.js';
 
 const KEY = 'system:catalog';
 const MAX_ITEMS = 2000; // full supplier imports (e.g. Arkha) can be large;
@@ -39,12 +39,9 @@ export async function onRequest(context) {
     if (!env.SJ_DATA) return json({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
 
     // Admin only: the publisher must be signed in as the admin Google account.
-    const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
-    if (!token) return json({ error: { message: 'חסר אסימון הזדהות.' } }, 401);
-    const email = await verifyGoogleEmail(token);
-    if (!email || email.toLowerCase() !== ADMIN_EMAIL) {
-      return json({ error: { message: 'רק מנהל המערכת יכול לפרסם את מאגר המערכת.' } }, 403);
-    }
+    // Re-wrapped through this file's json() so the denial keeps its CORS headers.
+    const gate = await adminGate(request);
+    if (!gate.ok) return json(gate.body, gate.status);
 
     let body;
     try { body = await request.json(); } catch { return json({ error: { message: 'גוף בקשה לא תקין.' } }, 400); }
@@ -57,7 +54,7 @@ export async function onRequest(context) {
       .filter((it) => it.name && Number.isFinite(it.price))
       .slice(0, MAX_ITEMS);
 
-    const payload = { items, updatedAt: Date.now(), publishedBy: email };
+    const payload = { items, updatedAt: Date.now(), publishedBy: gate.email };
     await env.SJ_DATA.put(KEY, JSON.stringify(payload));
     return json({ ok: true, count: items.length, updatedAt: payload.updatedAt });
   }

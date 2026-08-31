@@ -1,0 +1,86 @@
+// Ask the LIVE pricing endpoint a real case and print the answer.
+//
+// Separate from prompt_coverage.mjs on purpose: that one is free and
+// deterministic and answers "was it told?", this one costs quota and answers
+// "did it use what it was told?". Run it on a few cases, not all 24.
+//
+//   node scripts/eval/live_chat.mjs 1 5 19
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { hydrate, searchMaterials, searchMaterialsMulti, extractItemQueries,
+         categoryStats, renderMaterialsBlock, consumableQueries } from '../../functions/api/_materials.js';
+const ROOT = new URL('../../', import.meta.url);
+const read = (p) => readFileSync(new URL(p, ROOT), 'utf8');
+const db = hydrate(JSON.parse(read('data/materials/index.json')));
+const APP = read('sale/app.js');
+// The WHOLE function, not a fixed window. A 12,000-char window cut
+// getProfessionSystemInstruction — 13,970 chars — right before the JSON output
+// contract at offset 13,066, so every run tested a prompt that never asked for
+// structured output, and the absent JSON read as a production bug.
+function literalBlock(fn) {
+  const at = APP.indexOf(`function ${fn}(`);
+  if (at < 0) return '';
+  const next = APP.indexOf('\nfunction ', at + 10);
+  return ((next === -1 ? APP.slice(at) : APP.slice(at, next)).match(/`[^`]*`/g) || []).join('\n');
+}
+function sternBlock(){const r=JSON.parse(read('sale/stern-pricing.json').replace(/^\uFEFF/,''));const items=Array.isArray(r)?r:r.items;
+  return items.filter(i=>i&&i.description&&Number(i.price)>0).map(i=>`• ${i.description} — ${i.price} ₪`).join('\n');}
+const CLIENT=[literalBlock('getProfessionSystemInstruction'),sternBlock(),
+  literalBlock('getMarketAnchorsPromptBlock'),literalBlock('getPricingInstinctPromptBlock')].join('\n\n');
+
+function parseCases(md){const out=[];for(const c of md.split(/^### מקרה /m).slice(1)){
+  const num=parseInt(c,10);const title=(c.split('\n')[0]||'').replace(/^\d+\s*—\s*/,'').trim();
+  const msg=((c.match(/\*\*ההודעה:\*\*\s*\n((?:>.*\n?)+)/)||[,''])[1]).replace(/^>\s?/gm,'').trim();
+  if(msg)out.push({num,title,msg});}return out;}
+
+const want = process.argv.slice(2).map(Number);
+const cases = parseCases(read('docs/PRICING-EVAL-CASES.md')).filter(c=>want.includes(c.num));
+
+for (const c of cases) {
+  const qs = extractItemQueries(c.msg);
+  const hits = qs.length>=3 ? searchMaterialsMulti(db,qs,3,45) : searchMaterials(db,c.msg,45);
+  const named=new Set(hits.map(h=>h.sku));
+  const forgotten=searchMaterialsMulti(db,consumableQueries(c.msg),1,12).filter(h=>!named.has(h.sku));
+  const materials=renderMaterialsBlock(db,hits,categoryStats(db,c.msg),forgotten);
+  const system = CLIENT + '\n\n' + materials;
+
+  console.log(`\n${'='.repeat(78)}\nמקרה ${c.num} — ${c.title}\n${'='.repeat(78)}\n${c.msg}\n${'-'.repeat(78)}`);
+  const res = await fetch('https://www.sj-eng.co.il/api/chat', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ messages:[{role:'system',content:system},{role:'user',content:c.msg}],
+      max_tokens: 3000, stream:false }),
+  });
+  const data = await res.json().catch(()=>({}));
+  const choice = data?.choices?.[0];
+  const txt = choice?.message?.content;
+  const finish = choice?.finish_reason;
+  // Written to disk, not just printed: a 2,000-word Hebrew answer scrolls out of
+  // a terminal, and every one of these costs real AI quota — losing it to a pipe
+  // means paying twice for the same answer.
+  const outDir = new URL('data/field-research/live-answers/', ROOT);
+  mkdirSync(outDir, { recursive: true });
+  // Never let a failed call destroy a transcript that cost quota to produce.
+  // A 429 overwrote two good answers with error text before this existed, and
+  // the quota to regenerate them was already spent.
+  const dest = new URL(`case-${c.num}.md`, outDir);
+  if (!txt && existsSync(dest)) {
+    console.log(`[${res.status}] case ${c.num} — keeping the existing transcript`);
+    continue;
+  }
+  writeFileSync(dest,
+    `# מקרה ${c.num} — ${c.title}
+
+finish_reason: ${finish || 'n/a'}
+
+## ההודעה
+${c.msg}
+
+## התשובה
+${txt || `[${res.status}] ${JSON.stringify(data)}`}
+`);
+  // finish_reason is the difference between "the model was brief" and "the
+  // quote was cut off mid-item", and only one of those is a bug.
+  console.log(txt
+    ? `saved case-${c.num}.md (${txt.length} chars, finish=${finish})${finish === 'MAX_TOKENS' ? '  ⚠ TRUNCATED' : ''}`
+    : `[${res.status}] ${JSON.stringify(data).slice(0,200)}`);
+  await new Promise(r=>setTimeout(r,6000));   // stay under the 12/min burst cap
+}

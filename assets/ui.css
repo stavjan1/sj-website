@@ -1,0 +1,403 @@
+/* ============================================================
+   SJ / ZEREM — V3 shared primitives. Loaded after tokens.css.
+   Base + the small set of components every surface reuses.
+   Logical properties only (RTL-first site).
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Headings carry the display face everywhere, not only in the few places that
+   asked for it by name — half the page in one family and half in another was
+   part of why nothing looked deliberate. */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  line-height: var(--lh-tight); margin: 0 0 var(--sp-4); font-weight: 700;
+  letter-spacing: -0.01em;
+}
+p { margin: 0 0 var(--sp-4); }
+img, svg, video { max-width: 100%; height: auto; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-strong); }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::selection { background: var(--accent-soft); }
+
+/* ---------- scrollbars ----------
+   Every scrolling panel on the site was drawing the operating system's own
+   scrollbar — a grey trough with a raised block in it, which on Windows is
+   literally a 1990s control sitting inside a 2026 page. Same bar, in the
+   page's own colours, on both engines. */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong); border-radius: var(--r-pill);
+  border: 3px solid transparent; background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+.num, .money { font-variant-numeric: tabular-nums; }
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  min-height: 44px; padding: 0 var(--sp-6);
+  border: 1px solid transparent; border-radius: var(--r-sm);
+  font: 500 var(--fs-md)/1 var(--font-ui);
+  cursor: pointer; user-select: none;
+  transition: background-color var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+  touch-action: manipulation;
+}
+.btn:active { transform: translateY(1px); }
+.btn svg { width: 18px; height: 18px; flex: none; }
+
+/* The one place the sign's green is a field rather than a line. */
+.btn-primary { background: var(--action); color: var(--on-action); font-weight: 700; }
+.btn-primary:hover { background: var(--action-strong); color: var(--on-action); }
+
+.btn-quiet { background: transparent; color: var(--text); border-color: var(--border-strong); }
+.btn-quiet:hover { background: var(--surface-2); color: var(--text); }
+
+.btn-ghost { background: transparent; color: var(--text-2); }
+.btn-ghost:hover { background: var(--surface-2); color: var(--text); }
+
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { background: var(--danger-strong); color: #fff; }
+
+.btn-ok { background: var(--ok-btn); color: #fff; }
+.btn-whatsapp { background: var(--whatsapp-btn); color: #fff; }
+.btn-whatsapp:hover { filter: brightness(0.94); color: #fff; }
+
+.btn[disabled], .btn[aria-disabled="true"] { opacity: 0.45; pointer-events: none; }
+
+.btn-sm { min-height: 36px; padding: 0 var(--sp-4); font-size: var(--fs-sm); }
+.btn-lg { min-height: 52px; padding: 0 var(--sp-8); font-size: var(--fs-lg); }
+
+/* ---------- cards ---------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--sp-6);
+}
+.card-hover { transition: border-color var(--t-fast), box-shadow var(--t-fast); }
+.card-hover:hover { border-color: var(--border-strong); box-shadow: var(--shadow-1); }
+
+/* ---------- inputs ---------- */
+.field { display: flex; flex-direction: column; gap: var(--sp-2); margin-block-end: var(--sp-4); }
+.field > label { font-size: var(--fs-sm); font-weight: 500; color: var(--text-2); }
+.field .hint { font-size: var(--fs-xs); color: var(--text-3); }
+.field .error { font-size: var(--fs-xs); color: var(--danger); }
+
+.input, .select, .textarea {
+  width: 100%; min-height: 44px; padding: var(--sp-2) var(--sp-3);
+  font: 400 var(--fs-md)/1.4 var(--font-ui); color: var(--text);
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  transition: border-color var(--t-fast);
+}
+.textarea { min-height: 96px; resize: vertical; }
+.input:focus, .select:focus, .textarea:focus { outline: none; border-color: var(--accent); }
+.input::placeholder, .textarea::placeholder { color: var(--text-3); }
+
+/* ---------- chips ---------- */
+.chip {
+  display: inline-flex; align-items: center; gap: var(--sp-1);
+  min-height: 32px; padding: 0 var(--sp-3);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--surface); color: var(--text-2);
+  font-size: var(--fs-sm); cursor: pointer;
+  transition: border-color var(--t-fast), background-color var(--t-fast), color var(--t-fast);
+}
+.chip svg { width: 15px; height: 15px; flex: none; }
+.chip:hover { border-color: var(--accent); color: var(--text); }
+.chip[aria-pressed="true"], .chip.on {
+  background: var(--accent-soft); border-color: var(--accent); color: var(--text);
+}
+
+/* ---------- status text ---------- */
+.status-ok { color: var(--ok-text); }
+.status-warn { color: var(--warn-text); }
+.status-danger { color: var(--danger); }
+
+/* ---------- drawer (settings etc.) ---------- */
+.drawer-scrim {
+  position: fixed; inset: 0; background: var(--scrim);
+  opacity: 0; pointer-events: none; transition: opacity var(--t-med);
+  z-index: var(--z-drawer);
+}
+.drawer {
+  position: fixed; inset-block: 0; inset-inline-end: 0;
+  width: min(380px, 92vw);
+  background: var(--surface); border-inline-start: 1px solid var(--border);
+  transform: translateX(-100%);
+  transition: transform var(--t-med);
+  z-index: calc(var(--z-drawer) + 1);
+  overflow-y: auto; padding: var(--sp-6);
+}
+[dir="rtl"] .drawer { transform: translateX(100%); }
+.drawer-open .drawer { transform: none; }
+.drawer-open .drawer-scrim { opacity: 1; pointer-events: auto; }
+
+/* ---------- dialog ---------- */
+.dialog { border: none; border-radius: var(--r-md); background: var(--surface); color: var(--text);
+  box-shadow: var(--shadow-1); padding: var(--sp-6); max-width: min(480px, 92vw); }
+.dialog::backdrop { background: var(--scrim); }
+
+/* ---------- toast ---------- */
+.toast {
+  position: fixed; inset-block-end: calc(var(--sp-6) + env(safe-area-inset-bottom));
+  inset-inline-start: 50%; transform: translateX(50%);
+  background: var(--text); color: var(--bg);
+  padding: var(--sp-3) var(--sp-6); border-radius: var(--r-sm);
+  font-size: var(--fs-sm); z-index: var(--z-modal);
+}
+[dir="rtl"] .toast { transform: translateX(50%); }
+
+/* ---------- empty states are the guide ---------- */
+.empty {
+  text-align: center; padding: var(--sp-12) var(--sp-6);
+  color: var(--text-2);
+}
+.empty svg { width: 40px; height: 40px; color: var(--text-3); margin-block-end: var(--sp-3); }
+.empty h3 { font-size: var(--fs-lg); color: var(--text); margin-block-end: var(--sp-2); }
+.empty p { max-width: 42ch; margin-inline: auto; }
+
+/* ---------- a11y helpers ---------- */
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; margin: -1px;
+  clip-path: inset(50%); overflow: hidden; white-space: nowrap;
+}
+.skip-link {
+  position: absolute; inset-block-start: -48px; inset-inline-start: var(--sp-4);
+  background: var(--surface); color: var(--text); padding: var(--sp-2) var(--sp-4);
+  border-radius: 0 0 var(--r-sm) var(--r-sm); z-index: var(--z-modal);
+}
+.skip-link:focus { inset-block-start: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+/* ============================================================
+   Injected widgets (assistant.js) — the CHAT AND THE COOKIE BAR.
+   These live in the shared layer rather than in the marketing sheet because
+   assistant.js runs on /sale too, and /sale never loads styles.css: the panel
+   was rendering there with browser defaults for exactly that reason.
+   ============================================================ */
+/* ---------- AI assistant widget (.sj-assist-*) ---------- */
+/* The panel and overlays are INJECTED CLOSED and opened via a JS .open class —
+   V3.0 shipped them always-visible by mistake. Default must stay hidden. */
+.sj-assist-panel { display: none; }
+.sj-assist-panel.open { display: flex; }
+
+.sj-assist-launcher {
+  position: fixed; inset-block-end: calc(var(--sp-6) + env(safe-area-inset-bottom));
+  inset-inline-end: var(--sp-6);
+  min-height: 48px; padding: 0 var(--sp-4);
+  display: flex; align-items: center; gap: var(--sp-2);
+  background: var(--text); color: var(--bg);
+  border: none; border-radius: var(--r-pill); cursor: pointer;
+  font: 500 var(--fs-sm) var(--font-ui);
+  box-shadow: var(--shadow-1); z-index: var(--z-raised);
+}
+.sj-assist-launcher:hover { opacity: 0.9; }
+.sj-assist-panel {
+  /* display comes ONLY from the .open toggle above — never set it here */
+  position: fixed; inset-block-end: calc(84px + env(safe-area-inset-bottom)); inset-inline-end: var(--sp-6);
+  width: min(380px, calc(100vw - var(--sp-8)));
+  height: min(560px, 75vh);
+  flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+  box-shadow: var(--shadow-1); z-index: var(--z-drawer); overflow: hidden;
+}
+@media (max-width: 480px) {
+  .sj-assist-panel { inset: auto 0 0 0; width: 100%; height: 82dvh; border-radius: var(--r-md) var(--r-md) 0 0; }
+  /* The notice bar is injected after the panel and shares its layer, so it
+     landed on top of the panel's input row — the one part you have to reach. */
+  body.sj-has-cookiebar .sj-assist-panel {
+    inset-block-end: var(--sj-cookie-h, 0px);
+    height: calc(82dvh - var(--sj-cookie-h, 0px));
+  }
+}
+/* Every selector below was read off assistant.js. The V3 restyle was written
+   against class names the widget does not render (.sj-assist-body / -msg /
+   -inputrow / -chips), so the panel shipped with browser defaults: the three
+   head buttons collapsed into a floating cluster on top of the title, and the
+   bubbles had no bubble at all. */
+.sj-assist-head {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4); border-block-end: 1px solid var(--border);
+}
+.sj-assist-head-id { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.sj-assist-avatar {
+  width: 34px; height: 34px; flex: none; border-radius: var(--r-pill);
+  background: var(--accent-soft); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+}
+.sj-assist-titles { display: flex; flex-direction: column; min-width: 0; }
+.sj-assist-title { font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
+.sj-assist-sub { display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--text-3); }
+.sj-assist-dot { width: 7px; height: 7px; border-radius: var(--r-pill); background: var(--ok-text); flex: none; }
+
+.sj-assist-head-actions { display: flex; align-items: center; gap: 2px; margin-inline-start: auto; }
+.sj-assist-iconbtn {
+  width: 34px; height: 34px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: none; border-radius: var(--r-sm);
+  color: var(--text-3); cursor: pointer;
+  transition: background-color var(--t-fast), color var(--t-fast);
+}
+.sj-assist-iconbtn:hover { background: var(--surface-2); color: var(--text); }
+
+.sj-assist-log {
+  flex: 1; overflow-y: auto; padding: var(--sp-4);
+  display: flex; flex-direction: column; gap: var(--sp-2);
+}
+.sj-assist-bubble {
+  max-width: 88%; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md);
+  font-size: var(--fs-sm); line-height: 1.55; white-space: normal; overflow-wrap: anywhere;
+}
+/* Incoming on the start side, the reply on the other — the arrangement every
+   Hebrew messaging app already taught the reader. */
+.sj-assist-bubble.bot { align-self: flex-start; background: var(--surface-2); color: var(--text); }
+.sj-assist-bubble.user { align-self: flex-end; background: var(--accent-soft); color: var(--text); }
+.sj-assist-bubble strong { font-weight: 700; }
+
+.sj-assist-typing { display: flex; align-items: center; gap: 5px; padding: var(--sp-3); }
+.sj-assist-typing span {
+  width: 6px; height: 6px; border-radius: var(--r-pill); background: var(--text-3);
+  animation: sj-assist-blink 1.2s infinite ease-in-out;
+}
+.sj-assist-typing span:nth-child(2) { animation-delay: 0.16s; }
+.sj-assist-typing span:nth-child(3) { animation-delay: 0.32s; }
+@keyframes sj-assist-blink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sj-assist-typing span { animation: none; opacity: 0.5; } }
+
+.sj-assist-suggest { display: flex; flex-wrap: wrap; gap: var(--sp-2); padding: 0 var(--sp-4) var(--sp-2); }
+.sj-assist-suggest:empty { display: none; }
+.sj-assist-chip {
+  min-height: 32px; padding: 0 var(--sp-3);
+  background: var(--surface); color: var(--text-2);
+  border: 1px solid var(--border-strong); border-radius: var(--r-pill);
+  font: 500 var(--fs-xs) var(--font-ui); cursor: pointer;
+  transition: border-color var(--t-fast), color var(--t-fast);
+}
+.sj-assist-chip:hover { border-color: var(--accent); color: var(--text); }
+
+.sj-assist-escalate {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4); border-block-start: 1px solid var(--border);
+  font-size: var(--fs-xs); color: var(--text-3);
+}
+.sj-assist-tosj {
+  min-height: 32px; padding: 0 var(--sp-3); white-space: nowrap;
+  background: var(--accent-soft); color: var(--accent-strong);
+  border: 1px solid var(--accent); border-radius: var(--r-sm);
+  font: 700 var(--fs-xs) var(--font-ui); cursor: pointer;
+}
+.sj-assist-tosj:hover { background: var(--accent); color: var(--on-accent); }
+
+.sj-assist-inputbar {
+  display: flex; align-items: flex-end; gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4); border-block-start: 1px solid var(--border);
+}
+.sj-assist-inputbar textarea {
+  flex: 1; min-height: 40px; max-height: 120px; resize: none;
+  padding: var(--sp-2) var(--sp-3); font: 400 var(--fs-sm)/1.45 var(--font-ui);
+  color: var(--text); background: var(--bg);
+  border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+}
+.sj-assist-send {
+  width: 40px; height: 40px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: var(--r-sm);
+  background: var(--accent); color: var(--on-accent); cursor: pointer;
+}
+.sj-assist-send:disabled { opacity: 0.45; cursor: default; }
+.sj-assist-disclaimer {
+  padding: 0 var(--sp-4) var(--sp-3); font-size: var(--fs-xs); color: var(--text-3);
+  text-align: center; line-height: 1.5;
+}
+.sj-assist-note { font-size: var(--fs-xs); color: var(--text-3); text-align: center; padding: var(--sp-1) 0; }
+
+/* "Send me this conversation" — a form inside the log, not a second dialog. */
+.sj-assist-emailform {
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--bg);
+}
+.sj-assist-ef-title { font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
+.sj-assist-ef-name, .sj-assist-ef-email {
+  min-height: 40px; padding: 0 var(--sp-3); font: 400 var(--fs-sm) var(--font-ui);
+  color: var(--text); background: var(--surface);
+  border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+}
+.sj-assist-ef-row { display: flex; gap: var(--sp-2); }
+.sj-assist-ef-send, .sj-assist-ef-cancel {
+  min-height: 38px; padding: 0 var(--sp-4); border-radius: var(--r-sm);
+  font: 600 var(--fs-sm) var(--font-ui); cursor: pointer;
+}
+.sj-assist-ef-send { background: var(--accent); color: var(--on-accent); border: none; }
+.sj-assist-ef-cancel { background: transparent; color: var(--text-2); border: 1px solid var(--border-strong); }
+.sj-assist-ef-msg { font-size: var(--fs-xs); color: var(--text-3); }
+.sj-assist-ef-msg.err { color: var(--danger); }
+.sj-assist-contact { display: grid; gap: var(--sp-2); padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg); }
+
+
+/* While the cookie notice is up it owns the bottom of the screen; the floats
+   move above it rather than under it. */
+body.sj-has-cookiebar .sj-assist-launcher,
+body.sj-has-cookiebar .float-wa {
+  inset-block-end: calc(var(--sp-4) + var(--sj-cookie-h, 0px) + env(safe-area-inset-bottom));
+}
+
+/* In the app the bottom bar owns the bottom of the screen on a phone. */
+@media (max-width: 768px) {
+  body.dark-theme .sj-assist-launcher,
+  body.light-theme .sj-assist-launcher,
+  body.mid-theme .sj-assist-launcher {
+    inset-block-end: calc(72px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ---------- cookie notice bar ---------- */
+#sj-cookie-bar {
+  position: fixed; inset-block-end: 0; inset-inline: 0;
+  background: var(--surface); border-block-start: 1px solid var(--border);
+  padding: var(--sp-3) var(--sp-4); z-index: var(--z-drawer);
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3);
+  font-size: var(--fs-sm); color: var(--text-2);
+}
+#sj-cookie-bar a { text-decoration: underline; }
+#sj-cookie-bar button {
+  margin-inline-start: auto; min-height: 36px; padding: 0 var(--sp-4);
+  background: var(--text); color: var(--bg); border: none; border-radius: var(--r-sm);
+  font: 500 var(--fs-sm) var(--font-ui); cursor: pointer;
+}
+

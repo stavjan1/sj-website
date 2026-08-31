@@ -7,57 +7,79 @@
     <meta name="robots" content="noindex">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;900&display=swap" rel="stylesheet">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='none' stroke='%232b74db' stroke-width='6'/%3E%3Cpath d='M40 80 L60 45 L45 45 L55 15 L35 50 L50 50 Z' fill='%23ffaa00'/%3E%3C/svg%3E">
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Heebo:wght@400;500;700&family=Rubik:wght@500;700;900&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2L4.5 13h6l-1.5 9L18.5 10h-6z' fill='%236ABF3C'/%3E%3C/svg%3E">
     <style>
+        /* Client-facing quote document — deliberately always light, like paper. */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Heebo', 'Segoe UI', sans-serif; background: #eef2f8; color: #0f172a; line-height: 1.65; padding: 18px 12px 40px; }
+        body { font-family: 'Assistant', 'Heebo', sans-serif; background: #F5F5F4; color: #1C1917; line-height: 1.65; padding: 18px 12px 40px; }
         .sheet {
             max-width: 760px; margin: 0 auto; background: #fff;
-            border-radius: 14px; box-shadow: 0 6px 30px rgba(15, 23, 42, 0.12);
+            border: 1px solid #E7E5E4; border-radius: 12px;
+            box-shadow: 0 4px 18px rgb(28 25 23 / 0.07);
             padding: 30px 28px;
         }
-        .qs-loading, .qs-error { text-align: center; padding: 60px 20px; color: #475569; }
-        .qs-error { color: #b91c1c; }
+        .qs-loading, .qs-error { text-align: center; padding: 60px 20px; color: #57534E; }
+        .qs-error { color: #B91C1C; }
         .qs-header { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
-        .qs-to .lbl { color: #64748b; font-size: 0.85rem; }
-        .qs-to .name { font-weight: 800; font-size: 1.1rem; }
-        .qs-to .sub { color: #64748b; font-size: 0.85rem; }
+        .qs-to .lbl { color: #79716B; font-size: 0.85rem; }
+        .qs-to .name { font-weight: 700; font-size: 1.1rem; }
+        .qs-to .sub { color: #79716B; font-size: 0.85rem; }
         .qs-biz { text-align: center; }
         .qs-biz img { max-height: 64px; max-width: 190px; object-fit: contain; }
-        .qs-biz .bn { font-weight: 900; color: #1e3a8a; font-size: 1.15rem; }
-        .qs-biz .bo { color: #475569; font-size: 0.85rem; }
-        .qs-meta { text-align: left; color: #475569; font-size: 0.85rem; }
-        .qs-divider { height: 2px; background: #1e3a8a; margin: 16px 0 20px; }
-        h1 { text-align: center; color: #1e3a8a; font-size: 1.35rem; margin-bottom: 20px; text-decoration: underline; }
-        .qs-item { border-bottom: 1px dashed #cbd5e1; padding: 12px 0; }
+        .qs-biz .bn { font-weight: 700; font-size: 1.15rem; }
+        .qs-biz .bo { color: #57534E; font-size: 0.85rem; }
+        .qs-meta { text-align: left; color: #57534E; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+        .qs-divider { height: 2px; background: #1C1917; margin: 16px 0 20px; }
+        h1 { text-align: center; font-size: 1.3rem; margin-bottom: 20px; }
+        .qs-item { border-bottom: 1px dashed #D6D3D1; padding: 12px 0; }
         .qs-item .t { font-weight: 700; display: flex; justify-content: space-between; gap: 10px; }
-        .qs-item .t .p { color: #1e3a8a; white-space: nowrap; }
-        .qs-item .d { color: #475569; font-size: 0.92rem; white-space: pre-wrap; }
+        .qs-item .t .p { white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .qs-item .d { color: #57534E; font-size: 0.92rem; white-space: pre-wrap; }
         .qs-total {
             display: flex; justify-content: space-between; align-items: baseline;
-            background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px;
-            padding: 14px 18px; margin: 22px 0 6px; font-weight: 900; font-size: 1.15rem; color: #1e3a8a;
+            background: #E6EDF7; border: 1px solid #1B4B8F; border-radius: 8px;
+            padding: 14px 18px; margin: 22px 0 6px; font-weight: 700; font-size: 1.15rem;
+            font-variant-numeric: tabular-nums;
         }
-        .qs-vat { color: #64748b; font-size: 0.82rem; margin-bottom: 18px; }
-        .qs-summary { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px; font-size: 0.9rem; white-space: pre-wrap; margin-bottom: 16px; }
+        .qs-vat { color: #79716B; font-size: 0.82rem; margin-bottom: 18px; }
+        .qs-terms { display: grid; gap: 4px; margin: 14px 0; padding: 10px 14px;
+            border: 1px solid #E7E5E4; border-radius: 8px; background: #FAFAF9; font-size: 0.88rem; }
+        .qs-term { display: flex; gap: 8px; align-items: baseline; }
+        .qs-term .k { flex: none; min-width: 92px; font-weight: 700; color: #1e3a8a; }
+        .qs-excl { margin: 10px 0; padding: 10px 14px; border: 1px dashed #ef4444; border-radius: 8px;
+            color: #b91c1c; font-size: 0.86rem; line-height: 1.6; }
+        .qs-approve { margin: 18px 0; padding: 14px; border: 1px solid #16a34a; border-radius: 10px;
+            background: rgba(22, 163, 74, .05); }
+        .qs-approve-t { font-weight: 700; margin-bottom: 8px; }
+        .qs-approve-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .qs-approve-row input { flex: 1 1 180px; min-height: 44px; padding: 0 12px; border: 1px solid #d6d3d1;
+            border-radius: 8px; font: inherit; }
+        .qs-btn.approve { background: #16a34a; color: #fff; border: none; cursor: pointer; padding: 0 20px; border-radius: 8px; font-weight: 700; }
+        .qs-btn.approve:disabled { opacity: .6; cursor: default; }
+        .qs-approve-note { margin-top: 8px; font-size: 0.78rem; color: #78716c; }
+        .qs-approved { margin: 18px 0; padding: 12px 14px; border-radius: 10px; background: rgba(22,163,74,.09);
+            color: #15803d; font-weight: 700; }
+        .qs-summary { background: #FAFAF9; border: 1px solid #E7E5E4; border-radius: 8px; padding: 12px 16px; font-size: 0.9rem; white-space: pre-wrap; margin-bottom: 16px; }
         .qs-signed {
             display: flex; align-items: center; gap: 12px;
-            background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px;
+            background: #F0FDF4; border: 1px solid #15803D; border-radius: 8px;
             padding: 10px 16px; margin-bottom: 16px; font-size: 0.9rem;
         }
         .qs-signed img { height: 44px; }
         .qs-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 22px; }
         .qs-btn {
-            display: inline-flex; align-items: center; gap: 8px;
-            padding: 12px 26px; border-radius: 50px; font-weight: 700; text-decoration: none;
+            display: inline-flex; align-items: center; gap: 8px; min-height: 44px;
+            padding: 10px 26px; border-radius: 8px; font-weight: 500; text-decoration: none;
             font-size: 0.98rem;
         }
-        .qs-btn.call { background: #1e3a8a; color: #fff; }
-        .qs-btn.wa { background: #25d366; color: #fff; }
-        .qs-foot { text-align: center; color: #94a3b8; font-size: 0.78rem; margin-top: 22px; }
-        .qs-foot a { color: #64748b; }
+        .qs-btn.call { background: #1C1917; color: #fff; }
+        .qs-btn.wa { background: #1FAF5A; color: #fff; }
+        .qs-foot { text-align: center; color: #A8A29E; font-size: 0.78rem; margin-top: 22px; }
+        .qs-foot a { color: #79716B; }
+        @media print { body { background: #fff; padding: 0; } .sheet { border: none; box-shadow: none; } .qs-actions { display: none; } }
     </style>
+    <script>try{var t=localStorage.getItem("sj_theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 </head>
 <body>
     <div class="sheet" id="sheet">
@@ -86,13 +108,74 @@
                 if (!res.ok || !body.data) throw new Error((body.error && body.error.message) || 'ההצעה לא נמצאה.');
                 render(body.data, sheet);
             } catch (e) {
-                sheet.innerHTML = '<div class="qs-error">⚠️ ' + esc(e.message) + '</div>';
+                sheet.innerHTML = '<div class="qs-error">' + esc(e.message) + '</div>';
+            }
+        }
+
+        function token() { return new URLSearchParams(location.search).get('t') || ''; }
+
+        // The terms, in the same order they appear on the PDF.
+        function termsHtml(q) {
+            const rows = [];
+            if (q.validityDays) rows.push(['תוקף ההצעה', q.validityDays + ' ימים מתאריך ההצעה']);
+            if (q.paymentTerms) rows.push(['תנאי תשלום', q.paymentTerms]);
+            if (q.startWithinDays || q.durationDays) {
+                const start = q.startWithinDays ? 'תחילת עבודה תוך ' + q.startWithinDays + ' ימים מאישור ההצעה' : '';
+                const dur = q.durationDays ? (start ? ', ' : '') + 'משך העבודה כ־' + q.durationDays + ' ימי עבודה' : '';
+                rows.push(['מועד ביצוע', start + dur]);
+            }
+            if (q.warranty) rows.push(['אחריות', q.warranty]);
+            if (!rows.length) return '';
+            return '<div class="qs-terms">' + rows.map(function (r) {
+                return '<div class="qs-term"><span class="k">' + esc(r[0]) + '</span><span class="v">' + esc(r[1]) + '</span></div>';
+            }).join('') + '</div>';
+        }
+
+        // Approval, in one press, by the person holding the link. No account,
+        // no app: this is the whole point of sending a link instead of a file.
+        function approveHtml(q) {
+            if (q.approved && q.approved.at) {
+                const when = new Date(q.approved.at).toLocaleDateString('he-IL');
+                return '<div class="qs-approved">✓ ההצעה אושרה' + (q.approved.name ? ' על ידי ' + esc(q.approved.name) : '') +
+                    ' בתאריך ' + esc(when) + '</div>';
+            }
+            return '<div class="qs-approve">' +
+                '<div class="qs-approve-t">מאשרים את ההצעה?</div>' +
+                '<div class="qs-approve-row">' +
+                '<input id="qs-name" type="text" placeholder="השם שלך" maxlength="80">' +
+                '<button type="button" class="qs-btn approve" onclick="approveQuote()">אישור ההצעה</button>' +
+                '</div>' +
+                '<div class="qs-approve-note">האישור נשלח לבעל המקצוע. אין בו התחייבות לתשלום מקוון.</div>' +
+                '</div>';
+        }
+
+        async function approveQuote() {
+            const btn = document.querySelector('.qs-btn.approve');
+            const name = (document.getElementById('qs-name') || {}).value || '';
+            if (btn) { btn.disabled = true; btn.textContent = 'שולח…'; }
+            try {
+                const res = await fetch('/api/quote-share?t=' + encodeURIComponent(token()), {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name.trim() }),
+                });
+                const d = await res.json();
+                if (!res.ok || !d.ok) throw new Error((d.error && d.error.message) || 'שגיאה');
+                const box = document.querySelector('.qs-approve');
+                if (box) {
+                    const when = new Date(d.approved.at).toLocaleDateString('he-IL');
+                    box.outerHTML = '<div class="qs-approved">✓ ההצעה אושרה' +
+                        (d.approved.name ? ' על ידי ' + esc(d.approved.name) : '') + ' בתאריך ' + esc(when) + '</div>';
+                }
+            } catch (e) {
+                if (btn) { btn.disabled = false; btn.textContent = 'אישור ההצעה'; }
+                alert('האישור לא נשלח: ' + e.message);
             }
         }
 
         function render(q, sheet) {
             const biz = q.business || {};
-            document.title = 'הצעת מחיר ' + (q.quoteNumber || '') + (biz.name ? ' — ' + biz.name : '');
+            document.title = 'הצעת מחיר ' + (q.quoteNumber || '') + (biz.name ? ', ' + biz.name : '');
             const phoneDigits = String(biz.phone || '').replace(/[^\d]/g, '');
             const waPhone = phoneDigits.startsWith('0') ? '972' + phoneDigits.slice(1) : phoneDigits;
             const items = (q.items || []).map(it => `
@@ -122,21 +205,25 @@
                 ${items}
                 <div class="qs-total"><span>סה"כ לתשלום:</span><span>${fmt(q.finalPrice)} ₪</span></div>
                 <div class="qs-vat">${esc(q.vatLabel || '')}</div>
+                ${termsHtml(q)}
                 ${q.summary ? `<div class="qs-summary"><strong>פירוט תנאים נוספים:</strong>\n${esc(q.summary)}</div>` : ''}
+                ${q.exclusions ? `<div class="qs-excl"><strong>מה לא כלול:</strong> ${esc(q.exclusions)}</div>` : ''}
+                ${approveHtml(q)}
                 ${q.signature && safeImg(q.signature.img) ? `
                     <div class="qs-signed">
                         <img src="${esc(safeImg(q.signature.img))}" alt="חתימה">
                         <span>✓ ההצעה אושרה ונחתמה על ידי <strong>${esc(q.signature.name)}</strong> בתאריך ${esc(q.signature.date)}</span>
                     </div>` : ''}
                 <div class="qs-actions">
-                    ${biz.phone ? `<a class="qs-btn call" href="tel:${esc(biz.phone)}">📞 ${esc(biz.phone)}</a>` : ''}
+                    ${biz.phone ? `<a class="qs-btn call" href="tel:${esc(biz.phone)}">${esc(biz.phone)}</a>` : ''}
                     ${waPhone ? `<a class="qs-btn wa" target="_blank" rel="noopener" href="https://wa.me/${waPhone}?text=${encodeURIComponent('היי, בקשר להצעת מחיר ' + (q.quoteNumber || ''))}">וואטסאפ</a>` : ''}
                 </div>
-                <div class="qs-foot">הופק באמצעות <a href="/zerem/">זרם — תוכנת הצעות המחיר</a> ⚡</div>
+                <div class="qs-foot">הופק באמצעות <a href="/zerem/">זרם · תוכנת הצעות המחיר</a></div>
             `;
         }
 
         load();
     </script>
+    <script src="/track.js?v=481" defer></script>
 </body>
 </html>

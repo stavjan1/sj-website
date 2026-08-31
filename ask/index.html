@@ -2,38 +2,50 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>זרם — כמה לתמחר? שאל את ה-AI</title>
-<meta name="description" content="תאר עבודת חשמל וקבל מחיר מיידי — חומרים, עבודה, ומה לא לשכוח. בלי הרשמה.">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>זרם · כמה לתמחר? שאל את ה-AI</title>
+<meta name="description" content="תאר עבודת חשמל וקבל מחיר מיידי: חומרים, עבודה, ומה לא לשכוח. בלי הרשמה.">
 <meta property="og:title" content="כמה לתמחר? שאל את ה-AI של זרם">
-<meta property="og:description" content="תאר עבודת חשמל וקבל הערכת מחיר תוך שניות — חומרים + עבודה + מה שאנשים שוכחים לתמחר.">
+<meta property="og:description" content="תאר עבודת חשמל וקבל הערכת מחיר תוך שניות, חומרים + עבודה + מה שאנשים שוכחים לתמחר.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://www.sj-eng.co.il/ask/">
 <meta property="og:image" content="https://www.sj-eng.co.il/assets/og-ask.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="זרם — כמה לתמחר עבודת חשמל? תשובת AI בשניות, בלי הרשמה.">
+<meta property="og:image:alt" content="זרם · כמה לתמחר עבודת חשמל? תשובת AI בשניות, בלי הרשמה.">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://www.sj-eng.co.il/assets/og-ask.jpg">
+<link rel="canonical" href="https://www.sj-eng.co.il/ask/">
 <link rel="icon" href="/sale/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Heebo:wght@400;500;700&family=Rubik:wght@500;700;900&display=swap" rel="stylesheet">
 <script src="/assets/listcards.js"></script>
 <style>
   :root{
-    --bg:#0b0f1a; --panel:#141d2e; --line:#243049; --ink:#eef2fb; --sub:#9fb0cc; --muted:#6f819e;
-    --accent:#2b74db; --accent-ink:#fff; --me:#1c2a44; --price:#8fd0ff;
+    --bg:#FAFAF9; --panel:#FFFFFF; --line:#E7E5E4; --ink:#1C1917; --sub:#57534E; --muted:#79716B;
+    --accent:#1B4B8F; --accent-ink:#fff; --me:#E6EDF7; --price:#133766;
   }
-  body.dim{ --bg:#151b2a; --panel:#1d2639; --line:#2d3a56; --ink:#e9eef9; --sub:#a6b3cd; --muted:#7e8ca6; --me:#253452; }
-  body.light{ --bg:#eef2f8; --panel:#ffffff; --line:#d3dcea; --ink:#111827; --sub:#475569; --muted:#8494ab; --me:#d9e6f9; --price:#1d5fc2; }
-  body.light .msg.ai b{color:#1d5fc2}
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0C0A09; --panel:#1C1917; --line:#292524; --ink:#FAFAF9; --sub:#D6D3D1; --muted:#A8A29E;
+      --accent:#6ABF3C; --accent-ink:#1C1917; --me:#14301A; --price:#FCD34D;
+    }
+  }
+  body.dim{ --bg:#0C0A09; --panel:#1C1917; --line:#292524; --ink:#FAFAF9; --sub:#D6D3D1; --muted:#A8A29E;
+    --accent:#6ABF3C; --accent-ink:#1C1917; --me:#14301A; --price:#FCD34D; }
+  body.light{ --bg:#FAFAF9; --panel:#FFFFFF; --line:#E7E5E4; --ink:#1C1917; --sub:#57534E; --muted:#79716B;
+    --accent:#1B4B8F; --accent-ink:#fff; --me:#E6EDF7; --price:#133766; }
   /* Map the page theme onto the shared list-cards component (assets/listcards.js)
      — declared on body so the dim/light overrides above are picked up. */
   body{--zlc-bg:var(--bg); --zlc-panel:var(--panel); --zlc-line:var(--line);
     --zlc-ink:var(--ink); --zlc-sub:var(--sub); --zlc-muted:var(--muted); --zlc-accent:var(--accent)}
+  html{-webkit-text-size-adjust:100%; text-size-adjust:100%}
   *{box-sizing:border-box; margin:0; padding:0}
   html,body{height:100%}
   body{
     background:var(--bg); color:var(--ink);
-    font-family:'Heebo','Assistant',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    font-family:'Assistant','Heebo',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
     display:flex; flex-direction:column; height:100dvh; overflow:hidden;
   }
   header{
@@ -41,7 +53,7 @@
     border-bottom:1px solid var(--line); background:var(--panel); flex-shrink:0;
   }
   .logo{width:34px; height:34px; border-radius:9px; background:var(--accent);
-    display:flex; align-items:center; justify-content:center; color:#fff; font-size:1.1rem; flex-shrink:0}
+    display:flex; align-items:center; justify-content:center; color:var(--accent-ink); font-size:1.1rem; flex-shrink:0}
   .h-title{font-weight:800; font-size:1rem; line-height:1.1}
   .h-sub{font-size:.72rem; color:var(--sub)}
   .h-cta{margin-inline-start:auto; display:flex; gap:8px; align-items:center}
@@ -55,24 +67,37 @@
   .mode-tg{display:flex; border:1px solid var(--line); border-radius:999px; overflow:hidden}
   .mt-opt{font-size:.75rem; font-weight:700; padding:6px 11px; color:var(--sub);
     text-decoration:none; white-space:nowrap}
-  .mt-opt.cur{background:var(--accent); color:#fff}
+  .mt-opt.cur{background:var(--accent); color:var(--accent-ink)}
   a.mt-opt:hover{color:var(--ink)}
   @media (max-width:430px){ .h-cta{gap:6px} .mt-opt{padding:6px 8px} }
+  /* Four controls and a two-line brand do not fit a phone header: the name
+     stays on one line and the tagline steps aside, since the screen under it
+     asks the same question in bigger type. */
+  @media (max-width:600px){
+    .h-title{white-space:nowrap}
+    .h-sub{display:none}
+    .h-cta{flex-wrap:wrap; justify-content:flex-end; row-gap:6px}
+  }
   main{flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px}
   .wrap{width:100%; max-width:720px; margin:0 auto; display:flex; flex-direction:column; gap:12px}
   .intro{text-align:center; color:var(--sub); padding:22px 8px 6px}
-  .intro h1{font-size:1.35rem; color:var(--ink); margin-bottom:8px; font-weight:800}
+  /* On the empty screen the invitation sits in the middle of the space it has,
+     instead of hugging the header with a hole under it. The moment an answer
+     arrives the log fills from the top like any chat. */
+  main:has(> .wrap > .intro:only-child){justify-content:center}
+  .intro h1{font-size:1.2rem; color:var(--ink); margin-bottom:8px; font-weight:800}
   .intro p{font-size:.92rem; line-height:1.6; max-width:440px; margin:0 auto}
   .chips{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:14px}
   .chip{font-size:.82rem; color:var(--sub); background:var(--panel); border:1px solid var(--line);
     border-radius:999px; padding:7px 13px; cursor:pointer}
   .chip:hover{border-color:var(--accent); color:var(--ink)}
-  .msg{max-width:88%; padding:11px 14px; border-radius:14px; font-size:.94rem; line-height:1.6; white-space:pre-wrap; word-break:break-word}
+  .msg{max-width:88%; padding:11px 14px; border-radius:14px; font-size:.92rem; line-height:1.65; white-space:pre-wrap; word-break:break-word}
   .msg.ai{background:var(--panel); border:1px solid var(--line); align-self:flex-start; border-bottom-right-radius:5px}
   .msg.me{background:var(--me); align-self:flex-end; border-bottom-left-radius:5px}
-  .msg.ai b{color:#8fd0ff}
-  .price-line{display:block; font-size:1.15rem; font-weight:800; color:var(--price);
-    background:rgba(43,116,219,.12); border:1px solid rgba(43,116,219,.35);
+  .msg.ai b{color:var(--price)}
+  .price-note{display:block; font-size:.8rem; font-weight:500; color:var(--sub); margin-top:2px; line-height:1.5}
+  .price-line{display:block; font-size:1.05rem; font-weight:800; color:var(--price);
+    background:var(--me); border:1px solid var(--accent);
     border-radius:10px; padding:8px 12px; margin-bottom:8px}
   .typing .dots::after{content:''; animation:dots 1.4s steps(4,end) infinite}
   @keyframes dots{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}}
@@ -84,41 +109,54 @@
   .q-opt{font-size:.85rem; color:var(--ink); background:var(--bg); border:1px solid var(--line);
     border-radius:999px; padding:7px 14px; cursor:pointer; font-family:inherit}
   .q-opt:hover{border-color:var(--accent)}
-  .q-opt.on{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700}
+  .q-opt.on{background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:700}
+  .q-hint{font-size:.72rem; color:var(--muted); margin:8px 0 2px}
   .q-free{font-size:.85rem; background:var(--bg); border:1px solid var(--line); color:var(--ink);
     border-radius:999px; padding:7px 14px; font-family:inherit; width:130px}
   .q-free:focus{outline:none; border-color:var(--accent)}
-  .q-go{align-self:flex-start; background:var(--accent); color:#fff; border:none; border-radius:10px;
+  .q-go{align-self:flex-start; background:var(--accent); color:var(--accent-ink); border:none; border-radius:10px;
     padding:9px 18px; font-size:.9rem; font-weight:800; cursor:pointer; font-family:inherit; margin-top:2px}
   .q-go:disabled{opacity:.45; cursor:default}
   .qbox.done{opacity:.55; pointer-events:none}
   /* Length→price slider (site-owned formula; AI only fills the numbers) */
-  .calcbox{align-self:flex-start; max-width:88%; background:var(--panel); border:1px solid rgba(43,116,219,.45);
+  .calcbox{align-self:flex-start; max-width:88%; background:var(--panel); border:1px solid var(--accent);
     border-radius:14px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; width:340px}
-  .calc-price{font-size:1.5rem; font-weight:800; color:var(--price); text-align:center}
+  .calc-price{font-size:1.3rem; font-weight:800; color:var(--price); text-align:center}
   .calc-label{font-size:.82rem; color:var(--sub); display:flex; justify-content:space-between}
   .calc-label b{color:var(--ink)}
   .calcbox input[type=range]{width:100%; accent-color:var(--accent); cursor:pointer}
   .calc-note{font-size:.7rem; color:var(--muted); text-align:center}
+  /* "What this price assumed, and what nobody checked" — the honest footnote
+     that turns a fast estimate into a reason to characterize the job properly. */
+  .openbox{align-self:flex-start; max-width:88%; width:340px; background:var(--panel);
+    border:1px solid var(--line); border-radius:14px; padding:13px 15px;
+    display:flex; flex-direction:column; gap:4px}
+  .open-head{font-size:.8rem; font-weight:800; color:var(--ink); margin-bottom:4px}
+  .open-sub{font-size:.7rem; font-weight:700; color:var(--muted); margin-top:6px}
+  .open-list{margin:2px 0 0; padding-inline-start:16px; display:flex; flex-direction:column; gap:2px}
+  .open-list li{font-size:.79rem; color:var(--sub); line-height:1.5}
+  .open-list.open-miss li{color:var(--ink)}
+  .open-cta{margin-top:11px; font-size:.83rem; font-weight:700; color:var(--accent); text-decoration:none}
+  .open-cta:hover{text-decoration:underline}
   .msg-actions{align-self:flex-start; display:flex; gap:8px; margin:-4px 2px 2px}
   .msg-act{font-size:.76rem; font-weight:700; color:var(--sub); background:var(--panel);
     border:1px solid var(--line); border-radius:8px; padding:5px 11px; cursor:pointer; display:inline-flex; align-items:center; gap:5px}
   .msg-act:hover{border-color:var(--accent); color:var(--ink)}
   .msg-act:disabled{opacity:.4; cursor:default; pointer-events:none}
-  .msg-act.wa{color:#25d366; border-color:rgba(37,211,102,.4)}
+  .msg-act.wa{color:#1FAF5A; border-color:#1FAF5A}
   .typing{align-self:flex-start; color:var(--muted); font-size:.9rem; padding:6px 4px}
   .cta-card{align-self:stretch; background:var(--panel); border:1px solid var(--accent);
     border-radius:14px; padding:14px 16px; text-align:center}
   .cta-card p{font-size:.9rem; color:var(--sub); margin-bottom:10px}
-  .cta-card a{display:inline-block; background:var(--accent); color:#fff; font-weight:800;
+  .cta-card a{display:inline-block; background:var(--accent); color:var(--accent-ink); font-weight:800;
     text-decoration:none; border-radius:10px; padding:10px 20px; font-size:.92rem}
   footer{flex-shrink:0; border-top:1px solid var(--line); background:var(--panel); padding:10px 12px}
   .inbar{width:100%; max-width:720px; margin:0 auto; display:flex; gap:8px; align-items:flex-end}
   textarea{flex:1; resize:none; background:var(--bg); border:1px solid var(--line); color:var(--ink);
-    border-radius:12px; padding:11px 13px; font-family:inherit; font-size:.95rem; max-height:120px; line-height:1.5}
+    border-radius:12px; padding:12px 13px; font-family:inherit; font-size:1rem; max-height:140px; line-height:1.6}
   textarea:focus{outline:none; border-color:var(--accent)}
   .send{width:44px; height:44px; flex-shrink:0; border:none; border-radius:12px; background:var(--accent);
-    color:#fff; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center}
+    color:var(--accent-ink); font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center}
   .send:disabled{opacity:.5; cursor:default}
   .foot-note{text-align:center; font-size:.68rem; color:var(--muted); margin-top:7px}
   .foot-note a{color:var(--muted)}
@@ -128,28 +166,47 @@
   .chip-hint{font-size:.8rem; color:var(--muted); margin-top:18px}
   .trust{font-size:.76rem; color:var(--muted); margin-top:18px}
   .trust b{color:var(--sub); font-weight:700}
-  .send:hover{background:var(--accent-hover,#3a83ea)}
+  .send:hover{filter:brightness(0.94)}
   .send:active{transform:scale(.94)}
+  /* A quiet notice on the way in: this mode is a taste, and nothing typed here
+     is kept. Said once per device, dismissed with one press. */
+  .nosave-wrap{position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center;
+    padding:20px; background:rgba(12,10,9,.6); backdrop-filter:blur(2px)}
+  .nosave{max-width:420px; width:100%; max-height:86vh; overflow-y:auto;
+    background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    padding:20px; box-shadow:0 20px 60px rgba(0,0,0,.45)}
+  .nosave h2{margin:0 0 8px; font-size:1.05rem; color:var(--ink)}
+  .nosave p{margin:0 0 6px; font-size:.9rem; line-height:1.65; color:var(--sub)}
+  .nosave .fine{font-size:.8rem; color:var(--muted)}
+  .nosave-actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px}
+  .nosave-actions button, .nosave-actions a{flex:1 1 150px; min-height:44px; border-radius:10px;
+    font:700 .9rem inherit; display:inline-flex; align-items:center; justify-content:center;
+    cursor:pointer; text-decoration:none}
+  .nosave-ok{background:var(--accent); color:var(--accent-ink); border:none}
+  .nosave-full{background:transparent; color:var(--ink); border:1px solid var(--line)}
+  @media (max-width:600px){ .nosave-wrap{padding:14px} .nosave{max-width:none} }
+
   @media (max-width:600px){
     .intro h1{font-size:1.25rem}
     .chip{font-size:.9rem; padding:9px 15px}   /* thumb-friendly tap targets */
     textarea{font-size:16px}                    /* prevents iOS zoom-on-focus */
   }
 </style>
+    <script>try{var t=localStorage.getItem("sj_theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 </head>
 <body>
   <header>
-    <div class="logo">⚡</div>
+    <div class="logo"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M13 2L4.5 13h6l-1.5 9L18.5 10h-6z"/></svg></div>
     <div>
       <div class="h-title">זרם · תמחור AI</div>
       <div class="h-sub">כמה לתמחר עבודת חשמל?</div>
     </div>
     <div class="h-cta">
-      <button class="h-new" id="theme-btn" title="מצב תצוגה">🌙</button>
+      <button class="h-new" id="theme-btn" title="מצב תצוגה">תצוגה</button>
       <button class="h-new" id="new-chat" title="שיחה חדשה" style="display:none;">＋ חדשה</button>
-      <button class="h-new" id="acct-btn" title="התחברות עם Google — מכסה יומית מוגדלת">התחבר</button>
-      <nav class="mode-tg" title="אותה פלטפורמה — שני מצבים">
-        <span class="mt-opt cur">⚡ מהיר</span>
+      <button class="h-new" id="acct-btn" title="התחברות עם Google · מכסה יומית מוגדלת">התחבר</button>
+      <nav class="mode-tg" title="אותה פלטפורמה · שני מצבים">
+        <span class="mt-opt cur">מהיר</span>
         <a class="mt-opt" href="/sale/">מערכת מלאה</a>
       </nav>
     </div>
@@ -158,16 +215,16 @@
   <main id="feed">
     <div class="wrap" id="wrap">
       <div class="intro" id="intro">
-        <h1>כמה לתמחר את העבודה? <span class="wave">👋</span></h1>
-        <p>תאר לי עבודת חשמל <b>במילים שלך</b> — גם קיצורים וסלנג של השטח. תוך שניות תקבל טווח מחיר, מה זה כולל, ומה שאנשים שוכחים לתמחר. ואחרי המחיר — גם <b>רשימת ציוד וכלים</b> לשטח. בלי הרשמה.</p>
+        <h1>כמה לתמחר את העבודה?</h1>
+        <p>תאר לי עבודת חשמל <b>במילים שלך</b>, גם קיצורים וסלנג של השטח. תוך שניות תקבל טווח מחיר, מה זה כולל, ומה שאנשים שוכחים לתמחר. ואחרי המחיר, גם <b>רשימת ציוד וכלים</b> לשטח. בלי הרשמה.</p>
         <div class="chip-hint">רוצה לנסות? לחץ על דוגמה:</div>
         <div class="chips" id="chips">
           <span class="chip">התקנת עמדת טעינה 15 מטר מהלוח</span>
           <span class="chip">החלפת לוח חשמל בדירת 4 חדרים</span>
           <span class="chip">הוספת 6 נקודות חשמל בסלון</span>
-          <span class="chip">בדיקת תקלה — קצר במעגל</span>
+          <span class="chip">בדיקת תקלה · קצר במעגל</span>
         </div>
-        <div class="trust">מבית <b>SJ הנדסת חשמל</b> · בסמכות מהנדס חשמל מורשה</div>
+        <div class="trust">מבית <b>SJ הנדסת חשמל</b> · בסמכות מהנדס חשמל רשום בפנקס המהנדסים</div>
       </div>
     </div>
   </main>
@@ -177,35 +234,45 @@
       <textarea id="input" rows="1" placeholder="לדוגמה: התקנת עמדת טעינה 15 מטר מהלוח, קיר בלוק…" enterkeyhint="send"></textarea>
       <button class="send" id="send" aria-label="שלח">↑</button>
     </div>
-    <div class="foot-note"><span id="quota-note"></span>מבוסס AI — הערכה בלבד, לא תחליף לשיקול דעת מקצועי. <a href="/sale/">זרם — מערכת הצעות המחיר לחשמלאים ←</a></div>
+    <div class="foot-note"><span id="quota-note"></span>מבוסס AI · הערכה בלבד, לא תחליף לשיקול דעת מקצועי. <a href="/sale/">זרם · מערכת הצעות המחיר לחשמלאים ←</a></div>
   </footer>
 
 <script>
-const SYSTEM = `אתה "זרם" — עוזר תמחור AI לחשמלאים בישראל. חשמלאי מתאר עבודה בקצרה, ואתה מוביל אותו למחיר מדויק בשני שלבים:
+const SYSTEM = `אתה "זרם", עוזר תמחור AI לחשמלאים בישראל. חשמלאי מתאר עבודה בקצרה, ואתה מוביל אותו למחיר מדויק בשני שלבים:
 
-## שלב א' — שאלות חכמות (כשחסרים פרטים שמשנים את המחיר)
-אם בתיאור חסרים 1–4 פרטים שמזיזים את המחיר משמעותית (אורך תוואי, סוג תוואי, נגישות, מצב לוח, גובה, חד/תלת פאזי...) — אל תיתן מחיר סופי. חשוב בעצמך: מהם הגורמים שהכי משנים את המחיר בעבודה *הזאת*? החזר:
-0. **חובה לפני הכל**: אם המשתמש טעה מקצועית (כבל שגוי, הנחה שגויה, בחירה מסוכנת) — תקן אותו במשפט ברור אחד ("שים לב: 6×4 הוא כבל פיקוד — לתלת-פאזי צריך 5×4"). ואם שאל שאלה טכנית (איזה כבל/חתך/ציוד) — ענה עליה בשורה הראשונה. רק אחר כך השאלות.
-1. שורה אחת: "טווח גס: X–Y ₪ — כדי לדייק, ענה על כמה שאלות:"
+## סגנון כתיבה
+כתוב עברית פשוטה ויומיומית, כמו שחשמלאי מדבר עם חשמלאי. משפטים קצרים.
+אל תשתמש במקף ארוך (—). במקומו: פסיק, נקודתיים או נקודה. בלי אימוג'י.
+
+
+## שלב א': שאלות חכמות (כשחסרים פרטים שמשנים את המחיר)
+אם בתיאור חסרים 1–4 פרטים שמזיזים את המחיר משמעותית (אורך תוואי, סוג תוואי, נגישות, מצב לוח, גובה, חד/תלת פאזי...), אל תיתן מחיר סופי. חשוב בעצמך: מהם הגורמים שהכי משנים את המחיר בעבודה *הזאת*? החזר:
+0. **חובה לפני הכל**: אם המשתמש טעה מקצועית (כבל שגוי, הנחה שגויה, בחירה מסוכנת): תקן אותו במשפט ברור אחד ("שים לב: 6×4 הוא כבל פיקוד, לתלת-פאזי צריך 5×4"). ואם שאל שאלה טכנית (איזה כבל/חתך/ציוד), ענה עליה בשורה הראשונה. רק אחר כך השאלות.
+1. שורה אחת: "הערכה ראשונית: X–Y ₪ לפני מע"מ." ואז שורה שנייה קצרה בלבד: "כמה שאלות יחדדו את זה:"
 2. ואז בלוק בפורמט המדויק הזה (JSON תקין, בלי טקסט נוסף בתוכו):
-[[שאלות]]{"questions":[{"q":"אורך הקו מהלוח","opts":["עד 10 מ'","10-30 מ'","30+ מ'"]},{"q":"תוואי הכבל","opts":["פיר/צנרת קיימת","תעלות עה\\"ט","חציבה/משתלבות חדשות"]}]}[[/שאלות]]
-עד 4 שאלות, עד 4 אפשרויות קצרות לכל אחת. רק שאלות שבאמת משנות את המחיר לעבודה הזו.
-לעולם אל תשאל שאלה שהתשובה לה כבר משתמעת מהתיאור (למשל: המשתמש כתב "כבל 5×4" ⇒ תלת-פאזי — אל תשאל על פאזות; עמדת טעינה ⇒ ברירת מחדל תלת-פאזי).
+[[שאלות]]{"questions":[{"q":"אורך הקו מהלוח","opts":["עד 10 מ'","10-30 מ'","30+ מ'"],"def":1},{"q":"תוואי הכבל","opts":["פיר/צנרת קיימת","תעלות עה\\"ט","חציבה/משתלבות חדשות"],"def":0}]}[[/שאלות]]
+**עד 3 שאלות**, עד 4 אפשרויות קצרות לכל אחת. רק שאלות שבאמת משנות את המחיר לעבודה הזו.
+לכל שאלה סמן "def": האינדקס של התשובה הסטנדרטית, זו שנכונה ברוב המקרים. היא תסומן מראש והמשתמש רק ישנה אם אצלו זה אחרת. אם אין תשובה סטנדרטית ברורה, אל תוסיף "def".
+לעולם אל תשאל שאלה שהתשובה לה כבר משתמעת מהתיאור (למשל: המשתמש כתב "כבל 5×4" ⇒ תלת-פאזי, אל תשאל על פאזות; עמדת טעינה ⇒ ברירת מחדל תלת-פאזי).
 
-## שלב ב' — מחיר אחד
-כשיש לך את התשובות (או כשהתיאור מלא מההתחלה) — תן **מספר אחד** (או טווח צר של עד ±10%):
+## שלב ב' · מחיר אחד
+כשיש לך את התשובות (או כשהתיאור מלא מההתחלה), תן **מספר אחד** (או טווח צר של עד ±10%):
 1. **מחיר מומלץ: X ₪** + מה כלול, שורה אחת.
-2. **אל תשכח**: 1–3 נקודות שמעלות מחיר (בודק בנפרד, חציבה, פחת ייעודי...).
-3. שורת נימוק אחת. אל תהיה הזול — תמחר לפי ערך, סיכון ומורכבות.
-4. אם המחיר תלוי-אורך (כבל/תוואי/צנרת) — הוסף בסוף בלוק מחשבון בפורמט המדויק (JSON בלבד): [[מחשבון]]{"label":"אורך הקו (מ')","base":1800,"minM":5,"maxM":80,"defaultM":20,"tiers":[{"upToM":25,"perMeter":50},{"upToM":60,"perMeter":80},{"upToM":150,"perMeter":115}]}[[/מחשבון]]. המחיר למטר מדורג — קו ארוך יקר יותר למטר (זמן עבודה, חתך גדל). קבע maxM שמכסה את המקרה הריאלי (עד 150, לא רק את מה שהמשתמש אמר), ו-base כך שהמחיר ב-defaultM שווה בדיוק למחיר שנתת. אל תוסיף מחשבון לעבודות שאינן תלויות-אורך.
-קצר ולעניין. סיים תמיד בשורה: "רוצה לנהל את זה כהצעת מחיר מלאה ללקוח? היכנס לזרם."
+2. אל תוסיף שורת נימוק ואל תסביר את עצמך: המספר וההנחות שמתחתיו הם ההסבר.
+   מה שמעלה מחיר (בודק, חציבה, הגעות חח"י) נכנס לבלוק "פתוח" בסוף ולא כפסקה נפרדת. פעמיים אותו דבר במילים שונות זה מה שמנפח את התשובה.
+3. אל תהיה הזול · תמחר לפי ערך, סיכון ומורכבות.
+4. אם המחיר תלוי-אורך (כבל/תוואי/צנרת): הוסף בסוף בלוק מחשבון בפורמט המדויק (JSON בלבד): [[מחשבון]]{"label":"אורך הקו (מ')","base":1800,"minM":5,"maxM":80,"defaultM":20,"tiers":[{"upToM":25,"perMeter":50},{"upToM":60,"perMeter":80},{"upToM":150,"perMeter":115}]}[[/מחשבון]]. המחיר למטר מדורג, קו ארוך יקר יותר למטר (זמן עבודה, חתך גדל). קבע maxM שמכסה את המקרה הריאלי (עד 150, לא רק את מה שהמשתמש אמר), ו-base כך שהמחיר ב-defaultM שווה בדיוק למחיר שנתת. אל תוסיף מחשבון לעבודות שאינן תלויות-אורך.
+5. **חובה בסוף שלב ב'**: בלוק "מה נשאר פתוח" בפורמט המדויק הזה (JSON תקין, בלי טקסט נוסף):
+[[פתוח]]{"assumptions":["המסלול גלוי ואין חציבה","בלוח יש מקום פנוי ל-2 מודולים"],"open":["מצב ההארקה במבנה","מי מספק את החומר","נגישות וחניה באתר"]}[[/פתוח]]
+assumptions = 2–4 ההנחות שהמחיר שנתת נשען עליהן בפועל. open = 3–6 דברים שלא נבדקו ושיכולים להזיז את המחיר. קצר, בלי מספרים, כל פריט עד 6 מילים. זה לא קישוט, זה מה שמבדיל הערכה מהירה מהצעת מחיר.
+קצר ולעניין. אל תסיים בשורת שיווק ואל תזמין את המשתמש למערכת: זו תשובה מקצועית, לא פרסומת.
 
 ## רשימת ציוד וכלים (רק כשמתבקש במפורש)
-כשהמשתמש מבקש רשימת ציוד/חומרים/כלים — החזר משפט פתיחה קצר אחד, ואז בלוק בפורמט המדויק הזה (JSON תקין, בלי טקסט נוסף בתוכו):
+כשהמשתמש מבקש רשימת ציוד/חומרים/כלים: החזר משפט פתיחה קצר אחד, ואז בלוק בפורמט המדויק הזה (JSON תקין, בלי טקסט נוסף בתוכו):
 [[רשימות]]{"equipment":[{"item":"כבל NYY 5×4","qty":"25 מ'","note":""},{"item":"קופסת הסתעפות CI80","qty":"2","note":"5 מהדקי שוקולד בכל אחת"}],"tools":["מברגה + סט מקדחים לבטון","סרט מדידה"]}[[/רשימות]]
-כללים: equipment = כל מה שקונים לעבודה הזו — ציוד ראשי, אביזרים, חומרי התקנה ומתכלים, כולל הקטנים שנשכחים (דיבלים, ברגים, מהדקים, סופיות כבל, חבקים, סרט בידוד). לכל פריט qty קצר ("3", "25 מ'"); note רק כשיש דגש מקצועי שחשוב בשטח (מה בתוך הקופסה, חתך, דירוג אמפר). tools = כלי העבודה הנדרשים בשטח, בלי כמויות. בלי מחירים בתוך הרשימות. עד 25 פריטי ציוד ועד 15 כלים — רק מה שבאמת צריך.
+כללים: equipment = כל מה שקונים לעבודה הזו: ציוד ראשי, אביזרים, חומרי התקנה ומתכלים, כולל הקטנים שנשכחים (דיבלים, ברגים, מהדקים, סופיות כבל, חבקים, סרט בידוד). לכל פריט qty קצר ("3", "25 מ'"); note רק כשיש דגש מקצועי שחשוב בשטח (מה בתוך הקופסה, חתך, דירוג אמפר). tools = כלי העבודה הנדרשים בשטח, בלי כמויות. בלי מחירים בתוך הרשימות. עד 25 פריטי ציוד ועד 15 כלים, רק מה שבאמת צריך.
 
-עוגני שוק אמיתיים (מקבוצות חשמלאים בישראל — אל תתמחר מתחת לזה, עדיף גבוה-סביר מנמוך): חבילת פיטינג חיצונית קטנה (מתג + גוף תאורה + כמה שקעים + כמה קופסאות + ~20–30מ' תעלה + כבל) ≈ 2,500–3,500 ₪; הכנה להגדלת חיבור חד-פאזי → תלת-פאזי בדירה מ~2,000 ₪ ומעלה; התקנת עמדת טעינה כולל לוח פיצול על פילר ≈ 3,000–4,500 ₪ (ללא תשלום לבודק — ציין שזה בנפרד); התקנת גוף תאורה גדול ≈ 300 ₪; נקודת חשמל בודדת ≈ 120–200 ₪; החלפת לוח דירתי ≈ כמה אלפי ₪. עבודה קטנה-בודדת יקרה יחסית (יש רצפת ביקור). כייל את ההערכה למציאות הזו.`;
+עוגני שוק אמיתיים (מקבוצות חשמלאים בישראל: אל תתמחר מתחת לזה, עדיף גבוה-סביר מנמוך): חבילת פיטינג חיצונית קטנה (מתג + גוף תאורה + כמה שקעים + כמה קופסאות + ~20–30מ' תעלה + כבל) ≈ 2,500–3,500 ₪; הכנה להגדלת חיבור חד-פאזי → תלת-פאזי בדירה מ~2,000 ₪ ומעלה; התקנת עמדת טעינה כולל לוח פיצול על פילר ≈ 3,000–4,500 ₪ (ללא תשלום לבודק: ציין שזה בנפרד); התקנת גוף תאורה גדול ≈ 300 ₪; נקודת חשמל בודדת ≈ 120–200 ₪; החלפת לוח דירתי ≈ כמה אלפי ₪. עבודה קטנה-בודדת יקרה יחסית (יש רצפת ביקור). כייל את ההערכה למציאות הזו.`;
 
 const feed = document.getElementById('feed');
 const wrap = document.getElementById('wrap');
@@ -221,12 +288,73 @@ function esc(s){ const d=document.createElement('div'); d.textContent=s; return 
 function md(s){
   let h = esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
   // Make the price line POP — the one thing every visitor came for.
-  h = h.replace(/^(.*?(?:מחיר מומלץ|מחיר משוער|טווח מחיר|טווח גס)[^\n]*)/, '<span class="price-line">$1</span>');
+  // Big type for the NUMBER, small for what comes after it. The old pattern
+  // took the entire first line, so "לפני מע\"מ, לא כולל העמדה עצמה ובודק" was
+  // printed at headline weight across four lines — most of what made this
+  // screen read as a shouty gimmick rather than an answer.
+  h = h.replace(/^([^\n]*?(?:מחיר מומלץ|מחיר משוער|טווח מחיר|טווח גס|הערכה ראשונית)[^\n]*?[\d,]+(?:\s*[–-]\s*[\d,]+)?\s*₪)([^\n]*)/,
+    '<span class="price-line">$1</span><span class="price-note">$2</span>');
   return h;
 }
 
+// A name this browser made up about itself, so "how many different people
+// tried this" has an answer that survives a reload.
+//
+// Random, local, and about nothing: no IP, no fingerprint, no account. Clearing
+// the browser erases it and this visitor is simply new again, which is the
+// correct behaviour and not a bug to be worked around. It is sent only while
+// nobody is signed in — the moment there is a Google account, the account is
+// the identity and this has no job.
+const ANON_KEY = 'zerem_anon_id';
+function anonId(){
+  try{
+    let v = localStorage.getItem(ANON_KEY);
+    if (!/^[a-z0-9]{12,32}$/.test(v || '')){
+      const b = new Uint8Array(12);
+      crypto.getRandomValues(b);
+      v = Array.from(b, x => x.toString(16).padStart(2,'0')).join('');
+      localStorage.setItem(ANON_KEY, v);
+    }
+    return v;
+  }catch(e){ return ''; }   // private mode, storage disabled — count nothing
+}
+
+// Read an OpenAI-style SSE stream, calling onProgress(fullText) as it grows.
+// The same shape the full app has used for months (sale/app.js).
+async function consumeSSE(response, onProgress){
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '', full = '';
+  while (true){
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream:true });
+    let nl;
+    while ((nl = buffer.indexOf('\n')) !== -1){
+      const line = buffer.slice(0, nl).trim();
+      buffer = buffer.slice(nl + 1);
+      if (!line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === '[DONE]') continue;
+      try{
+        const j = JSON.parse(payload);
+        const delta = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
+        if (delta){ full += delta; if (onProgress) onProgress(full); }
+      }catch(_){ /* keep-alive or a half-arrived line */ }
+    }
+  }
+  return full;
+}
+
+// While the answer is still arriving, the machine blocks must not flash on
+// screen as raw JSON. Everything from an opening [[ onwards is held back until
+// its closing tag lands; the final render (addMsg) parses them properly.
+function streamPreview(t){
+  return t.replace(/\[\[(שאלות|מחשבון|רשימות|פתוח)\]\][\s\S]*?(\[\[\/\1\]\]|$)/g, '').trim();
+}
+
 function addMsg(role, text){
-  let questions = null, calc = null, lists = null;
+  let questions = null, calc = null, lists = null, openItems = null;
   if (role !== 'user'){
     // Phase-1 protocol: extract the machine block, show the rest as text.
     const m = /\[\[שאלות\]\]([\s\S]*?)\[\[\/שאלות\]\]/.exec(text);
@@ -243,6 +371,11 @@ function addMsg(role, text){
     if (l){
       try{ lists = JSON.parse(l[1]); }catch(e){}
       text = text.replace(l[0], '').trim();
+    }
+    const o = /\[\[פתוח\]\]([\s\S]*?)\[\[\/פתוח\]\]/.exec(text);
+    if (o){
+      try{ openItems = JSON.parse(o[1]); }catch(e){}
+      text = text.replace(o[0], '').trim();
     }
   }
   let el = null;
@@ -261,8 +394,27 @@ function addMsg(role, text){
   if (role !== 'user' && !questions && !lists && text) addActions(text);
   if (questions && questions.length) renderQuestions(questions);
   if (calc) renderCalc(calc);
+  if (openItems) renderOpenItems(openItems);
   feed.scrollTop = feed.scrollHeight;
   return el;
+}
+
+// The honest footnote under every instant price: what it assumed, and what
+// nobody checked. This is the funnel — not a nag, a demonstration. Seeing the
+// list is a better argument for characterizing the job than any sales copy.
+function renderOpenItems(o){
+  const assumptions = (Array.isArray(o.assumptions) ? o.assumptions : []).slice(0,4);
+  const open = (Array.isArray(o.open) ? o.open : []).slice(0,6);
+  if (!assumptions.length && !open.length) return;
+  const box = document.createElement('div'); box.className='openbox';
+  const li = (arr)=> arr.map(x=>'<li>'+esc(String(x).slice(0,80))+'</li>').join('');
+  box.innerHTML =
+    '<div class="open-head">המחיר הזה נשען על ' + assumptions.length + ' הנחות' +
+      (open.length ? ' · ' + open.length + ' דברים עוד לא נבדקו' : '') + '</div>' +
+    (assumptions.length ? '<div class="open-sub">הנחנו ש…</div><ul class="open-list">' + li(assumptions) + '</ul>' : '') +
+    (open.length ? '<div class="open-sub">לא נבדק</div><ul class="open-list open-miss">' + li(open) + '</ul>' : '') +
+    '';
+  wrap.appendChild(box);
 }
 
 // Length→price slider. The FORMULA lives here (site code, clamped); the AI only
@@ -301,7 +453,7 @@ function renderCalc(c){
   };
   range.oninput = upd; upd();
   const note = document.createElement('div'); note.className='calc-note';
-  note.textContent = 'גרור לשינוי האורך — המחיר מתעדכן מיד';
+  note.textContent = 'גרור לשינוי האורך · המחיר מתעדכן מיד';
   box.appendChild(price); box.appendChild(range); box.appendChild(lab); box.appendChild(note);
   wrap.appendChild(box);
 }
@@ -314,8 +466,15 @@ function renderQuestions(questions){
     const g = document.createElement('div'); g.className='qgroup';
     const lab = document.createElement('div'); lab.className='q-label'; lab.textContent = q.q;
     const opts = document.createElement('div'); opts.className='q-opts';
-    (q.opts||[]).slice(0,4).forEach(op=>{
+    // "def" is the index of the answer that is true in most jobs. Clamped
+    // against the options that actually exist — it arrives from a language
+    // model, and a def of 7 on a three-option question must pre-select nothing
+    // rather than throw inside a render.
+    const list = (q.opts||[]).slice(0,4);
+    const def = Number.isInteger(q.def) && q.def >= 0 && q.def < list.length ? q.def : -1;
+    list.forEach((op,oi)=>{
       const b = document.createElement('button'); b.className='q-opt'; b.textContent = op;
+      if (oi === def){ b.classList.add('on'); answers[qi] = op; }
       b.onclick = ()=>{
         opts.querySelectorAll('.q-opt').forEach(x=>x.classList.remove('on'));
         b.classList.add('on'); answers[qi] = op; free.value='';
@@ -332,8 +491,13 @@ function renderQuestions(questions){
     opts.appendChild(free);
     g.appendChild(lab); g.appendChild(opts); box.appendChild(g);
   });
-  const go = document.createElement('button'); go.className='q-go'; go.disabled = true;
+  const go = document.createElement('button'); go.className='q-go';
+  go.disabled = Object.keys(answers).length === 0;
   go.textContent = 'חשב מחיר מדויק ←';
+  const hint = document.createElement('div');
+  hint.className = 'q-hint';
+  hint.textContent = 'הסטנדרטי כבר מסומן. שנה רק מה ששונה אצלך.';
+  box.appendChild(hint);
   go.onclick = ()=>{
     const parts = questions.map((q,qi)=> answers[qi] ? (q.q + ': ' + answers[qi]) : null).filter(Boolean);
     box.classList.add('done');
@@ -360,12 +524,12 @@ function addActions(answer){
   // what do I bring" bubbles (one list per described job).
   if (/₪/.test(answer) && !listsMade){
     const listBtn = document.createElement('button'); listBtn.className='msg-act lists';
-    listBtn.innerHTML = '🧰 רשימת ציוד וכלים';
+    listBtn.innerHTML = 'רשימת ציוד וכלים';
     listBtn.onclick = ()=>{
       if (busy || listsMade) return;
       listBtn.disabled = true;
-      send('צור עבורי עכשיו רשימת ציוד וחומרים ורשימת כלי עבודה מלאה לעבודה שתוארה בשיחה, לפי פורמט [[רשימות]] — משפט פתיחה קצר אחד ואז הבלוק.',
-        { label:'🧰 רשימת ציוד וכלים', lists:true });
+      send('צור עבורי עכשיו רשימת ציוד וחומרים ורשימת כלי עבודה מלאה לעבודה שתוארה בשיחה, לפי פורמט [[רשימות]]: משפט פתיחה קצר אחד ואז הבלוק.',
+        { label:'רשימת ציוד וכלים', lists:true });
     };
     row.appendChild(listBtn);
   }
@@ -398,9 +562,28 @@ function saveHandoff(reply){
 }
 function showCTA(){
   if (ctaShown) return; ctaShown = true;
-  const c = document.createElement('div'); c.className='cta-card';
-  c.innerHTML = '<p>אהבת? זו רק ההתחלה. במערכת המלאה נמשיך <b>בדיוק את העבודה הזו</b> — רשימת מוצרים, הצעת PDF ללקוח וחשבונית.</p><a href="/sale/">המשך את זה במערכת (חינם) ←</a>';
-  wrap.appendChild(c); feed.scrollTop = feed.scrollHeight;
+  // Deliberately does nothing now. This card used to say "אהבת? זו רק ההתחלה…"
+  // directly under a professional pricing answer, and an advertisement inside
+  // an answer cheapens the answer — which matters most in the one place this
+  // gets seen, a WhatsApp group of two hundred electricians. The logo at the
+  // top of the page is the whole pitch; a tradesman who got a good number will
+  // find it by himself.
+  return;
+}
+
+// When a send fails, the thing he typed must not be lost: one button puts it
+// back on its way, without retyping it.
+function addRetry(text){
+  const holder = document.createElement('div');
+  holder.className = 'msg-actions';
+  const btn = document.createElement('button');
+  btn.className = 'msg-act retry-act';
+  btn.type = 'button';
+  btn.textContent = 'שליחה מחדש';
+  btn.onclick = () => { holder.remove(); send(text); };
+  holder.appendChild(btn);
+  wrap.appendChild(holder);
+  feed.scrollTop = feed.scrollHeight;
 }
 
 async function send(text, opts){
@@ -422,18 +605,65 @@ async function send(text, opts){
   try{
     const headers = {'Content-Type':'application/json'};
     if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+    // Only while signed out. With a Google account there is already a real
+    // identity, and sending a second one would be pointless as well as worse.
+    else { const a = anonId(); if (a) headers['X-Zerem-Anon'] = a; }
     const res = await fetch('/api/chat', {
       method:'POST', headers,
-      body: JSON.stringify({ modelClass:'basic', stream:false, max_tokens: opts.lists ? 2000 : 1200, thinkingBudget:0,
+      body: JSON.stringify({ modelClass:'basic', stream:true, max_tokens: opts.lists ? 2000 : 1200, thinkingBudget:0,
         messages: [{ role:'system', content:SYSTEM }, ...history.map(m=>({ role:m.role, content:m.content }))] })
     });
-    const d = await res.json();
+    // Streaming, because this is the page a stranger opens from a WhatsApp
+    // link. Measured before this change: 18, 18 and 24 seconds for three
+    // people asking at once, with a blank screen for every one of those
+    // seconds. The full app has streamed for months; the public front, the one
+    // page whose first impression actually decides anything, did not.
+    //
+    // The stream is only a PREVIEW. Whatever arrives is shown as it comes, then
+    // the bubble is thrown away and the complete text goes through addMsg
+    // exactly as before — so the questions, the calculator and the "what is
+    // still open" block are parsed by the same code as always, and none of
+    // that had to be made stream-aware.
+    const ct = res.headers.get('content-type') || '';
+    if (res.ok && ct.includes('text/event-stream')){
+      typing.remove();
+      const live = document.createElement('div');
+      live.className = 'msg ai';
+      wrap.appendChild(live);
+      let stuck = false;
+      const full = await consumeSSE(res, (t) => {
+        live.innerHTML = md(streamPreview(t));
+        if (!stuck) { feed.scrollTop = feed.scrollHeight; }
+      });
+      live.remove();
+      const reply = full.trim() || 'לא התקבלה תשובה, נסה שוב.';
+      addMsg('ai', reply);
+      history.push({ role:'assistant', content:reply });
+      bumpQuota();
+      saveSession();
+      if (!opts.lists) saveHandoff(reply);
+      return;
+    }
+
+    // A gateway error can answer with an empty body or with HTML, and then
+    // res.json() throws before anyone looks at the status. Read the text first,
+    // so a 502 says "502" instead of "the chat is unavailable".
+    const raw = await res.text();
+    let d = null;
+    try { d = raw ? JSON.parse(raw) : null; } catch (e) { d = null; }
     typing.remove();
     if (!res.ok){
-      const m = (d && d.error && d.error.message) || 'שגיאה זמנית — נסה שוב עוד רגע.';
+      const m = (d && d.error && d.error.message)
+        || (res.status === 429 ? 'הגעת למכסת השאלות היומית. אפשר להתחבר עם Google ולקבל מכסה גדולה יותר.'
+        : res.status >= 500 ? `מנוע ה-AI לא ענה כרגע (שגיאה ${res.status}). זה בדרך כלל חולף תוך כמה שניות.`
+        : 'שגיאה זמנית, נסה שוב עוד רגע.');
       addMsg('ai', m);
+      addRetry(text);
+    } else if (!d) {
+      addMsg('ai', 'התשובה חזרה ריקה מהשרת. נסה שוב.');
+      addRetry(text);
     } else {
-      const reply = d.choices && d.choices[0] ? d.choices[0].message.content : 'לא התקבלה תשובה — נסה שוב.';
+      const reply = d.choices && d.choices[0] ? d.choices[0].message.content : 'לא התקבלה תשובה, נסה שוב.';
       addMsg('ai', reply);
       history.push({ role:'assistant', content:reply });
       bumpQuota();
@@ -443,7 +673,10 @@ async function send(text, opts){
     }
   }catch(e){
     typing.remove();
-    addMsg('ai', 'הצ\'אט לא זמין כרגע — נסה שוב עוד רגע.');
+    addMsg('ai', navigator.onLine === false
+      ? 'אין חיבור לאינטרנט כרגע. ברגע שיחזור, אפשר לשלוח שוב.'
+      : 'לא הצלחתי להגיע לשרת. נסה שוב עוד רגע.');
+    addRetry(text);
   }finally{
     busy = false; sendBtn.disabled = false; input.focus();
   }
@@ -517,12 +750,12 @@ function renderAcct(){
   const b = document.getElementById('acct-btn'); if (!b) return;
   if (me && me.email){
     const name = me.email.split('@')[0];
-    b.textContent = '⚡ ' + (name.length > 12 ? name.slice(0,12) + '…' : name);
-    b.title = me.email + ' · מסלול ' + (TIER_NAMES[me.tier] || me.tier) + ' — לחץ להתנתקות';
+    b.textContent = (name.length > 12 ? name.slice(0,12) + '…' : name);
+    b.title = me.email + ' · מסלול ' + (TIER_NAMES[me.tier] || me.tier) + ', לחץ להתנתקות';
     b.classList.add('on');
   } else {
     b.textContent = 'התחבר';
-    b.title = 'התחברות עם Google — מכסה יומית מוגדלת';
+    b.title = 'התחברות עם Google · מכסה יומית מוגדלת';
     b.classList.remove('on');
   }
 }
@@ -545,9 +778,11 @@ document.getElementById('acct-btn').addEventListener('click', ()=>{
   if (authToken) fetchMe();
 })();
 
-// Transparent quota note: guests count locally (10/day server-side, per-IP);
-// connected accounts show the real plan numbers from /api/me.
-const GUEST_DAILY = 10;
+// Transparent quota note: guests count locally (the server's guest ceiling is
+// per IP per day, see functions/api/_tiers.js); connected accounts show the
+// real plan numbers from /api/me. Keep this in step with the server, or the
+// page tells people they are out when they are not.
+const GUEST_DAILY = 100;
 function quotaKey(){ return 'zerem_ask_q_' + new Date().toISOString().slice(0,10); }
 function bumpQuota(){
   if (me && me.email){ meDelta++; updateQuotaNote(); return; }
@@ -592,7 +827,7 @@ document.getElementById('new-chat').addEventListener('click', ()=>{
 restoreSession();
 
 // Theme: night (default) → dim → day, persisted.
-const THEMES = [['','🌙'],['dim','🌓'],['light','☀️']];
+const THEMES = [['','אוטו'],['dim','כהה'],['light','בהיר']];
 let themeIdx = 0;
 function applyTheme(i){
   themeIdx = i % THEMES.length;
@@ -608,7 +843,39 @@ sendBtn.addEventListener('click', ()=>send());
 input.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }});
 input.addEventListener('input', ()=>{ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,120)+'px'; });
 document.getElementById('chips').addEventListener('click', e=>{ if(e.target.classList.contains('chip')) send(e.target.textContent); });
+// Said once per device, and never in the middle of a conversation: this mode
+// is a taste, and nothing typed here is kept.
+function maybeShowNoSave(){
+  try{ if (localStorage.getItem('sj_ask_nosave') === '1') return; }catch(e){ /* private mode: show it */ }
+  if (document.querySelectorAll('#wrap .msg').length) return;   // already talking
+  const wrap = document.createElement('div');
+  wrap.className = 'nosave-wrap';
+  wrap.innerHTML = `
+    <div class="nosave" role="dialog" aria-modal="true" aria-labelledby="nosave-t">
+      <h2 id="nosave-t">רק שתדעו, זו טעימה</h2>
+      <p>השיחה כאן לא נשמרת. סוגרים את הדף, והכל נעלם, כולל המחיר שיצא.</p>
+      <p class="fine">במערכת המלאה כל עבודה נשמרת עם האפיון, החומרים וההצעה, ואפשר לחזור אליה מכל מכשיר. ההתחברות עם Google, בחינם.</p>
+      <div class="nosave-actions">
+        <button type="button" class="nosave-ok" id="nosave-ok">הבנתי, בואו נתמחר</button>
+        <a class="nosave-full" href="/sale/">למערכת המלאה</a>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+  const close = () => {
+    try{ localStorage.setItem('sj_ask_nosave','1'); }catch(e){}
+    wrap.remove();
+    input.focus();
+  };
+  wrap.querySelector('#nosave-ok').addEventListener('click', close);
+  wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
+  document.addEventListener('keydown', function esc(e){
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', esc); }
+  });
+}
+setTimeout(maybeShowNoSave, 500);
+
 input.focus();
 </script>
+    <script src="/track.js?v=481" defer></script>
 </body>
 </html>

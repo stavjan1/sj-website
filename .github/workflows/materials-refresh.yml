@@ -1,0 +1,68 @@
+# Re-harvests the supplier price catalog and commits it if the guards pass.
+#
+# The failure mode this is built around is the quiet one: prices drift, the
+# database keeps looking perfectly valid, and the pricing bot keeps quoting last
+# season's numbers with full confidence. So the run is scheduled rather than
+# manual, and it commits ONLY when tests/materials.test.mjs passes — a harvest
+# that came back truncated or with zero-priced rows is left on the floor and
+# reported as a failed run.
+name: Materials price refresh
+
+on:
+  schedule:
+    - cron: '0 3 * * 1' # Monday 03:00 UTC — quiet hours for the supplier
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materials-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # A fresh harvest, not a resume: stale state would let a supplier-side
+      # deletion live on in the database forever.
+      - name: Harvest the ERCO catalog
+        run: python scripts/suppliers/erco_harvest.py --fresh
+
+      - name: Read units off the product pages
+        run: python scripts/suppliers/erco_units.py
+
+      - name: Rebuild the materials database
+        run: python scripts/suppliers/build_materials_db.py
+
+      - name: Run the guards
+        run: node --test tests/materials.test.mjs
+
+      - name: Commit if anything moved
+        run: |
+          git config user.name "materials-price-bot"
+          git config user.email "actions@users.noreply.github.com"
+          # Explicit paths only: this job shares a repo with human work and must
+          # never sweep up anything it did not produce. erco.json is NOT here on
+          # purpose — it is gitignored (4.7MB that regenerates in seconds), and
+          # `git add` on an ignored path exits non-zero, which would have failed
+          # every scheduled run.
+          git add data/materials/index.json data/materials/taxonomy.json
+          if git diff --cached --quiet; then
+            echo "Prices unchanged — nothing to commit."
+            exit 0
+          fi
+          COUNT=$(node -e "console.log(JSON.parse(require('fs').readFileSync('data/materials/index.json','utf8')).meta.count)")
+          git commit -m "Materials refresh: ${COUNT} priced items from ארכה"
+          git push

@@ -1,0 +1,796 @@
+/* ZEREM — PDF & print layer. Ported VERBATIM from V2 — the 794px A4 rule and print output are contract. Do not restyle. */
+
+/* Notes for maintainers:
+   - The PDF sheet is deliberately independent of the app theme — it is always
+     a light printed document. Nothing here may read the app's dark/light vars.
+   - PDF fonts (David Libre / Frank Ruhl Libre / Heebo / Outfit / Rubik) are
+     loaded via the Google Fonts <link> in index.html; this file only
+     references them by family name.
+   - The signature modal (#signature-modal, #signature-canvas) and the
+     signature row (#pdf-signature-row) carry their styling INLINE in
+     index.html — there were no rules for them in styles.css, so there is
+     nothing to port here.
+   - The three design templates (classic / modern / minimal) live in app.js as
+     value sets; they work by writing the --pdf-custom-* variables consumed in
+     the "Dynamic PDF styling hooks" section below. */
+
+/* ==========================================================================
+   1. PDF print variables
+   ========================================================================== */
+:root {
+    /* PDF Print Variables (Standard Light A4) */
+    --pdf-bg: #ffffff;
+    --pdf-text-main: #0f172a;
+    --pdf-text-muted: #475569;
+    --pdf-border: #cbd5e1;
+    --pdf-primary: #1e3a8a; /* Navy Blue */
+    --pdf-secondary: #3b82f6; /* Accent Blue */
+    --pdf-danger: #b91c1c;
+}
+
+/* ==========================================================================
+   2. A4 sheet system — real 794px layout width is contract
+   ========================================================================== */
+
+/* A4 Sheet Preview & Page */
+.sheet-scroller {
+    flex-grow: 1;
+    overflow: auto;
+    padding: 30px;
+    display: flex;
+    justify-content: center;
+    background-color: #0f172a;
+}
+
+/* A4 dimensions: 210mm x 297mm */
+.a4-sheet {
+    background-color: var(--pdf-bg);
+    color: var(--pdf-text-main);
+    /* Frank Ruhl Libre first, not David Libre. Measured at 100px with real
+       glyph bounding boxes, Latin cap height ÷ Hebrew letter height:
+       Frank Ruhl 1.10 · David Libre 1.17 · Assistant 1.18 · Heebo 1.23.
+       Stav: "ה-A של האמפר בגודל לא פרופורציונלי" — on "3x25A" the A was
+       towering over the Hebrew beside it. Latin capitals are taller than
+       Hebrew letters in every Hebrew face, so this picks the closest pairing
+       rather than pretending to cure it. */
+    font-family: 'Frank Ruhl Libre', 'David Libre', 'Heebo', serif;
+    width: 794px; /* A4 width at 96 DPI */
+    /* NEVER let flexbox squeeze the sheet below true A4 width — the preview
+       shrinks it with transform:scale instead, and the PDF capture relies on
+       the real 794px layout (a squeezed sheet = wrong line breaks in the PDF). */
+    flex-shrink: 0;
+    min-width: 794px;
+    min-height: 1123px; /* A4 height at 96 DPI */
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    padding: 45px 50px; /* Layout margins */
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    transform-origin: top center;
+}
+
+/* Watermark Overlay behind PDF content */
+.pdf-watermark {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.06;
+    pointer-events: none;
+    z-index: 0;
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-origin: content-box;
+    padding: 80px; /* standard document margins */
+}
+
+.pdf-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    flex-grow: 1;
+    position: relative;
+    z-index: 1; /* Render text on top of the watermark */
+}
+
+/* The quote-designer live preview clones the sheet — same width contract:
+   the clone must never be flex-squeezed either. */
+.designer-preview .designer-preview-sheet { box-shadow: 0 6px 24px rgba(0,0,0,0.35); flex-shrink: 0; }
+
+/* ==========================================================================
+   3. Quote sheet — header block
+   ========================================================================== */
+
+/* PDF Elements Styling (Exactly matches print mockup) */
+.pdf-header {
+    width: 100%;
+    margin-bottom: 6px;
+}
+
+.pdf-header-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1.2fr;
+    align-items: flex-start;
+    width: 100%;
+    gap: 20px;
+}
+
+.pdf-recipient-column {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: right;
+    align-items: flex-start;
+}
+
+.pdf-logo-column {
+    display: flex;
+    flex-direction: column;
+    align-items: var(--logo-align, center);
+    text-align: var(--logo-text-align, center);
+    margin-top: var(--logo-margin-top, 0px);
+    margin-bottom: var(--logo-margin-bottom, 10px);
+}
+
+.pdf-meta-column {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: left;
+    gap: 6px;
+    font-weight: 500;
+}
+
+.pdf-logo-wrapper {
+    width: var(--logo-width, 75px);
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.pdf-logo-wrapper img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.pdf-logo-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.pdf-company-title {
+    font-size: 1.25rem;
+    font-weight: 900;
+    color: var(--pdf-primary);
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+}
+
+.pdf-company-subtitle {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--pdf-secondary);
+    border-bottom: 1.5px solid var(--pdf-secondary);
+    display: inline-block;
+    padding-bottom: 2px;
+    margin-bottom: 2px;
+    letter-spacing: 1px;
+    min-width: 150px;
+}
+
+.pdf-company-owner {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--pdf-text-muted);
+}
+
+.pdf-header-divider {
+    width: 100%;
+    height: 1.5px;
+    background-color: var(--pdf-secondary);
+    margin-bottom: 20px;
+    margin-top: 6px;
+}
+
+.recipient-label {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--pdf-text-muted);
+}
+
+.recipient-name {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--pdf-primary);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    white-space: nowrap;
+}
+
+.recipient-sub {
+    font-size: 0.95rem;
+    color: var(--pdf-text-main);
+    font-weight: 400;
+    white-space: pre-line;
+    line-height: 1.4;
+}
+
+/* Client details render every line the user typed (the field is a textarea now) */
+#pdf-client-sub { white-space: pre-line; }
+
+.meta-val-date {
+    font-size: 1.05rem;
+    font-weight: 700;
+    font-family: 'Outfit', 'Rubik', sans-serif;
+    color: var(--pdf-text-main);
+}
+
+/* A quote number is an identifier, not a sentence — it has to print exactly as
+   it was typed. Inside an RTL page bidi reorders it: "2026-101/A" came out as
+   "A/2026-101" on the customer's PDF, because the trailing Latin letter is a
+   strong LTR character and gets moved. Pure-digit numbers were unaffected,
+   which is why this went unnoticed. isolate keeps the run out of the
+   surrounding paragraph's ordering; ltr fixes the order inside it. */
+#pdf-number,
+#pdf-date {
+    unicode-bidi: isolate;
+    direction: ltr;
+    display: inline-block;
+}
+
+.meta-val-number {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--pdf-text-main);
+}
+
+.meta-val-number span {
+    font-family: 'Outfit', 'Rubik', sans-serif;
+}
+
+.meta-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    white-space: nowrap;
+}
+
+/* ==========================================================================
+   4. Quote sheet — title block
+   ========================================================================== */
+
+/* PDF Title Block */
+.pdf-title-container {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.pdf-title {
+    font-size: 1.55rem;
+    font-weight: 800;
+    color: var(--pdf-primary);
+    display: inline-block;
+    padding-bottom: 6px;
+    border-bottom: 2.5px solid var(--pdf-primary);
+}
+
+/* ==========================================================================
+   5. Quote sheet — body: work items and table
+   ========================================================================== */
+
+/* PDF Content */
+.pdf-content-area {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.pdf-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-bottom: 30px;
+}
+
+.pdf-work-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    page-break-inside: avoid;
+}
+
+.pdf-item-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--pdf-primary);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    margin-bottom: 2px;
+}
+
+.pdf-item-desc {
+    font-size: 0.95rem;
+    color: var(--pdf-text-main);
+    white-space: pre-line;
+    padding-right: 12px;
+    line-height: 1.6;
+}
+
+/* Detailed HTML Table inside PDF */
+.pdf-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 24px;
+    font-size: 0.95rem;
+    page-break-inside: auto;
+}
+
+.pdf-table tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+}
+
+.pdf-table th,
+.pdf-table td {
+    border: 1.5px solid var(--pdf-border);
+    padding: 10px 14px;
+    text-align: right;
+    vertical-align: top;
+}
+
+.pdf-table th {
+    background-color: #f1f5f9;
+    color: var(--pdf-primary);
+    font-weight: 700;
+}
+
+.pdf-table tbody tr:nth-child(even) {
+    background-color: #f8fafc;
+}
+
+/* ==========================================================================
+   6. Quote sheet — summary and warning boxes
+   ========================================================================== */
+
+/* Summary & Warning boxes */
+.pdf-summary-box {
+    background-color: #fafafa;
+    border-right: 3px solid var(--pdf-secondary);
+    padding: 12px 16px;
+    margin-top: auto;
+    margin-bottom: 12px;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.9rem;
+    page-break-inside: avoid;
+}
+
+.summary-title {
+    font-weight: 700;
+    color: var(--pdf-primary);
+    margin-bottom: 4px;
+}
+
+.summary-text {
+    color: var(--pdf-text-main);
+    white-space: pre-line;
+    line-height: 1.5;
+}
+
+.pdf-warning-box {
+    color: var(--pdf-danger);
+    font-weight: 700;
+    text-align: center;
+    border: 1px dashed var(--pdf-danger);
+    background-color: rgba(239, 68, 68, 0.03);
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    page-break-inside: avoid;
+}
+
+/* ==========================================================================
+   7. Quote sheet — totals and footer
+   ========================================================================== */
+
+/* PDF Footer Section */
+.pdf-footer-section {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    page-break-inside: avoid;
+}
+
+.pdf-price-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--pdf-primary);
+    margin-bottom: 2px;
+}
+
+.price-label {
+    text-decoration: underline;
+}
+
+.price-val {
+    font-family: 'Outfit', 'Rubik', sans-serif;
+    font-size: 1.45rem;
+    text-decoration: underline;
+}
+
+.price-sub-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--pdf-text-muted);
+    margin-bottom: 24px;
+}
+
+.pdf-footer-line {
+    width: 100%;
+    height: 1.5px;
+    background-color: var(--pdf-primary);
+    margin-bottom: 12px;
+}
+
+.pdf-company-footer {
+    width: 100%;
+    text-align: center;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.footer-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+}
+
+.font-bold {
+    font-weight: 700;
+    color: var(--pdf-text-main);
+}
+
+.text-secondary {
+    color: var(--pdf-text-muted);
+}
+
+.bullet {
+    color: var(--pdf-border);
+}
+
+.footer-notice {
+    /* This is the sentence that turns the page into a binding agreement, and it
+       was set at 0.65rem (~7.8pt) in muted italic -- the second-smallest and
+       second-palest thing on an A4 whose largest item was the logo. A reviewer
+       put it plainly: the lines with legal consequences are the ones you can
+       least read. Small is fine for a footer; unreadable is not, and italic at
+       that size in Hebrew is worse still. */
+    font-size: 0.72rem;
+    color: var(--pdf-text-main);
+    margin-top: 6px;
+}
+
+/* PDF credit line (free/guest plans) */
+.pdf-zerem-credit {
+    margin-top: 6px; text-align: center;
+    font-size: 8.5px; color: #94a3b8; letter-spacing: 0.4px;
+}
+
+/* ==========================================================================
+   8. Dynamic PDF styling hooks (--pdf-custom-*) — written by the design
+      templates (classic/modern/minimal) and the customizer in app.js
+   ========================================================================== */
+
+/* ===== Dynamic PDF Styling variables and Mini Preview layout =====
+   A CLASS, not the id it used to be. Both preview paths — "תצוגה מלאה" and the
+   designer's live preview — do cloneNode(true) followed by removeAttribute('id')
+   to avoid a duplicate id in the document. That is correct, and it silently
+   dropped all sixteen rules below, so the clone fell back to body's 16px while
+   the real sheet and the exported PDF are 12px.
+   Measured: preview 16px, PDF 12px. A third bigger, with different line breaks,
+   on the screen whose entire job is "look at the exact PDF before you send it".
+   A class survives cloning; an id cannot. */
+.quote-sheet {
+    font-family: var(--pdf-custom-font, 'Heebo', sans-serif) !important;
+    line-height: var(--pdf-custom-line-height, 1.4) !important;
+}
+
+.quote-sheet .pdf-wrapper {
+    font-size: var(--pdf-custom-font-size-body, 12px) !important;
+}
+
+.quote-sheet td,
+.quote-sheet th,
+.quote-sheet .summary-text,
+.quote-sheet .pdf-warning-box,
+.quote-sheet .pdf-company-footer {
+    font-size: var(--pdf-custom-font-size-body, 12px) !important;
+}
+
+.quote-sheet .pdf-title {
+    color: var(--pdf-custom-primary, #1e3a8a) !important;
+}
+
+.quote-sheet .underline-bar {
+    background-color: var(--pdf-custom-secondary, #3b82f6) !important;
+}
+
+.quote-sheet #pdf-total-price {
+    color: var(--pdf-custom-primary, #1e3a8a) !important;
+}
+
+.quote-sheet #pdf-logo-container svg {
+    color: var(--pdf-custom-primary, #1e3a8a) !important;
+}
+
+/* English mode: the sheet flips to LTR; keep the money column readable */
+.quote-sheet.pdf-english { direction: ltr; }
+.quote-sheet.pdf-english .pdf-header-grid { direction: ltr; }
+
+/* Designer block styles forced onto text-bearing children (a child <h1>/<td>
+   resets text-decoration, so an inline underline on the block did nothing). */
+.qb-bold, .qb-bold * { font-weight: 700 !important; }
+.qb-underline { text-decoration: underline !important; }
+.qb-underline *:not(i):not(svg):not(img) { text-decoration: underline !important; }
+
+/* ==========================================================================
+   9. Mini A4 preview (settings customizer) — layout is inline in index.html
+      (#mini-a4-preview-box); CSS adds only the transitions
+   ========================================================================== */
+
+/* Mini Preview Styles */
+.mini-a4-preview {
+    transition: all 0.3s ease;
+    user-select: none;
+}
+.mini-a4-preview * {
+    transition: font-size 0.2s ease, font-family 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+/* ==========================================================================
+   10. Design template pills (quote editor UI)
+   ========================================================================== */
+
+/* Design template pills (quote editor) */
+.pdf-template-row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 8px 12px; margin-bottom: 12px;
+    background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px;
+}
+.tpl-label { font-size: 0.82rem; font-weight: 700; display: flex; gap: 6px; align-items: center; }
+.tpl-btn {
+    padding: 5px 14px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--border-color); background: var(--bg-input);
+    color: var(--text-secondary); font-family: inherit; font-size: 0.8rem; font-weight: 600;
+    transition: all 0.2s ease;
+}
+.tpl-btn:hover { border-color: var(--color-accent); }
+.tpl-btn.active { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
+.tpl-hint { margin: 0 auto 0 0; }
+@media (max-width: 768px) { .tpl-hint { display: none; } }
+
+/* ==========================================================================
+   11. Inspection report sheet (#report-pdf-sheet)
+   ========================================================================== */
+
+/* Hidden A4 sheet (cloned by html2pdf; never visible on screen) */
+#report-pdf-sheet {
+    position: fixed; top: 0; left: -2200px;
+    width: 794px; min-height: 1123px;
+    background: #ffffff; color: #0f172a;
+    font-family: 'Heebo', 'Segoe UI', sans-serif;
+    padding: 34px 40px; box-sizing: border-box;
+    font-size: 13px; line-height: 1.6;
+}
+#report-pdf-sheet .rpt-header {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
+}
+#report-pdf-sheet .rpt-recipient { min-width: 160px; }
+#report-pdf-sheet .rpt-label { color: #475569; font-size: 12px; }
+#report-pdf-sheet .rpt-client { font-weight: 700; font-size: 15px; }
+#report-pdf-sheet .rpt-site { color: #475569; font-size: 12px; }
+#report-pdf-sheet .rpt-logo { text-align: center; }
+#report-pdf-sheet .rpt-meta { min-width: 150px; text-align: left; color: #475569; font-size: 12px; }
+#report-pdf-sheet .rpt-divider { height: 2px; background: #1e3a8a; margin: 14px 0 18px; }
+#report-pdf-sheet .rpt-title {
+    text-align: center; font-size: 20px; font-weight: 800; color: #1e3a8a;
+    text-decoration: underline; margin: 0 0 14px;
+}
+#report-pdf-sheet .rpt-intro { white-space: pre-wrap; margin-bottom: 12px; }
+#report-pdf-sheet .rpt-warning {
+    background: #fef9c3; border: 1px solid #eab308; border-radius: 6px;
+    padding: 10px 14px; font-weight: 700; margin-bottom: 16px; white-space: pre-wrap;
+}
+#report-pdf-sheet .rpt-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+#report-pdf-sheet .rpt-table th {
+    background: #1e3a8a; color: #fff; padding: 7px 9px; font-size: 12px; text-align: right;
+}
+#report-pdf-sheet .rpt-table td {
+    border: 1px solid #cbd5e1; padding: 7px 9px; vertical-align: top; font-size: 12.5px;
+}
+#report-pdf-sheet .rpt-table td img {
+    width: 120px; max-height: 110px; object-fit: cover; border-radius: 4px; display: block;
+}
+#report-pdf-sheet .rpt-row { page-break-inside: avoid; }
+#report-pdf-sheet .rpt-summary-wrap {
+    border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px 14px; margin-bottom: 18px;
+}
+#report-pdf-sheet .rpt-summary-title { font-weight: 700; color: #1e3a8a; margin-bottom: 4px; }
+#report-pdf-sheet .rpt-summary { white-space: pre-wrap; }
+#report-pdf-sheet .rpt-sign { margin: 22px 0 26px; }
+#report-pdf-sheet .rpt-sign-name { font-weight: 700; font-size: 15px; }
+#report-pdf-sheet .rpt-sign-role { color: #475569; font-size: 12px; }
+#report-pdf-sheet .rpt-footer { border-top: 1px solid #cbd5e1; padding-top: 10px; }
+
+/* --- Report live preview: the REAL A4 sheet, scaled into the card ------- */
+.report-live-preview { min-height: 120px; overflow: hidden; border-radius: 8px; }
+#report-pdf-sheet.in-preview {
+    position: static; left: auto; top: auto;
+    transform-origin: top right;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    border-radius: 4px;
+}
+
+/* Free-form blocks inside the printed report */
+#report-pdf-sheet .rpt-free-text { margin: 10px 0; white-space: pre-line; }
+#report-pdf-sheet .rpt-free-table { width: 100%; border-collapse: collapse; margin: 12px 0; page-break-inside: avoid; }
+#report-pdf-sheet .rpt-free-table th {
+    background: #1e3a8a; color: #fff; padding: 6px 8px; font-size: 12px; text-align: right; border: 1px solid #cbd5e1;
+}
+#report-pdf-sheet .rpt-free-table td {
+    padding: 6px 8px; font-size: 12px; border: 1px solid #cbd5e1; vertical-align: top;
+}
+#report-pdf-sheet .rpt-free-table tr:nth-child(even) td { background: #f8fafc; }
+
+/* Images inside the printed report tables */
+#report-pdf-sheet .rpt-free-table td .rpt-cell-img { max-width: 100%; max-height: 110px; border-radius: 3px; display: block; margin: 0 auto; }
+
+/* ==========================================================================
+   12. Full-screen PDF preview modal (#pdf-fullscreen-modal)
+   ========================================================================== */
+
+/* ===== Full-screen PDF preview modal ===== */
+.pdf-fs-modal {
+    position: fixed; inset: 0; z-index: 99000;
+    display: flex; flex-direction: column;
+    background: rgba(5, 8, 16, 0.88); backdrop-filter: blur(6px);
+    animation: fadeIn 0.2s ease;
+}
+.pdf-fs-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px; background: var(--bg-card-header);
+    border-bottom: 1px solid var(--border-color); flex-shrink: 0;
+}
+.pdf-fs-title { font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 9px; }
+.pdf-fs-title i { color: var(--color-accent); }
+.pdf-fs-actions { display: flex; gap: 10px; }
+.pdf-fs-stage {
+    flex: 1; overflow: auto; padding: 28px 16px;
+    display: flex; justify-content: center; align-items: flex-start;
+}
+/* The cloned .a4-sheet keeps its own white styling; just constrain width nicely */
+.pdf-fs-content { width: 794px; max-width: 100%; }
+.pdf-fs-content .a4-sheet {
+    box-shadow: 0 20px 70px rgba(0,0,0,0.6);
+    transform-origin: top center;
+}
+@media (max-width: 860px) {
+    .pdf-fs-content { width: 100%; }
+    /* No fixed scale. 0.62 x 794 = 492px, which fits no phone; fitFullPreview()
+       in sale/app.js measures the stage and scales to it. The origin stays here
+       because the scale is applied inline. */
+    .pdf-fs-content .a4-sheet { transform-origin: top center; }
+}
+
+/* ==========================================================================
+   13. Page-boundary guides and overflow warning (preview only, never printed)
+   ========================================================================== */
+
+/* ── Where the paper ends ────────────────────────────────────────────────────
+   A dashed rule across the preview at each A4 boundary, so a quote that will
+   arrive as two pages says so while it can still be shortened. Lives inside
+   the sheet to inherit its scale; removed before capture so it never prints. */
+.page-guide {
+    position: absolute;
+    inset-inline: 0;
+    height: 0;
+    border-top: 2px dashed var(--color-danger, #c0392b);
+    pointer-events: none;
+    z-index: 5;
+}
+.page-guide-label {
+    position: absolute;
+    top: 3px;
+    inset-inline-start: 6px;
+    background: var(--color-danger, #c0392b);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 0 0 6px 6px;
+    white-space: nowrap;
+}
+
+.page-overflow-warning {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    padding: 9px 12px;
+    border: 1px solid var(--color-danger, #c0392b);
+    border-inline-start-width: 4px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--color-danger, #c0392b) 8%, transparent);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
+.page-overflow-warning i { color: var(--color-danger, #c0392b); flex-shrink: 0; }
+
+/* ==========================================================================
+   14. Print media rules
+   ========================================================================== */
+
+/* ==========================================================================
+   Print Styles for html2pdf.js
+   ========================================================================== */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+
+    .quote-sheet,
+    .quote-sheet * {
+        visibility: visible;
+    }
+
+    .quote-sheet {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: auto;
+        box-shadow: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .pdf-watermark {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}
+
+/* Belt and braces: the print path bypasses html2canvas entirely, so the guides
+   have to be hidden there too or they would show up on a printed quote. */
+@media print {
+    .page-guide, .page-overflow-warning { display: none !important; }
+}
+
+/* The terms block on the sheet: four short lines a customer reads once and a
+   court reads later. Quiet, but present. */
+.pdf-terms-box {
+    margin-block-start: 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--pdf-line, #e2e8f0);
+    border-radius: 6px;
+    background: rgba(148, 163, 184, .06);
+    display: grid;
+    gap: 4px;
+}
+.pdf-term-row { display: flex; gap: 8px; align-items: baseline; font-size: 0.82rem; line-height: 1.5; }
+.pdf-term-k { flex: none; min-width: 88px; font-weight: 700; color: var(--pdf-primary, #1e3a8a); }
+.pdf-term-v { color: var(--pdf-text-main, #334155); }

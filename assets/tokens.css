@@ -1,0 +1,141 @@
+/* ============================================================
+   SJ / ZEREM — V3 design tokens. The ONE source of truth.
+   Loaded first on every page (marketing, zerem, sale, ask, q, checkups).
+   Light is the default; dark via [data-theme="dark"] or OS auto.
+   ============================================================ */
+
+:root {
+  /* -- type -- */
+  /* Assistant, not Heebo, for anything you read a paragraph of. Heebo is a
+     Hebrew Roboto: even, tight and mechanical, and a chat answer set in it
+     turns into a wall. Assistant has more air between the letters and a
+     lighter stroke, closer to the Hebrew people read all day in their OS. */
+  --font-ui: "Assistant", "Heebo", -apple-system, "Segoe UI", sans-serif;
+  /* Display stays Rubik, and it stays a sans: the Hebrew serif fell back to
+     David on Windows and read as a 1997 dialog box. */
+  --font-display: "Rubik", "Assistant", "Heebo", sans-serif;
+  --fs-xs: 0.8125rem;  /* 13 */
+  --fs-sm: 0.9375rem;  /* 15 */
+  --fs-md: 1rem;       /* 16 */
+  --fs-lg: 1.125rem;   /* 18 */
+  --fs-xl: 1.375rem;   /* 22 */
+  --fs-2xl: 1.75rem;   /* 28 */
+  --fs-3xl: 2.25rem;   /* 36 */
+  --fs-4xl: 3rem;      /* 48 */
+  --lh-body: 1.6;
+  --lh-tight: 1.25;
+
+  /* -- space (4pt grid) -- */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-6: 24px; --sp-8: 32px; --sp-12: 48px; --sp-16: 64px;
+
+  /* -- shape -- */
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-pill: 999px;
+
+  /* -- motion -- */
+  --t-fast: 160ms ease-out;
+  --t-med: 220ms ease-out;
+
+  /* -- layers -- */
+  --z-raised: 10; --z-nav: 40; --z-drawer: 100; --z-modal: 1000;
+
+  /* -- light palette (default) -- */
+  --bg: #F7F6F3;            /* warm paper — the drawing sits on a desk, not on glass */
+  --surface: #FFFFFF;
+  --surface-2: #EFEEE9;     /* subtle wells / hovers */
+  --text: #131A24;
+  --text-2: #4A5566;        /* secondary text, 7:1 on bg */
+  --text-3: #5D6A7C;        /* hints — 4.6:1 on the DARKEST light surface (#EFEEE9), not just on --bg */
+  --border: #E4E1DA;
+  --border-strong: #D2CEC5;
+
+  --accent: #1B4B8F;        /* sign navy; 7.4:1 on white */
+  --accent-strong: #133766; /* hover / active */
+  --accent-soft: #E6EDF7;   /* soft fill behind accent content */
+  --on-accent: #FFFFFF;
+
+  /* The call to action is the sign itself: green field, navy lettering. A FILL
+     only — the sign's green measures ~2:1 on white and can never be text. */
+  --action: #6ABF3C;
+  --action-strong: #5CAE30;
+  --on-action: #0B1A2E;
+
+  /* status — dual greens kept from V2 (measured WCAG work) */
+  --ok-text: #15803D;
+  --ok-btn: #0D7A4A;
+  --danger: #DC2626;
+  --danger-strong: #B91C1C;
+  --warn-text: #9A5B06;
+
+  --shadow-1: 0 1px 2px rgb(28 25 23 / 0.05), 0 4px 14px rgb(28 25 23 / 0.06);
+  --scrim: rgb(12 10 9 / 0.5);
+
+  /* -- WhatsApp (real brand action, allowed) --
+     Two values for the same brand, for the same reason --ok-text and --ok-btn
+     are two: the round float carries an icon and only needs 3:1, while a
+     button with white words on it needs 4.5:1 and #1FAF5A gives 2.86. */
+  --whatsapp: #1FAF5A;      /* icon-only float: 3:1 on white */
+  --whatsapp-btn: #0F7A40;  /* white text on it: 5.4:1 */
+}
+
+/* dark palette — desaturated, not inverted */
+[data-theme="dark"] {
+  --bg: #08111F;
+  --surface: #0F1E35;
+  --surface-2: #16294A;
+  --text: #EAF1FB;
+  --text-2: #C2D0E4;
+  --text-3: #93A5BF;
+  --border: #1B3055;
+  --border-strong: #2C4571;
+
+  --accent: #6ABF3C;        /* sign green — on the dark ground it is the readable one, ~9:1 */
+  --accent-strong: #86D95B;
+  --accent-soft: #14301A;
+  --on-accent: #08111F;
+  --action: #6ABF3C;
+  --action-strong: #86D95B;
+  --on-action: #08111F;
+
+  --ok-text: #34D399;
+  --ok-btn: #15803D;
+  --danger: #F87171;
+  --danger-strong: #EF4444;
+  --warn-text: #FCD34D;
+
+  --shadow-1: 0 0 0 1px rgb(255 255 255 / 0.04);
+  --scrim: rgb(0 0 0 / 0.6);
+  --whatsapp: #25D366;
+  --whatsapp-btn: #0F7A40;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #08111F;
+    --surface: #0F1E35;
+    --surface-2: #16294A;
+    --text: #EAF1FB;
+    --text-2: #C2D0E4;
+    --text-3: #93A5BF;
+    --border: #1B3055;
+    --border-strong: #2C4571;
+    --accent: #6ABF3C;
+    --accent-strong: #86D95B;
+    --accent-soft: #14301A;
+    --on-accent: #08111F;
+    --action: #6ABF3C;
+    --action-strong: #86D95B;
+    --on-action: #08111F;
+    --ok-text: #34D399;
+    --ok-btn: #15803D;
+    --danger: #F87171;
+    --danger-strong: #EF4444;
+    --warn-text: #FCD34D;
+    --shadow-1: 0 0 0 1px rgb(255 255 255 / 0.04);
+    --scrim: rgb(0 0 0 / 0.6);
+    --whatsapp: #25D366;
+    --whatsapp-btn: #0F7A40;
+  }
+}

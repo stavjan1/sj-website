@@ -3,4 +3,63 @@ Allow: /
 Disallow: /sale/
 Disallow: /login
 
+# AI assistants and their crawlers are welcome here, explicitly.
+# The pricing guide and the professional guides are written to be quoted:
+# accurate, sourced, and attributed. Being cited is the point.
+User-agent: GPTBot
+Allow: /
+Disallow: /sale/
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /sale/
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /sale/
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /sale/
+
+User-agent: Claude-User
+Allow: /
+Disallow: /sale/
+
+User-agent: Claude-SearchBot
+Allow: /
+Disallow: /sale/
+
+User-agent: anthropic-ai
+Allow: /
+Disallow: /sale/
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /sale/
+
+User-agent: Perplexity-User
+Allow: /
+Disallow: /sale/
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /sale/
+
+User-agent: Applebot-Extended
+Allow: /
+Disallow: /sale/
+
+User-agent: CCBot
+Allow: /
+Disallow: /sale/
+
+User-agent: Bytespider
+Allow: /
+Disallow: /sale/
+
+User-agent: Meta-ExternalAgent
+Allow: /
+Disallow: /sale/
+
 Sitemap: https://www.sj-eng.co.il/sitemap.xml

@@ -1,398 +1,106 @@
-// Interactive Features for SJ Electrical Engineering Homepage
+// SJ marketing site — shared page interactions (V3).
+// Loaded by every marketing page. No dependencies.
 
 document.addEventListener('DOMContentLoaded', () => {
-    initHeaderScroll();
-    initMobileMenu();
-    initScrollReveal();
-    initStatsCounter();
+    initThemeToggle();
+    initMobileNav();
+    initReveal();
+    initShowMore('btn-show-more-services', '.extra-service-card', 'הצג עוד שירותים', 'הצג פחות');
+    initShowMore('btn-show-more-guides', '.extra-guide-card', 'הצג עוד מדריכים', 'הצג פחות');
     initContactForm();
-    initSmoothScrollMobile();
-    initCursorGlow();
-    initFaqAccordion();
-    initCertsAccordion();
-    initGuidesCarousel();
 });
 
-
-/**
- * 1. Change header styling when user scrolls down
- */
-function initHeaderScroll() {
-    const header = document.getElementById('main-header');
-    
-    const checkScroll = () => {
-        if (window.scrollY > 50) {
-            header.classList.add('scrolled');
-        } else {
-            header.classList.remove('scrolled');
-        }
-    };
-    
-    window.addEventListener('scroll', checkScroll);
-    checkScroll(); // Initial check on load
-}
-
-/**
- * 2. Mobile drawer menu functionality
- */
-function initMobileMenu() {
-    const toggleBtn = document.getElementById('mobile-menu-toggle');
-    const drawer = document.getElementById('mobile-drawer');
-    
-    if (!toggleBtn || !drawer) return;
-    
-    const toggleMenu = () => {
-        const isOpen = drawer.classList.toggle('open');
-        toggleBtn.classList.toggle('open');
-        toggleBtn.setAttribute('aria-expanded', isOpen);
-    };
-    
-    toggleBtn.addEventListener('click', toggleMenu);
-    
-    // Close drawer when clicking outside it or on a link
-    document.addEventListener('click', (e) => {
-        if (drawer.classList.contains('open') && 
-            !drawer.contains(e.target) && 
-            e.target !== toggleBtn && 
-            !toggleBtn.contains(e.target)) {
-            toggleMenu();
-        }
+// The site follows the operating system by default; this is the manual
+// override, remembered per browser. Nothing is stored until it is used, so a
+// visitor who never touches it keeps following their system.
+function initThemeToggle() {
+    const btn = document.getElementById('theme-toggle');
+    if (!btn) return;
+    const systemDark = () => window.matchMedia('(prefers-color-scheme: dark)').matches;
+    btn.addEventListener('click', () => {
+        const now = document.documentElement.getAttribute('data-theme') || (systemDark() ? 'dark' : 'light');
+        const next = now === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        try { localStorage.setItem('sj_theme', next); } catch (e) { /* private mode */ }
     });
 }
 
-/**
- * 3. Close mobile drawer on link navigation
- */
-function initSmoothScrollMobile() {
-    const mobileLinks = document.querySelectorAll('.mobile-nav-link');
-    const drawer = document.getElementById('mobile-drawer');
-    const toggleBtn = document.getElementById('mobile-menu-toggle');
-    
-    mobileLinks.forEach(link => {
-        link.addEventListener('click', () => {
-            if (drawer.classList.contains('open')) {
-                drawer.classList.remove('open');
-                toggleBtn.classList.remove('open');
+function initMobileNav() {
+    const toggle = document.getElementById('nav-toggle');
+    const scrim = document.getElementById('nav-scrim');
+    const nav = document.getElementById('site-nav');
+    if (!toggle || !nav) return;
+    const close = () => {
+        document.body.classList.remove('nav-open');
+        toggle.setAttribute('aria-expanded', 'false');
+    };
+    toggle.addEventListener('click', () => {
+        const open = document.body.classList.toggle('nav-open');
+        toggle.setAttribute('aria-expanded', String(open));
+    });
+    if (scrim) scrim.addEventListener('click', close);
+    nav.addEventListener('click', (e) => { if (e.target.closest('a')) close(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+}
+
+function initReveal() {
+    const els = document.querySelectorAll('.rv');
+    if (!els.length || !('IntersectionObserver' in window)) {
+        els.forEach(el => el.classList.add('on'));
+        return;
+    }
+    const io = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('on');
+                io.unobserve(entry.target);
             }
         });
+    }, { threshold: 0.1 });
+    els.forEach(el => io.observe(el));
+}
+
+function initShowMore(btnId, selector, moreLabel, lessLabel) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const cards = document.querySelectorAll(selector);
+        const expanding = cards.length && cards[0].hidden;
+        cards.forEach(card => {
+            card.hidden = !expanding;
+            if (expanding) card.classList.add('on');
+        });
+        btn.textContent = expanding ? lessLabel : moreLabel;
     });
 }
 
-/**
- * 4. Scroll Reveal Animations (Intersection Observer)
- */
-function initScrollReveal() {
-    const revealElements = document.querySelectorAll('.reveal');
-    
-    const observerOptions = {
-        root: null,
-        threshold: 0.1,
-        rootMargin: '0px 0px -50px 0px' // Trigger slightly before element is in full view
-    };
-    
-    const observer = new IntersectionObserver((entries, obs) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('active');
-                obs.unobserve(entry.target); // Stop observing once animated
-            }
-        });
-    }, observerOptions);
-    
-    revealElements.forEach(el => observer.observe(el));
-}
-
-/**
- * 5. Animated Counter for Stats Section (Intersection Observer)
- */
-function initStatsCounter() {
-    const statsSection = document.getElementById('stats');
-    const statNumbers = document.querySelectorAll('.stat-number');
-    
-    if (!statsSection || statNumbers.length === 0) return;
-    
-    const runCounter = () => {
-        statNumbers.forEach(stat => {
-            const target = parseInt(stat.getAttribute('data-target'), 10);
-            const duration = 2000; // Animation duration in milliseconds
-            const startTime = performance.now();
-            
-            const updateCount = (currentTime) => {
-                const elapsed = currentTime - startTime;
-                const progress = Math.min(elapsed / duration, 1);
-                
-                // Ease-out function for smooth transition at the end
-                const easeOutQuad = (t) => t * (2 - t);
-                const currentCount = Math.floor(easeOutQuad(progress) * target);
-                
-                stat.textContent = currentCount;
-                
-                if (progress < 1) {
-                    requestAnimationFrame(updateCount);
-                } else {
-                    stat.textContent = target; // Ensure exact final number
-                }
-            };
-            
-            requestAnimationFrame(updateCount);
-        });
-    };
-    
-    const observer = new IntersectionObserver((entries, obs) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                runCounter();
-                obs.unobserve(entry.target); // Run animation once
-            }
-        });
-    }, { threshold: 0.3 });
-    
-    observer.observe(statsSection);
-}
-
-/**
- * 6. Contact Form Validation and Submission (Netlify Forms)
- */
 function initContactForm() {
     const form = document.getElementById('contact-form');
+    if (!form) return;
     const feedback = document.getElementById('form-feedback');
     const submitBtn = document.getElementById('btn-form-submit');
-    
-    if (!form || !feedback) return;
-    
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
-        // Basic inputs
-        const name = document.getElementById('form-name').value.trim();
-        const phone = document.getElementById('form-phone').value.trim();
-        
-        if (!name || !phone) {
-            showFeedback('אנא מלא את כל שדות החובה (*)', 'error');
+        const phone = form.querySelector('[name="phone"]');
+        if (phone && !/^[0-9\-+ ]{9,15}$/.test(phone.value.trim())) {
+            if (feedback) { feedback.textContent = 'מספר הטלפון לא נראה תקין, בדקו אותו רגע.'; feedback.className = 'form-feedback status-danger'; }
+            phone.focus();
             return;
         }
-        
-        // Basic Phone validation (Israeli format/numbers)
-        const phoneRegex = /^[0-9\-+]{9,15}$/;
-        if (!phoneRegex.test(phone.replace(/\s+/g, ''))) {
-            showFeedback('אנא הזן מספר טלפון תקין', 'error');
-            return;
-        }
-        
-        // Disable submit button and show loading state
-        submitBtn.disabled = true;
-        const originalText = submitBtn.textContent;
-        submitBtn.textContent = 'שולח...';
-        
-        const formData = new FormData(form);
-
-        fetch('https://api.web3forms.com/submit', {
-            method: 'POST',
-            body: formData
-        })
-        .then((res) => {
-            if (!res.ok) throw new Error('submit-failed');
-            // Dedicated thank-you page: clearer UX + a clean conversion point
-            // for analytics.
-            window.location.href = '/thanks.html';
-        })
-        .catch(() => {
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalText;
-            showFeedback('שגיאה בשליחה. אנא נסה שוב או פנה אלינו ישירות בטלפון.', 'error');
-        });
-    });
-    
-    function showFeedback(message, type) {
-        feedback.textContent = message;
-        feedback.className = 'form-feedback ' + type;
-        
-        // Clear message after 6 seconds
-        setTimeout(() => {
-            feedback.textContent = '';
-            feedback.className = 'form-feedback';
-        }, 6000);
-    }
-}
-
-/**
- * 7. Cursor Glow Spotlight effect following mouse movement
- */
-function initCursorGlow() {
-    const glow = document.getElementById('cursor-glow');
-    if (!glow) return;
-
-    const lightSections = ['.services-section'];
-
-    if (window.matchMedia('(hover: hover)').matches) {
-        document.addEventListener('mousemove', (e) => {
-            glow.style.left = `${e.clientX}px`;
-            glow.style.top = `${e.clientY}px`;
-            glow.style.opacity = '1';
-
-            // Switch to dark multiply glow on light-background sections
-            const el = document.elementFromPoint(e.clientX, e.clientY);
-            const onLight = el && lightSections.some(sel => el.closest(sel));
-            glow.classList.toggle('on-light', !!onLight);
-        });
-
-        document.addEventListener('mouseleave', () => {
-            glow.style.opacity = '0';
-        });
-    }
-}
-
-/**
- * 9. Certificates accordion on mobile
- */
-function initCertsAccordion() {
-    const toggle = document.getElementById('certs-toggle');
-    const grid = document.querySelector('.certificates-grid');
-    if (!toggle || !grid) return;
-
-    toggle.addEventListener('click', () => {
-        const isOpen = grid.classList.toggle('open');
-        toggle.setAttribute('aria-expanded', String(isOpen));
-        const label = toggle.querySelector('.certs-toggle-label');
-        if (label) label.textContent = isOpen ? 'הסתר' : 'הצג רישיונות והסמכות';
-    });
-}
-
-/**
- * 8. Interactive FAQ Accordion Click Handlers
- */
-function initFaqAccordion() {
-    const faqItems = document.querySelectorAll('.faq-item');
-    
-    faqItems.forEach(item => {
-        const trigger = item.querySelector('.faq-trigger');
-        const pane = item.querySelector('.faq-answer-pane');
-        
-        if (!trigger || !pane) return;
-        
-        trigger.addEventListener('click', () => {
-            const isOpen = item.classList.contains('open');
-            
-            // Close all other FAQ items for a cleaner accordion feel (optional, but premium)
-            faqItems.forEach(otherItem => {
-                if (otherItem !== item && otherItem.classList.contains('open')) {
-                    otherItem.classList.remove('open');
-                    otherItem.querySelector('.faq-trigger').setAttribute('aria-expanded', 'false');
-                    otherItem.querySelector('.faq-answer-pane').style.maxHeight = '0px';
-                }
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'שולח…'; }
+        try {
+            const res = await fetch('https://api.web3forms.com/submit', {
+                method: 'POST',
+                body: new FormData(form),
             });
-            
-            // Toggle the clicked FAQ item
-            if (isOpen) {
-                item.classList.remove('open');
-                trigger.setAttribute('aria-expanded', 'false');
-                pane.style.maxHeight = '0px';
-            } else {
-                item.classList.add('open');
-                trigger.setAttribute('aria-expanded', 'true');
-                pane.style.maxHeight = pane.scrollHeight + 'px';
+            if (res.ok) {
+                window.location = '/thanks.html';
+                return;
             }
-        });
-    });
-}
-
-/**
- * 10. Guides carousel (homepage) — scroll-snap row of guide cards
- *     Direction-agnostic: uses scrollIntoView + start-edge distance (RTL-safe).
- */
-function _guideSlides() {
-    const track = document.getElementById('guides-track');
-    return track ? Array.from(track.querySelectorAll('.guide-slide')) : [];
-}
-
-function currentGuideIndex() {
-    const track = document.getElementById('guides-track');
-    const slides = _guideSlides();
-    if (!track || !slides.length) return 0;
-    const t = track.getBoundingClientRect();
-    let best = 0, bestDist = Infinity;
-    slides.forEach((s, i) => {
-        const r = s.getBoundingClientRect();
-        // In RTL the inline-start edge is the right edge; measure distance to track start.
-        const dist = Math.abs(r.right - t.right);
-        if (dist < bestDist) { bestDist = dist; best = i; }
-    });
-    return best;
-}
-
-function goToGuide(i) {
-    const slides = _guideSlides();
-    if (!slides[i]) return;
-    slides[i].scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
-}
-
-function moveGuides(dir) {
-    const slides = _guideSlides();
-    if (!slides.length) return;
-    let next = currentGuideIndex() + dir;
-    next = Math.max(0, Math.min(slides.length - 1, next));
-    goToGuide(next);
-}
-
-function updateGuidesDots() {
-    const idx = currentGuideIndex();
-    document.querySelectorAll('#guides-dots .gdot').forEach((d, i) => {
-        d.classList.toggle('active', i === idx);
-    });
-}
-
-function initGuidesCarousel() {
-    const track = document.getElementById('guides-track');
-    const dotsWrap = document.getElementById('guides-dots');
-    const slides = _guideSlides();
-    if (!track || !slides.length) return;
-
-    if (dotsWrap) {
-        dotsWrap.innerHTML = '';
-        slides.forEach((_, i) => {
-            const b = document.createElement('button');
-            b.className = 'gdot' + (i === 0 ? ' active' : '');
-            b.type = 'button';
-            b.setAttribute('aria-label', 'מדריך ' + (i + 1));
-            b.addEventListener('click', () => goToGuide(i));
-            dotsWrap.appendChild(b);
-        });
-    }
-
-    let raf;
-    track.addEventListener('scroll', () => {
-        cancelAnimationFrame(raf);
-        raf = requestAnimationFrame(updateGuidesDots);
-    }, { passive: true });
-    updateGuidesDots();
-}
-
-function toggleMoreServices() {
-    const cards = document.querySelectorAll('.extra-service-card');
-    const btn = document.getElementById('btn-show-more-services');
-    if (!cards.length || !btn) return;
-    const isHidden = cards[0].style.display === 'none';
-    cards.forEach(card => {
-        card.style.display = isHidden ? 'flex' : 'none';
-        if (isHidden) {
-            card.classList.add('active');
+            throw new Error('send failed');
+        } catch {
+            if (feedback) { feedback.textContent = 'השליחה נכשלה. אפשר לנסות שוב, או פשוט להתקשר: 053-530-2887.'; feedback.className = 'form-feedback status-danger'; }
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'שליחת פנייה'; }
         }
     });
-    btn.textContent = isHidden ? 'הצג פחות' : 'הצג עוד שירותים';
 }
-
-function toggleMoreGuides() {
-    const cards = document.querySelectorAll('.extra-guide-card');
-    const btn = document.getElementById('btn-show-more-guides');
-    if (!cards.length || !btn) return;
-    const isHidden = cards[0].style.display === 'none';
-    cards.forEach(card => {
-        card.style.display = isHidden ? 'block' : 'none';
-        if (isHidden) {
-            card.classList.add('active');
-        }
-    });
-    btn.textContent = isHidden ? 'הצג פחות' : 'הצג עוד מדריכים';
-}
-
-

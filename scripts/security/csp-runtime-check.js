@@ -9,7 +9,8 @@ const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
 
-const ROOT = '/home/user/sj-website';
+// Resolved from this file, not hardcoded — see csp-page-check.js.
+const ROOT = require('path').resolve(__dirname, '..', '..');
 const PORT = 8932;
 const headersFile = fs.readFileSync(path.join(ROOT, '_headers'), 'utf8');
 const cspLine = headersFile.split('\n').find((l) => /^\s*Content-Security-Policy(-Report-Only)?:/.test(l));
@@ -26,6 +27,8 @@ const CONNECTS = [
   ['https://oauth2.googleapis.com/tokeninfo', 'token check'],
   ['https://accounts.google.com/gsi/status', 'Google Identity Services'],
   ['https://www.clarity.ms/tag/x', 'Clarity analytics'],
+  ['https://www.googletagmanager.com/gtag/js', 'Google Tag Manager / GA4 loader'],
+  ['https://region1.google-analytics.com/g/collect', 'GA4 event collection'],
   ['https://evil-attacker-domain.test/steal', 'ATTACKER EXFIL — must be BLOCKED'],
 ];
 

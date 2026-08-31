@@ -18,7 +18,8 @@
 // keeps everything locally (PDF export still works) and shows the upgrade
 // screen. Counted by history-entry IDs that don't exist in the stored blob.
 
-import { loadTierConfig, getTierForEmail, monthKey, verifyGoogleEmail } from './_tiers.js';
+import { loadTierConfig, getTierForEmail, monthKey, verifyGoogleEmail, ADMIN_EMAIL } from './_tiers.js';
+import { sendMailTracked } from './_mail.js';
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -68,10 +69,42 @@ export async function onRequest(context) {
     // list with a non-empty trash slipped past the all-empty check above and
     // poisoned the cloud). Preserve the existing non-empty collection instead.
     if (existing) {
-      for (const k of ['projects', 'history', 'catalog']) {
+      // invoices/clients joined the guard in V3 — a single sync could wipe them.
+      for (const k of ['projects', 'history', 'catalog', 'invoices', 'clients']) {
         const inLen = Array.isArray(incoming[k]) ? incoming[k].length : 0;
         const exLen = Array.isArray(existing[k]) ? existing[k].length : 0;
         if (inLen === 0 && exLen > 0) incoming[k] = existing[k];
+      }
+    }
+
+    // LAST-WRITER-WINS WAS LOSING WORK. The two guards above stop a collection
+    // being emptied, but not a SHORTER one overwriting a longer one: device A
+    // holding 5 projects saves over device B's 6, and the sixth — the job
+    // created on the phone an hour ago — is gone with nothing said.
+    //
+    // A union by id fixes it and is safe here for one specific reason: deleting
+    // a project does not remove it, it moves it to `trash` with a _deletedAt
+    // (sale/app.js deleteProject). So an id that is absent from the incoming
+    // blob AND absent from its trash was never deleted — it is simply something
+    // this device has not heard about yet, and keeping it is correct. An id in
+    // the incoming trash stays deleted, which is what stops the old
+    // "resurrected a just-deleted project" bug.
+    //
+    // This is the same union-by-id the client already does on load
+    // (mergeCloudIntoLocal); doing it on the server too means it holds even when
+    // the other device never reloads.
+    if (existing) {
+      const trashIds = new Set(
+        (Array.isArray(incoming.trash) ? incoming.trash : [])
+          .map((t) => t && t.id).filter(Boolean)
+      );
+      for (const coll of ['projects', 'clients', 'invoices']) {
+        const inArr = Array.isArray(incoming[coll]) ? incoming[coll] : null;
+        const exArr = Array.isArray(existing[coll]) ? existing[coll] : null;
+        if (!inArr || !exArr || !exArr.length) continue;
+        const haveIds = new Set(inArr.map((x) => x && x.id).filter(Boolean));
+        const missed = exArr.filter((x) => x && x.id && !haveIds.has(x.id) && !trashIds.has(x.id));
+        if (missed.length) incoming[coll] = inArr.concat(missed);
       }
     }
 
@@ -92,12 +125,26 @@ export async function onRequest(context) {
     if (payload.length > 5 * 1024 * 1024) {
       return json({ error: { message: 'הנתונים גדולים מדי לאחסון בענן.' } }, 413);
     }
-    await env.SJ_DATA.put(key, payload);
+    // A failed write must not escape the Function. Unguarded, an exhausted daily
+    // KV write budget (or any transient KV error) threw straight out and the
+    // electrician got Cloudflare's bare 502 — which the app cannot distinguish
+    // from "saved". His work stays in localStorage either way, so the honest
+    // answer is "not saved to the cloud, try again", not a crash and not
+    // silence. Analytics and stats now stop long before this point precisely so
+    // that this write keeps working; this is the backstop for when it does not.
+    try {
+      await env.SJ_DATA.put(key, payload);
+    } catch (e) {
+      return json({ error: { message: 'הגיבוי לענן נכשל כרגע. המידע שמור אצלך במכשיר — נסה שוב בעוד כמה דקות.' } }, 503);
+    }
 
-    // Notify AFTER the save succeeded — a rejected first sync (413 above) must
-    // not email the admin about a user that has no cloud record.
+    // Notify AFTER the save succeeded — a rejected first sync (413 below) must
+    // not announce a user who has no cloud record. Sent via Resend: web3forms
+    // rejects server-to-server calls on the free plan, which is why the old
+    // notification never actually arrived. The result is recorded, so Admin
+    // shows what really happened instead of promising an email.
     if (isNewUser) {
-      context.waitUntil(notifyNewSignup(env, email).catch(() => {}));
+      context.waitUntil(notifyNewSignup(env, email));
     }
 
     // ---- Free-plan monthly cloud-quote counter (SOFT — never blocks the save) ----
@@ -132,26 +179,45 @@ export async function onRequest(context) {
     return json({ ok: true, updatedAt: Date.now(), quotaSoftExceeded });
   }
 
+  // ---- DELETE: erasure, and it means erasure ------------------------------
+  // zerem/terms.html promises a user can ask for their data to be deleted. Until
+  // now that promise was kept by hand, in the Cloudflare dashboard, by one
+  // person — which is a promise that works at ten users and not at five hundred.
+  //
+  // Authenticated by the user's OWN Google token, so nobody can erase anybody
+  // else: the key is derived from the verified email, never from a parameter.
+  //
+  // What goes: the data blob, and the tier record, which is the other place the
+  // address is written. What stays: the monthly quota counter, which carries no
+  // content and expires by itself in about forty days.
+  //
+  // The client must cancel its pending sync BEFORE calling this and clear its
+  // own storage after — otherwise the browser still holds everything and the
+  // next save writes the whole record straight back. That ordering is the
+  // difference between an erasure and a two-second pause.
+  if (method === 'DELETE') {
+    await env.SJ_DATA.delete(key);
+    try { await env.SJ_DATA.delete('tier:' + email.toLowerCase()); } catch { /* no tier is the normal case */ }
+    return json({ ok: true, deleted: true });
+  }
+
   return json({ error: { message: 'מתודה לא נתמכת.' } }, 405);
 }
 
 
-// Fire-and-forget "new user signed up" email to the admin (web3forms — the
-// same channel the lead form uses; env WEB3FORMS_KEY with the same public
-// fallback lead.js documents, dead once Stav rotates the key).
-const WEB3FORMS_KEY_FALLBACK = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
+// "New user signed up" → the admin. Fire-and-forget by design (a signup must
+// never fail because email is down), but tracked, so a broken key surfaces in
+// Admin → מצב מערכת rather than disappearing.
 async function notifyNewSignup(env, email) {
-  await fetch('https://api.web3forms.com/submit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({
-      access_key: (env && env.WEB3FORMS_KEY) || WEB3FORMS_KEY_FALLBACK,
-      subject: '⚡ נרשם חדש בזרם: ' + email,
-      from_name: 'זרם — הרשמות',
-      message: 'משתמש חדש התחבר ושמר לראשונה במערכת זרם:\n\n' + email +
-        '\n\nאפשר לראות את הפעילות שלו בלשונית Admin.',
-    }),
-  });
+  return sendMailTracked(env, 'signup', {
+    to: ADMIN_EMAIL,
+    subject: '⚡ נרשם חדש בזרם: ' + email,
+    text: `משתמש חדש התחבר ושמר לראשונה במערכת זרם:
+
+${email}
+
+אפשר לראות את הפעילות שלו בלשונית Admin ← משתמשי המערכת.`,
+  }).catch(() => ({ ok: false }));
 }
 
 function isEmptyDb(db) {
@@ -165,7 +231,7 @@ function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
 function cors() {
   return {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, PUT, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, PUT, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
 }
