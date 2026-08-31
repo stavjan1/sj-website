@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write # the relay authenticates this workflow by its GitHub OIDC token
 
 jobs:
   pull:
@@ -22,7 +23,13 @@ jobs:
       - name: Fetch Clarity metrics via the site relay
         id: fetch
         run: |
-          RESP=$(curl -sS --max-time 60 "https://www.sj-eng.co.il/api/clarity" || echo '{}')
+          # The relay's GET is admin-gated (traffic data is not public); this
+          # workflow proves it is the repo's own automation with a GitHub OIDC
+          # token — signed by GitHub, audience-pinned, no secret to manage.
+          OIDC=$(curl -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sj-clarity-pull" | jq -r '.value')
+          echo "::add-mask::$OIDC"
+          RESP=$(curl -sS --max-time 60 -H "X-GitHub-OIDC: $OIDC" "https://www.sj-eng.co.il/api/clarity" || echo '{}')
           OK=$(echo "$RESP" | jq -r '.ok // false')
           if [ "$OK" != "true" ]; then
             echo "No data available yet ($(echo "$RESP" | jq -r '.error // "unknown"')) — nothing to commit."

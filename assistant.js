@@ -16,7 +16,10 @@
   // Users can opt out on privacy.html (localStorage sj_no_track).
   var TRACKING_OFF = false;
   try { TRACKING_OFF = localStorage.getItem('sj_no_track') === '1'; } catch (e) {}
-  if (CLARITY_ID && !TRACKING_OFF && MODE !== 'sale' && window.location.pathname.indexOf('/sale') !== 0) {
+  // Dev servers must not pollute the analytics (localhost visits showed up in
+  // the Clarity data as phantom sessions).
+  var IS_LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
+  if (CLARITY_ID && !TRACKING_OFF && !IS_LOCAL && MODE !== 'sale' && window.location.pathname.indexOf('/sale') !== 0) {
     (function (c, l, a, r, i, t, y) {
       c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
       t = l.createElement(r); t.async = 1; t.src = 'https://www.clarity.ms/tag/' + i;

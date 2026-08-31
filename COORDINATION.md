@@ -259,3 +259,13 @@ Touch them in the smallest possible diff, never reformat, and log the edit below
   per run, one write per run, skip what is already booked, stop on an expired
   token, and exactly one calendar-file builder in the repo.
 
+
+## Analytics session (periodic-checkup branch) — 31/08
+- `/api/clarity` GET contract: allowed callers are the signed-in admin OR the
+  repo's GitHub Actions puller via an OIDC token (`X-GitHub-OIDC`, audience
+  `sj-clarity-pull`, repository-pinned; verifier lives at the bottom of
+  functions/api/clarity.js). If you tighten auth there again, keep BOTH paths —
+  the adminGate-only change on 25-31/08 silently starved the analytics pipeline.
+- Owns: functions/api/clarity.js auth path, .github/workflows/clarity-history.yml,
+  ANALYTICS.md. Clarity loaders (assistant.js head, zerem inline) now skip
+  localhost so dev runs stop polluting the data.

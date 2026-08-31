@@ -38,14 +38,18 @@ export async function onRequestPost(context) {
 
 export async function onRequestGet(context) {
   const { request, env } = context;
-  // The POST beside this one has had adminGate since it was written; this GET
-  // never did. It returns the BUSINESS's own Clarity analytics — sessions,
-  // pages, where visitors drop off — to anyone who asks. Not customer data, but
-  // Stav's traffic figures were public, and a rate limit is not an
-  // authorisation check.
-  const gate = await adminGate(request);
-  if (!gate.ok) return gate.response;
   if (!env.SJ_DATA) return jsonResponse({ ok: false, error: 'KV לא מוגדר' }, 501);
+  // Two callers are allowed, nobody else: the signed-in admin (browser), and
+  // the repo's own GitHub Actions puller. The adminGate that closed the
+  // public hole (traffic figures are the business's own data) also cut off
+  // the puller — Actions has no Google session — so it authenticates with a
+  // GitHub OIDC token instead: short-lived, signed by GitHub, pinned below to
+  // THIS repository. No shared secret to provision anywhere.
+  const oidcOk = await verifyGithubOidc(env, request.headers.get('X-GitHub-OIDC') || '');
+  if (!oidcOk) {
+    const gate = await adminGate(request);
+    if (!gate.ok) return gate.response;
+  }
   if (!(await rateLimit(env, request, 'clarity', 5))) {
     return jsonResponse({ ok: false, error: 'rate-limited' }, 429);
   }
@@ -88,4 +92,70 @@ export async function onRequestGet(context) {
   const payload = { fetchedAt: Date.now(), data };
   await env.SJ_DATA.put(CACHE_KEY, JSON.stringify(payload), { expirationTtl: 60 * 60 * 24 });
   return jsonResponse({ ok: true, fetchedAt: payload.fetchedAt, cached: false, data });
+}
+
+// ---- GitHub Actions OIDC verification ----
+// Accepts only a token GitHub itself signed for a workflow of THIS repo, with
+// the audience this relay names. JWKS is cached a day and refreshed once on an
+// unknown kid (key rotation).
+
+const GH_ISSUER = 'https://token.actions.githubusercontent.com';
+const GH_AUDIENCE = 'sj-clarity-pull';
+const GH_REPO = 'stavjan1/sj-website';
+
+function b64urlToBytes(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+}
+function b64urlToJson(s) {
+  return JSON.parse(new TextDecoder().decode(b64urlToBytes(s)));
+}
+
+async function fetchJwks(env, force) {
+  if (!force) {
+    try {
+      const cached = JSON.parse((await env.SJ_DATA.get('gh:jwks')) || 'null');
+      if (cached && cached.keys) return cached;
+    } catch { /* refetch */ }
+  }
+  const res = await fetch(GH_ISSUER + '/.well-known/jwks');
+  if (!res.ok) return null;
+  const jwks = await res.json();
+  await env.SJ_DATA.put('gh:jwks', JSON.stringify(jwks), { expirationTtl: 86400 });
+  return jwks;
+}
+
+async function verifyGithubOidc(env, jwt) {
+  try {
+    if (!jwt) return false;
+    const parts = jwt.split('.');
+    if (parts.length !== 3) return false;
+    const header = b64urlToJson(parts[0]);
+    const payload = b64urlToJson(parts[1]);
+
+    if (payload.iss !== GH_ISSUER) return false;
+    const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+    if (!aud.includes(GH_AUDIENCE)) return false;
+    if (payload.repository !== GH_REPO) return false;
+    const now = Date.now() / 1000;
+    if (!payload.exp || now > payload.exp || (payload.nbf && now < payload.nbf)) return false;
+
+    let jwks = await fetchJwks(env, false);
+    let jwk = jwks && (jwks.keys || []).find((k) => k.kid === header.kid);
+    if (!jwk) {
+      jwks = await fetchJwks(env, true); // rotation — refresh once
+      jwk = jwks && (jwks.keys || []).find((k) => k.kid === header.kid);
+    }
+    if (!jwk) return false;
+
+    const key = await crypto.subtle.importKey(
+      'jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+    return await crypto.subtle.verify(
+      'RSASSA-PKCS1-v1_5', key,
+      b64urlToBytes(parts[2]),
+      new TextEncoder().encode(parts[0] + '.' + parts[1]));
+  } catch {
+    return false;
+  }
 }

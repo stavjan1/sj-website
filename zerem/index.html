@@ -405,6 +405,7 @@
         // funnel, so it's measured like the rest of the site (never inside
         // /sale itself). Honors the sj_no_track opt-out from /privacy.html.
         (function () {
+            if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname)) return; // dev runs must not pollute analytics
             try { if (localStorage.getItem('sj_no_track') === '1') return; } catch (e) {}
             (function (c, l, a, r, i, t, y) {
                 c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
