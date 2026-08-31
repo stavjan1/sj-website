@@ -10582,7 +10582,11 @@ function syncPlanChip() {
     // open. A guest sees the invitation rather than the word "אורח" twice.
     const rail = document.getElementById('rail-plan');
     if (rail) {
-        rail.textContent = t === 'guest' ? 'התחבר · חינם' : `מסלול ${label}`;
+        // The rail is 76px wide (~65px of text) — anything past one word truncates
+        // to "מסלול ...", so the chip carries a single word and the tooltip does
+        // the explaining. Measured: two-word texts need 75-91px.
+        const railNames = { free: 'סילבר', pro: 'גולד', business: 'דיימונד' };
+        rail.textContent = t === 'guest' ? 'התחבר' : (railNames[t] || label);
         rail.className = 'rail-plan plan-' + t;
     }
 }
