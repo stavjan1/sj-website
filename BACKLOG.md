@@ -3,6 +3,25 @@
 Goal: a wildly-accessible viral pricing platform for electricians. Instant no-signup
 pricing chat pulls people in → full ZEREM (projects, quotes, invoicing) retains them.
 
+## Open after 2.9.2026 (helper screen + insight tree shipped)
+- [ ] **Dekel BOQ frequency** — count which סעיפים recur across the 43 BOQs of 2026 (Ofir Arad's
+      account; statistics only, no project content leaves). Blocked: Chrome freezes the Dekel
+      tab's timers unless that window is in front. Output → the order of the helper list.
+- [ ] **Dekel quantity-tier labels** — data/dekel/dekel_prices_raw.json (gitignored, licensed)
+      has the two tier prices but not the "עד 5 / מעל 5" labels; re-harvest with the fixed parser.
+- [ ] **Two price worlds in ZEREM** — "מחיר מכרז (דקל)" vs "מחיר שוק פרטי", never mixed; Dekel
+      gives vocabulary + ratios (בטון ×1.6, דירתי ×1.21, תלת-פאזי ×1.14), Stav's anchors give levels.
+      Parked by Stav ("לא יודע כבר לגבי האתר תמחור") — keep, do not start unasked.
+- [ ] **Helper list ← Dekel 9xxx vocabulary** — seed the helper items from the 100 renovation
+      items (ניתוק וביטול, שיפוץ נקודה, העתקה, פירוק…) once the frequency count says which matter.
+- [ ] **Voice notes on a tree bubble** — needs an R2 bucket bound to the Pages project (Stav-only,
+      dashboard) and `Permissions-Policy: microphone=(self)` for /mind/* in _headers.
+- [ ] **Pricing map: renovation point anchor** — the /ask/ chat answered "מחיר לנקודה" with a job
+      total and used the new-build anchor; fix = answer in the unit asked + situation words decide.
+- [ ] **Site: "עובדים בחברה"** — photos of Stav + Matan, click → certificates modal with a divider
+      "ההסמכות של מתן". Blocked on photos + Matan's certificate list.
+- [ ] **Instagram / OpenClaw review** — blocked on the links.
+
 ## Done this cycle (night 23-24/07)
 - [x] `/ask/` — no-signup pricing chat LIVE: dedicated OG card, session continuity (24h),
       price chip, live thinking indicator, theme modes (night/dim/day), guest-quota note,
