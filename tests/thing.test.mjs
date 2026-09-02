@@ -205,3 +205,13 @@ test('three small things: an untitled bubble shows its first words, a tapped lin
     assert.ok(min > 0 && min <= 0.1, 'the map must zoom out well past the old 0.25');
     assert.ok(!/Math\.max\(0\.(15|25),/.test(js), 'a leftover hard-coded zoom floor');
 });
+
+test('choosing many: a selection box, a whole tree by Ctrl or from the sheet, and they move together', () => {
+    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
+    assert.ok(html.includes('id="marquee"') && html.includes('id="btn-marquee"'), 'no selection box or its phone button');
+    assert.ok(/type: 'marquee'/.test(js) && /ev\.shiftKey \|\| marqueeMode/.test(js), 'Shift-drag or the mode must start a box');
+    assert.ok(/function connectedTo/.test(js) && /function pickTree/.test(js), 'no way to grab a whole tree');
+    assert.ok(/gesture\.group/.test(js), 'a picked group must move together');
+    assert.ok(html.includes('onclick="pickTree()"'), 'the sheet must offer בחר את העץ');
+});

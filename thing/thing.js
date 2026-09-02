@@ -60,6 +60,8 @@ let dirty = false;                       // this device changed something the cl
 let lastServerAt = 0;                    // updatedAt of the last tree the cloud handed us
 let pollTimer = null;
 let hitIndex = -1;
+let picked = new Set();                  // bubbles chosen together — they move together
+let marqueeMode = false;                 // phone: the 🔲 button turns a drag on the ground into a selection box
 
 const $ = (id) => document.getElementById(id);
 const stage = $('stage'), world = $('world'), wires = $('wires'), nodesEl = $('nodes');
@@ -416,7 +418,7 @@ function render() {
     renderWires();
     applyView();
     const ns = visibleNodes(), es = visibleEdges();
-    $('count').textContent = ns.length ? `${ns.length} תובנות · ${es.length} קווים` : (tab === 'all' ? 'עדיין ריק' : 'לשונית ריקה');
+    $('count').textContent = picked.size ? `${picked.size} נבחרו · גרור אחת וכולן זזות` : (ns.length ? `${ns.length} תובנות · ${es.length} קווים` : (tab === 'all' ? 'עדיין ריק' : 'לשונית ריקה'));
     $('hint').hidden = ns.length > 0;
 }
 
@@ -442,6 +444,7 @@ function renderNodes() {
         el.classList.toggle('sel', n.id === selectedId);
         el.dataset.c = n.c || 0;
         el.classList.toggle('dim', !!query && !matches(n));
+        el.classList.toggle('picked', picked.has(n.id));
         el.title = (LEGEND_BY_C[n.c] || LEGEND[0]).name + (tab === 'all' && n.p ? ' · ' + pageName(n.p) : '');
         const p = pos(n);
         el.style.left = p.x + 'px'; el.style.top = p.y + 'px';
@@ -852,6 +855,45 @@ function goTo(id) {
     $('results').hidden = true;
 }
 
+// ---------- choosing many ----------
+
+// Every bubble reachable from one by lines of either kind.
+function connectedTo(id) {
+    const seen = new Set([id]); const q = [id];
+    while (q.length) {
+        const cur = q.pop();
+        for (const e of tree.edges) {
+            const other = e.a === cur ? e.b : (e.b === cur ? e.a : null);
+            if (other && !seen.has(other)) { seen.add(other); q.push(other); }
+        }
+    }
+    return seen;
+}
+
+// From the sheet: "בחר את העץ" — the open bubble and everything tied to it.
+function pickTree() {
+    if (!selectedId) return;
+    picked = new Set(connectedTo(selectedId));
+    closeSheet(); render();
+    toast(`${picked.size} נבחרו — גרור אחת, כולן זזות`);
+}
+
+function toggleMarquee() {
+    marqueeMode = !marqueeMode;
+    $('btn-marquee').classList.toggle('on', marqueeMode);
+    stage.classList.toggle('marquee-mode', marqueeMode);
+    toast(marqueeMode ? 'גרור על הרקע כדי לבחור' : 'חזרה לגרירה רגילה');
+}
+
+function clearPicked() { picked = new Set(); render(); }
+
+function deletePicked() {
+    if (!picked.size) return;
+    const ids = [...picked]; picked = new Set();
+    for (const id of ids) { selectedId = id; deleteSelected(); }
+    selectedId = null;
+}
+
 // ---------- theme ----------
 
 function applyTheme(t) {
@@ -1005,7 +1047,13 @@ function bindStage() {
         if (ev.target.closest('.bubble') || ev.target.closest('.cluster')) return;
         pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
         if (pointers.size === 2) { gesture = pinchStart(); return; }
-        stage.setPointerCapture(ev.pointerId);
+        try { stage.setPointerCapture(ev.pointerId); } catch { /* a pointer that is already gone must not kill the gesture */ }
+        // Shift on a computer, or the 🔲 mode on a phone: the drag is a box.
+        if (ev.shiftKey || marqueeMode) {
+            gesture = { type: 'marquee', sx: ev.clientX, sy: ev.clientY, add: ev.ctrlKey || ev.metaKey };
+            const m = $('marquee'); m.hidden = false; m.style.left = ev.clientX + 'px'; m.style.top = ev.clientY + 'px'; m.style.width = '0px'; m.style.height = '0px';
+            return;
+        }
         gesture = { type: 'pan', sx: ev.clientX, sy: ev.clientY, vx: view.x, vy: view.y, moved: false };
         stage.classList.add('panning');
     });
@@ -1023,7 +1071,10 @@ function bindStage() {
     });
     window.addEventListener('resize', applyView);
     document.addEventListener('keydown', (ev) => {
-        if (ev.key === 'Escape') { linkFrom = null; closeSheet(); }
+        const typing = ev.target && (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA');
+        if (ev.key === 'Escape') { linkFrom = null; closeSheet(); if (picked.size) clearPicked(); }
+        if (!typing && (ev.key === 'Delete' || ev.key === 'Backspace') && picked.size) { ev.preventDefault(); deletePicked(); }
+        if (!typing && ev.key === 'a' && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); picked = new Set(visibleNodes().map((n) => n.id)); render(); }
     });
 }
 
@@ -1032,13 +1083,16 @@ function bindNode(el) {
         ev.stopPropagation();
         const id = el.dataset.id;
         pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
-        el.setPointerCapture(ev.pointerId);
+        try { el.setPointerCapture(ev.pointerId); } catch { /* same */ }
         const n = tree.nodes.find((x) => x.id === id);
         if (ev.target.closest('.knob')) {
             gesture = { type: 'link', from: id, el, sx: ev.clientX, sy: ev.clientY, over: null };
             return;
         }
-        gesture = { type: 'node', id, el, sx: ev.clientX, sy: ev.clientY, nx: n.x, ny: n.y, moved: false };
+        // Ctrl (or ⌘) on a bubble: its whole connected tree comes along.
+        if ((ev.ctrlKey || ev.metaKey) && !picked.has(id)) { picked = new Set(connectedTo(id)); render(); }
+        const group = picked.has(id) ? [...picked].map((pid) => { const q = tree.nodes.find((x) => x.id === pid); return q && { id: pid, x: q.x, y: q.y }; }).filter(Boolean) : null;
+        gesture = { type: 'node', id, el, sx: ev.clientX, sy: ev.clientY, nx: n.x, ny: n.y, moved: false, group };
     });
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerup', onUp);
@@ -1051,12 +1105,26 @@ function onMove(ev) {
     if (p) { p.x = ev.clientX; p.y = ev.clientY; }
     if (gesture.type === 'pinch') { pinchMove(); return; }
     const dx = ev.clientX - gesture.sx, dy = ev.clientY - gesture.sy;
+    if (gesture.type === 'marquee') {
+        const m = $('marquee');
+        m.style.left = Math.min(gesture.sx, ev.clientX) + 'px'; m.style.top = Math.min(gesture.sy, ev.clientY) + 'px';
+        m.style.width = Math.abs(dx) + 'px'; m.style.height = Math.abs(dy) + 'px';
+        return;
+    }
     if (gesture.type === 'pan') {
         if (Math.hypot(dx, dy) > 4) gesture.moved = true;
         view.x = gesture.vx + dx; view.y = gesture.vy + dy; applyView();
     } else if (gesture.type === 'node') {
         if (Math.hypot(dx, dy) > 4 && !gesture.moved) { gesture.moved = true; gesture.el.classList.add('drag'); }
         if (!gesture.moved) return;
+        if (gesture.group) {
+            for (const g0 of gesture.group) {
+                const m = tree.nodes.find((x) => x.id === g0.id); if (!m) continue;
+                m.x = Math.round(g0.x + dx / view.k); m.y = Math.round(g0.y + dy / view.k);
+            }
+            renderNodes(); renderWires();
+            return;
+        }
         const n = tree.nodes.find((x) => x.id === gesture.id);
         n.x = Math.round(gesture.nx + dx / view.k); n.y = Math.round(gesture.ny + dy / view.k);
         const q = pos(n);
@@ -1085,6 +1153,20 @@ function onUp(ev) {
     if (g.type === 'pinch') { if (pointers.size < 2) gesture = null; return; }
     gesture = null;
     stage.classList.remove('panning');
+    if (g.type === 'marquee') {
+        $('marquee').hidden = true;
+        const x0 = Math.min(g.sx, ev.clientX), x1 = Math.max(g.sx, ev.clientX), y0 = Math.min(g.sy, ev.clientY), y1 = Math.max(g.sy, ev.clientY);
+        if (!g.add) picked = new Set();
+        if (x1 - x0 > 4 && y1 - y0 > 4) {
+            for (const n of visibleNodes()) {
+                const p = pos(n), sx = p.x * view.k + view.x, sy = p.y * view.k + view.y;
+                if (sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1) picked.add(n.id);
+            }
+        }
+        render();
+        if (picked.size) toast(`${picked.size} נבחרו — גרור אחת, כולן זזות`);
+        return;
+    }
     if (g.type === 'pan') {
         saveView();
         if (!g.moved) {
@@ -1093,10 +1175,16 @@ function onUp(ev) {
             lastTap = now;
             linkFrom = null; closeSheet(); $('results').hidden = true;
             if (selectedEdge) { selectedEdge = null; $('edge-del').hidden = true; renderWires(); }
+            if (picked.size) { picked = new Set(); render(); }
         }
     } else if (g.type === 'node') {
         g.el.classList.remove('drag');
-        if (g.moved) { touch(tree.nodes.find((x) => x.id === g.id)); renderClusterLabels(); return; }
+        if (g.moved) {
+            if (g.group) { const now = Date.now(); for (const g0 of g.group) { const q = tree.nodes.find((x) => x.id === g0.id); if (q) q.u = now; } touch(); }
+            else touch(tree.nodes.find((x) => x.id === g.id));
+            renderClusterLabels();
+            return;
+        }
         if (linkFrom) { connect(linkFrom, g.id); linkFrom = null; return; }
         select(g.id);
     } else if (g.type === 'link') {
