@@ -41,6 +41,12 @@ const REC_MAX_PER_NODE = 10;
 const MAX_PAGES = 60;
 const REC_MIMES = /^audio\/(webm|ogg|mp4|mpeg|mp3|wav|x-wav|aac|m4a|x-m4a)/;
 
+// Pictures. The page shrinks them to ~1280px JPEG before sending, so a photo
+// from the phone is a few hundred kilobytes; the cap is a guard, not a budget.
+const IMG_MAX_BYTES = 2 * 1024 * 1024;
+const IMG_MAX_PER_NODE = 6;
+const IMG_MIMES = /^image\/(jpeg|png|webp)/;
+
 function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
 
 // The key never touches KV as itself. Its hash is the record name, so a KV
@@ -80,6 +86,10 @@ export function cleanTree(raw) {
       tx: String(r.tx || '').slice(0, 4000),
       at: Number(r.at) || 0,
     })).filter((r) => r.id),
+    imgs: (Array.isArray(n.imgs) ? n.imgs : []).slice(0, IMG_MAX_PER_NODE).map((g) => ({
+      id: String(g.id || '').slice(0, 24), m: String(g.m || '').slice(0, 40),
+      n: Math.max(0, Math.round(Number(g.n)) || 0), w: Math.round(Number(g.w)) || 0, h: Math.round(Number(g.h)) || 0, at: Number(g.at) || 0,
+    })).filter((g) => g.id),
   })).filter((n) => n.id);
   const ids = new Set(nodes.map((n) => n.id));
   const seen = new Set();
@@ -98,6 +108,7 @@ export function cleanTree(raw) {
     u: Number(x.u) || 0, c: Math.min(7, Math.max(0, Math.round(Number(x.c)) || 0)),
     p: String(x.p || '').slice(0, 24),
     recs: (Array.isArray(x.recs) ? x.recs : []).slice(0, REC_MAX_PER_NODE).map((r) => ({ id: String(r.id || '').slice(0, 24), m: String(r.m || '').slice(0, 40), n: Number(r.n) || 0, d: Number(r.d) || 0, tx: String(r.tx || '').slice(0, 4000), at: Number(r.at) || 0 })).filter((r) => r.id),
+    imgs: (Array.isArray(x.imgs) ? x.imgs : []).slice(0, IMG_MAX_PER_NODE).map((g) => ({ id: String(g.id || '').slice(0, 24), m: String(g.m || '').slice(0, 40), n: Number(g.n) || 0, w: Number(g.w) || 0, h: Number(g.h) || 0, at: Number(g.at) || 0 })).filter((g) => g.id),
     edges: (Array.isArray(x.edges) ? x.edges : []).slice(0, 200).map((e) => ({ a: String(e.a || '').slice(0, 24), b: String(e.b || '').slice(0, 24), k: e.k === 'x' ? 'x' : 'in' })).filter((e) => e.a && e.b),
     dAt: Number(x.dAt) || 0,
   })).filter((x) => x.id && x.dAt > tcut && !ids.has(x.id));
@@ -316,6 +327,49 @@ async function postRecording(context, k, name) {
   return jsonResponse({ ok: true, rec });
 }
 
+async function postImage(context, k, name) {
+  const { request, env } = context;
+  const url = new URL(request.url);
+  const nodeId = String(url.searchParams.get('node') || '').slice(0, 24);
+  const w = Math.round(Number(url.searchParams.get('w')) || 0), h = Math.round(Number(url.searchParams.get('h')) || 0);
+  const mime = (request.headers.get('Content-Type') || '').toLowerCase();
+  if (!nodeId) return jsonResponse({ error: { message: 'חסרה תובנה.' } }, 400);
+  if (!IMG_MIMES.test(mime)) return jsonResponse({ error: { message: 'סוג תמונה לא נתמך.' } }, 415);
+  const bytes = await request.arrayBuffer();
+  if (!bytes.byteLength) return jsonResponse({ error: { message: 'התמונה ריקה.' } }, 400);
+  if (bytes.byteLength > IMG_MAX_BYTES) return jsonResponse({ error: { message: 'התמונה גדולה מדי.' } }, 413);
+  const tree = await loadTree(env, name);
+  const node = tree && tree.nodes.find((n) => n.id === nodeId);
+  if (!node) return jsonResponse({ error: { message: 'התובנה עוד לא נשמרה בענן — נסה שוב עוד רגע.' } }, 409);
+  if ((node.imgs || []).length >= IMG_MAX_PER_NODE) return jsonResponse({ error: { message: 'עד 6 תמונות לתובנה.' } }, 400);
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  await env.SJ_DATA.put(`${name}:img:${id}`, bytes, { metadata: { m: mime, n: bytes.byteLength } });
+  const img = { id, m: mime.slice(0, 40), n: bytes.byteLength, w, h, at: Date.now() };
+  await patchNode(env, name, nodeId, (n) => { n.imgs = [...(n.imgs || []), img]; });
+  return jsonResponse({ ok: true, img });
+}
+
+async function getImage(env, name, id) {
+  const got = await env.SJ_DATA.getWithMetadata(`${name}:img:${id}`, 'arrayBuffer');
+  if (!got || !got.value) return jsonResponse({ error: { message: 'לא נמצא.' } }, 404);
+  const mime = (got.metadata && got.metadata.m) || 'image/jpeg';
+  return new Response(got.value, { status: 200, headers: {
+    'Content-Type': mime, 'Content-Length': String(got.value.byteLength),
+    'Cache-Control': 'private, max-age=31536000, immutable',
+  } });
+}
+
+async function deleteImage(context, name) {
+  const { request, env } = context;
+  const url = new URL(request.url);
+  const id = String(url.searchParams.get('img') || '').slice(0, 24);
+  const nodeId = String(url.searchParams.get('node') || '').slice(0, 24);
+  if (!id || !nodeId) return jsonResponse({ error: { message: 'בקשה לא תקינה.' } }, 400);
+  await env.SJ_DATA.delete(`${name}:img:${id}`);
+  await patchNode(env, name, nodeId, (n) => { n.imgs = (n.imgs || []).filter((g) => g.id !== id); });
+  return jsonResponse({ ok: true });
+}
+
 async function getRecording(env, name, id) {
   const got = await env.SJ_DATA.getWithMetadata(`${name}:rec:${id}`, 'arrayBuffer');
   if (!got || !got.value) return jsonResponse({ error: { message: 'לא נמצא.' } }, 404);
@@ -344,6 +398,8 @@ export async function onRequestGet(context) {
   if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
   const rec = new URL(request.url).searchParams.get('rec');
   if (rec) return getRecording(env, 'thing:' + await keyHash(k), String(rec).slice(0, 24));
+  const img = new URL(request.url).searchParams.get('img');
+  if (img) return getImage(env, 'thing:' + await keyHash(k), String(img).slice(0, 24));
   const raw = await env.SJ_DATA.get('thing:' + await keyHash(k));
   // An unknown key and an empty tree look the same from outside — nothing to probe.
   return jsonResponse({ ok: true, tree: raw ? cleanTree(safeParse(raw)) : null });
@@ -385,6 +441,7 @@ export async function onRequestPost(context) {
   if (!(await rateLimit(env, request, 'thing-rec', 20))) return jsonResponse({ error: { message: 'יותר מדי הקלטות בזמן קצר.' } }, 429);
   if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
   if (new URL(request.url).searchParams.get('title')) return postTitle(context, 'thing:' + await keyHash(k));
+  if (new URL(request.url).searchParams.get('img')) return postImage(context, k, 'thing:' + await keyHash(k));
   return postRecording(context, k, 'thing:' + await keyHash(k));
 }
 
@@ -393,5 +450,6 @@ export async function onRequestDelete(context) {
   const k = keyFrom(request);
   if (!validKey(k)) return jsonResponse({ error: { message: 'לא נמצא.' } }, 404);
   if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
+  if (new URL(request.url).searchParams.get('img')) return deleteImage(context, 'thing:' + await keyHash(k));
   return deleteRecording(context, 'thing:' + await keyHash(k));
 }

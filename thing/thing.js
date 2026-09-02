@@ -114,6 +114,7 @@ function normalize(t) {
         c: Math.min(7, Math.max(0, Number(x.c) || 0)),
         p: pageIds.has(String(x.p || '')) ? String(x.p) : '',
         recs: (Array.isArray(x.recs) ? x.recs : []).filter((r) => r && r.id),
+        imgs: (Array.isArray(x.imgs) ? x.imgs : []).filter((g) => g && g.id),
     }));
     const ids = new Set(nodes.map((x) => x.id));
     const edges = (Array.isArray(n.edges) ? n.edges : []).filter((e) => e && ids.has(e.a) && ids.has(e.b) && e.a !== e.b)
@@ -441,6 +442,7 @@ function renderNodes() {
         el.classList.toggle('long', title.length > 28);
         el.classList.toggle('has-body', !!n.b.trim());
         el.classList.toggle('has-rec', !!(n.recs && n.recs.length));
+        el.classList.toggle('has-img', !!(n.imgs && n.imgs.length));
         el.classList.toggle('sel', n.id === selectedId);
         el.dataset.c = n.c || 0;
         el.classList.toggle('dim', !!query && !matches(n));
@@ -518,6 +520,7 @@ function select(id) {
     renderSwatches(n.c || 0);
     renderPageSelect(n);
     renderRecs(n);
+    renderImgs(n);
     $('sheet').classList.add('open');
 }
 
@@ -577,7 +580,10 @@ async function purgeFromTrash(id) {
     if (i < 0) return;
     const x = tree.trash[i];
     if (!confirm(`למחוק לצמיתות את "${x.t || 'ללא כותרת'}"? אין דרך חזרה.`)) return;
-    // Its recordings go with it.
+    // Its recordings and pictures go with it.
+    if (cloudKey) for (const g of x.imgs || []) {
+        try { await fetch('/api/thing?k=' + encodeURIComponent(cloudKey) + '&node=' + encodeURIComponent(x.id) + '&img=' + encodeURIComponent(g.id), { method: 'DELETE' }); } catch { /* harmless */ }
+    }
     if (cloudKey) for (const r of x.recs || []) {
         try { await fetch('/api/thing?k=' + encodeURIComponent(cloudKey) + '&node=' + encodeURIComponent(x.id) + '&rec=' + encodeURIComponent(r.id), { method: 'DELETE' }); } catch { /* the blob will outlive its bubble — harmless */ }
     }
@@ -732,6 +738,75 @@ function firstWords(n) {
     const cut = words.slice(0, 5).join(' ').replace(/[.,;:!?]+$/, '');
     return words.length > 5 ? cut + '…' : cut;
 }
+
+// ---------- pictures ----------
+
+function imgUrl(id) { return '/api/thing?k=' + encodeURIComponent(cloudKey) + '&img=' + encodeURIComponent(id); }
+
+function renderImgs(n) {
+    const box = $('f-imgs'); if (!box) return;
+    const imgs = (n && n.imgs) || [];
+    box.innerHTML = imgs.map((g) => `
+        <div class="pic">
+            <img src="${imgUrl(g.id)}" alt="" loading="lazy" onclick="openPic('${g.id}')">
+            <button type="button" class="pic-x" onclick="deleteImg('${g.id}')" aria-label="מחק תמונה">✕</button>
+        </div>`).join('');
+}
+
+// A photo from the phone is 3-5 MB; the bubble needs a picture, not a file.
+// Drawn onto a canvas at 1280px on the long side, saved as JPEG — a few
+// hundred kilobytes, the same picture to the eye.
+async function shrinkImage(file) {
+    const url = URL.createObjectURL(file);
+    try {
+        const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+        const MAX = 1280; const k = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+        const w = Math.round(img.naturalWidth * k), h = Math.round(img.naturalHeight * k);
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.82));
+        return { blob, w, h };
+    } finally { URL.revokeObjectURL(url); }
+}
+
+function pickImage() {
+    if (!selectedId) return;
+    if (!cloudKey) { toast('תמונות נשמרות בענן — פתח את הכתובת המלאה פעם אחת'); return; }
+    if (!navigator.onLine) { toast('אין קליטה — תמונות עולות רק עם קליטה'); return; }
+    const inp = $('f-img-input'); inp.value = ''; inp.click();
+}
+
+async function onImagePicked(inp) {
+    const file = inp.files && inp.files[0]; if (!file || !selectedId) return;
+    const nodeId = selectedId;
+    setSync('מעלה תמונה…', false);
+    try {
+        const { blob, w, h } = await shrinkImage(file);
+        await cloudSave();
+        const res = await fetch('/api/thing?k=' + encodeURIComponent(cloudKey) + '&img=1&node=' + encodeURIComponent(nodeId) + '&w=' + w + '&h=' + h, {
+            method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: blob,
+        });
+        const body = await res.json();
+        if (!res.ok) { setSync('לא נשמר', false); toast((body.error && body.error.message) || 'התמונה לא נשמרה'); return; }
+        const n = tree.nodes.find((x) => x.id === nodeId);
+        if (n) { n.imgs = [...(n.imgs || []), body.img]; n.u = Date.now(); localStorage.setItem(STORAGE_KEY, JSON.stringify(tree)); }
+        if (selectedId === nodeId) renderImgs(n);
+        renderNodes();
+        setSync('מסונכרן', true); toast('התמונה נשמרה');
+    } catch { setSync('לא מקוון', false); toast('התמונה לא הועלתה'); }
+}
+
+async function deleteImg(id) {
+    const n = tree.nodes.find((x) => x.id === selectedId);
+    if (!n || !confirm('למחוק את התמונה?')) return;
+    try { await fetch('/api/thing?k=' + encodeURIComponent(cloudKey) + '&node=' + encodeURIComponent(n.id) + '&img=' + encodeURIComponent(id), { method: 'DELETE' }); } catch { /* corrected on the next merge */ }
+    n.imgs = (n.imgs || []).filter((g) => g.id !== id); n.u = Date.now();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tree));
+    renderImgs(n); renderNodes();
+}
+
+function openPic(id) { const lb = $('lightbox'); lb.querySelector('img').src = imgUrl(id); lb.hidden = false; }
+function closePic() { const lb = $('lightbox'); lb.hidden = true; lb.querySelector('img').src = ''; }
 
 // ---------- a title from the words ----------
 

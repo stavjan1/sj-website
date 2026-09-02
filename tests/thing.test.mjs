@@ -33,6 +33,8 @@ test('a tree keeps only bubbles, lines and tombstones the page understands', () 
     assert.equal(recs.length, 10, 'at most ten notes per bubble');
     assert.equal(recs[0].tx.length, 4000, 'a transcript is clamped');
     assert.equal(cleanTree({ nodes: [{ id: 'q' }] }).nodes[0].recs.length, 0, 'no notes is an empty list, not undefined');
+    const imgs = cleanTree({ nodes: [{ id: 'i', imgs: Array.from({ length: 9 }, (_, k) => ({ id: 'g' + k, m: 'image/jpeg', n: 1, w: 10, h: 10 })) }] }).nodes[0].imgs;
+    assert.equal(imgs.length, 6, 'at most six pictures per bubble');
     assert.deepEqual(t.edges, []);
     assert.deepEqual(t.del.map((d) => d.id), ['fresh'], 'tombstones older than 90 days are dropped');
 });
@@ -214,4 +216,14 @@ test('choosing many: a selection box, a whole tree by Ctrl or from the sheet, an
     assert.ok(/function connectedTo/.test(js) && /function pickTree/.test(js), 'no way to grab a whole tree');
     assert.ok(/gesture\.group/.test(js), 'a picked group must move together');
     assert.ok(html.includes('onclick="pickTree()"'), 'the sheet must offer בחר את העץ');
+});
+
+test('pictures on a bubble: shrunk in the page, stored like the voice notes, gone with the bubble', () => {
+    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
+    const api = readFileSync(new URL('../functions/api/thing.js', import.meta.url), 'utf8');
+    assert.ok(html.includes('id="f-img-input"') && html.includes('accept="image/*"'), 'no way to pick a picture');
+    assert.ok(/toBlob\(res, 'image\/jpeg', 0\.82\)/.test(js) && /MAX = 1280/.test(js), 'a photo must be shrunk before it is sent');
+    assert.ok(/async function postImage/.test(api) && /async function getImage/.test(api) && /async function deleteImage/.test(api));
+    assert.ok(/&img=/.test(js.slice(js.indexOf('async function purgeFromTrash'), js.indexOf('async function emptyTrash'))), 'a permanent delete must drop the pictures too');
 });
