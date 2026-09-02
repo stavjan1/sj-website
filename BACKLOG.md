@@ -14,9 +14,8 @@ pricing chat pulls people in → full ZEREM (projects, quotes, invoicing) retain
       Parked by Stav ("לא יודע כבר לגבי האתר תמחור") — keep, do not start unasked.
 - [ ] **Helper list ← Dekel 9xxx vocabulary** — seed the helper items from the 100 renovation
       items (ניתוק וביטול, שיפוץ נקודה, העתקה, פירוק…) once the frequency count says which matter.
-- [ ] **Voice notes on a tree bubble** (/thing/) — needs an R2 bucket bound to the Pages project
-      (Stav-only, dashboard) and `Permissions-Policy: microphone=(self)` for /thing/* in _headers.
-      The tree is keyed by the address (/thing/#k=…), no Google — the key lives only in Stav's bookmark.
+- [x] **Voice notes on a tree bubble** (/thing/) — in KV, transcribed by Workers AI Whisper; Gemini fallback.
+      Move blobs to R2 only if the notes outgrow KV. Not yet tried with a real voice (only a synthetic tone).
 - [ ] **Pricing map: renovation point anchor** — the /ask/ chat answered "מחיר לנקודה" with a job
       total and used the new-build anchor; fix = answer in the unit asked + situation words decide.
 - [ ] **Site: "עובדים בחברה"** — photos of Stav + Matan, click → certificates modal with a divider
