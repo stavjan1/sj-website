@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/tokens.css?v=484">
+    <link rel="stylesheet" href="/assets/tokens.css?v=485">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='%236ABF3C'/%3E%3C/svg%3E">
     <style>
         /* A notebook you walk around in. Nothing here competes with the
@@ -166,6 +166,19 @@
         .swatch:not([data-c="0"]) { box-shadow: none; }
         .swatch.on { border-color: var(--text); transform: scale(1.15); }
         .swatch:hover { transform: scale(1.1); }
+        #btn-rec.live { background: var(--danger); color: #fff; border-color: transparent; }
+        .btn.small { min-height: 28px; padding: 0 10px; font-size: var(--fs-xs); }
+        #f-recs { display: flex; flex-direction: column; gap: 10px; }
+        .rec { border: 1px solid var(--border); border-radius: var(--r-md); padding: 8px 10px; background: var(--bg); }
+        .rec audio { width: 100%; height: 36px; }
+        .rec-meta { display: flex; align-items: center; gap: 8px; font-size: var(--fs-xs); color: var(--text-3); margin-top: 4px; }
+        .rec-meta .btn { margin-inline-start: auto; }
+        .rec-tx { margin-top: 6px; font-size: var(--fs-sm); line-height: 1.5; white-space: pre-wrap; -webkit-user-select: text; user-select: text; }
+        .rec-tx.muted { color: var(--text-3); font-style: normal; }
+        .bubble.has-rec::before {
+            content: ''; position: absolute; inset-inline-end: 6px; bottom: 6px; width: 6px; height: 6px;
+            border-radius: 50%; background: var(--danger); opacity: .8;
+        }
 
         .toast {
             position: fixed; inset-inline: 0; bottom: 92px; margin: 0 auto; width: max-content; max-width: 90vw; z-index: 50;
@@ -183,6 +196,7 @@
         </div>
         <div class="spacer"></div>
         <span class="sync" id="sync">מקומי</span>
+        <button class="btn quiet" id="btn-theme" onclick="toggleTheme()" title="יום / לילה" aria-label="יום או לילה">🌙</button>
     </div>
 
     <div id="stage">
@@ -207,6 +221,11 @@
         <textarea id="f-body" placeholder="הגוף — למה, מאיפה זה בא, מה עושים עם זה" maxlength="4000" oninput="onFieldInput()"></textarea>
         <div id="f-colors" role="group" aria-label="צבע"></div>
         <div class="row">
+            <button type="button" class="btn" id="btn-rec" onclick="toggleRecord()">🎙 הקלט</button>
+            <span class="meta">הקלטה קולית נשמרת לתובנה ומתומללת</span>
+        </div>
+        <div id="f-recs"></div>
+        <div class="row">
             <button class="btn primary" onclick="closeSheet()">סגור</button>
             <button class="btn" id="btn-link" onclick="startLinkFromSheet()">חבר ל…</button>
             <span class="spacer" style="flex:1"></span>
@@ -217,6 +236,6 @@
 
     <div class="toast" id="toast"></div>
 
-    <script src="thing.js?v=484"></script>
+    <script src="thing.js?v=485"></script>
 </body>
 </html>

@@ -29,6 +29,10 @@ test('a tree keeps only bubbles, lines and tombstones the page understands', () 
     assert.equal(t.nodes[0].secret, undefined);
     assert.equal(t.nodes[0].c, 0, 'no colour is colour 0');
     assert.equal(cleanTree({ nodes: [{ id: 'z', c: 99 }] }).nodes[0].c, 7, 'a colour is one of eight');
+    const recs = cleanTree({ nodes: [{ id: 'r', recs: Array.from({ length: 14 }, (_, i) => ({ id: 'r' + i, m: 'audio/webm', n: 1000, d: 61, tx: 'x'.repeat(5000) })) }] }).nodes[0].recs;
+    assert.equal(recs.length, 10, 'at most ten notes per bubble');
+    assert.equal(recs[0].tx.length, 4000, 'a transcript is clamped');
+    assert.equal(cleanTree({ nodes: [{ id: 'q' }] }).nodes[0].recs.length, 0, 'no notes is an empty list, not undefined');
     assert.deepEqual(t.edges, []);
     assert.deepEqual(t.del.map((d) => d.id), ['fresh'], 'tombstones older than 90 days are dropped');
 });
@@ -71,6 +75,9 @@ test('the page is private, needs no Google, revalidates, and /mind/ is gone', ()
     assert.match(html, /name="robots" content="noindex/);
     assert.ok(!/gsi\/client|google\.accounts/.test(html + js), 'the tree must not depend on a Google login');
     assert.ok(/\/thing\/\n\s+Cache-Control: no-cache/.test(headers));
+    // The microphone is off everywhere (the /* block) and on only under /thing/.
+    assert.match(headers, /\/\*\n[^\n]*\n(?:[^\n]*\n)*?\s+Permissions-Policy: geolocation=\(\), microphone=\(\), camera=\(\)/, 'site-wide microphone must stay off');
+    assert.match(headers, /\/thing\/\*\n\s+! Permissions-Policy\n\s+Permissions-Policy: [^\n]*microphone=\(self\)/, '/thing/ must be allowed to record');
     assert.ok(!existsSync(new URL('../mind/index.html', import.meta.url)), 'the old /mind/ page was left behind');
     assert.ok(!existsSync(new URL('../functions/api/mind.js', import.meta.url)), 'the old /api/mind was left behind');
 });

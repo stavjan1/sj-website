@@ -17,6 +17,7 @@
 
 const STORAGE_KEY = 'sj_thing_v1';
 const KEY_KEY = 'sj_thing_key';
+const THEME_KEY = 'sj_thing_theme';
 
 let tree = { nodes: [], edges: [], del: [], updatedAt: 0 };
 let view = { x: 0, y: 0, k: 1 };
@@ -34,6 +35,7 @@ const stage = $('stage'), world = $('world'), wires = $('wires'), nodesEl = $('n
 init();
 
 function init() {
+    applyTheme(localStorage.getItem(THEME_KEY) || 'light');
     tree = normalize(safeParse(localStorage.getItem(STORAGE_KEY)));
     cloudKey = keyFromAddress() || localStorage.getItem(KEY_KEY) || null;
     if (cloudKey) localStorage.setItem(KEY_KEY, cloudKey);
@@ -61,6 +63,7 @@ function normalize(t) {
     const n = t && typeof t === 'object' ? t : {};
     const nodes = (Array.isArray(n.nodes) ? n.nodes : []).filter((x) => x && x.id).map((x) => ({
         id: String(x.id), t: String(x.t || ''), b: String(x.b || ''), x: Number(x.x) || 0, y: Number(x.y) || 0, u: Number(x.u) || 0, c: Math.min(7, Math.max(0, Number(x.c) || 0)),
+        recs: (Array.isArray(x.recs) ? x.recs : []).filter((r) => r && r.id),
     }));
     const ids = new Set(nodes.map((x) => x.id));
     const edges = (Array.isArray(n.edges) ? n.edges : []).filter((e) => e && ids.has(e.a) && ids.has(e.b) && e.a !== e.b)
@@ -189,6 +192,7 @@ function renderNodes() {
         if (label.textContent !== title) label.textContent = title;
         el.classList.toggle('long', title.length > 28);
         el.classList.toggle('has-body', !!n.b.trim());
+        el.classList.toggle('has-rec', !!(n.recs && n.recs.length));
         el.classList.toggle('sel', n.id === selectedId);
         el.dataset.c = n.c || 0;
         el.style.left = n.x + 'px'; el.style.top = n.y + 'px';
@@ -227,6 +231,7 @@ function select(id) {
     $('f-title').value = n.t; $('f-body').value = n.b;
     $('f-meta').textContent = n.b ? `${n.b.length} תווים` : '';
     renderSwatches(n.c || 0);
+    renderRecs(n);
     $('sheet').classList.add('open');
 }
 
@@ -437,6 +442,97 @@ function pinchMove() {
     const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
     view.k = k; view.x = cx - gesture.w.x * k; view.y = cy - gesture.w.y * k;
     applyView();
+}
+
+// ---------- theme ----------
+
+// Day is the default (Stav: "תעשה גם את הרקע שיהיה מצב יום"); the moon flips
+// it and the choice sticks to the device.
+function applyTheme(t) {
+    document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light';
+    const b = $('btn-theme'); if (b) b.textContent = t === 'dark' ? '☀️' : '🌙';
+}
+function toggleTheme() {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem(THEME_KEY, next); applyTheme(next);
+}
+
+// ---------- voice notes ----------
+
+let recorder = null, recChunks = [], recStart = 0, recTimer = null;
+
+function recUrl(id) { return '/api/thing?k=' + encodeURIComponent(cloudKey) + '&rec=' + encodeURIComponent(id); }
+function fmtDur(sec) { const m = Math.floor(sec / 60), s = sec % 60; return m + ':' + String(s).padStart(2, '0'); }
+
+function renderRecs(n) {
+    const box = $('f-recs'); if (!box) return;
+    const recs = (n && n.recs) || [];
+    box.innerHTML = recs.map((r) => `
+        <div class="rec" data-id="${r.id}">
+            <audio controls preload="none" src="${recUrl(r.id)}"></audio>
+            <div class="rec-meta">${fmtDur(r.d || 0)} · ${Math.round((r.n || 0) / 1024)}KB
+                <button type="button" class="btn quiet small" onclick="deleteRec('${r.id}')">מחק</button></div>
+            ${r.tx ? `<div class="rec-tx">${escapeHtml(r.tx)}</div>` : '<div class="rec-tx muted">בלי תמלול</div>'}
+        </div>`).join('');
+}
+
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+async function toggleRecord() {
+    if (recorder && recorder.state === 'recording') { recorder.stop(); return; }
+    if (!selectedId) return;
+    if (!cloudKey) { toast('הקלטות נשמרות בענן — פתח את הכתובת המלאה פעם אחת'); return; }
+    if (!navigator.mediaDevices || !window.MediaRecorder) { toast('הדפדפן הזה לא מקליט'); return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch { toast('אין גישה למיקרופון'); return; }
+    const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'].find((m) => MediaRecorder.isTypeSupported(m)) || '';
+    recorder = new MediaRecorder(stream, mime ? { mimeType: mime, audioBitsPerSecond: 32000 } : undefined);
+    recChunks = []; recStart = Date.now();
+    const nodeId = selectedId;
+    recorder.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.push(e.data); };
+    recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        clearInterval(recTimer);
+        const btn = $('btn-rec'); if (btn) { btn.classList.remove('live'); btn.textContent = '🎙 הקלט'; }
+        const blob = new Blob(recChunks, { type: recorder.mimeType || mime || 'audio/webm' });
+        recorder = null;
+        if (blob.size < 1000) { toast('ההקלטה קצרה מדי'); return; }
+        await uploadRec(nodeId, blob, Math.round((Date.now() - recStart) / 1000));
+    };
+    recorder.start(1000);
+    const btn = $('btn-rec'); if (btn) { btn.classList.add('live'); btn.textContent = '■ עצור 0:00'; }
+    recTimer = setInterval(() => { const b = $('btn-rec'); if (b) b.textContent = '■ עצור ' + fmtDur(Math.round((Date.now() - recStart) / 1000)); }, 1000);
+}
+
+async function uploadRec(nodeId, blob, dur) {
+    // The bubble must already be in the cloud before a note can hang on it.
+    await cloudSave();
+    setSync('מעלה הקלטה…', false);
+    try {
+        const res = await fetch('/api/thing?k=' + encodeURIComponent(cloudKey) + '&node=' + encodeURIComponent(nodeId) + '&dur=' + dur, {
+            method: 'POST', headers: { 'Content-Type': blob.type || 'audio/webm' }, body: blob,
+        });
+        const body = await res.json();
+        if (!res.ok) { setSync('לא נשמר', false); toast((body.error && body.error.message) || 'ההקלטה לא נשמרה'); return; }
+        const n = tree.nodes.find((x) => x.id === nodeId);
+        if (n) { n.recs = [...(n.recs || []), body.rec]; n.u = Date.now(); localStorage.setItem(STORAGE_KEY, JSON.stringify(tree)); }
+        if (selectedId === nodeId) renderRecs(n);
+        renderNodes();
+        setSync('מסונכרן', true);
+        toast(body.rec.tx ? 'נשמר ותומלל' : 'נשמר (בלי תמלול)');
+    } catch { setSync('לא מקוון', false); toast('ההקלטה לא הועלתה'); }
+}
+
+async function deleteRec(id) {
+    const n = tree.nodes.find((x) => x.id === selectedId);
+    if (!n || !confirm('למחוק את ההקלטה?')) return;
+    try {
+        await fetch('/api/thing?k=' + encodeURIComponent(cloudKey) + '&node=' + encodeURIComponent(n.id) + '&rec=' + encodeURIComponent(id), { method: 'DELETE' });
+    } catch { /* the list below is corrected on the next merge either way */ }
+    n.recs = (n.recs || []).filter((r) => r.id !== id); n.u = Date.now();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tree));
+    renderRecs(n); renderNodes();
 }
 
 // ---------- small things ----------

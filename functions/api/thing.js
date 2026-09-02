@@ -22,11 +22,21 @@
 //   PUT /api/thing?k=<key>  { tree } → { ok, tree }        (merged result)
 
 import { jsonResponse, rateLimit } from './_tiers.js';
+import { keyFor } from './_ai.js';
 
 const MAX_BYTES = 900 * 1024;
 const MAX_NODES = 2000;
 const SNAP_TTL = 60 * 24 * 3600;
 const TOMB_KEEP_MS = 90 * 24 * 3600 * 1000;
+
+// Voice notes. KV holds them as raw bytes under thing:<hash>:rec:<id>. Not the
+// textbook store for audio — R2 is — but a person's notebook of one-minute
+// notes at ~32 kbit/s is a few hundred kilobytes each, KV values go to 25 MB,
+// and this needs no dashboard step. If the notes ever outgrow it, the blob
+// key is the only thing that moves.
+const REC_MAX_BYTES = 4 * 1024 * 1024;   // ~15 minutes of opus
+const REC_MAX_PER_NODE = 10;
+const REC_MIMES = /^audio\/(webm|ogg|mp4|mpeg|mp3|wav|x-wav|aac|m4a|x-m4a)/;
 
 function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
 
@@ -53,6 +63,14 @@ export function cleanTree(raw) {
     y: Number.isFinite(Number(n.y)) ? Math.round(Number(n.y)) : 0,
     u: Number(n.u) || 0,
     c: Math.min(7, Math.max(0, Math.round(Number(n.c)) || 0)),
+    recs: (Array.isArray(n.recs) ? n.recs : []).slice(0, REC_MAX_PER_NODE).map((r) => ({
+      id: String(r.id || '').slice(0, 24),
+      m: String(r.m || '').slice(0, 40),
+      n: Math.max(0, Math.round(Number(r.n)) || 0),
+      d: Math.max(0, Math.round(Number(r.d)) || 0),
+      tx: String(r.tx || '').slice(0, 4000),
+      at: Number(r.at) || 0,
+    })).filter((r) => r.id),
   })).filter((n) => n.id);
   const ids = new Set(nodes.map((n) => n.id));
   const seen = new Set();
@@ -105,11 +123,115 @@ function keyFrom(request) {
   return url.searchParams.get('k') || '';
 }
 
+const b64 = (buf) => {
+  const bytes = new Uint8Array(buf);
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+};
+
+// Hebrew speech → text. Workers AI's Whisper first (free, bound already, takes
+// the browser's webm/opus as-is); Gemini as the fallback when the binding is
+// missing, with the same audio inline. Either way an empty string is a valid
+// answer — a note with no transcript is still a note.
+export async function transcribe(env, bytes, mime) {
+  if (env.AI) {
+    try {
+      const out = await env.AI.run('@cf/openai/whisper-large-v3-turbo', { audio: b64(bytes), language: 'he' });
+      const text = out && (out.text || (out.result && out.result.text));
+      if (typeof text === 'string') return text.trim();
+    } catch { /* fall through to Gemini */ }
+  }
+  const key = keyFor(env, 'gemini');
+  if (!key) return '';
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [
+          { text: 'תמלל את ההקלטה הזו מילה במילה בעברית. החזר רק את התמלול, בלי הקדמה ובלי הערות.' },
+          { inline_data: { mime_type: mime.split(';')[0], data: b64(bytes) } },
+        ] }],
+        generationConfig: { temperature: 0 },
+      }),
+    });
+    if (!res.ok) return '';
+    const data = await res.json();
+    return ((data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [])
+      .map((p) => p.text || '').join('').trim();
+  } catch { return ''; }
+}
+
+async function loadTree(env, name) {
+  const raw = await env.SJ_DATA.get(name);
+  return raw ? cleanTree(safeParse(raw)) : null;
+}
+
+// Attach a recording to one bubble in the stored tree, as a per-bubble change
+// (bumps that bubble's `u`), so the next merge from any device carries it.
+async function patchNode(env, name, nodeId, fn) {
+  const tree = (await loadTree(env, name)) || cleanTree({});
+  const node = tree.nodes.find((n) => n.id === nodeId);
+  if (!node) return null;
+  fn(node);
+  node.u = Date.now();
+  tree.updatedAt = node.u;
+  await env.SJ_DATA.put(name, JSON.stringify(cleanTree(tree)));
+  return node;
+}
+
+async function postRecording(context, k, name) {
+  const { request, env } = context;
+  const url = new URL(request.url);
+  const nodeId = String(url.searchParams.get('node') || '').slice(0, 24);
+  const dur = Math.max(0, Math.round(Number(url.searchParams.get('dur')) || 0));
+  const mime = (request.headers.get('Content-Type') || '').toLowerCase();
+  if (!nodeId) return jsonResponse({ error: { message: 'חסרה תובנה.' } }, 400);
+  if (!REC_MIMES.test(mime)) return jsonResponse({ error: { message: 'סוג הקלטה לא נתמך.' } }, 415);
+  const bytes = await request.arrayBuffer();
+  if (!bytes.byteLength) return jsonResponse({ error: { message: 'ההקלטה ריקה.' } }, 400);
+  if (bytes.byteLength > REC_MAX_BYTES) return jsonResponse({ error: { message: 'ההקלטה ארוכה מדי (עד כ-15 דקות).' } }, 413);
+  const tree = await loadTree(env, name);
+  const node = tree && tree.nodes.find((n) => n.id === nodeId);
+  if (!node) return jsonResponse({ error: { message: 'התובנה עוד לא נשמרה בענן — נסה שוב עוד רגע.' } }, 409);
+  if (node.recs.length >= REC_MAX_PER_NODE) return jsonResponse({ error: { message: 'עד 10 הקלטות לתובנה.' } }, 400);
+
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  await env.SJ_DATA.put(`${name}:rec:${id}`, bytes, { metadata: { m: mime, n: bytes.byteLength } });
+  const tx = await transcribe(env, bytes, mime);
+  const rec = { id, m: mime.slice(0, 40), n: bytes.byteLength, d: dur, tx, at: Date.now() };
+  await patchNode(env, name, nodeId, (n) => { n.recs = [...(n.recs || []), rec]; });
+  return jsonResponse({ ok: true, rec });
+}
+
+async function getRecording(env, name, id) {
+  const got = await env.SJ_DATA.getWithMetadata(`${name}:rec:${id}`, 'arrayBuffer');
+  if (!got || !got.value) return jsonResponse({ error: { message: 'לא נמצא.' } }, 404);
+  const mime = (got.metadata && got.metadata.m) || 'audio/webm';
+  return new Response(got.value, { status: 200, headers: {
+    'Content-Type': mime, 'Content-Length': String(got.value.byteLength),
+    'Cache-Control': 'private, max-age=31536000, immutable',
+  } });
+}
+
+async function deleteRecording(context, name) {
+  const { request, env } = context;
+  const url = new URL(request.url);
+  const id = String(url.searchParams.get('rec') || '').slice(0, 24);
+  const nodeId = String(url.searchParams.get('node') || '').slice(0, 24);
+  if (!id || !nodeId) return jsonResponse({ error: { message: 'בקשה לא תקינה.' } }, 400);
+  await env.SJ_DATA.delete(`${name}:rec:${id}`);
+  await patchNode(env, name, nodeId, (n) => { n.recs = (n.recs || []).filter((r) => r.id !== id); });
+  return jsonResponse({ ok: true });
+}
+
 export async function onRequestGet(context) {
   const { request, env } = context;
   const k = keyFrom(request);
   if (!validKey(k)) return jsonResponse({ error: { message: 'לא נמצא.' } }, 404);
   if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
+  const rec = new URL(request.url).searchParams.get('rec');
+  if (rec) return getRecording(env, 'thing:' + await keyHash(k), String(rec).slice(0, 24));
   const raw = await env.SJ_DATA.get('thing:' + await keyHash(k));
   // An unknown key and an empty tree look the same from outside — nothing to probe.
   return jsonResponse({ ok: true, tree: raw ? cleanTree(safeParse(raw)) : null });
@@ -142,4 +264,21 @@ export async function onRequestPut(context) {
     } catch { /* a missed snapshot is not a failed save */ }
   }
   return jsonResponse({ ok: true, tree: merged });
+}
+
+export async function onRequestPost(context) {
+  const { request, env } = context;
+  const k = keyFrom(request);
+  if (!validKey(k)) return jsonResponse({ error: { message: 'לא נמצא.' } }, 404);
+  if (!(await rateLimit(env, request, 'thing-rec', 20))) return jsonResponse({ error: { message: 'יותר מדי הקלטות בזמן קצר.' } }, 429);
+  if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
+  return postRecording(context, k, 'thing:' + await keyHash(k));
+}
+
+export async function onRequestDelete(context) {
+  const { request, env } = context;
+  const k = keyFrom(request);
+  if (!validKey(k)) return jsonResponse({ error: { message: 'לא נמצא.' } }, 404);
+  if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
+  return deleteRecording(context, 'thing:' + await keyHash(k));
 }
