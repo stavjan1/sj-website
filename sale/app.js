@@ -1312,8 +1312,17 @@ function applyDatabaseObject(cloudData) {
 
 // Debounced save, protects the free-tier KV write budget (1k/day). Multiple
 // rapid edits collapse into a single upload ~1.5s after the last change.
+// Signed-in identity, regardless of whether the hour-long access token is in
+// memory right now. The sync functions mint one silently; gating them on the
+// token itself is what used to stop every push the moment the hour lapsed —
+// the phone kept editing, the cloud never heard, and the computer showed
+// yesterday.
+function isCloudIdentity() {
+    return !isGuestUser() && !!getActiveUser();
+}
+
 function scheduleCloudSync() {
-    if (!isCloudUser()) return; // guests are local-only by design
+    if (!isCloudIdentity()) return; // guests are local-only by design
     if (_cloudSaveTimer) clearTimeout(_cloudSaveTimer);
     _cloudSaveTimer = setTimeout(cloudSaveNow, 1500);
 }
@@ -1330,11 +1339,14 @@ function handleExpiredCloudToken() {
 }
 
 async function cloudSaveNow() {
-    if (!isCloudUser()) return;
+    if (!isCloudIdentity()) return;
     try {
+        const tok = (typeof ensureGoogleToken === 'function') ? await ensureGoogleToken() : googleAccessToken;
+        if (!tok) return false;
+        googleAccessToken = tok;
         const res = await fetch('/api/data', {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + googleAccessToken },
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok },
             body: JSON.stringify({ data: buildDatabaseObject() })
         });
         // 501 = KV binding not configured yet → stay local-only, silently.
@@ -1430,11 +1442,14 @@ function mergeCloudIntoLocal(cloud) {
 let _mergeBusy = false;
 let _mergePending = false;
 async function cloudLoadAndMerge(silent) {
-    if (!isCloudUser()) return;
+    if (!isCloudIdentity()) return;
     if (_mergeBusy) { _mergePending = true; return; }
     _mergeBusy = true;
     try {
-        const res = await fetch('/api/data', { headers: { 'Authorization': 'Bearer ' + googleAccessToken } });
+        const tok = (typeof ensureGoogleToken === 'function') ? await ensureGoogleToken() : googleAccessToken;
+        if (!tok) return;
+        googleAccessToken = tok;
+        const res = await fetch('/api/data', { headers: { 'Authorization': 'Bearer ' + tok } });
         if (res.status === 501) {
             if (!silent) showToast('אחסון הענן (KV) עדיין לא הוגדר, נשמר מקומית בינתיים');
             return;
@@ -1463,6 +1478,31 @@ async function cloudLoadAndMerge(silent) {
         // Collapse any calls that arrived mid-merge into a single follow-up.
         if (_mergePending) { _mergePending = false; setTimeout(() => cloudLoadAndMerge(true), 60); }
     }
+}
+
+// The phone writes, the computer is open: it used to learn about it only on
+// the next reload. Stav, 3.9.2026: "תבצע איזה סינכרון בבקשה שזה תמיד ידבר אחד
+// עם השני." So the open app asks the cloud when it comes back into view, on
+// focus, when the network returns, and once a minute — but not while a save
+// is still debouncing or a field is being typed into, so a pull never lands
+// on top of an edit.
+const CLOUD_REFRESH_MS = 60000;
+let _cloudRefreshArmed = false;
+function cloudRefreshIfIdle() {
+    if (!isCloudIdentity() || !navigator.onLine) return;
+    if (document.visibilityState !== 'visible') return;
+    if (_cloudSaveTimer) return;
+    const a = document.activeElement;
+    if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.isContentEditable)) return;
+    cloudLoadAndMerge(true);
+}
+function armCloudRefresh() {
+    if (_cloudRefreshArmed) return;
+    _cloudRefreshArmed = true;
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') cloudRefreshIfIdle(); });
+    window.addEventListener('focus', cloudRefreshIfIdle);
+    window.addEventListener('online', cloudRefreshIfIdle);
+    setInterval(cloudRefreshIfIdle, CLOUD_REFRESH_MS);
 }
 
 // ===== Login transition spinner ("pose" before entering the app) =====
@@ -9158,6 +9198,7 @@ function checkGoogleSession() {
         forgetExpiredGoogleToken();
     }
     refreshTierInfo();
+    armCloudRefresh();
     if (_haveFreshIdToken()) {
         // We already have a valid identity token — sync ONCE and do NOT nag with
         // the Google One Tap card. (This is why sign-in kept popping up when you

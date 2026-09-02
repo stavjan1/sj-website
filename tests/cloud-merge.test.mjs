@@ -71,3 +71,14 @@ test('an entry with no id is never duplicated in', () => {
     const out = mergeInto(incoming, existing);
     assert.equal(out.projects.length, 1, 'an id-less row was appended on every sync');
 });
+
+test('the open app keeps talking to the cloud, and a lapsed hour does not silence it', () => {
+    const src = readFileSync(new URL('../sale/app.js', import.meta.url), 'utf8');
+    const fn = (name) => { const i = src.indexOf('async function ' + name); return src.slice(i, src.indexOf('\n}\n', i)); };
+    assert.ok(/ensureGoogleToken\(\)/.test(fn('cloudSaveNow')), 'cloudSaveNow must mint a token silently, not trust the one in memory');
+    assert.ok(/ensureGoogleToken\(\)/.test(fn('cloudLoadAndMerge')), 'cloudLoadAndMerge must mint a token silently');
+    assert.ok(!/function scheduleCloudSync\(\) \{\s+if \(!isCloudUser\(\)\)/.test(src), 'the debounced save must be gated on identity, not on the access token');
+    assert.ok(/visibilitychange[\s\S]{0,200}cloudRefreshIfIdle/.test(src), 'returning to the tab must pull from the cloud');
+    assert.ok(/setInterval\(cloudRefreshIfIdle, CLOUD_REFRESH_MS\)/.test(src) && /CLOUD_REFRESH_MS = [0-9]{5,}/.test(src), 'a periodic pull, no faster than tens of seconds');
+    assert.ok(/armCloudRefresh\(\);/.test(src), 'the refresh must actually be armed at boot');
+});
