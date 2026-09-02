@@ -72,6 +72,9 @@ function init() {
     tree = normalize(safeParse(localStorage.getItem(STORAGE_KEY)));
     cloudKey = keyFromAddress() || localStorage.getItem(KEY_KEY) || null;
     if (cloudKey) localStorage.setItem(KEY_KEY, cloudKey);
+    // The icon added from this page must open connected: the manifest it
+    // reads carries the key in start_url (see functions/thing/manifest.webmanifest.js).
+    const ml = $('manifest-link'); if (ml && cloudKey) ml.href = '/thing/manifest.webmanifest?k=' + encodeURIComponent(cloudKey);
     tab = localStorage.getItem(TAB_KEY) || 'all';
     if (tab !== 'all' && !tree.pages.some((p) => p.id === tab)) tab = 'all';
     linkKind = localStorage.getItem(LINK_KEY) === 'x' ? 'x' : 'in';
@@ -198,12 +201,15 @@ async function cloudSave() {
 
 function showNoKey() {
     const el = $('nokey'); if (!el) return;
-    if (localStorage.getItem('sj_thing_nokey_dismissed') === '1' && !tree.nodes.length) return;
+    if (localStorage.getItem('sj_thing_nokey_dismissed') === '1') return;
     const n = tree.nodes.length;
     $('nokey-local').textContent = n ? `במכשיר הזה יש ${n} תובנות שעוד לא בענן — הן יצטרפו, לא יימחקו.` : '';
     el.hidden = false;
 }
-function dismissNoKey() { localStorage.setItem('sj_thing_nokey_dismissed', '1'); $('nokey').hidden = true; }
+function dismissNoKey() {
+    try { localStorage.setItem('sj_thing_nokey_dismissed', '1'); } catch { /* fine */ }
+    const el = $('nokey'); if (el) { el.hidden = true; el.style.display = 'none'; }
+}
 
 async function pasteKey() {
     try { const t = await navigator.clipboard.readText(); $('nokey-input').value = t || ''; if (t) connectKey(); }
@@ -223,7 +229,7 @@ function connectKey() {
     cloudKey = m[1];
     localStorage.setItem(KEY_KEY, cloudKey);
     localStorage.removeItem('sj_thing_nokey_dismissed');
-    $('nokey').hidden = true;
+    const el = $('nokey'); if (el) { el.hidden = true; el.style.display = 'none'; }
     dirty = true;                      // whatever is here goes up and merges
     setSync('מתחבר…', false);
     cloudLoad().then(() => { toast('מחובר לענן — הכל מסונכרן'); flushPending(); });

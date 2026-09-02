@@ -97,7 +97,9 @@ test('the tree opens without a signal: a worker caches its shell, never the API,
     assert.ok(/pathname\.startsWith\('\/api\/'\)\) return/.test(sw), 'the API must never be served from cache');
     assert.ok(/cache: 'reload'/.test(sw), 'a deploy must reach the phone on the next open');
     assert.ok(js.includes("serviceWorker.register('/thing/sw.js')"), 'the worker is never registered');
-    assert.ok(html.includes('rel="manifest"') && existsSync(new URL('../thing/manifest.webmanifest', import.meta.url)), 'no manifest — no icon on the phone');
+    assert.ok(html.includes('rel="manifest"') && existsSync(new URL('../functions/thing/manifest.webmanifest.js', import.meta.url)), 'no manifest — no icon on the phone');
+    assert.ok(!existsSync(new URL('../thing/manifest.webmanifest', import.meta.url)), 'the static manifest would shadow the keyed one');
+    assert.ok(/endsWith\('\.webmanifest'\)\) return/.test(sw), 'the worker must never serve a cached keyless manifest');
     assert.match(headers, /media-src 'self' blob:/, 'a note that only exists on the phone cannot play');
 });
 
@@ -139,4 +141,17 @@ test('a device without the address can join, keeps a backup, and every device po
     assert.ok(/setInterval\([\s\S]*?cloudLoad\(\)[\s\S]*?POLL_MS\)/.test(js), 'devices must poll the cloud');
     assert.ok(/dirty = true;/.test(js) && /dirty = false;/.test(js), 'the poll must know whether this device has unsent changes');
     assert.ok(!/POLL_MS = [0-9]{1,4};/.test(js), 'polling faster than every few seconds would burn the KV write budget');
+});
+
+test('the home-screen icon carries the address: the manifest answers with the key in start_url', async () => {
+    const { onRequestGet } = await import('../functions/thing/manifest.webmanifest.js');
+    const res = await onRequestGet({ request: new Request('https://www.sj-eng.co.il/thing/manifest.webmanifest?k=' + 'a'.repeat(40)) });
+    const m = await res.json();
+    assert.equal(m.start_url, '/thing/#k=' + 'a'.repeat(40));
+    const bare = await (await onRequestGet({ request: new Request('https://www.sj-eng.co.il/thing/manifest.webmanifest') })).json();
+    assert.equal(bare.start_url, '/thing/', 'no key, no key');
+    const bad = await (await onRequestGet({ request: new Request('https://www.sj-eng.co.il/thing/manifest.webmanifest?k=../x') })).json();
+    assert.equal(bad.start_url, '/thing/', 'a malformed key is dropped, not echoed');
+    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    assert.ok(/manifest\.webmanifest\?k=/.test(js), 'the page must point its manifest at the keyed one');
 });

@@ -6,8 +6,8 @@
 // (a deploy still arrives on the next open with signal) and from the cache
 // when the network is gone. The API is never cached — a stale tree served as
 // fresh would be worse than "לא מקוון".
-const CACHE = 'thing-shell-v1';
-const SHELL = ['/thing/', '/thing/index.html', '/thing/thing.js', '/assets/tokens.css', '/thing/manifest.webmanifest'];
+const CACHE = 'thing-shell-v2';
+const SHELL = ['/thing/', '/thing/index.html', '/thing/thing.js', '/assets/tokens.css'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
@@ -21,6 +21,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET') return;
   if (url.pathname.startsWith('/api/')) return;                    // never cached
+  if (url.pathname.endsWith('.webmanifest')) return;              // carries the key in its query — never from cache
   const isShell = url.origin === location.origin && (url.pathname.startsWith('/thing/') || url.pathname === '/assets/tokens.css');
   const isFont = url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com';
   if (!isShell && !isFont) return;
