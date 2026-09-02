@@ -28,6 +28,8 @@ const MAX_BYTES = 900 * 1024;
 const MAX_NODES = 2000;
 const SNAP_TTL = 60 * 24 * 3600;
 const TOMB_KEEP_MS = 90 * 24 * 3600 * 1000;
+const TRASH_KEEP_MS = 30 * 24 * 3600 * 1000;   // a bubble waits in the bin this long
+const MAX_TRASH = 500;
 
 // Voice notes. KV holds them as raw bytes under thing:<hash>:rec:<id>. Not the
 // textbook store for audio — R2 is — but a person's notebook of one-minute
@@ -86,10 +88,23 @@ export function cleanTree(raw) {
     k: e.k === 'x' ? 'x' : 'in',   // 'in' assigns the far bubble to this page; 'x' only connects
   })).filter((e) => e.a && e.b && e.a !== e.b && ids.has(e.a) && ids.has(e.b))
     .filter((e) => { const k = edgeKey(e); if (seen.has(k)) return false; seen.add(k); return true; });
+  // The bin: the whole bubble, plus the lines it had, so a restore brings
+  // back what was there and not a bare title. Entries older than 30 days go.
+  const tcut = Date.now() - TRASH_KEEP_MS;
+  const trash = (Array.isArray(t.trash) ? t.trash : []).slice(0, MAX_TRASH).map((x) => ({
+    id: String(x.id || '').slice(0, 24),
+    t: String(x.t || '').slice(0, 120), b: String(x.b || '').slice(0, 4000),
+    x: Math.round(Number(x.x)) || 0, y: Math.round(Number(x.y)) || 0,
+    u: Number(x.u) || 0, c: Math.min(7, Math.max(0, Math.round(Number(x.c)) || 0)),
+    p: String(x.p || '').slice(0, 24),
+    recs: (Array.isArray(x.recs) ? x.recs : []).slice(0, REC_MAX_PER_NODE).map((r) => ({ id: String(r.id || '').slice(0, 24), m: String(r.m || '').slice(0, 40), n: Number(r.n) || 0, d: Number(r.d) || 0, tx: String(r.tx || '').slice(0, 4000), at: Number(r.at) || 0 })).filter((r) => r.id),
+    edges: (Array.isArray(x.edges) ? x.edges : []).slice(0, 200).map((e) => ({ a: String(e.a || '').slice(0, 24), b: String(e.b || '').slice(0, 24), k: e.k === 'x' ? 'x' : 'in' })).filter((e) => e.a && e.b),
+    dAt: Number(x.dAt) || 0,
+  })).filter((x) => x.id && x.dAt > tcut && !ids.has(x.id));
   const cutoff = Date.now() - TOMB_KEEP_MS;
   const del = (Array.isArray(t.del) ? t.del : []).map((d) => ({ id: String(d.id || '').slice(0, 60), at: Number(d.at) || 0 }))
     .filter((d) => d.id && d.at > cutoff);
-  return { nodes, edges, del, pages, updatedAt: Number(t.updatedAt) || Date.now() };
+  return { nodes, edges, del, pages, trash, updatedAt: Number(t.updatedAt) || Date.now() };
 }
 
 function edgeKey(e) { return [e.a, e.b].sort().join('|'); }
@@ -127,7 +142,14 @@ export function mergeTrees(a, b) {
   }
   // A bubble whose page is gone is not gone: it is page-less.
   const alive = [...nodes.values()].map((n) => (n.p && !pages.has(n.p)) ? { ...n, p: '' } : n);
+  const trash = new Map();
+  for (const x of [...A.trash, ...B.trash]) {
+    if (nodes.has(x.id)) continue;                      // it lives again somewhere — not in the bin
+    const cur = trash.get(x.id);
+    if (!cur || x.dAt > cur.dAt) trash.set(x.id, x);
+  }
   return {
+    trash: [...trash.values()],
     nodes: alive,
     edges: [...edges.values()],
     del: [...tomb].map(([id, at]) => ({ id, at })),

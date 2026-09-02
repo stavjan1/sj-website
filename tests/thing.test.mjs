@@ -161,3 +161,36 @@ test('a fragment is not a title: "הצ" falls through to the next engine', () =>
     assert.ok(!plausibleTitle('הצגה'), 'one word is still not the three-to-six the prompt asks for');
     assert.ok(plausibleTitle('הצגה עצמית דרך שיחה'));
 });
+
+test('the bin: a deleted bubble waits 30 days with its lines, a restore beats the tombstone, an alive bubble is never in the bin', () => {
+    const now = Date.now();
+    const t = cleanTree({
+        nodes: [{ id: 'alive', u: 1 }],
+        trash: [
+            { id: 'gone', t: 'נמחק', edges: [{ a: 'gone', b: 'alive', k: 'in' }], dAt: now - 1000 },
+            { id: 'old', dAt: now - 40 * 24 * 3600 * 1000 },
+            { id: 'alive', dAt: now },
+        ],
+    });
+    assert.deepEqual(t.trash.map((x) => x.id), ['gone'], 'old entries expire; an alive bubble is not in the bin');
+    assert.equal(t.trash[0].edges.length, 1, 'the bin keeps the lines');
+
+    // Deleted on the phone (tombstone + bin) …
+    const phone = { nodes: [{ id: 'b', u: 1 }], edges: [], del: [{ id: 'a', at: now - 500 }], trash: [{ id: 'a', t: 'A', dAt: now - 500 }] };
+    // … the computer still has it, unedited:
+    const desk = { nodes: [{ id: 'a', t: 'A', u: 1 }, { id: 'b', u: 1 }], edges: [] };
+    const m1 = mergeTrees(phone, desk);
+    assert.deepEqual(m1.nodes.map((n) => n.id), ['b'], 'the deletion holds');
+    assert.deepEqual(m1.trash.map((x) => x.id), ['a'], 'and the bubble is in the bin');
+
+    // Restored on the computer (a newer change):
+    const restored = { nodes: [{ id: 'a', t: 'A', u: now }, { id: 'b', u: 1 }], edges: [], trash: [] };
+    const m2 = mergeTrees(m1, restored);
+    assert.ok(m2.nodes.some((n) => n.id === 'a'), 'the restore wins over the tombstone');
+    assert.equal(m2.trash.length, 0, 'and it leaves the bin');
+
+    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
+    assert.ok(/function restoreFromTrash/.test(js) && /function purgeFromTrash/.test(js) && /function emptyTrash/.test(js));
+    assert.ok(html.includes('id="trash"') && html.includes('id="btn-trash"'), 'the bin has no door');
+});

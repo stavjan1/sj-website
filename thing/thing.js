@@ -44,7 +44,7 @@ const LEGEND = [
 ];
 const LEGEND_BY_C = Object.fromEntries(LEGEND.map((l) => [l.c, l]));
 
-let tree = { nodes: [], edges: [], del: [], pages: [], updatedAt: 0 };
+let tree = { nodes: [], edges: [], del: [], pages: [], trash: [], updatedAt: 0 };
 let view = { x: 0, y: 0, k: 1 };
 let tab = 'all';            // 'all' or a page id
 let linkKind = 'in';        // the kind of line the knob draws in "הכל"
@@ -116,7 +116,8 @@ function normalize(t) {
     const edges = (Array.isArray(n.edges) ? n.edges : []).filter((e) => e && ids.has(e.a) && ids.has(e.b) && e.a !== e.b)
         .map((e) => ({ a: e.a, b: e.b, u: Number(e.u) || 0, k: e.k === 'x' ? 'x' : 'in' }));
     const del = (Array.isArray(n.del) ? n.del : []).filter((d) => d && d.id).map((d) => ({ id: String(d.id), at: Number(d.at) || 0 }));
-    return { nodes, edges, del, pages, updatedAt: Number(n.updatedAt) || 0 };
+    const trash = (Array.isArray(n.trash) ? n.trash : []).filter((x) => x && x.id && !ids.has(String(x.id))).map((x) => ({ ...x, id: String(x.id), edges: Array.isArray(x.edges) ? x.edges : [], recs: Array.isArray(x.recs) ? x.recs : [], dAt: Number(x.dAt) || 0 }));
+    return { nodes, edges, del, pages, trash, updatedAt: Number(n.updatedAt) || 0 };
 }
 
 // ---------- persistence ----------
@@ -405,6 +406,7 @@ function fitAll() {
 // ---------- rendering ----------
 
 function render() {
+    renderTrash();
     computeOffsets();
     renderTabs();
     renderNodes();
@@ -527,16 +529,94 @@ function onFieldInput() {
     renderNodes(); renderWires(); touch(n);
 }
 
+// Deleting puts the bubble in the bin with its lines; it can come back for
+// 30 days. The tombstones still go in — they are what stops a stale device
+// from bringing the bubble back on its own, and a restore beats them because
+// it is a newer change.
 function deleteSelected() {
     if (!selectedId) return;
     const n = tree.nodes.find((x) => x.id === selectedId);
-    if (!confirm(`למחוק את "${(n && n.t) || 'ללא כותרת'}"? הקווים שלה יימחקו איתה.`)) return;
+    if (!n) return;
     const now = Date.now();
-    tree.del.push({ id: selectedId, at: now });
-    for (const e of tree.edges) if (e.a === selectedId || e.b === selectedId) tree.del.push({ id: [e.a, e.b].sort().join('|'), at: now });
-    tree.nodes = tree.nodes.filter((x) => x.id !== selectedId);
-    tree.edges = tree.edges.filter((e) => e.a !== selectedId && e.b !== selectedId);
+    const mine = tree.edges.filter((e) => e.a === n.id || e.b === n.id);
+    tree.trash = [{ ...n, edges: mine.map((e) => ({ a: e.a, b: e.b, k: e.k })), dAt: now }, ...(tree.trash || [])];
+    tree.del.push({ id: n.id, at: now });
+    for (const e of mine) tree.del.push({ id: [e.a, e.b].sort().join('|'), at: now });
+    tree.nodes = tree.nodes.filter((x) => x.id !== n.id);
+    tree.edges = tree.edges.filter((e) => e.a !== n.id && e.b !== n.id);
     closeSheet(); render(); touch();
+    toast('הועבר לסל המחזור');
+}
+
+function restoreFromTrash(id) {
+    const i = (tree.trash || []).findIndex((x) => x.id === id);
+    if (i < 0) return;
+    const x = tree.trash[i];
+    const now = Date.now();
+    const { edges, dAt, ...node } = x;
+    const back = { ...node, u: now, p: tree.pages.some((p) => p.id === node.p) ? node.p : '' };
+    tree.nodes.push(back);
+    for (const e of edges || []) {
+        if (!tree.nodes.some((q) => q.id === e.a) || !tree.nodes.some((q) => q.id === e.b)) continue;
+        if (tree.edges.some((q) => (q.a === e.a && q.b === e.b) || (q.a === e.b && q.b === e.a))) continue;
+        tree.edges.push({ a: e.a, b: e.b, k: e.k === 'x' ? 'x' : 'in', u: now });
+    }
+    tree.trash.splice(i, 1);
+    render(); touch(); renderTrash();
+    toast('שוחזר');
+}
+
+async function purgeFromTrash(id) {
+    const i = (tree.trash || []).findIndex((x) => x.id === id);
+    if (i < 0) return;
+    const x = tree.trash[i];
+    if (!confirm(`למחוק לצמיתות את "${x.t || 'ללא כותרת'}"? אין דרך חזרה.`)) return;
+    // Its recordings go with it.
+    if (cloudKey) for (const r of x.recs || []) {
+        try { await fetch('/api/thing?k=' + encodeURIComponent(cloudKey) + '&node=' + encodeURIComponent(x.id) + '&rec=' + encodeURIComponent(r.id), { method: 'DELETE' }); } catch { /* the blob will outlive its bubble — harmless */ }
+    }
+    tree.trash.splice(i, 1);
+    touch(); renderTrash();
+}
+
+async function emptyTrash() {
+    if (!(tree.trash || []).length) return;
+    if (!confirm(`לרוקן את הסל? ${tree.trash.length} תובנות יימחקו לצמיתות.`)) return;
+    for (const x of tree.trash) if (cloudKey) for (const r of x.recs || []) {
+        try { await fetch('/api/thing?k=' + encodeURIComponent(cloudKey) + '&node=' + encodeURIComponent(x.id) + '&rec=' + encodeURIComponent(r.id), { method: 'DELETE' }); } catch { /* see above */ }
+    }
+    tree.trash = [];
+    touch(); renderTrash();
+}
+
+function ago(ts) {
+    const d = Math.max(0, Date.now() - ts), h = Math.floor(d / 3600000), days = Math.floor(h / 24);
+    if (days >= 1) return days === 1 ? 'אתמול' : `לפני ${days} ימים`;
+    if (h >= 1) return `לפני ${h} שע'`;
+    return 'עכשיו';
+}
+
+function toggleTrash() {
+    const el = $('trash'); if (!el) return;
+    el.hidden = !el.hidden;
+    if (!el.hidden) { closeSheet(); renderTrash(); }
+}
+function renderTrash() {
+    const el = $('trash'), list = $('trash-list'), btn = $('btn-trash');
+    const items = tree.trash || [];
+    if (btn) btn.textContent = items.length ? `🗑 ${items.length}` : '🗑';
+    if (!el || el.hidden) return;
+    list.innerHTML = items.length ? items.map((x) => `
+        <div class="trash-row">
+            <span class="swatch" data-c="${x.c || 0}"></span>
+            <div class="trash-text">
+                <div class="trash-title">${escapeHtml(x.t.trim() || 'ללא כותרת')}</div>
+                <div class="trash-meta">${ago(x.dAt)}${x.p && pageName(x.p) ? ' · ' + escapeHtml(pageName(x.p)) : ''}${(x.recs || []).length ? ' · 🎙' + x.recs.length : ''}</div>
+            </div>
+            <button type="button" class="btn small" onclick="restoreFromTrash('${x.id}')">שחזר</button>
+            <button type="button" class="btn quiet small danger" onclick="purgeFromTrash('${x.id}')">מחק</button>
+        </div>`).join('') : '<div class="trash-empty">הסל ריק. תובנה שנמחקת מחכה כאן 30 יום.</div>';
+    $('btn-empty-trash').hidden = !items.length;
 }
 
 function selectEdge(e) {
