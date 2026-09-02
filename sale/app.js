@@ -10870,3 +10870,8 @@ function syncChatGreeting() {
     const rest = el.textContent.replace(/^\s*שלום[^!]*!\s*/, '').trim();
     el.textContent = `${hello} ${rest}`;
 }
+
+// Armed for everyone at load, not only on the signed-in boot path: every tick
+// checks isCloudIdentity() itself, so for a guest this is a no-op and for a
+// user who signs in later it is already listening.
+try { armCloudRefresh(); } catch (e) {}
