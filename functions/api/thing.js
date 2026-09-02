@@ -66,7 +66,7 @@ export function cleanTree(raw) {
   const t = raw && typeof raw === 'object' ? raw : {};
   // Tabs: each a blank page. A bubble names its page in `p`; '' is no page.
   const pages = (Array.isArray(t.pages) ? t.pages : []).slice(0, MAX_PAGES).map((p) => ({
-    id: String(p.id || '').slice(0, 24), name: String(p.name || '').slice(0, 40), u: Number(p.u) || 0,
+    id: String(p.id || '').slice(0, 24), name: String(p.name || '').slice(0, 40), u: Number(p.u) || 0, x: !!p.x,
   })).filter((p) => p.id);
   const pageIds = new Set(pages.map((p) => p.id));
   const nodes = (Array.isArray(t.nodes) ? t.nodes : []).slice(0, MAX_NODES).map((n) => ({
@@ -280,6 +280,60 @@ export async function suggestTitle(env, text) {
   return fallbackTitle(body);
 }
 
+// "כפתור שלחיצה עליו צובעת את כל הפתקים, כל אחד בצבע שמתאים לו." Every
+// bubble's words go up with the legend as Stav named it, and one answer
+// comes back: a colour per bubble. Gemini in JSON mode, no thinking, cold;
+// Llama as the fallback; on failure nothing is painted — never a guess.
+const PAINT_PROMPT = 'לפניך מקרא של קטגוריות (מספר צבע, שם, הסבר) ורשימת פתקים (מזהה, טקסט). לכל פתק בחר את הקטגוריה המתאימה ביותר לפי תוכנו. החזר JSON בלבד: מערך של אובייקטים {"id": "...", "c": מספר} — מזהה אחד לכל פתק, בלי הסברים.';
+
+export async function classifyBubbles(env, items, legend) {
+  const list = (Array.isArray(items) ? items : []).slice(0, 150).map((it) => ({ id: String(it.id || '').slice(0, 24), text: String(it.text || '').slice(0, 600) })).filter((it) => it.id && it.text.trim());
+  const leg = (Array.isArray(legend) ? legend : []).slice(0, 8).map((l) => ({ c: Math.min(7, Math.max(0, Math.round(Number(l.c)) || 0)), name: String(l.name || '').slice(0, 30), hint: String(l.hint || '').slice(0, 80) }));
+  if (!list.length || !leg.length) return [];
+  const allowed = new Set(leg.map((l) => l.c));
+  const body = 'מקרא:\n' + leg.map((l) => `${l.c} = ${l.name}${l.hint ? ' (' + l.hint + ')' : ''}`).join('\n') + '\n\nפתקים:\n' + list.map((it) => `[${it.id}] ${it.text.replace(/\s+/g, ' ')}`).join('\n');
+  const parse = (txt) => {
+    try {
+      const m = String(txt || '').match(/\[[\s\S]*\]/); const arr = JSON.parse(m ? m[0] : txt);
+      const ids = new Set(list.map((it) => it.id));
+      return (Array.isArray(arr) ? arr : []).map((r) => ({ id: String(r.id || ''), c: Math.round(Number(r.c)) })).filter((r) => ids.has(r.id) && allowed.has(r.c));
+    } catch { return []; }
+  };
+  const key = keyFor(env, 'gemini');
+  if (key) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: PAINT_PROMPT + '\n\n' + body }] }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const out = parse(((data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || []).map((p) => p.text || '').join(''));
+        if (out.length) return out;
+      }
+    } catch { /* next engine */ }
+  }
+  if (env.AI) {
+    try {
+      const out = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', { messages: [{ role: 'system', content: PAINT_PROMPT }, { role: 'user', content: body }], max_tokens: 4096, temperature: 0.1 });
+      const parsed = parse(out && (out.response || (out.result && out.result.response)));
+      if (parsed.length) return parsed;
+    } catch { /* fall through */ }
+  }
+  return [];
+}
+
+async function postPaint(context) {
+  let payload;
+  try { payload = await context.request.json(); } catch { return jsonResponse({ error: { message: 'בקשה לא תקינה.' } }, 400); }
+  const colors = await classifyBubbles(context.env, payload && payload.items, payload && payload.legend);
+  if (!colors.length) return jsonResponse({ error: { message: 'המנוע לא החזיר צבעים — נסה שוב עוד רגע.' } }, 502);
+  return jsonResponse({ ok: true, colors });
+}
+
 async function postTitle(context, name) {
   const { request, env } = context;
   const url = new URL(request.url);
@@ -450,6 +504,7 @@ export async function onRequestPost(context) {
   if (!(await rateLimit(env, request, 'thing-rec', 20))) return jsonResponse({ error: { message: 'יותר מדי הקלטות בזמן קצר.' } }, 429);
   if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
   if (new URL(request.url).searchParams.get('title')) return postTitle(context, 'thing:' + await keyHash(k));
+  if (new URL(request.url).searchParams.get('paint')) return postPaint(context);
   if (new URL(request.url).searchParams.get('img')) return postImage(context, k, 'thing:' + await keyHash(k));
   return postRecording(context, k, 'thing:' + await keyHash(k));
 }

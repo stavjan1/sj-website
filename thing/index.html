@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/tokens.css?v=498">
+    <link rel="stylesheet" href="/assets/tokens.css?v=499">
     <link rel="manifest" id="manifest-link" href="/thing/manifest.webmanifest">
     <meta name="theme-color" content="#F7F6F3">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -215,6 +215,8 @@
         }
 
         .legend-tools { display: flex; gap: 6px; justify-content: flex-end; padding: 0 4px 4px; }
+        .toast-act { margin-inline-start: 12px; border: 0; border-radius: 999px; padding: 2px 10px; background: var(--accent); color: #fff; font-weight: 700; cursor: pointer; }
+        .tab-tools .btn.on { background: var(--surface-2); border-color: var(--border-strong); }
         #btn-legend-edit.on { background: var(--accent); color: #fff; border-color: transparent; }
         .legend-row.editing { display: flex; align-items: center; gap: 8px; padding: 4px 6px; }
         .legend-input { flex: 1; min-width: 0; border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--bg); padding: 4px 8px; font-size: var(--fs-sm); -webkit-user-select: text; user-select: text; }
@@ -359,6 +361,7 @@
     <aside id="legend" aria-label="מקרא צבעים">
         <button type="button" id="legend-toggle" class="btn quiet small" onclick="toggleLegend()">מקרא</button>
         <div class="legend-tools">
+            <button type="button" class="btn quiet small" id="btn-paint" onclick="paintAll()" title="צבע את כל הפתקים שרואים, כל אחד לפי מה שכתוב בו">🎨</button>
             <button type="button" class="btn quiet small" id="btn-legend-edit" onclick="toggleLegendEdit()" title="ערוך את שמות המקרא">✎</button>
             <button type="button" class="btn quiet small" id="btn-legend-reset" onclick="resetLegend()" hidden>איפוס</button>
         </div>
@@ -454,6 +457,6 @@
 
     <div class="toast" id="toast"></div>
 
-    <script src="thing.js?v=498"></script>
+    <script src="thing.js?v=499"></script>
 </body>
 </html>

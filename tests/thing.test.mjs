@@ -239,3 +239,17 @@ test('the legend is his to rename: names ride with the tree, the newest rename w
     assert.ok(html.includes('id="btn-legend-edit"'), 'no pencil on the legend');
     assert.ok(!/LEGEND_BY_C\[c\]\.name\)/.test(js.slice(js.indexOf('function legendPick'), js.indexOf('function toggleLegendEdit'))), 'the picker must show the renamed name');
 });
+
+test('a page can stay out of הכל, and one button paints every bubble by the legend', async () => {
+    const t = cleanTree({ pages: [{ id: 'p1', name: 'פרטי', u: 1, x: 1 }, { id: 'p2', name: 'עבודה', u: 1 }] });
+    assert.deepEqual(t.pages.map((p) => p.x), [true, false], 'the flag rides with the page');
+    const m = mergeTrees({ pages: [{ id: 'p1', name: 'פרטי', u: 1, x: false }] }, { pages: [{ id: 'p1', name: 'פרטי', u: 2, x: true }] });
+    assert.equal(m.pages[0].x, true, 'the newer flag wins');
+    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
+    assert.ok(/function hiddenPages/.test(js) && /function togglePageHidden/.test(js), 'no way to keep a page out of the general view');
+    assert.ok(/const groups = generalPages\(\);/.test(js), 'a hidden page must not get a slot in הכל');
+    assert.ok(html.includes('id="btn-paint"') && /async function paintAll/.test(js) && /function undoPaint/.test(js), 'no paint-all button, or no way back');
+    const { classifyBubbles } = await import('../functions/api/thing.js');
+    assert.deepEqual(await classifyBubbles({}, [{ id: 'a', text: 'x' }], [{ c: 5, name: 'תובנה' }]), [], 'with no engine at hand nothing is painted — never a guess');
+});

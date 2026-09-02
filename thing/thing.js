@@ -114,7 +114,7 @@ function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function normalize(t) {
     const n = t && typeof t === 'object' ? t : {};
-    const pages = (Array.isArray(n.pages) ? n.pages : []).filter((p) => p && p.id).map((p) => ({ id: String(p.id), name: String(p.name || ''), u: Number(p.u) || 0 }));
+    const pages = (Array.isArray(n.pages) ? n.pages : []).filter((p) => p && p.id).map((p) => ({ id: String(p.id), name: String(p.name || ''), u: Number(p.u) || 0, x: !!p.x }));
     const pageIds = new Set(pages.map((p) => p.id));
     const nodes = (Array.isArray(n.nodes) ? n.nodes : []).filter((x) => x && x.id).map((x) => ({
         id: String(x.id), t: String(x.t || ''), b: String(x.b || ''), x: Number(x.x) || 0, y: Number(x.y) || 0, u: Number(x.u) || 0,
@@ -277,6 +277,15 @@ function renamePage(id) {
     touch(); render();
 }
 
+// "שתהיה אפשרות שכרטיסיה לא תהיה חלק מהכללי." The page keeps everything; it
+// just does not show up in הכל. The flag rides with the page, newest wins.
+function togglePageHidden(id) {
+    const p = tree.pages.find((x) => x.id === id); if (!p) return;
+    p.x = !p.x; p.u = Date.now();
+    touch(); render();
+    toast(p.x ? `"${p.name}" לא תופיע בכללי` : `"${p.name}" חזרה לכללי`);
+}
+
 // Removing a page never removes a bubble: they simply become page-less and
 // show in "הכל" as their own group.
 function deletePage(id) {
@@ -295,13 +304,16 @@ function renderTabs() {
     const bar = $('tabs'); if (!bar) return;
     const chip = (id, label, extra) => `<button type="button" class="tab${tab === id ? ' on' : ''}" data-id="${id}" onclick="setTab('${id}')" ${extra || ''}>${escapeHtml(label)}</button>`;
     bar.innerHTML = chip('all', 'הכל')
-        + tree.pages.map((p) => chip(p.id, p.name || 'לשונית', `ondblclick="renamePage('${p.id}')" title="לחיצה כפולה לשינוי שם"`)).join('')
+        + tree.pages.map((p) => chip(p.id, (p.x ? '◌ ' : '') + (p.name || 'לשונית'), `ondblclick="renamePage('${p.id}')" title="${p.x ? 'לא מוצגת בכללי · ' : ''}לחיצה כפולה לשינוי שם"`)).join('')
         + `<button type="button" class="tab add" onclick="addPage()" title="לשונית חדשה">＋</button>`;
     const tools = $('tab-tools'); if (!tools) return;
     if (tab === 'all') {
         tools.innerHTML = `<button type="button" class="btn small" id="btn-linkkind" onclick="toggleLinkKind()" title="איזה קו הנקודה הכחולה מותחת">${linkKind === 'in' ? 'קו: משייך ללשונית' : 'קו: חוצה'}</button>`;
     } else {
-        tools.innerHTML = `<button type="button" class="btn quiet small" onclick="renamePage('${tab}')">שם</button><button type="button" class="btn quiet small" onclick="deletePage('${tab}')">מחק לשונית</button>`;
+        const pg = tree.pages.find((p) => p.id === tab);
+        tools.innerHTML = `<button type="button" class="btn quiet small" onclick="renamePage('${tab}')">שם</button>`
+            + `<button type="button" class="btn quiet small${pg && pg.x ? ' on' : ''}" onclick="togglePageHidden('${tab}')" title="האם הלשונית הזו מופיעה גם בתצוגת הכל">${pg && pg.x ? '◌ לא בכללי' : 'מוצגת בכללי'}</button>`
+            + `<button type="button" class="btn quiet small" onclick="deletePage('${tab}')">מחק לשונית</button>`;
     }
 }
 
@@ -355,9 +367,16 @@ function onPageSelect() {
 
 // ---------- layout in "הכל": pages side by side ----------
 
-function visibleNodes() { return tab === 'all' ? tree.nodes : tree.nodes.filter((n) => n.p === tab); }
+// A page marked "לא בכללי" keeps to its own tab: its bubbles, its lines and
+// its slot are all left out of the general view.
+function hiddenPages() { return new Set(tree.pages.filter((p) => p.x).map((p) => p.id)); }
+function generalPages() { return ['', ...tree.pages.filter((p) => !p.x).map((p) => p.id)]; }
+function visibleNodes() {
+    if (tab !== 'all') return tree.nodes.filter((n) => n.p === tab);
+    const hid = hiddenPages();
+    return hid.size ? tree.nodes.filter((n) => !hid.has(n.p)) : tree.nodes;
+}
 function visibleEdges() {
-    if (tab === 'all') return tree.edges;
     const ids = new Set(visibleNodes().map((n) => n.id));
     return tree.edges.filter((e) => ids.has(e.a) && ids.has(e.b));
 }
@@ -365,7 +384,7 @@ function visibleEdges() {
 function computeOffsets() {
     offsets = {};
     if (tab !== 'all') { offsets[tab] = { x: 0, y: 0 }; return; }
-    const groups = ['', ...tree.pages.map((p) => p.id)];
+    const groups = generalPages();
     let cursor = 0;
     const GAP = 320;
     for (const g of groups) {
@@ -468,7 +487,7 @@ function renderNodes() {
 function renderClusterLabels() {
     nodesEl.querySelectorAll('.cluster').forEach((x) => x.remove());
     if (tab !== 'all') return;
-    for (const g of ['', ...tree.pages.map((p) => p.id)]) {
+    for (const g of generalPages()) {
         const ns = tree.nodes.filter((n) => n.p === g);
         if (!ns.length && g === '') continue;
         const o = off(g);
@@ -767,6 +786,37 @@ function firstWords(n) {
     const words = src.replace(/\s+/g, ' ').split(' ').filter(Boolean);
     const cut = words.slice(0, 5).join(' ').replace(/[.,;:!?]+$/, '');
     return words.length > 5 ? cut + '…' : cut;
+}
+
+// ---------- colour every bubble by what it says ----------
+
+let lastPaint = null;
+
+async function paintAll() {
+    if (!cloudKey) { toast('הצביעה צריכה ענן — פתח את הכתובת המלאה פעם אחת'); return; }
+    const ns = visibleNodes().filter((n) => (n.t + n.b + ((n.recs || []).map((r) => r.tx || '').join(' '))).trim().length >= 3);
+    if (!ns.length) { toast('אין פתקים עם טקסט לצבוע'); return; }
+    if (!confirm(`לצבוע ${ns.length} פתקים לפי המקרא? אפשר לבטל מיד אחרי.`)) return;
+    const btn = $('btn-paint'); if (btn) { btn.disabled = true; btn.textContent = '…'; }
+    try {
+        const items = ns.map((n) => ({ id: n.id, text: [n.t, n.b, ((n.recs || [])[0] || {}).tx || ''].filter(Boolean).join(' — ').slice(0, 600) }));
+        const legend = LEGEND.map((l) => ({ c: l.c, name: legendName(l.c), hint: l.hint }));
+        const res = await fetch('/api/thing?k=' + encodeURIComponent(cloudKey) + '&paint=1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items, legend }) });
+        const body = await res.json();
+        if (!res.ok) { toast((body.error && body.error.message) || 'הצביעה לא הצליחה'); return; }
+        lastPaint = ns.map((n) => ({ id: n.id, c: n.c || 0 }));
+        const now = Date.now(); let changed = 0;
+        for (const r of body.colors || []) { const n = tree.nodes.find((x) => x.id === r.id); if (n && n.c !== r.c) { n.c = r.c; n.u = now; changed++; } }
+        render(); touch();
+        toast(changed ? `נצבעו ${changed} פתקים` : 'הכל כבר בצבע הנכון', { action: changed ? 'בטל' : null, onAction: undoPaint });
+    } catch { toast('הצביעה לא הצליחה'); }
+    finally { if (btn) { btn.disabled = false; btn.textContent = '🎨'; } }
+}
+function undoPaint() {
+    if (!lastPaint) return;
+    const now = Date.now();
+    for (const p of lastPaint) { const n = tree.nodes.find((x) => x.id === p.id); if (n) { n.c = p.c; n.u = now; } }
+    lastPaint = null; render(); touch(); toast('הצבעים חזרו');
 }
 
 // ---------- pictures ----------
@@ -1316,7 +1366,13 @@ function pinchMove() {
 // ---------- small things ----------
 
 let toastTimer = null;
-function toast(msg) {
-    const el = $('toast'); el.textContent = msg; el.classList.add('show');
-    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+function toast(msg, opts) {
+    const el = $('toast'); el.textContent = msg;
+    if (opts && opts.action && opts.onAction) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'toast-act'; b.textContent = opts.action;
+        b.onclick = () => { el.classList.remove('show'); opts.onAction(); };
+        el.appendChild(b);
+    }
+    el.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), opts && opts.action ? 8000 : 1800);
 }
