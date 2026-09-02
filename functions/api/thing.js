@@ -112,10 +112,16 @@ export function cleanTree(raw) {
     edges: (Array.isArray(x.edges) ? x.edges : []).slice(0, 200).map((e) => ({ a: String(e.a || '').slice(0, 24), b: String(e.b || '').slice(0, 24), k: e.k === 'x' ? 'x' : 'in' })).filter((e) => e.a && e.b),
     dAt: Number(x.dAt) || 0,
   })).filter((x) => x.id && x.dAt > tcut && !ids.has(x.id));
+  // The legend as Stav renamed it: one entry per colour he touched.
+  const legend = (Array.isArray(t.legend) ? t.legend : []).slice(0, 8).map((l) => ({
+    c: Math.min(7, Math.max(0, Math.round(Number(l.c)) || 0)),
+    name: String(l.name || '').replace(/\s+/g, ' ').trim().slice(0, 30),
+    u: Number(l.u) || 0,
+  })).filter((l) => l.name);
   const cutoff = Date.now() - TOMB_KEEP_MS;
   const del = (Array.isArray(t.del) ? t.del : []).map((d) => ({ id: String(d.id || '').slice(0, 60), at: Number(d.at) || 0 }))
     .filter((d) => d.id && d.at > cutoff);
-  return { nodes, edges, del, pages, trash, updatedAt: Number(t.updatedAt) || Date.now() };
+  return { nodes, edges, del, pages, trash, legend, updatedAt: Number(t.updatedAt) || Date.now() };
 }
 
 function edgeKey(e) { return [e.a, e.b].sort().join('|'); }
@@ -159,7 +165,10 @@ export function mergeTrees(a, b) {
     const cur = trash.get(x.id);
     if (!cur || x.dAt > cur.dAt) trash.set(x.id, x);
   }
+  const legend = new Map();
+  for (const l of [...A.legend, ...B.legend]) { const cur = legend.get(l.c); if (!cur || l.u > cur.u) legend.set(l.c, l); }
   return {
+    legend: [...legend.values()],
     trash: [...trash.values()],
     nodes: alive,
     edges: [...edges.values()],

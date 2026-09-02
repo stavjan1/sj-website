@@ -45,7 +45,14 @@ const LEGEND = [
 ];
 const LEGEND_BY_C = Object.fromEntries(LEGEND.map((l) => [l.c, l]));
 
-let tree = { nodes: [], edges: [], del: [], pages: [], trash: [], updatedAt: 0 };
+// The name a colour goes by here: what Stav wrote for it, or the default.
+function legendName(c) {
+    const o = (tree.legend || []).find((l) => l.c === c);
+    return (o && o.name) || (LEGEND_BY_C[c] || LEGEND[0]).name;
+}
+let legendEditing = false;
+
+let tree = { nodes: [], edges: [], del: [], pages: [], trash: [], legend: [], updatedAt: 0 };
 let view = { x: 0, y: 0, k: 1 };
 let tab = 'all';            // 'all' or a page id
 let linkKind = 'in';        // the kind of line the knob draws in "הכל"
@@ -121,7 +128,8 @@ function normalize(t) {
         .map((e) => ({ a: e.a, b: e.b, u: Number(e.u) || 0, k: e.k === 'x' ? 'x' : 'in' }));
     const del = (Array.isArray(n.del) ? n.del : []).filter((d) => d && d.id).map((d) => ({ id: String(d.id), at: Number(d.at) || 0 }));
     const trash = (Array.isArray(n.trash) ? n.trash : []).filter((x) => x && x.id && !ids.has(String(x.id))).map((x) => ({ ...x, id: String(x.id), edges: Array.isArray(x.edges) ? x.edges : [], recs: Array.isArray(x.recs) ? x.recs : [], dAt: Number(x.dAt) || 0 }));
-    return { nodes, edges, del, pages, trash, updatedAt: Number(n.updatedAt) || 0 };
+    const legend = (Array.isArray(n.legend) ? n.legend : []).filter((l) => l && l.name).map((l) => ({ c: Math.min(7, Math.max(0, Number(l.c) || 0)), name: String(l.name).slice(0, 30), u: Number(l.u) || 0 }));
+    return { nodes, edges, del, pages, trash, legend, updatedAt: Number(n.updatedAt) || 0 };
 }
 
 // ---------- persistence ----------
@@ -447,7 +455,7 @@ function renderNodes() {
         el.dataset.c = n.c || 0;
         el.classList.toggle('dim', !!query && !matches(n));
         el.classList.toggle('picked', picked.has(n.id));
-        el.title = (LEGEND_BY_C[n.c] || LEGEND[0]).name + (tab === 'all' && n.p ? ' · ' + pageName(n.p) : '');
+        el.title = legendName(n.c || 0) + (tab === 'all' && n.p ? ' · ' + pageName(n.p) : '');
         const p = pos(n);
         el.style.left = p.x + 'px'; el.style.top = p.y + 'px';
     }
@@ -497,14 +505,36 @@ function renderWires() {
 
 function renderLegend() {
     const box = $('legend-list'); if (!box) return;
-    box.innerHTML = LEGEND.map((l) => `
+    const eb = $('btn-legend-edit'); if (eb) { eb.textContent = legendEditing ? 'סיום' : '✎'; eb.classList.toggle('on', legendEditing); }
+    const rb = $('btn-legend-reset'); if (rb) rb.hidden = !legendEditing || !(tree.legend || []).length;
+    box.innerHTML = LEGEND.map((l) => legendEditing ? `
+        <div class="legend-row editing" data-c="${l.c}">
+            <span class="swatch" data-c="${l.c}"></span>
+            <input type="text" class="legend-input" value="${escapeHtml(legendName(l.c))}" maxlength="30" placeholder="${escapeHtml(l.name)}"
+                   onchange="renameLegend(${l.c}, this.value)" onkeydown="if(event.key==='Enter'){this.blur()}">
+        </div>` : `
         <button type="button" class="legend-row" data-c="${l.c}" onclick="legendPick(${l.c})" title="${escapeHtml(l.hint)}">
-            <span class="swatch" data-c="${l.c}"></span><span class="legend-name">${escapeHtml(l.name)}</span>
+            <span class="swatch" data-c="${l.c}"></span><span class="legend-name">${escapeHtml(legendName(l.c))}</span>
         </button>`).join('');
 }
 function legendPick(c) {
-    if (selectedId) { setColor(c); toast('נצבע: ' + LEGEND_BY_C[c].name); }
-    else toast(LEGEND_BY_C[c].name + ' — ' + LEGEND_BY_C[c].hint);
+    if (selectedId) { setColor(c); toast('נצבע: ' + legendName(c)); }
+    else toast(legendName(c) + ' — ' + LEGEND_BY_C[c].hint);
+}
+
+// Stav: "אפשרות לערוך את המקרא". The colours stay; the words are his. A name
+// is kept per colour with a time, so the newest rename wins across devices;
+// an empty name means "back to the default".
+function toggleLegendEdit() { legendEditing = !legendEditing; renderLegend(); if (legendEditing) $('legend').classList.add('open'); }
+function renameLegend(c, value) {
+    const name = String(value || '').replace(/\s+/g, ' ').trim().slice(0, 30);
+    tree.legend = (tree.legend || []).filter((l) => l.c !== c);
+    if (name && name !== LEGEND_BY_C[c].name) tree.legend.push({ c, name, u: Date.now() });
+    touch(); renderLegend(); renderNodes();
+}
+function resetLegend() {
+    if (!confirm('להחזיר את שמות המקרא לברירת המחדל?')) return;
+    tree.legend = []; touch(); renderLegend(); renderNodes();
 }
 function toggleLegend() { $('legend').classList.toggle('open'); }
 

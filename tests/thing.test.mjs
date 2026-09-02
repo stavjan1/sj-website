@@ -227,3 +227,15 @@ test('pictures on a bubble: shrunk in the page, stored like the voice notes, gon
     assert.ok(/async function postImage/.test(api) && /async function getImage/.test(api) && /async function deleteImage/.test(api));
     assert.ok(/&img=/.test(js.slice(js.indexOf('async function purgeFromTrash'), js.indexOf('async function emptyTrash'))), 'a permanent delete must drop the pictures too');
 });
+
+test('the legend is his to rename: names ride with the tree, the newest rename wins, colours stay', () => {
+    const t = cleanTree({ legend: [{ c: 4, name: '  סיפור   ישן  ', u: 5 }, { c: 99, name: 'x', u: 1 }, { c: 2, name: '', u: 9 }] });
+    assert.deepEqual(t.legend.map((l) => [l.c, l.name]), [[4, 'סיפור ישן'], [7, 'x']], 'names are trimmed and colours clamped; an empty name is no entry');
+    const m = mergeTrees({ legend: [{ c: 4, name: 'ישן', u: 1 }] }, { legend: [{ c: 4, name: 'חדש', u: 2 }, { c: 7, name: 'לעשות', u: 1 }] });
+    assert.deepEqual(m.legend.map((l) => l.name).sort(), ['חדש', 'לעשות']);
+    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
+    assert.ok(/function legendName/.test(js) && /function renameLegend/.test(js), 'no way to rename');
+    assert.ok(html.includes('id="btn-legend-edit"'), 'no pencil on the legend');
+    assert.ok(!/LEGEND_BY_C\[c\]\.name\)/.test(js.slice(js.indexOf('function legendPick'), js.indexOf('function toggleLegendEdit'))), 'the picker must show the renamed name');
+});
