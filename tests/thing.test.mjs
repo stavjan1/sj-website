@@ -130,3 +130,13 @@ test('search: the page has a field and the script searches titles, bodies and tr
     assert.ok(/tree\.nodes\.filter\(matches\)/.test(js), 'search must run over every page, not only the open tab');
     assert.ok(/\\u0591-\\u05C7/.test(js), 'niqqud must not break a match');
 });
+
+test('a device without the address can join, keeps a backup, and every device polls the cloud', () => {
+    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    assert.ok(html.includes('id="nokey"') && html.includes('id="nokey-input"'), 'no way to enter the address on a device that lacks it');
+    assert.ok(/sj_thing_backup_/.test(js), 'joining must leave a local backup behind');
+    assert.ok(/setInterval\([\s\S]*?cloudLoad\(\)[\s\S]*?POLL_MS\)/.test(js), 'devices must poll the cloud');
+    assert.ok(/dirty = true;/.test(js) && /dirty = false;/.test(js), 'the poll must know whether this device has unsent changes');
+    assert.ok(!/POLL_MS = [0-9]{1,4};/.test(js), 'polling faster than every few seconds would burn the KV write budget');
+});

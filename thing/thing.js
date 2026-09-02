@@ -25,6 +25,7 @@ const THEME_KEY = 'sj_thing_theme';
 const TAB_KEY = 'sj_thing_tab';
 const LINK_KEY = 'sj_thing_link';
 const DB_NAME = 'sj_thing', DB_STORE = 'pending';
+const POLL_MS = 45000;   // GET only — reads are plentiful, writes are not
 
 // What the eight colours mean. Stav named four (3.9.2026): אמונה מגבילה in a
 // light purple, פרקטיקה in green, plain thoughts in the plain colour, things he
@@ -54,6 +55,9 @@ let saveTimer = null;
 let cloudTimer = null;
 let offsets = { '': { x: 0, y: 0 } };   // page id → shift applied in "הכל"
 let query = '';                          // what is typed in the search field, normalized
+let dirty = false;                       // this device changed something the cloud has not seen
+let lastServerAt = 0;                    // updatedAt of the last tree the cloud handed us
+let pollTimer = null;
 let hitIndex = -1;
 
 const $ = (id) => document.getElementById(id);
@@ -78,12 +82,14 @@ function init() {
     render();
     if (!visibleNodes().length) fitAll();
     setSync(cloudKey ? 'מתחבר…' : 'מקומי בלבד', false);
-    if (cloudKey) cloudLoad();
+    if (cloudKey) cloudLoad(); else showNoKey();
     bindStage();
+    startPolling();
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/thing/sw.js').catch(() => {});
     window.addEventListener('online', () => { if (cloudKey) { cloudSave().then(flushPending); } });
     if (navigator.onLine && cloudKey) setTimeout(flushPending, 2500);
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && cloudKey) cloudLoad(); });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && cloudKey) { cloudLoad(); startPolling(); } });
+    window.addEventListener('focus', () => { if (cloudKey) cloudLoad(); });
 }
 
 function keyFromAddress() {
@@ -116,6 +122,7 @@ function touch(changed) {
     const now = Date.now();
     if (changed) changed.u = now;
     tree.updatedAt = now;
+    dirty = true;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(tree)), 150);
     clearTimeout(cloudTimer);
@@ -148,9 +155,27 @@ async function cloudLoad() {
         if (res.status === 404) { setSync('כתובת לא מוכרת', false); return; }
         const body = await res.json();
         if (!res.ok) { setSync('לא מקוון', false); return; }
-        if (tree.nodes.length || tree.del.length || tree.pages.length || (body.tree && body.tree.nodes && body.tree.nodes.length)) await cloudSave();
-        else setSync('מסונכרן', true);
+        const cloud = body.tree ? normalize(body.tree) : null;
+        const cloudAt = cloud ? cloud.updatedAt : 0;
+        if (dirty || (!cloud && (tree.nodes.length || tree.pages.length || tree.del.length))) {
+            // We hold something the cloud has not seen: send, and take the merge back.
+            await cloudSave();
+        } else if (cloud && cloudAt !== lastServerAt) {
+            // The other device wrote. We are clean, so the cloud's copy IS the truth.
+            lastServerAt = cloudAt;
+            adopt(cloud);
+            setSync('מסונכרן', true);
+        } else {
+            setSync('מסונכרן', true);
+        }
     } catch { setSync('לא מקוון', false); }
+}
+
+// Every device asks the cloud on a clock while it is on screen, so the
+// computer sees what the phone wrote within a minute without a reload.
+function startPolling() {
+    clearInterval(pollTimer);
+    pollTimer = setInterval(() => { if (document.visibilityState === 'visible' && cloudKey && navigator.onLine) cloudLoad(); }, POLL_MS);
 }
 
 async function cloudSave() {
@@ -162,9 +187,46 @@ async function cloudSave() {
         });
         const body = await res.json();
         if (!res.ok) { setSync('לא נשמר', false); toast((body.error && body.error.message) || 'לא נשמר'); return; }
+        dirty = false;
+        lastServerAt = body.tree ? (Number(body.tree.updatedAt) || 0) : 0;
         adopt(body.tree);
         setSync('מסונכרן', true);
     } catch { setSync('לא מקוון', false); }
+}
+
+// ---------- joining the cloud from a device that has no address ----------
+
+function showNoKey() {
+    const el = $('nokey'); if (!el) return;
+    if (localStorage.getItem('sj_thing_nokey_dismissed') === '1' && !tree.nodes.length) return;
+    const n = tree.nodes.length;
+    $('nokey-local').textContent = n ? `במכשיר הזה יש ${n} תובנות שעוד לא בענן — הן יצטרפו, לא יימחקו.` : '';
+    el.hidden = false;
+}
+function dismissNoKey() { localStorage.setItem('sj_thing_nokey_dismissed', '1'); $('nokey').hidden = true; }
+
+async function pasteKey() {
+    try { const t = await navigator.clipboard.readText(); $('nokey-input').value = t || ''; if (t) connectKey(); }
+    catch { toast('לא הצלחתי לקרוא מהלוח — הדבק ידנית בשדה'); $('nokey-input').focus(); }
+}
+
+// Before anything leaves the device, a copy of what it holds stays behind
+// under its own name. The merge is union-by-bubble and cannot lose a bubble,
+// but a backup that costs nothing is worth more than trusting a merge.
+function connectKey() {
+    const raw = ($('nokey-input').value || '').trim();
+    const m = raw.match(/k=([A-Za-z0-9_-]{32,64})/) || raw.match(/^([A-Za-z0-9_-]{32,64})$/);
+    if (!m) { toast('זו לא נראית כמו הכתובת המלאה — צריך את החלק #k=…'); return; }
+    if (tree.nodes.length) {
+        try { localStorage.setItem('sj_thing_backup_' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-'), JSON.stringify(tree)); } catch { /* no room — the merge still keeps it */ }
+    }
+    cloudKey = m[1];
+    localStorage.setItem(KEY_KEY, cloudKey);
+    localStorage.removeItem('sj_thing_nokey_dismissed');
+    $('nokey').hidden = true;
+    dirty = true;                      // whatever is here goes up and merges
+    setSync('מתחבר…', false);
+    cloudLoad().then(() => { toast('מחובר לענן — הכל מסונכרן'); flushPending(); });
 }
 
 // ---------- pages (tabs) ----------
