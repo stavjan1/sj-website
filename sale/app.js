@@ -2644,6 +2644,10 @@ function switchTab(tabId, opts) {
         // leave the users list to be refreshed by something else, so a failure
         // there had no owner.
         renderAdminAll({ fromGesture: true });
+        try { window.renderAdminHelpers && window.renderAdminHelpers(); } catch (e) {}
+    }
+    if (tabId === 'helper') {
+        try { window.renderHelperPanel && window.renderHelperPanel(); } catch (e) {}
     }
     if (tabId === 'reports') {
         initReportsPanel();
@@ -9638,6 +9642,7 @@ function updateUserProfileUI() {
     if (chipRole) chipRole.textContent = isGuest ? 'מצב התנסות' : professionName;
     const adminRail = document.getElementById('tab-admin-rail');
     if (adminRail) adminRail.hidden = !(typeof isAdmin === 'function' && isAdmin());
+    try { window.refreshHelperAccess && window.refreshHelperAccess(); } catch (e) {}
     const chipAvatar = document.getElementById('user-chip-avatar');
     if (chipAvatar) {
         const pic = isGuest ? null : localStorage.getItem('gsi_picture');

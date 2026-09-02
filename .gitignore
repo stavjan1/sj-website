@@ -41,3 +41,6 @@ __pycache__/
 .env.*
 !.env.example
 .wrangler/
+
+# Dekel price-book dump — licensed data, kept local only (repo is public)
+data/dekel/
