@@ -66,6 +66,12 @@
 /thing/
   Cache-Control: no-cache
 
+/thing/thing.js
+  Cache-Control: no-cache
+
+/thing/sw.js
+  Cache-Control: no-cache
+
 # The insight tree records voice notes. Site-wide the microphone is off (above);
 # here, and only here, the page itself may ask for it.
 /thing/*
@@ -73,12 +79,6 @@
   Permissions-Policy: geolocation=(), microphone=(self), camera=()
 
 /thing/index.html
-  Cache-Control: no-cache
-
-/thing/thing.js
-  Cache-Control: no-cache
-
-/thing/sw.js
   Cache-Control: no-cache
 
 /checkups/
