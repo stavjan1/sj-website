@@ -14,11 +14,19 @@ function helperFmt(n) { return Number(n).toLocaleString('he-IL'); }
 
 // Whether the signed-in account is a helper. Runs after login; a 403 is the
 // normal answer for almost everyone and simply keeps the rail button hidden.
+//
+// Two things this must NOT do. It must not ask the server about the admin —
+// the admin is a helper by definition and isAdmin() is a local check, so a
+// lapsed Google hour would otherwise hide the button from the one account
+// that always has it. And a missing token is not a "no": it is "not yet", so
+// the answer is retried a few times instead of being remembered as a refusal.
+let helperAccessRetries = 0;
 async function refreshHelperAccess() {
     const btn = document.getElementById('tab-helper-rail');
     if (!btn) return;
     const guest = typeof isGuestUser === 'function' ? isGuestUser() : true;
     if (guest || typeof adminRes !== 'function') { btn.hidden = true; return; }
+    if (typeof isAdmin === 'function' && isAdmin()) { btn.hidden = false; return; }
     try {
         const res = await adminRes('/api/helper-prices');
         btn.hidden = !res.ok;
@@ -26,8 +34,12 @@ async function refreshHelperAccess() {
             const data = await res.json();
             helperState = { items: data.items || [], mine: data.mine || {}, others: data.others || {}, loaded: true };
         }
+        helperAccessRetries = 0;
     } catch (e) {
-        btn.hidden = true;
+        if (e && e.code === 'NO_TOKEN' && helperAccessRetries < 4) {
+            helperAccessRetries++;
+            setTimeout(refreshHelperAccess, 25000);
+        }
     }
 }
 
@@ -42,7 +54,13 @@ async function renderHelperPanel(force) {
             if (!res.ok) { root.innerHTML = '<p class="input-help">' + helperEsc((data.error && data.error.message) || 'אין גישה.') + '</p>'; return; }
             helperState = { items: data.items || [], mine: data.mine || {}, others: data.others || {}, loaded: true };
         } catch (e) {
-            root.innerHTML = '<p class="input-help">לא הצלחתי לטעון. התחבר שוב לגוגל ונסה שוב.</p>';
+            // A helper who is not the admin never sees the admin strip, so this
+            // is his one way back in. Same reconnect as the strip's button —
+            // adminSignInNow — not a second implementation of it.
+            root.innerHTML = (e && e.code === 'NO_TOKEN' && typeof adminSignInNow === 'function')
+                ? `<div class="admin-auth"><p>צריך אישור מגוגל כדי לטעון את הרשימה.</p>
+                     <button type="button" class="btn btn-accent btn-small" onclick="adminSignInNow(this)">התחבר מחדש</button></div>`
+                : '<p class="input-help">לא הצלחתי לטעון. התחבר שוב לגוגל ונסה שוב.</p>';
             return;
         }
     }
