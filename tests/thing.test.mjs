@@ -100,3 +100,24 @@ test('the tree opens without a signal: a worker caches its shell, never the API,
     assert.ok(html.includes('rel="manifest"') && existsSync(new URL('../thing/manifest.webmanifest', import.meta.url)), 'no manifest — no icon on the phone');
     assert.match(headers, /media-src 'self' blob:/, 'a note that only exists on the phone cannot play');
 });
+
+test('tabs: a bubble keeps its page, a line keeps its kind, and a deleted page frees its bubbles', () => {
+    const t = cleanTree({
+        pages: [{ id: 'p1', name: 'עבודה', u: 1 }, { name: 'no id' }],
+        nodes: [{ id: 'a', p: 'p1', u: 1 }, { id: 'b', p: 'ghost', u: 1 }, { id: 'c', u: 1 }],
+        edges: [{ a: 'a', b: 'b', k: 'x', u: 1 }, { a: 'a', b: 'c', k: 'anything', u: 1 }],
+    });
+    assert.deepEqual(t.pages.map((p) => p.id), ['p1']);
+    assert.equal(t.nodes.find((n) => n.id === 'a').p, 'p1');
+    assert.equal(t.nodes.find((n) => n.id === 'b').p, '', 'a page that does not exist is no page');
+    assert.deepEqual(t.edges.map((e) => e.k).sort(), ['in', 'x'], 'a line is assigning unless it says it crosses');
+
+    const cloud = { pages: [{ id: 'p1', name: 'עבודה', u: 1 }], nodes: [{ id: 'a', p: 'p1', u: 1 }], edges: [] };
+    const phone = { pages: [], nodes: [{ id: 'a', p: 'p1', u: 1 }], edges: [], del: [{ id: 'page:p1', at: Date.now() }] };
+    const m = mergeTrees(cloud, phone);
+    assert.equal(m.pages.length, 0, 'the tombstone removed the page');
+    assert.equal(m.nodes[0].p, '', 'its bubble survived, page-less');
+
+    const renamed = mergeTrees({ pages: [{ id: 'p1', name: 'ישן', u: 1 }] }, { pages: [{ id: 'p1', name: 'חדש', u: 2 }] });
+    assert.equal(renamed.pages[0].name, 'חדש', 'the newer name wins');
+});

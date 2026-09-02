@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/tokens.css?v=487">
+    <link rel="stylesheet" href="/assets/tokens.css?v=488">
     <link rel="manifest" href="manifest.webmanifest">
     <meta name="theme-color" content="#F7F6F3">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -125,9 +125,55 @@
         @media (pointer: coarse) { .bubble .knob { opacity: .55; } }
         .bubble.target { border-color: var(--action); box-shadow: 0 0 0 4px color-mix(in srgb, var(--action) 30%, transparent); }
 
+        /* Tabs */
+        #tabbar {
+            position: fixed; inset-inline: 0; top: 58px; z-index: 29; display: flex; align-items: center; gap: 8px;
+            padding: 6px 10px; background: color-mix(in srgb, var(--bg) 82%, transparent);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid var(--border);
+        }
+        #tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 1; }
+        #tabs::-webkit-scrollbar { display: none; }
+        .tab {
+            flex: none; min-height: 32px; padding: 0 14px; border-radius: var(--r-pill); border: 1px solid var(--border-strong);
+            background: var(--surface); font-weight: 600; font-size: var(--fs-sm); white-space: nowrap;
+        }
+        .tab.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+        .tab.add { padding: 0 10px; color: var(--text-2); }
+        #tab-tools { display: flex; gap: 6px; flex: none; }
+        @media (max-width: 480px) { #tabbar { top: 52px; } }
+
+        /* Page groups in "הכל" carry their name */
+        .cluster {
+            position: absolute; font-family: var(--font-display); font-weight: 700; font-size: var(--fs-md);
+            color: var(--text-3); letter-spacing: .02em; padding: 4px 10px; border-radius: var(--r-sm);
+            background: color-mix(in srgb, var(--text) 6%, transparent); cursor: pointer; white-space: nowrap;
+        }
+        #wires .wire.cross { stroke-dasharray: 8 7; opacity: .55; }
+        #wires .wire.ghost.cross { stroke-dasharray: 3 5; }
+
+        /* Legend */
+        #legend {
+            position: fixed; inset-inline-start: 12px; top: 112px; z-index: 28; display: flex; flex-direction: column; gap: 4px;
+            padding: 8px; border-radius: var(--r-md); background: color-mix(in srgb, var(--surface) 88%, transparent);
+            border: 1px solid var(--border); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+        }
+        #legend-toggle { display: none; }
+        .legend-row {
+            display: flex; align-items: center; gap: 8px; padding: 4px 8px 4px 6px; border: 0; background: transparent;
+            border-radius: var(--r-pill); font-size: var(--fs-sm); font-weight: 600; text-align: start;
+        }
+        .legend-row:hover { background: var(--surface-2); }
+        .legend-row .swatch { width: 18px; height: 18px; pointer-events: none; }
+        @media (max-width: 900px) {
+            #legend { top: auto; bottom: 90px; inset-inline-start: 12px; padding: 4px; }
+            #legend-toggle { display: inline-flex; }
+            #legend-list { display: none; }
+            #legend.open #legend-list { display: flex; flex-direction: column; }
+        }
+
         /* Empty-world hint and the floating + */
         #hint {
-            position: fixed; inset-inline: 0; bottom: 96px; text-align: center; color: var(--text-3);
+            position: fixed; inset-inline: 0; bottom: 140px; text-align: center; color: var(--text-3);
             font-size: var(--fs-sm); pointer-events: none; z-index: 20;
         }
         #fab {
@@ -148,7 +194,7 @@
         }
         #sheet.open { transform: translateY(0); }
         @media (min-width: 900px) {
-            #sheet { inset-inline-end: 0; inset-inline-start: auto; top: 58px; bottom: 0; width: 380px; max-height: none;
+            #sheet { inset-inline-end: 0; inset-inline-start: auto; top: 104px; bottom: 0; width: 380px; max-height: none;
                      border-radius: 0; transform: translateX(-105%); }
             #sheet.open { transform: translateX(0); }
         }
@@ -207,6 +253,18 @@
         <button class="btn quiet" id="btn-theme" onclick="toggleTheme()" title="יום / לילה" aria-label="יום או לילה">🌙</button>
     </div>
 
+    <!-- Tabs: "הכל" and one chip per page. Under the top bar, scrolls sideways on a phone. -->
+    <div id="tabbar">
+        <div id="tabs" role="tablist"></div>
+        <div id="tab-tools"></div>
+    </div>
+
+    <!-- The legend: what each colour means. Tapping a row colours the selected bubble. -->
+    <aside id="legend" aria-label="מקרא צבעים">
+        <button type="button" id="legend-toggle" class="btn quiet small" onclick="toggleLegend()">מקרא</button>
+        <div id="legend-list"></div>
+    </aside>
+
     <div id="stage">
         <div id="world">
             <svg id="wires"></svg>
@@ -228,7 +286,14 @@
             <button type="button" class="btn" id="btn-title" onclick="autoTitle(selectedId)" title="כותרת מהטקסט וההקלטות">✨</button>
         </div>
         <textarea id="f-body" placeholder="הגוף — למה, מאיפה זה בא, מה עושים עם זה" maxlength="4000" oninput="onFieldInput()"></textarea>
-        <div id="f-colors" role="group" aria-label="צבע"></div>
+        <div class="row">
+            <div id="f-colors" role="group" aria-label="צבע"></div>
+            <span class="meta" id="f-color-name"></span>
+        </div>
+        <div class="row">
+            <label class="meta" for="f-page">לשונית</label>
+            <select id="f-page" onchange="onPageSelect()" style="flex:1;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--bg);padding:8px 10px"></select>
+        </div>
         <div class="row">
             <button type="button" class="btn" id="btn-rec" onclick="toggleRecord()">🎙 הקלט</button>
             <span class="meta">הקלטה קולית נשמרת לתובנה ומתומללת</span>
@@ -245,6 +310,6 @@
 
     <div class="toast" id="toast"></div>
 
-    <script src="thing.js?v=487"></script>
+    <script src="thing.js?v=488"></script>
 </body>
 </html>

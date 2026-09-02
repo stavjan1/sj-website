@@ -36,6 +36,7 @@ const TOMB_KEEP_MS = 90 * 24 * 3600 * 1000;
 // key is the only thing that moves.
 const REC_MAX_BYTES = 4 * 1024 * 1024;   // ~15 minutes of opus
 const REC_MAX_PER_NODE = 10;
+const MAX_PAGES = 60;
 const REC_MIMES = /^audio\/(webm|ogg|mp4|mpeg|mp3|wav|x-wav|aac|m4a|x-m4a)/;
 
 function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
@@ -55,6 +56,11 @@ export function validKey(k) {
 // time it last changed, which is what the merge decides by.
 export function cleanTree(raw) {
   const t = raw && typeof raw === 'object' ? raw : {};
+  // Tabs: each a blank page. A bubble names its page in `p`; '' is no page.
+  const pages = (Array.isArray(t.pages) ? t.pages : []).slice(0, MAX_PAGES).map((p) => ({
+    id: String(p.id || '').slice(0, 24), name: String(p.name || '').slice(0, 40), u: Number(p.u) || 0,
+  })).filter((p) => p.id);
+  const pageIds = new Set(pages.map((p) => p.id));
   const nodes = (Array.isArray(t.nodes) ? t.nodes : []).slice(0, MAX_NODES).map((n) => ({
     id: String(n.id || '').slice(0, 24),
     t: String(n.t || '').slice(0, 120),
@@ -63,6 +69,7 @@ export function cleanTree(raw) {
     y: Number.isFinite(Number(n.y)) ? Math.round(Number(n.y)) : 0,
     u: Number(n.u) || 0,
     c: Math.min(7, Math.max(0, Math.round(Number(n.c)) || 0)),
+    p: pageIds.has(String(n.p || '')) ? String(n.p) : '',
     recs: (Array.isArray(n.recs) ? n.recs : []).slice(0, REC_MAX_PER_NODE).map((r) => ({
       id: String(r.id || '').slice(0, 24),
       m: String(r.m || '').slice(0, 40),
@@ -76,12 +83,13 @@ export function cleanTree(raw) {
   const seen = new Set();
   const edges = (Array.isArray(t.edges) ? t.edges : []).map((e) => ({
     a: String(e.a || '').slice(0, 24), b: String(e.b || '').slice(0, 24), u: Number(e.u) || 0,
+    k: e.k === 'x' ? 'x' : 'in',   // 'in' assigns the far bubble to this page; 'x' only connects
   })).filter((e) => e.a && e.b && e.a !== e.b && ids.has(e.a) && ids.has(e.b))
     .filter((e) => { const k = edgeKey(e); if (seen.has(k)) return false; seen.add(k); return true; });
   const cutoff = Date.now() - TOMB_KEEP_MS;
   const del = (Array.isArray(t.del) ? t.del : []).map((d) => ({ id: String(d.id || '').slice(0, 60), at: Number(d.at) || 0 }))
     .filter((d) => d.id && d.at > cutoff);
-  return { nodes, edges, del, updatedAt: Number(t.updatedAt) || Date.now() };
+  return { nodes, edges, del, pages, updatedAt: Number(t.updatedAt) || Date.now() };
 }
 
 function edgeKey(e) { return [e.a, e.b].sort().join('|'); }
@@ -110,10 +118,20 @@ export function mergeTrees(a, b) {
     const cur = edges.get(k);
     if (!cur || e.u > cur.u) edges.set(k, e);
   }
+  const pages = new Map();
+  for (const p of [...A.pages, ...B.pages]) {
+    const dead = tomb.get('page:' + p.id);
+    if (dead && dead >= p.u) continue;
+    const cur = pages.get(p.id);
+    if (!cur || p.u > cur.u) pages.set(p.id, p);
+  }
+  // A bubble whose page is gone is not gone: it is page-less.
+  const alive = [...nodes.values()].map((n) => (n.p && !pages.has(n.p)) ? { ...n, p: '' } : n);
   return {
-    nodes: [...nodes.values()],
+    nodes: alive,
     edges: [...edges.values()],
     del: [...tomb].map(([id, at]) => ({ id, at })),
+    pages: [...pages.values()],
     updatedAt: Math.max(A.updatedAt, B.updatedAt),
   };
 }
