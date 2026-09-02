@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>עץ התובנות</title>
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/tokens.css?v=483">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='%236ABF3C'/%3E%3C/svg%3E">
+    <style>
+        /* A notebook you walk around in. Nothing here competes with the
+           bubbles: one accent for lines and the selected bubble, paper behind. */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+        body {
+            background: var(--bg); color: var(--text);
+            font-family: var(--font-ui); font-size: var(--fs-md); line-height: var(--lh-body);
+            touch-action: none; -webkit-user-select: none; user-select: none;
+        }
+        button, input, textarea { font-family: inherit; font-size: inherit; color: inherit; }
+        button { cursor: pointer; }
+
+        .top {
+            position: fixed; inset-inline: 0; top: 0; z-index: 30;
+            display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+            background: color-mix(in srgb, var(--bg) 82%, transparent);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--border);
+        }
+        .top h1 { font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 700; }
+        .top .sub { font-size: var(--fs-xs); color: var(--text-3); }
+        .top .spacer { flex: 1; }
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px;
+            border-radius: var(--r-pill); border: 1px solid var(--border-strong); background: var(--surface);
+            font-weight: 600; font-size: var(--fs-sm); transition: background var(--t-fast), border-color var(--t-fast);
+        }
+        .btn:hover { border-color: var(--accent); }
+        .btn.primary { background: var(--action); border-color: transparent; color: var(--on-action); }
+        .btn.quiet { background: transparent; border-color: transparent; color: var(--text-2); }
+        .btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+        .sync { font-size: var(--fs-xs); color: var(--text-3); min-width: 60px; text-align: start; }
+        .sync.on { color: var(--ok-text); }
+        @media (max-width: 480px) {
+            .top { gap: 8px; padding: 8px 10px; }
+            .top h1 { font-size: var(--fs-md); white-space: nowrap; }
+            .top .sub { font-size: 11px; }
+            .sync { display: none; }
+            .btn { padding: 0 10px; min-height: 34px; }
+        }
+
+        /* The world. #world is translated/scaled; everything inside is in world units. */
+        #stage { position: fixed; inset: 0; cursor: grab; }
+        #stage.panning { cursor: grabbing; }
+        #world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+        #wires { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+        #wires .wire { stroke: var(--accent); stroke-width: 2; fill: none; opacity: .75; }
+        #wires .wire-hit { stroke: transparent; stroke-width: 22; fill: none; pointer-events: stroke; cursor: pointer; }
+        #wires .wire.sel { stroke: var(--danger); opacity: 1; stroke-width: 3; }
+        #wires .wire.ghost { stroke-dasharray: 6 6; opacity: .5; }
+
+        /* A bubble is as wide as its title. That is the whole design: the world
+           shows titles, the sheet shows the body. */
+        .bubble {
+            position: absolute; transform: translate(-50%, -50%);
+            width: max-content; max-width: 240px; padding: 10px 16px; border-radius: var(--r-pill);
+            background: var(--surface); border: 1.5px solid var(--border-strong);
+            box-shadow: 0 2px 10px rgba(0,0,0,.08);
+            font-weight: 600; font-size: var(--fs-sm); line-height: 1.3; text-align: center;
+            cursor: grab; touch-action: none;
+            transition: box-shadow var(--t-fast), border-color var(--t-fast);
+        }
+        .bubble .label { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bubble.long .label { white-space: normal; }
+        .bubble:hover { border-color: var(--accent); }
+        .bubble.sel { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft), 0 4px 16px rgba(0,0,0,.12); }
+        .bubble.drag { cursor: grabbing; box-shadow: 0 8px 24px rgba(0,0,0,.18); z-index: 5; }
+        .bubble.has-body::after {
+            content: ''; position: absolute; inset-inline-end: 6px; top: 6px; width: 6px; height: 6px;
+            border-radius: 50%; background: var(--accent); opacity: .7;
+        }
+        /* The connect handle: drag from here to another bubble to draw a line. */
+        .bubble .knob {
+            position: absolute; inset-inline-start: -14px; top: 50%; transform: translateY(-50%);
+            width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+            opacity: 0; transition: opacity var(--t-fast); cursor: crosshair; touch-action: none;
+        }
+        .bubble .knob::before { content: ''; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); box-shadow: 0 0 0 1.5px var(--accent); }
+        .bubble:hover .knob, .bubble.sel .knob { opacity: 1; }
+        @media (pointer: coarse) { .bubble .knob { opacity: .55; } }
+        .bubble.target { border-color: var(--action); box-shadow: 0 0 0 4px color-mix(in srgb, var(--action) 30%, transparent); }
+
+        /* Empty-world hint and the floating + */
+        #hint {
+            position: fixed; inset-inline: 0; bottom: 96px; text-align: center; color: var(--text-3);
+            font-size: var(--fs-sm); pointer-events: none; z-index: 20;
+        }
+        #fab {
+            position: fixed; inset-inline-end: 18px; bottom: 22px; z-index: 30;
+            width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--action); color: var(--on-action);
+            font-size: 30px; line-height: 1; box-shadow: 0 6px 20px rgba(0,0,0,.2);
+        }
+        #zoom { position: fixed; inset-inline-start: 14px; bottom: 22px; z-index: 30; display: flex; gap: 6px; }
+        #zoom .btn { min-width: 36px; padding: 0; justify-content: center; }
+
+        /* The sheet: the body of the selected bubble. Bottom sheet on the phone,
+           side panel on a desk. */
+        #sheet {
+            position: fixed; z-index: 40; background: var(--surface); border: 1px solid var(--border);
+            box-shadow: 0 -8px 30px rgba(0,0,0,.15); display: flex; flex-direction: column; gap: 10px; padding: 14px;
+            inset-inline: 0; bottom: 0; max-height: 72vh; border-radius: 18px 18px 0 0;
+            transform: translateY(105%); transition: transform var(--t-med);
+        }
+        #sheet.open { transform: translateY(0); }
+        @media (min-width: 900px) {
+            #sheet { inset-inline-end: 0; inset-inline-start: auto; top: 58px; bottom: 0; width: 380px; max-height: none;
+                     border-radius: 0; transform: translateX(-105%); }
+            #sheet.open { transform: translateX(0); }
+        }
+        #sheet input, #sheet textarea {
+            width: 100%; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--bg);
+            padding: 10px 12px; -webkit-user-select: text; user-select: text;
+        }
+        #sheet input { font-weight: 700; font-size: var(--fs-lg); }
+        #sheet textarea { min-height: 120px; resize: vertical; flex: 1; line-height: 1.55; }
+        #sheet .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        #sheet .meta { font-size: var(--fs-xs); color: var(--text-3); }
+
+        .toast {
+            position: fixed; inset-inline: 0; bottom: 92px; margin: 0 auto; width: max-content; max-width: 90vw; z-index: 50;
+            background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: var(--r-pill); font-size: var(--fs-sm);
+            opacity: 0; transition: opacity var(--t-med); pointer-events: none;
+        }
+        .toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+    <div class="top">
+        <div>
+            <h1>עץ התובנות</h1>
+            <div class="sub" id="count">—</div>
+        </div>
+        <div class="spacer"></div>
+        <span class="sync" id="sync">מקומי</span>
+        <button class="btn" id="btn-login" onclick="loginGoogle()">התחברות Google</button>
+        <button class="btn quiet" id="btn-logout" onclick="logoutLocal()" hidden>יציאה</button>
+    </div>
+
+    <div id="stage">
+        <div id="world">
+            <svg id="wires"></svg>
+            <div id="nodes"></div>
+        </div>
+    </div>
+
+    <div id="hint" hidden>לחיצה כפולה על הרקע פותחת תובנה חדשה · גרירה מהנקודה הכחולה מחברת קו</div>
+    <div id="zoom">
+        <button class="btn" onclick="zoomBy(1.2)" title="הגדל">+</button>
+        <button class="btn" onclick="zoomBy(1/1.2)" title="הקטן">−</button>
+        <button class="btn" onclick="fitAll()" title="הצג הכל">⤢</button>
+    </div>
+    <button id="fab" onclick="addNodeAtCenter()" title="תובנה חדשה" aria-label="תובנה חדשה">+</button>
+
+    <div id="sheet" role="dialog" aria-label="תובנה">
+        <div class="row">
+            <input type="text" id="f-title" placeholder="כותרת — מה התובנה במשפט" maxlength="120" oninput="onFieldInput()">
+        </div>
+        <textarea id="f-body" placeholder="הגוף — למה, מאיפה זה בא, מה עושים עם זה" maxlength="4000" oninput="onFieldInput()"></textarea>
+        <div class="row">
+            <button class="btn primary" onclick="closeSheet()">סגור</button>
+            <button class="btn" id="btn-link" onclick="startLinkFromSheet()">חבר ל…</button>
+            <span class="spacer" style="flex:1"></span>
+            <button class="btn danger" onclick="deleteSelected()">מחק</button>
+        </div>
+        <div class="meta" id="f-meta"></div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="mind.js?v=483"></script>
+</body>
+</html>
