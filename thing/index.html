@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/tokens.css?v=494">
+    <link rel="stylesheet" href="/assets/tokens.css?v=495">
     <link rel="manifest" id="manifest-link" href="/thing/manifest.webmanifest">
     <meta name="theme-color" content="#F7F6F3">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -68,7 +68,8 @@
         }
         #stage {
             position: fixed; inset: 0; cursor: grab;
-            background-image: radial-gradient(var(--dot) 1.2px, transparent 1.4px);
+            --dot-alpha: 1;
+            background-image: radial-gradient(color-mix(in srgb, var(--dot) calc(100% * var(--dot-alpha)), transparent) 1.2px, transparent 1.4px);
             background-size: 28px 28px;
         }
         #stage.panning { cursor: grabbing; }
@@ -150,6 +151,8 @@
         .hit-none { padding: 10px; color: var(--text-3); font-size: var(--fs-sm); }
         .bubble.dim { opacity: .18; }
         #wires .wire.dim { opacity: .12; }
+        #edge-del { position: fixed; z-index: 30; transform: translate(-50%, -50%); background: var(--surface); box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+        #edge-del[hidden] { display: none; }
         .cluster.dim { opacity: .3; }
         @media (max-width: 640px) {
             #q { display: none; width: 100%; }
@@ -372,6 +375,9 @@
         <div id="trash-list"></div>
     </div>
 
+    <!-- One button for a tapped line, at its middle. -->
+    <button type="button" id="edge-del" class="btn danger small" onclick="deleteSelectedEdge()" hidden>מחק קו</button>
+
     <div id="hint" hidden>לחיצה כפולה על הרקע פותחת תובנה חדשה · גרירה מהנקודה הכחולה מחברת קו</div>
     <div id="zoom">
         <button class="btn" onclick="zoomBy(1.2)" title="הגדל">+</button>
@@ -410,6 +416,6 @@
 
     <div class="toast" id="toast"></div>
 
-    <script src="thing.js?v=494"></script>
+    <script src="thing.js?v=495"></script>
 </body>
 </html>

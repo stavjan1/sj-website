@@ -194,3 +194,14 @@ test('the bin: a deleted bubble waits 30 days with its lines, a restore beats th
     assert.ok(/function restoreFromTrash/.test(js) && /function purgeFromTrash/.test(js) && /function emptyTrash/.test(js));
     assert.ok(html.includes('id="trash"') && html.includes('id="btn-trash"'), 'the bin has no door');
 });
+
+test('three small things: an untitled bubble shows its first words, a tapped line has a delete button, and the map zooms far out', () => {
+    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
+    assert.ok(/firstWords\(n\) \|\| 'ללא כותרת'/.test(js), 'the label must fall back to the body before "ללא כותרת"');
+    assert.ok(html.includes('id="edge-del"') && /function deleteSelectedEdge/.test(js), 'no delete button for a line');
+    assert.ok(!/confirm\(`למחוק את הקו/.test(js), 'the line dialog should be gone');
+    const min = Number((js.match(/MIN_ZOOM = ([0-9.]+)/) || [])[1]);
+    assert.ok(min > 0 && min <= 0.1, 'the map must zoom out well past the old 0.25');
+    assert.ok(!/Math\.max\(0\.(15|25),/.test(js), 'a leftover hard-coded zoom floor');
+});

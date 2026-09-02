@@ -25,7 +25,8 @@ const THEME_KEY = 'sj_thing_theme';
 const TAB_KEY = 'sj_thing_tab';
 const LINK_KEY = 'sj_thing_link';
 const DB_NAME = 'sj_thing', DB_STORE = 'pending';
-const POLL_MS = 45000;   // GET only — reads are plentiful, writes are not
+const POLL_MS = 45000;
+const MIN_ZOOM = 0.06, MAX_ZOOM = 3;   // Stav: "שיהיה אפשר לצאת עוד בזום"   // GET only — reads are plentiful, writes are not
 
 // What the eight colours mean. Stav named four (3.9.2026): אמונה מגבילה in a
 // light purple, פרקטיקה in green, plain thoughts in the plain colour, things he
@@ -372,8 +373,10 @@ function pos(n) { const o = off(n.p); return { x: n.x + o.x, y: n.y + o.y }; }
 
 function applyView() {
     world.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.k})`;
+    if (selectedEdge) placeEdgeButton();
     const g = Math.max(14, 28 * view.k);
     stage.style.backgroundSize = `${g}px ${g}px`;
+    stage.style.setProperty('--dot-alpha', view.k < 0.3 ? '0' : '1');
     stage.style.backgroundPosition = `${view.x}px ${view.y}px`;
 }
 function toWorld(sx, sy) { return { x: (sx - view.x) / view.k, y: (sy - view.y) / view.k }; }
@@ -383,7 +386,7 @@ function centerOn(wx, wy) {
     applyView(); saveView();
 }
 function zoomAt(sx, sy, factor) {
-    const k = Math.min(3, Math.max(0.15, view.k * factor));
+    const k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, view.k * factor));
     const w = toWorld(sx, sy);
     view.k = k;
     view.x = sx - w.x * k; view.y = sy - w.y * k;
@@ -398,7 +401,7 @@ function fitAll() {
     const xs = ps.map((p) => p.x), ys = ps.map((p) => p.y);
     const minX = Math.min(...xs) - 160, maxX = Math.max(...xs) + 160;
     const minY = Math.min(...ys) - 110, maxY = Math.max(...ys) + 120;
-    const k = Math.min(2, Math.max(0.15, Math.min(stage.clientWidth / (maxX - minX), stage.clientHeight / (maxY - minY))));
+    const k = Math.min(2, Math.max(MIN_ZOOM, Math.min(stage.clientWidth / (maxX - minX), stage.clientHeight / (maxY - minY))));
     view.k = k;
     centerOn((minX + maxX) / 2, (minY + maxY) / 2);
 }
@@ -431,7 +434,7 @@ function renderNodes() {
             nodesEl.appendChild(el);
         }
         const label = el.querySelector('.label');
-        const title = n.t.trim() || 'ללא כותרת';
+        const title = n.t.trim() || firstWords(n) || 'ללא כותרת';
         if (label.textContent !== title) label.textContent = title;
         el.classList.toggle('long', title.length > 28);
         el.classList.toggle('has-body', !!n.b.trim());
@@ -619,17 +622,33 @@ function renderTrash() {
     $('btn-empty-trash').hidden = !items.length;
 }
 
+// A tapped line lights up and shows one button at its middle: מחק. No
+// dialog — on a phone the line is thin and the question was the annoying
+// part. Tapping the ground puts the button away.
 function selectEdge(e) {
     selectedEdge = e; selectedId = null;
     $('sheet').classList.remove('open');
     renderNodes(); renderWires();
-    const a = tree.nodes.find((n) => n.id === e.a), b = tree.nodes.find((n) => n.id === e.b);
-    if (confirm(`למחוק את הקו בין "${a ? a.t : ''}" ל-"${b ? b.t : ''}"?`)) {
-        tree.del.push({ id: [e.a, e.b].sort().join('|'), at: Date.now() });
-        tree.edges = tree.edges.filter((x) => !(x.a === e.a && x.b === e.b));
-        touch();
-    }
-    selectedEdge = null; renderWires();
+    placeEdgeButton();
+}
+function placeEdgeButton() {
+    const btn = $('edge-del'); if (!btn) return;
+    const e = selectedEdge;
+    const a = e && tree.nodes.find((n) => n.id === e.a), b = e && tree.nodes.find((n) => n.id === e.b);
+    if (!a || !b) { btn.hidden = true; return; }
+    const pa = pos(a), pb = pos(b);
+    const mx = (pa.x + pb.x) / 2, my = (pa.y + pb.y) / 2;
+    btn.style.left = (mx * view.k + view.x) + 'px';
+    btn.style.top = (my * view.k + view.y) + 'px';
+    btn.hidden = false;
+}
+function deleteSelectedEdge() {
+    const e = selectedEdge; if (!e) return;
+    tree.del.push({ id: [e.a, e.b].sort().join('|'), at: Date.now() });
+    tree.edges = tree.edges.filter((x) => !(x.a === e.a && x.b === e.b));
+    selectedEdge = null; $('edge-del').hidden = true;
+    renderWires(); touch();
+    toast('הקו נמחק');
 }
 
 // ---------- creating ----------
@@ -699,6 +718,16 @@ function setColor(i) {
     if (!n) return;
     n.c = i;
     renderSwatches(i); renderNodes(); renderWires(); touch(n);
+}
+
+// The label of a bubble with no title: the first few words of its body, or
+// of its first transcript — so an untitled note still says what it is.
+function firstWords(n) {
+    const src = (n.b || '').trim() || (((n.recs || [])[0] || {}).tx || '').trim();
+    if (!src) return '';
+    const words = src.replace(/\s+/g, ' ').split(' ').filter(Boolean);
+    const cut = words.slice(0, 5).join(' ').replace(/[.,;:!?]+$/, '');
+    return words.length > 5 ? cut + '…' : cut;
 }
 
 // ---------- a title from the words ----------
@@ -1063,6 +1092,7 @@ function onUp(ev) {
             if (now - lastTap < 350) { const w = toWorld(ev.clientX, ev.clientY); addNodeAt(w.x, w.y); lastTap = 0; return; }
             lastTap = now;
             linkFrom = null; closeSheet(); $('results').hidden = true;
+            if (selectedEdge) { selectedEdge = null; $('edge-del').hidden = true; renderWires(); }
         }
     } else if (g.type === 'node') {
         g.el.classList.remove('drag');
@@ -1084,7 +1114,7 @@ function pinchMove() {
     if (pointers.size < 2) return;
     const [a, b] = [...pointers.values()];
     const d = Math.hypot(a.x - b.x, a.y - b.y);
-    const k = Math.min(3, Math.max(0.15, gesture.k0 * (d / gesture.d0)));
+    const k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, gesture.k0 * (d / gesture.d0)));
     const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
     view.k = k; view.x = cx - gesture.w.x * k; view.y = cy - gesture.w.y * k;
     applyView();
