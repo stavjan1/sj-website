@@ -162,6 +162,68 @@ export async function transcribe(env, bytes, mime) {
   } catch { return ''; }
 }
 
+// A title for a bubble that has none, from what it says. Stav, 2.9.2026:
+// "אפשר שהכותרת תיווצר לבד מהקונספט של הפתק?" — it can, and it is the same
+// engines as the transcript. Gemini first (good Hebrew), Workers AI's Llama
+// second, and if both are away the first few words of the text, so the
+// bubble is never left blank.
+const TITLE_PROMPT = 'תן כותרת קצרה בעברית, 3 עד 6 מילים, שמסכמת את הרעיון המרכזי של הטקסט הבא. החזר רק את הכותרת, בלי מירכאות, בלי נקודה בסוף, בלי הסבר.';
+
+export function fallbackTitle(text) {
+  const words = String(text || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  return words.slice(0, 6).join(' ').replace(/[.,;:!?]+$/, '').slice(0, 60);
+}
+
+function cleanTitle(t) {
+  return String(t || '').split('\n')[0].replace(/^["'״׳\s]+|["'״׳\s.]+$/g, '').replace(/\s+/g, ' ').slice(0, 80);
+}
+
+export async function suggestTitle(env, text) {
+  const body = String(text || '').slice(0, 6000);
+  if (body.trim().length < 3) return '';
+  const key = keyFor(env, 'gemini');
+  if (key) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: TITLE_PROMPT + '\n\n' + body }] }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 40 },
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const t = cleanTitle(((data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || []).map((p) => p.text || '').join(''));
+        if (t) return t;
+      }
+    } catch { /* next engine */ }
+  }
+  if (env.AI) {
+    try {
+      const out = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+        messages: [{ role: 'system', content: TITLE_PROMPT }, { role: 'user', content: body }], max_tokens: 40, temperature: 0.2,
+      });
+      const t = cleanTitle(out && (out.response || (out.result && out.result.response)));
+      if (t) return t;
+    } catch { /* fall through */ }
+  }
+  return fallbackTitle(body);
+}
+
+async function postTitle(context, name) {
+  const { request, env } = context;
+  const url = new URL(request.url);
+  const nodeId = String(url.searchParams.get('node') || '').slice(0, 24);
+  let payload;
+  try { payload = await request.json(); } catch { return jsonResponse({ error: { message: 'בקשה לא תקינה.' } }, 400); }
+  const title = await suggestTitle(env, payload && payload.text);
+  if (!title) return jsonResponse({ error: { message: 'אין מספיק טקסט לכותרת.' } }, 400);
+  // Written into the stored bubble too, so the other device sees it on its
+  // next merge and not only the one that asked.
+  if (nodeId) await patchNode(env, name, nodeId, (n) => { n.t = title; });
+  return jsonResponse({ ok: true, title });
+}
+
 async function loadTree(env, name) {
   const raw = await env.SJ_DATA.get(name);
   return raw ? cleanTree(safeParse(raw)) : null;
@@ -272,6 +334,7 @@ export async function onRequestPost(context) {
   if (!validKey(k)) return jsonResponse({ error: { message: 'לא נמצא.' } }, 404);
   if (!(await rateLimit(env, request, 'thing-rec', 20))) return jsonResponse({ error: { message: 'יותר מדי הקלטות בזמן קצר.' } }, 429);
   if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
+  if (new URL(request.url).searchParams.get('title')) return postTitle(context, 'thing:' + await keyHash(k));
   return postRecording(context, k, 'thing:' + await keyHash(k));
 }
 

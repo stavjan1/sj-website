@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
-import { cleanTree, mergeTrees, validKey, keyHash } from '../functions/api/thing.js';
+import { cleanTree, mergeTrees, validKey, keyHash, fallbackTitle } from '../functions/api/thing.js';
 
 test('only a long random key is a key', () => {
     assert.ok(validKey('a'.repeat(32)));
@@ -80,4 +80,10 @@ test('the page is private, needs no Google, revalidates, and /mind/ is gone', ()
     assert.match(headers, /\/thing\/\*\n\s+! Permissions-Policy\n\s+Permissions-Policy: [^\n]*microphone=\(self\)/, '/thing/ must be allowed to record');
     assert.ok(!existsSync(new URL('../mind/index.html', import.meta.url)), 'the old /mind/ page was left behind');
     assert.ok(!existsSync(new URL('../functions/api/mind.js', import.meta.url)), 'the old /api/mind was left behind');
+});
+
+
+test('with no engine at hand, the first words become the title, never a blank', () => {
+    assert.equal(fallbackTitle('דקל הוא מחירון מכרז, לא שוק פרטי. ההוכחה: שיפוצים גבוה מבנייה ב-5% בלבד.'), 'דקל הוא מחירון מכרז, לא שוק');
+    assert.equal(fallbackTitle('   '), '');
 });

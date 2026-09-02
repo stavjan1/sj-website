@@ -521,6 +521,7 @@ async function uploadRec(nodeId, blob, dur) {
         renderNodes();
         setSync('מסונכרן', true);
         toast(body.rec.tx ? 'נשמר ותומלל' : 'נשמר (בלי תמלול)');
+        if (n && !n.t.trim() && body.rec.tx) autoTitle(nodeId, { quiet: true });
     } catch { setSync('לא מקוון', false); toast('ההקלטה לא הועלתה'); }
 }
 
@@ -533,6 +534,33 @@ async function deleteRec(id) {
     n.recs = (n.recs || []).filter((r) => r.id !== id); n.u = Date.now();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(tree));
     renderRecs(n); renderNodes();
+}
+
+// ---------- a title from the words ----------
+
+// Everything the bubble says, body first, then every transcript.
+function bubbleText(n) {
+    return [n.b || '', ...((n.recs || []).map((r) => r.tx || ''))].filter((t) => t.trim()).join('\n');
+}
+
+async function autoTitle(nodeId, opts) {
+    const n = tree.nodes.find((x) => x.id === nodeId);
+    if (!n || !cloudKey) return;
+    const text = bubbleText(n);
+    if (text.trim().length < 3) { if (!(opts && opts.quiet)) toast('אין עדיין טקסט להוציא ממנו כותרת'); return; }
+    const btn = $('btn-title'); if (btn) { btn.disabled = true; btn.textContent = '…'; }
+    try {
+        const res = await fetch('/api/thing?k=' + encodeURIComponent(cloudKey) + '&title=1&node=' + encodeURIComponent(nodeId), {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }),
+        });
+        const body = await res.json();
+        if (!res.ok) { if (!(opts && opts.quiet)) toast((body.error && body.error.message) || 'לא יצאה כותרת'); return; }
+        n.t = body.title; n.u = Date.now();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(tree));
+        if (selectedId === nodeId) $('f-title').value = n.t;
+        renderNodes(); renderWires();
+    } catch { if (!(opts && opts.quiet)) toast('לא יצאה כותרת'); }
+    finally { if (btn) { btn.disabled = false; btn.textContent = '✨'; } }
 }
 
 // ---------- small things ----------
