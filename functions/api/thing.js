@@ -52,6 +52,7 @@ export function cleanTree(raw) {
     x: Number.isFinite(Number(n.x)) ? Math.round(Number(n.x)) : 0,
     y: Number.isFinite(Number(n.y)) ? Math.round(Number(n.y)) : 0,
     u: Number(n.u) || 0,
+    c: Math.min(7, Math.max(0, Math.round(Number(n.c)) || 0)),
   })).filter((n) => n.id);
   const ids = new Set(nodes.map((n) => n.id));
   const seen = new Set();

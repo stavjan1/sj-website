@@ -53,7 +53,18 @@
         }
 
         /* The world. #world is translated/scaled; everything inside is in world units. */
-        #stage { position: fixed; inset: 0; cursor: grab; }
+        /* Eight colours, each a hue the bubble mixes into its own fill and border.
+           Dark paper wants deeper fills with light text; light paper wants pastels. */
+        :root {
+            --c1: #F5B342; --c2: #F0704A; --c3: #E85D8A; --c4: #9B6BF2;
+            --c5: #3FA7F5; --c6: #2EC4A6; --c7: #8BD13F;
+            --dot: color-mix(in srgb, var(--text) 12%, transparent);
+        }
+        #stage {
+            position: fixed; inset: 0; cursor: grab;
+            background-image: radial-gradient(var(--dot) 1.2px, transparent 1.4px);
+            background-size: 28px 28px;
+        }
         #stage.panning { cursor: grabbing; }
         #world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
         #wires { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
@@ -73,6 +84,21 @@
             cursor: grab; touch-action: none;
             transition: box-shadow var(--t-fast), border-color var(--t-fast);
         }
+        .bubble[data-c="1"] { --hue: var(--c1); } .bubble[data-c="2"] { --hue: var(--c2); }
+        .bubble[data-c="3"] { --hue: var(--c3); } .bubble[data-c="4"] { --hue: var(--c4); }
+        .bubble[data-c="5"] { --hue: var(--c5); } .bubble[data-c="6"] { --hue: var(--c6); }
+        .bubble[data-c="7"] { --hue: var(--c7); }
+        .bubble[data-c]:not([data-c="0"]) {
+            background: color-mix(in srgb, var(--hue) 30%, var(--surface));
+            border-color: color-mix(in srgb, var(--hue) 70%, var(--surface));
+        }
+        .bubble[data-c]:not([data-c="0"]) .knob::before { background: var(--hue); box-shadow: 0 0 0 1.5px var(--hue); }
+        .bubble[data-c]:not([data-c="0"]).sel { box-shadow: 0 0 0 4px color-mix(in srgb, var(--hue) 35%, transparent), 0 4px 16px rgba(0,0,0,.12); border-color: var(--hue); }
+        #wires .wire[data-c="1"] { stroke: var(--c1); } #wires .wire[data-c="2"] { stroke: var(--c2); }
+        #wires .wire[data-c="3"] { stroke: var(--c3); } #wires .wire[data-c="4"] { stroke: var(--c4); }
+        #wires .wire[data-c="5"] { stroke: var(--c5); } #wires .wire[data-c="6"] { stroke: var(--c6); }
+        #wires .wire[data-c="7"] { stroke: var(--c7); }
+        #wires .wire { stroke-width: 2.5; }
         .bubble .label { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .bubble.long .label { white-space: normal; }
         .bubble:hover { border-color: var(--accent); }
@@ -128,6 +154,18 @@
         #sheet textarea { min-height: 120px; resize: vertical; flex: 1; line-height: 1.55; }
         #sheet .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         #sheet .meta { font-size: var(--fs-xs); color: var(--text-3); }
+        #f-colors { display: flex; gap: 8px; flex-wrap: wrap; }
+        .swatch {
+            width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: var(--surface-2);
+            box-shadow: inset 0 0 0 1.5px var(--border-strong); cursor: pointer; transition: transform var(--t-fast);
+        }
+        .swatch[data-c="1"] { background: var(--c1); } .swatch[data-c="2"] { background: var(--c2); }
+        .swatch[data-c="3"] { background: var(--c3); } .swatch[data-c="4"] { background: var(--c4); }
+        .swatch[data-c="5"] { background: var(--c5); } .swatch[data-c="6"] { background: var(--c6); }
+        .swatch[data-c="7"] { background: var(--c7); }
+        .swatch:not([data-c="0"]) { box-shadow: none; }
+        .swatch.on { border-color: var(--text); transform: scale(1.15); }
+        .swatch:hover { transform: scale(1.1); }
 
         .toast {
             position: fixed; inset-inline: 0; bottom: 92px; margin: 0 auto; width: max-content; max-width: 90vw; z-index: 50;
@@ -167,6 +205,7 @@
             <input type="text" id="f-title" placeholder="כותרת — מה התובנה במשפט" maxlength="120" oninput="onFieldInput()">
         </div>
         <textarea id="f-body" placeholder="הגוף — למה, מאיפה זה בא, מה עושים עם זה" maxlength="4000" oninput="onFieldInput()"></textarea>
+        <div id="f-colors" role="group" aria-label="צבע"></div>
         <div class="row">
             <button class="btn primary" onclick="closeSheet()">סגור</button>
             <button class="btn" id="btn-link" onclick="startLinkFromSheet()">חבר ל…</button>

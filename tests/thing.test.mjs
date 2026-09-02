@@ -27,6 +27,8 @@ test('a tree keeps only bubbles, lines and tombstones the page understands', () 
     assert.equal(t.nodes.length, 1);
     assert.equal(t.nodes[0].x, 11);
     assert.equal(t.nodes[0].secret, undefined);
+    assert.equal(t.nodes[0].c, 0, 'no colour is colour 0');
+    assert.equal(cleanTree({ nodes: [{ id: 'z', c: 99 }] }).nodes[0].c, 7, 'a colour is one of eight');
     assert.deepEqual(t.edges, []);
     assert.deepEqual(t.del.map((d) => d.id), ['fresh'], 'tombstones older than 90 days are dropped');
 });

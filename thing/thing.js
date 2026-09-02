@@ -60,7 +60,7 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 function normalize(t) {
     const n = t && typeof t === 'object' ? t : {};
     const nodes = (Array.isArray(n.nodes) ? n.nodes : []).filter((x) => x && x.id).map((x) => ({
-        id: String(x.id), t: String(x.t || ''), b: String(x.b || ''), x: Number(x.x) || 0, y: Number(x.y) || 0, u: Number(x.u) || 0,
+        id: String(x.id), t: String(x.t || ''), b: String(x.b || ''), x: Number(x.x) || 0, y: Number(x.y) || 0, u: Number(x.u) || 0, c: Math.min(7, Math.max(0, Number(x.c) || 0)),
     }));
     const ids = new Set(nodes.map((x) => x.id));
     const edges = (Array.isArray(n.edges) ? n.edges : []).filter((e) => e && ids.has(e.a) && ids.has(e.b) && e.a !== e.b)
@@ -133,6 +133,9 @@ async function cloudSave() {
 
 function applyView() {
     world.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.k})`;
+    const g = Math.max(14, 28 * view.k);
+    stage.style.backgroundSize = `${g}px ${g}px`;
+    stage.style.backgroundPosition = `${view.x}px ${view.y}px`;
 }
 function toWorld(sx, sy) { return { x: (sx - view.x) / view.k, y: (sy - view.y) / view.k }; }
 function centerOn(wx, wy) {
@@ -187,6 +190,7 @@ function renderNodes() {
         el.classList.toggle('long', title.length > 28);
         el.classList.toggle('has-body', !!n.b.trim());
         el.classList.toggle('sel', n.id === selectedId);
+        el.dataset.c = n.c || 0;
         el.style.left = n.x + 'px'; el.style.top = n.y + 'px';
     }
     for (const [id, el] of byId) if (!keep.has(id)) el.remove();
@@ -202,7 +206,8 @@ function renderWires() {
         if (!a || !b) continue;
         const d = `M${a.x},${a.y} L${b.x},${b.y}`;
         const sel = selectedEdge && selectedEdge.a === e.a && selectedEdge.b === e.b;
-        parts.push(`<path class="wire${sel ? ' sel' : ''}" d="${d}"/><path class="wire-hit" data-a="${e.a}" data-b="${e.b}" d="${d}"/>`);
+        const c = a.c || b.c || 0;
+        parts.push(`<path class="wire${sel ? ' sel' : ''}" data-c="${c}" d="${d}"/><path class="wire-hit" data-a="${e.a}" data-b="${e.b}" d="${d}"/>`);
     }
     wires.innerHTML = parts.join('') + '<path id="ghost" class="wire ghost" d=""/>';
     wires.setAttribute('width', '1'); wires.setAttribute('height', '1');
@@ -221,6 +226,7 @@ function select(id) {
     if (!n) { closeSheet(); return; }
     $('f-title').value = n.t; $('f-body').value = n.b;
     $('f-meta').textContent = n.b ? `${n.b.length} תווים` : '';
+    renderSwatches(n.c || 0);
     $('sheet').classList.add('open');
 }
 
@@ -266,7 +272,8 @@ function selectEdge(e) {
 // ---------- creating ----------
 
 function addNodeAt(wx, wy) {
-    const n = { id: uid(), t: '', b: '', x: Math.round(wx), y: Math.round(wy), u: Date.now() };
+    const parent = tree.nodes.find((x) => x.id === selectedId);
+    const n = { id: uid(), t: '', b: '', x: Math.round(wx), y: Math.round(wy), u: Date.now(), c: parent ? (parent.c || 0) : 0 };
     tree.nodes.push(n);
     render(); touch(n);
     select(n.id);
@@ -283,6 +290,20 @@ function connect(a, b) {
     const e = { a, b, u: Date.now() };
     tree.edges.push(e);
     renderWires(); touch();
+}
+
+// Colour is a way of grouping, chosen in the sheet. A bubble created while
+// another is selected inherits its colour, so a cluster colours itself.
+function renderSwatches(cur) {
+    const box = $('f-colors'); if (!box) return;
+    box.innerHTML = [0, 1, 2, 3, 4, 5, 6, 7].map((i) =>
+        `<button type="button" class="swatch${i === cur ? ' on' : ''}" data-c="${i}" onclick="setColor(${i})" aria-label="צבע ${i}"></button>`).join('');
+}
+function setColor(i) {
+    const n = tree.nodes.find((x) => x.id === selectedId);
+    if (!n) return;
+    n.c = i;
+    renderSwatches(i); renderNodes(); renderWires(); touch(n);
 }
 
 // "חבר ל…" from the sheet: the next bubble you tap gets the line.
