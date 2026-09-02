@@ -121,3 +121,12 @@ test('tabs: a bubble keeps its page, a line keeps its kind, and a deleted page f
     const renamed = mergeTrees({ pages: [{ id: 'p1', name: 'ישן', u: 1 }] }, { pages: [{ id: 'p1', name: 'חדש', u: 2 }] });
     assert.equal(renamed.pages[0].name, 'חדש', 'the newer name wins');
 });
+
+test('search: the page has a field and the script searches titles, bodies and transcripts across pages', () => {
+    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    assert.ok(html.includes('id="q"') && html.includes('id="results"'), 'no search field or results list');
+    assert.ok(/function bubbleHaystack[\s\S]*?n\.t[\s\S]*?n\.b[\s\S]*?r\.tx/.test(js), 'search must cover title, body and transcripts');
+    assert.ok(/tree\.nodes\.filter\(matches\)/.test(js), 'search must run over every page, not only the open tab');
+    assert.ok(/\\u0591-\\u05C7/.test(js), 'niqqud must not break a match');
+});

@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/tokens.css?v=488">
+    <link rel="stylesheet" href="/assets/tokens.css?v=489">
     <link rel="manifest" href="manifest.webmanifest">
     <meta name="theme-color" content="#F7F6F3">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -124,6 +124,41 @@
         .bubble:hover .knob, .bubble.sel .knob { opacity: 1; }
         @media (pointer: coarse) { .bubble .knob { opacity: .55; } }
         .bubble.target { border-color: var(--action); box-shadow: 0 0 0 4px color-mix(in srgb, var(--action) 30%, transparent); }
+
+        /* Search: the field lives in the top bar; results drop under it. While a
+           query is typed, everything that does not match fades and the matches
+           stay lit — the world itself is the result list, the dropdown is the index. */
+        #search { position: relative; display: flex; align-items: center; gap: 4px; }
+        #q {
+            width: 220px; min-height: 36px; padding: 0 14px; border-radius: var(--r-pill); border: 1px solid var(--border-strong);
+            background: var(--surface); -webkit-user-select: text; user-select: text;
+        }
+        #q:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+        #btn-search { display: none; }
+        #results {
+            position: absolute; top: 42px; inset-inline-start: 0; width: min(420px, calc(100vw - 24px)); max-height: 60vh; overflow: auto;
+            background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: 0 10px 30px rgba(0,0,0,.15);
+            padding: 6px; z-index: 50;
+        }
+        .hit { display: block; width: 100%; text-align: start; border: 0; background: transparent; padding: 8px 10px; border-radius: var(--r-sm); cursor: pointer; }
+        .hit:hover, .hit.on { background: var(--surface-2); }
+        .hit-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: var(--fs-sm); }
+        .hit-title .swatch { width: 12px; height: 12px; flex: none; pointer-events: none; }
+        .hit-page { color: var(--text-3); font-weight: 500; font-size: var(--fs-xs); margin-inline-start: auto; }
+        .hit-snip { color: var(--text-2); font-size: var(--fs-xs); line-height: 1.45; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .hit mark { background: color-mix(in srgb, var(--c1) 55%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+        .hit-none { padding: 10px; color: var(--text-3); font-size: var(--fs-sm); }
+        .bubble.dim { opacity: .18; }
+        #wires .wire.dim { opacity: .12; }
+        .cluster.dim { opacity: .3; }
+        @media (max-width: 640px) {
+            #q { display: none; width: 100%; }
+            #btn-search { display: inline-flex; }
+            .top.searching #q { display: block; }
+            .top.searching h1, .top.searching .sub, .top.searching #btn-search, .top.searching #btn-theme { display: none; }
+            .top.searching #search { flex: 1; }
+            #results { width: calc(100vw - 20px); inset-inline-start: 0; }
+        }
 
         /* Tabs */
         #tabbar {
@@ -249,6 +284,11 @@
             <div class="sub" id="count">—</div>
         </div>
         <div class="spacer"></div>
+        <div id="search">
+            <input type="search" id="q" placeholder="חיפוש בתובנות…" autocomplete="off" oninput="onSearchInput()" onfocus="onSearchInput()" onkeydown="onSearchKey(event)">
+            <button type="button" class="btn quiet" id="btn-search" onclick="openSearch()" aria-label="חיפוש">🔍</button>
+            <div id="results" hidden></div>
+        </div>
         <span class="sync" id="sync">מקומי</span>
         <button class="btn quiet" id="btn-theme" onclick="toggleTheme()" title="יום / לילה" aria-label="יום או לילה">🌙</button>
     </div>
@@ -310,6 +350,6 @@
 
     <div class="toast" id="toast"></div>
 
-    <script src="thing.js?v=488"></script>
+    <script src="thing.js?v=489"></script>
 </body>
 </html>

@@ -53,6 +53,8 @@ let cloudKey = null;
 let saveTimer = null;
 let cloudTimer = null;
 let offsets = { '': { x: 0, y: 0 } };   // page id → shift applied in "הכל"
+let query = '';                          // what is typed in the search field, normalized
+let hitIndex = -1;
 
 const $ = (id) => document.getElementById(id);
 const stage = $('stage'), world = $('world'), wires = $('wires'), nodesEl = $('nodes');
@@ -366,6 +368,7 @@ function renderNodes() {
         el.classList.toggle('has-rec', !!(n.recs && n.recs.length));
         el.classList.toggle('sel', n.id === selectedId);
         el.dataset.c = n.c || 0;
+        el.classList.toggle('dim', !!query && !matches(n));
         el.title = (LEGEND_BY_C[n.c] || LEGEND[0]).name + (tab === 'all' && n.p ? ' · ' + pageName(n.p) : '');
         const p = pos(n);
         el.style.left = p.x + 'px'; el.style.top = p.y + 'px';
@@ -386,7 +389,7 @@ function renderClusterLabels() {
         const minX = ns.length ? Math.min(...ns.map((n) => n.x)) : 0;
         const minY = ns.length ? Math.min(...ns.map((n) => n.y)) : 0;
         const el = document.createElement('div');
-        el.className = 'cluster';
+        el.className = 'cluster' + (query && !ns.some(matches) ? ' dim' : '');
         el.textContent = g ? pageName(g) : 'כללי';
         el.style.left = (minX + o.x - 120) + 'px'; el.style.top = (minY + o.y - 70) + 'px';
         el.onclick = () => { if (g) setTab(g); };
@@ -403,7 +406,8 @@ function renderWires() {
         const d = `M${pa.x},${pa.y} L${pb.x},${pb.y}`;
         const sel = selectedEdge && selectedEdge.a === e.a && selectedEdge.b === e.b;
         const c = a.c || b.c || 0;
-        parts.push(`<path class="wire${sel ? ' sel' : ''}${e.k === 'x' ? ' cross' : ''}" data-c="${c}" d="${d}"/><path class="wire-hit" data-a="${e.a}" data-b="${e.b}" d="${d}"/>`);
+        const dim = !!query && !matches(a) && !matches(b);
+        parts.push(`<path class="wire${sel ? ' sel' : ''}${e.k === 'x' ? ' cross' : ''}${dim ? ' dim' : ''}" data-c="${c}" d="${d}"/><path class="wire-hit" data-a="${e.a}" data-b="${e.b}" d="${d}"/>`);
     }
     wires.innerHTML = parts.join('') + '<path id="ghost" class="wire ghost" d=""/>';
     wires.setAttribute('width', '1'); wires.setAttribute('height', '1');
@@ -573,6 +577,102 @@ async function autoTitle(nodeId, opts) {
         renderNodes(); renderWires();
     } catch { if (!(opts && opts.quiet)) toast('לא יצאה כותרת'); }
     finally { if (btn) { btn.disabled = false; btn.textContent = '✨'; } }
+}
+
+// ---------- search ----------
+
+// Hebrew as people type it: no niqqud, no punctuation, one kind of quote, one
+// space. A match is a plain substring of that, in the title, the body or any
+// transcript — across every page, whichever tab is open.
+function norm(s) {
+    return String(s || '').toLowerCase()
+        .replace(/[\u0591-\u05C7]/g, '')            // niqqud and cantillation
+        .replace(/[״"“”]/g, '"').replace(/[׳'‘’]/g, "'")
+        .replace(/[^\p{L}\p{N}\s'"]/gu, ' ')
+        .replace(/\s+/g, ' ').trim();
+}
+function bubbleHaystack(n) { return norm([n.t, n.b, ...((n.recs || []).map((r) => r.tx || ''))].join(' \n ')); }
+function matches(n) { return !query || bubbleHaystack(n).includes(query); }
+
+function openSearch() {
+    document.querySelector('.top').classList.add('searching');
+    const q = $('q'); q.hidden = false; q.focus();
+}
+function closeSearch() {
+    query = ''; hitIndex = -1;
+    const q = $('q'); if (q) q.value = '';
+    $('results').hidden = true;
+    document.querySelector('.top').classList.remove('searching');
+    renderNodes(); renderWires();
+}
+
+function onSearchInput() {
+    query = norm($('q').value);
+    hitIndex = -1;
+    renderNodes(); renderWires();
+    const box = $('results');
+    if (!query) { box.hidden = true; return; }
+    const hits = tree.nodes.filter(matches).slice(0, 40);
+    box.hidden = false;
+    box.innerHTML = hits.length ? hits.map((n, i) => `
+        <button type="button" class="hit" data-id="${n.id}" onclick="goTo('${n.id}')">
+            <div class="hit-title"><span class="swatch" data-c="${n.c || 0}"></span>${hl(n.t.trim() || 'ללא כותרת')}<span class="hit-page">${escapeHtml(n.p ? pageName(n.p) : 'כללי')}</span></div>
+            ${snippet(n)}
+        </button>`).join('') : '<div class="hit-none">אין תובנה עם המילים האלה</div>';
+}
+
+// The matched words lit inside the text, on the raw text (not the normalized
+// one), so what is shown is what was written.
+function hl(text) {
+    const t = String(text || '');
+    if (!query) return escapeHtml(t);
+    const words = query.split(' ').filter((w) => w.length > 1);
+    let out = escapeHtml(t);
+    for (const w of words) {
+        const re = new RegExp('(' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+        out = out.replace(re, '<mark>$1</mark>');
+    }
+    return out;
+}
+function snippet(n) {
+    const src = [n.b, ...((n.recs || []).map((r) => r.tx || ''))].join(' ');
+    if (!src.trim()) return '';
+    const low = norm(src);
+    const at = low.indexOf(query.split(' ')[0] || '');
+    const start = Math.max(0, at - 40);
+    const piece = (start > 0 ? '…' : '') + src.slice(start, start + 140) + (start + 140 < src.length ? '…' : '');
+    return `<div class="hit-snip">${hl(piece)}</div>`;
+}
+
+function onSearchKey(ev) {
+    const hits = [...document.querySelectorAll('#results .hit')];
+    if (ev.key === 'Escape') { closeSearch(); $('q').blur(); return; }
+    if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        if (!hits.length) return;
+        hitIndex = (hitIndex + (ev.key === 'ArrowDown' ? 1 : -1) + hits.length) % hits.length;
+        hits.forEach((h, i) => h.classList.toggle('on', i === hitIndex));
+        hits[hitIndex].scrollIntoView({ block: 'nearest' });
+    }
+    if (ev.key === 'Enter') {
+        ev.preventDefault();
+        const h = hits[hitIndex >= 0 ? hitIndex : 0];
+        if (h) goTo(h.dataset.id);
+    }
+}
+
+// Jump to a bubble: its page's tab if we are inside another page, then the
+// bubble centred on screen and open. The search stays lit so the next result
+// is one tap away.
+function goTo(id) {
+    const n = tree.nodes.find((x) => x.id === id); if (!n) return;
+    if (tab !== 'all' && n.p !== tab) setTab(n.p || 'all');
+    computeOffsets();
+    const p = pos(n);
+    if (view.k < 0.6) view.k = 1;
+    centerOn(p.x, p.y);
+    select(id);
+    $('results').hidden = true;
 }
 
 // ---------- theme ----------
@@ -814,7 +914,7 @@ function onUp(ev) {
             const now = Date.now();
             if (now - lastTap < 350) { const w = toWorld(ev.clientX, ev.clientY); addNodeAt(w.x, w.y); lastTap = 0; return; }
             lastTap = now;
-            linkFrom = null; closeSheet();
+            linkFrom = null; closeSheet(); $('results').hidden = true;
         }
     } else if (g.type === 'node') {
         g.el.classList.remove('drag');
