@@ -63,13 +63,13 @@
 /assistant.js
   Cache-Control: no-cache
 
-/mind/
+/thing/
   Cache-Control: no-cache
 
-/mind/index.html
+/thing/index.html
   Cache-Control: no-cache
 
-/mind/mind.js
+/thing/thing.js
   Cache-Control: no-cache
 
 /checkups/

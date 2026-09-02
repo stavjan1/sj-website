@@ -4,23 +4,25 @@
 // out in the world the boxes show only their titles, as bubbles sized to the
 // title; stretch lines between insights and delete them; walk around.
 //
+// And no login. The address is the key: /thing/#k=<long random key>. The
+// first visit keeps the key on the device, so the plain /thing/ opens it from
+// then on; a device that has never seen the key sees an empty, local-only
+// tree and says so. Nothing is ever deleted by a failed sync — the tree is in
+// localStorage first, and the server merges bubble by bubble (see
+// functions/api/thing.js).
+//
 // Everything lives in world units. The screen shows the world through one
 // transform (pan + zoom) applied to #world. Pointer events do all the input,
 // so a finger and a mouse are the same thing here.
-//
-// Local first: the tree is always in localStorage. Signed in as the admin it
-// also syncs to /api/mind, whole document, newest wins — see mind.js's server.
 
-const STORAGE_KEY = 'sj_mind_v1';
-const TOKEN_KEY = 'sj_mind_token';
-const CLIENT_ID = '4351198135-oltod8jremuq7pgn2e5bad4ahkupufkp.apps.googleusercontent.com';
+const STORAGE_KEY = 'sj_thing_v1';
+const KEY_KEY = 'sj_thing_key';
 
-let tree = { nodes: [], edges: [], updatedAt: 0 };
+let tree = { nodes: [], edges: [], del: [], updatedAt: 0 };
 let view = { x: 0, y: 0, k: 1 };
 let selectedId = null;
 let selectedEdge = null;
-let authToken = null;
-let authEmail = null;
+let cloudKey = null;
 let saveTimer = null;
 let cloudTimer = null;
 
@@ -33,16 +35,24 @@ init();
 
 function init() {
     tree = normalize(safeParse(localStorage.getItem(STORAGE_KEY)));
-    const saved = safeParse(localStorage.getItem(TOKEN_KEY));
-    if (saved && saved.token && saved.exp > Date.now()) { authToken = saved.token; authEmail = saved.email; }
-    renderAuth();
+    cloudKey = keyFromAddress() || localStorage.getItem(KEY_KEY) || null;
+    if (cloudKey) localStorage.setItem(KEY_KEY, cloudKey);
     const v = safeParse(localStorage.getItem(STORAGE_KEY + ':view'));
     if (v && Number.isFinite(v.k) && v.k > 0) view = v;
     else centerOn(0, 0);
     render();
     if (!tree.nodes.length) fitAll();
-    if (authToken) cloudLoad();
+    setSync(cloudKey ? 'מתחבר…' : 'מקומי בלבד', false);
+    if (cloudKey) cloudLoad();
     bindStage();
+    // Sync again whenever the page comes back into view — the phone in the
+    // pocket, the tab left open on the desk.
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && cloudKey) cloudLoad(); });
+}
+
+function keyFromAddress() {
+    const m = (location.hash || '').match(/[#&]k=([A-Za-z0-9_-]{32,64})/);
+    return m ? m[1] : null;
 }
 
 function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
@@ -50,22 +60,26 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 function normalize(t) {
     const n = t && typeof t === 'object' ? t : {};
     const nodes = (Array.isArray(n.nodes) ? n.nodes : []).filter((x) => x && x.id).map((x) => ({
-        id: String(x.id), t: String(x.t || ''), b: String(x.b || ''), x: Number(x.x) || 0, y: Number(x.y) || 0,
+        id: String(x.id), t: String(x.t || ''), b: String(x.b || ''), x: Number(x.x) || 0, y: Number(x.y) || 0, u: Number(x.u) || 0,
     }));
     const ids = new Set(nodes.map((x) => x.id));
-    const edges = (Array.isArray(n.edges) ? n.edges : []).filter((e) => e && ids.has(e.a) && ids.has(e.b) && e.a !== e.b);
-    return { nodes, edges, updatedAt: Number(n.updatedAt) || 0 };
+    const edges = (Array.isArray(n.edges) ? n.edges : []).filter((e) => e && ids.has(e.a) && ids.has(e.b) && e.a !== e.b)
+        .map((e) => ({ a: e.a, b: e.b, u: Number(e.u) || 0 }));
+    const del = (Array.isArray(n.del) ? n.del : []).filter((d) => d && d.id).map((d) => ({ id: String(d.id), at: Number(d.at) || 0 }));
+    return { nodes, edges, del, updatedAt: Number(n.updatedAt) || 0 };
 }
 
 // ---------- persistence ----------
 
-function touch() {
-    tree.updatedAt = Date.now();
+function touch(changed) {
+    const now = Date.now();
+    if (changed) changed.u = now;
+    tree.updatedAt = now;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(tree)), 150);
     clearTimeout(cloudTimer);
     cloudTimer = setTimeout(cloudSave, 1200);
-    setSync(authToken ? 'שומר…' : 'מקומי', false);
+    setSync(cloudKey ? 'שומר…' : 'מקומי בלבד', false);
 }
 
 function saveView() {
@@ -77,74 +91,42 @@ function setSync(text, ok) {
     el.textContent = text; el.classList.toggle('on', !!ok);
 }
 
+// Whatever comes back from the server is the merged truth: it already holds
+// everything this device sent plus everything the other one did.
+function adopt(merged) {
+    if (!merged) return;
+    tree = normalize(merged);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tree));
+    render();
+    if (selectedId && !tree.nodes.some((n) => n.id === selectedId)) closeSheet();
+}
+
 async function cloudLoad() {
-    if (!authToken) return;
+    if (!cloudKey) return;
     try {
-        const res = await fetch('/api/mind', { headers: { Authorization: 'Bearer ' + authToken } });
-        if (res.status === 401) { logoutLocal(); return; }
-        if (res.status === 403) { setSync('לא הבעלים', false); return; }
+        const res = await fetch('/api/thing?k=' + encodeURIComponent(cloudKey));
+        if (res.status === 404) { setSync('כתובת לא מוכרת', false); return; }
         const body = await res.json();
-        const cloud = body && body.tree ? normalize(body.tree) : null;
-        if (cloud && cloud.updatedAt > (tree.updatedAt || 0)) {
-            tree = cloud;
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(tree));
-            render();
-            setSync('מסונכרן', true);
-        } else if (tree.updatedAt > (cloud ? cloud.updatedAt : 0)) {
-            cloudSave();
-        } else {
-            setSync('מסונכרן', true);
-        }
+        if (!res.ok) { setSync('לא מקוון', false); return; }
+        // The server's copy and ours may each hold something the other lacks;
+        // a PUT merges them and returns the union. Sending is how we read.
+        if (tree.nodes.length || tree.del.length || (body.tree && body.tree.nodes && body.tree.nodes.length)) await cloudSave();
+        else setSync('מסונכרן', true);
     } catch { setSync('לא מקוון', false); }
 }
 
 async function cloudSave() {
-    if (!authToken) return;
+    if (!cloudKey) return;
     try {
-        const res = await fetch('/api/mind', {
-            method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + authToken },
+        const res = await fetch('/api/thing?k=' + encodeURIComponent(cloudKey), {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tree }),
         });
-        if (res.status === 401) { logoutLocal(); return; }
         const body = await res.json();
         if (!res.ok) { setSync('לא נשמר', false); toast((body.error && body.error.message) || 'לא נשמר'); return; }
+        adopt(body.tree);
         setSync('מסונכרן', true);
     } catch { setSync('לא מקוון', false); }
-}
-
-// ---------- Google sign-in (identity only) ----------
-
-function loginGoogle() {
-    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) { toast('Google עדיין נטען · נסה שוב עוד רגע'); return; }
-    const tc = google.accounts.oauth2.initTokenClient({
-        client_id: CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/userinfo.email',
-        callback: async (resp) => {
-            if (!resp || !resp.access_token) return;
-            authToken = resp.access_token;
-            try {
-                const info = await (await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + authToken } })).json();
-                authEmail = info.email || null;
-            } catch { authEmail = null; }
-            localStorage.setItem(TOKEN_KEY, JSON.stringify({ token: authToken, email: authEmail, exp: Date.now() + (parseInt(resp.expires_in, 10) || 3600) * 1000 }));
-            renderAuth();
-            cloudLoad();
-        },
-    });
-    tc.requestAccessToken({ prompt: '' });
-}
-
-function logoutLocal() {
-    authToken = null; authEmail = null;
-    localStorage.removeItem(TOKEN_KEY);
-    renderAuth();
-    setSync('מקומי', false);
-}
-
-function renderAuth() {
-    $('btn-login').hidden = !!authToken;
-    $('btn-logout').hidden = !authToken;
-    if (authToken) setSync('מתחבר…', false);
 }
 
 // ---------- view (pan / zoom) ----------
@@ -210,13 +192,6 @@ function renderNodes() {
     for (const [id, el] of byId) if (!keep.has(id)) el.remove();
 }
 
-function nodeRect(id) {
-    const el = nodesEl.querySelector(`[data-id="${CSS.escape(id)}"]`);
-    const n = tree.nodes.find((x) => x.id === id);
-    if (!el || !n) return null;
-    return { x: n.x, y: n.y, w: el.offsetWidth, h: el.offsetHeight };
-}
-
 // A line runs centre to centre and the bubbles simply sit on top of it; the
 // stroke under a bubble is hidden by the bubble. Simpler than clipping, and
 // what a pen would do.
@@ -230,7 +205,6 @@ function renderWires() {
         parts.push(`<path class="wire${sel ? ' sel' : ''}" d="${d}"/><path class="wire-hit" data-a="${e.a}" data-b="${e.b}" d="${d}"/>`);
     }
     wires.innerHTML = parts.join('') + '<path id="ghost" class="wire ghost" d=""/>';
-    // The SVG only needs to exist; paths draw wherever they like (overflow visible).
     wires.setAttribute('width', '1'); wires.setAttribute('height', '1');
     wires.querySelectorAll('.wire-hit').forEach((p) => p.addEventListener('pointerdown', (ev) => {
         ev.stopPropagation();
@@ -261,13 +235,16 @@ function onFieldInput() {
     if (!n) return;
     n.t = $('f-title').value; n.b = $('f-body').value;
     $('f-meta').textContent = n.b ? `${n.b.length} תווים` : '';
-    renderNodes(); renderWires(); touch();
+    renderNodes(); renderWires(); touch(n);
 }
 
 function deleteSelected() {
     if (!selectedId) return;
     const n = tree.nodes.find((x) => x.id === selectedId);
     if (!confirm(`למחוק את "${(n && n.t) || 'ללא כותרת'}"? הקווים שלה יימחקו איתה.`)) return;
+    const now = Date.now();
+    tree.del.push({ id: selectedId, at: now });
+    for (const e of tree.edges) if (e.a === selectedId || e.b === selectedId) tree.del.push({ id: [e.a, e.b].sort().join('|'), at: now });
     tree.nodes = tree.nodes.filter((x) => x.id !== selectedId);
     tree.edges = tree.edges.filter((e) => e.a !== selectedId && e.b !== selectedId);
     closeSheet(); render(); touch();
@@ -279,6 +256,7 @@ function selectEdge(e) {
     renderNodes(); renderWires();
     const a = tree.nodes.find((n) => n.id === e.a), b = tree.nodes.find((n) => n.id === e.b);
     if (confirm(`למחוק את הקו בין "${a ? a.t : ''}" ל-"${b ? b.t : ''}"?`)) {
+        tree.del.push({ id: [e.a, e.b].sort().join('|'), at: Date.now() });
         tree.edges = tree.edges.filter((x) => !(x.a === e.a && x.b === e.b));
         touch();
     }
@@ -288,22 +266,22 @@ function selectEdge(e) {
 // ---------- creating ----------
 
 function addNodeAt(wx, wy) {
-    const n = { id: uid(), t: '', b: '', x: Math.round(wx), y: Math.round(wy) };
+    const n = { id: uid(), t: '', b: '', x: Math.round(wx), y: Math.round(wy), u: Date.now() };
     tree.nodes.push(n);
-    render(); touch();
+    render(); touch(n);
     select(n.id);
     setTimeout(() => $('f-title').focus(), 50);
 }
 function addNodeAtCenter() {
     const c = toWorld(stage.clientWidth / 2, stage.clientHeight / 2 - 40);
-    // Nudge so a second "+" does not land exactly on the first.
     addNodeAt(c.x + (Math.random() - 0.5) * 60, c.y + (Math.random() - 0.5) * 60);
 }
 
 function connect(a, b) {
     if (!a || !b || a === b) return;
     if (tree.edges.some((e) => (e.a === a && e.b === b) || (e.a === b && e.b === a))) { toast('כבר מחובר'); return; }
-    tree.edges.push({ a, b });
+    const e = { a, b, u: Date.now() };
+    tree.edges.push(e);
     renderWires(); touch();
 }
 
@@ -325,7 +303,7 @@ let lastTap = 0;
 
 function bindStage() {
     stage.addEventListener('pointerdown', (ev) => {
-        if (ev.target.closest('.bubble')) return;   // handled by the bubble
+        if (ev.target.closest('.bubble')) return;
         pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
         if (pointers.size === 2) { gesture = pinchStart(); return; }
         stage.setPointerCapture(ev.pointerId);
@@ -409,8 +387,6 @@ function onUp(ev) {
     if (g.type === 'pan') {
         saveView();
         if (!g.moved) {
-            // A tap on empty ground: closes whatever is open, and a quick second
-            // tap (a finger's double-click) plants a bubble.
             const now = Date.now();
             if (now - lastTap < 350) { const w = toWorld(ev.clientX, ev.clientY); addNodeAt(w.x, w.y); lastTap = 0; return; }
             lastTap = now;
@@ -418,7 +394,7 @@ function onUp(ev) {
         }
     } else if (g.type === 'node') {
         g.el.classList.remove('drag');
-        if (g.moved) { touch(); return; }
+        if (g.moved) { touch(tree.nodes.find((x) => x.id === g.id)); return; }
         if (linkFrom) { connect(linkFrom, g.id); linkFrom = null; return; }
         select(g.id);
     } else if (g.type === 'link') {
@@ -430,7 +406,7 @@ function onUp(ev) {
 
 function pinchStart() {
     const [a, b] = [...pointers.values()];
-    return { type: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y), k0: view.k, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, w: toWorld((a.x + b.x) / 2, (a.y + b.y) / 2) };
+    return { type: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y), k0: view.k, w: toWorld((a.x + b.x) / 2, (a.y + b.y) / 2) };
 }
 function pinchMove() {
     if (pointers.size < 2) return;
