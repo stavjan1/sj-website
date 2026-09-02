@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
-import { cleanTree, mergeTrees, validKey, keyHash, fallbackTitle } from '../functions/api/thing.js';
+import { cleanTree, mergeTrees, validKey, keyHash, fallbackTitle, plausibleTitle } from '../functions/api/thing.js';
 
 test('only a long random key is a key', () => {
     assert.ok(validKey('a'.repeat(32)));
@@ -154,4 +154,10 @@ test('the home-screen icon carries the address: the manifest answers with the ke
     assert.equal(bad.start_url, '/thing/', 'a malformed key is dropped, not echoed');
     const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
     assert.ok(/manifest\.webmanifest\?k=/.test(js), 'the page must point its manifest at the keyed one');
+});
+
+test('a fragment is not a title: "הצ" falls through to the next engine', () => {
+    assert.ok(!plausibleTitle('הצ'));
+    assert.ok(!plausibleTitle('הצגה'), 'one word is still not the three-to-six the prompt asks for');
+    assert.ok(plausibleTitle('הצגה עצמית דרך שיחה'));
 });

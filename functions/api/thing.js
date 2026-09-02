@@ -192,8 +192,16 @@ export function fallbackTitle(text) {
   return words.slice(0, 6).join(' ').replace(/[.,;:!?]+$/, '').slice(0, 60);
 }
 
-function cleanTitle(t) {
+export function cleanTitle(t) {
   return String(t || '').split('\n')[0].replace(/^["'״׳\s]+|["'״׳\s.]+$/g, '').replace(/\s+/g, ' ').slice(0, 80);
+}
+
+// "הצ" is not a title. A model cut off mid-word hands back a fragment that
+// passes every string check; the only tell is that it is too short to be a
+// title of three to six words. Below this, fall through to the next engine.
+export function plausibleTitle(t) {
+  const s = String(t || '').trim();
+  return s.length >= 6 && /\s/.test(s);
 }
 
 export async function suggestTitle(env, text) {
@@ -206,13 +214,15 @@ export async function suggestTitle(env, text) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: TITLE_PROMPT + '\n\n' + body }] }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 40 },
+          // Gemini 2.5 spends "thinking" tokens out of the same budget as the answer;
+          // with a 40-token cap the thought ate the title and two letters came back.
+          generationConfig: { temperature: 0.2, maxOutputTokens: 96, thinkingConfig: { thinkingBudget: 0 } },
         }),
       });
       if (res.ok) {
         const data = await res.json();
         const t = cleanTitle(((data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || []).map((p) => p.text || '').join(''));
-        if (t) return t;
+        if (plausibleTitle(t)) return t;
       }
     } catch { /* next engine */ }
   }
@@ -222,7 +232,7 @@ export async function suggestTitle(env, text) {
         messages: [{ role: 'system', content: TITLE_PROMPT }, { role: 'user', content: body }], max_tokens: 40, temperature: 0.2,
       });
       const t = cleanTitle(out && (out.response || (out.result && out.result.response)));
-      if (t) return t;
+      if (plausibleTitle(t)) return t;
     } catch { /* fall through */ }
   }
   return fallbackTitle(body);
