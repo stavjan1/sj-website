@@ -18,6 +18,7 @@
 const STORAGE_KEY = 'sj_thing_v1';
 const KEY_KEY = 'sj_thing_key';
 const THEME_KEY = 'sj_thing_theme';
+const DB_NAME = 'sj_thing', DB_STORE = 'pending';
 
 let tree = { nodes: [], edges: [], del: [], updatedAt: 0 };
 let view = { x: 0, y: 0, k: 1 };
@@ -47,6 +48,10 @@ function init() {
     setSync(cloudKey ? 'מתחבר…' : 'מקומי בלבד', false);
     if (cloudKey) cloudLoad();
     bindStage();
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/thing/sw.js').catch(() => {});
+    // Signal returns: push what waited — tree edits first, then the notes.
+    window.addEventListener('online', () => { if (cloudKey) { cloudSave().then(flushPending); } });
+    if (navigator.onLine && cloudKey) setTimeout(flushPending, 2500);
     // Sync again whenever the page comes back into view — the phone in the
     // pocket, the tab left open on the desk.
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && cloudKey) cloudLoad(); });
@@ -467,7 +472,13 @@ function fmtDur(sec) { const m = Math.floor(sec / 60), s = sec % 60; return m + 
 function renderRecs(n) {
     const box = $('f-recs'); if (!box) return;
     const recs = (n && n.recs) || [];
-    box.innerHTML = recs.map((r) => `
+    const waiting = n ? pendingCache.filter((p) => p.nodeId === n.id) : [];
+    const pendingHtml = waiting.map((p) => `
+        <div class="rec pending">
+            <audio controls preload="none" src="${URL.createObjectURL(p.blob)}"></audio>
+            <div class="rec-meta">${fmtDur(p.dur || 0)} · ממתין לקליטה — יעלה ויתומלל לבד</div>
+        </div>`).join('');
+    box.innerHTML = pendingHtml + recs.map((r) => `
         <div class="rec" data-id="${r.id}">
             <audio controls preload="none" src="${recUrl(r.id)}"></audio>
             <div class="rec-meta">${fmtDur(r.d || 0)} · ${Math.round((r.n || 0) / 1024)}KB
@@ -505,7 +516,51 @@ async function toggleRecord() {
     recTimer = setInterval(() => { const b = $('btn-rec'); if (b) b.textContent = '■ עצור ' + fmtDur(Math.round((Date.now() - recStart) / 1000)); }, 1000);
 }
 
-async function uploadRec(nodeId, blob, dur) {
+// ---------- the queue for notes recorded without signal ----------
+
+function idb() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(DB_STORE, { keyPath: 'id' });
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+async function idbAll() {
+    try { const db = await idb(); return await new Promise((res, rej) => { const r = db.transaction(DB_STORE).objectStore(DB_STORE).getAll(); r.onsuccess = () => res(r.result || []); r.onerror = () => rej(r.error); }); }
+    catch { return []; }
+}
+async function idbPut(item) { const db = await idb(); await new Promise((res, rej) => { const t = db.transaction(DB_STORE, 'readwrite'); t.objectStore(DB_STORE).put(item); t.oncomplete = res; t.onerror = () => rej(t.error); }); }
+async function idbDel(id) { const db = await idb(); await new Promise((res, rej) => { const t = db.transaction(DB_STORE, 'readwrite'); t.objectStore(DB_STORE).delete(id); t.oncomplete = res; t.onerror = () => rej(t.error); }); }
+
+let pendingCache = [];
+async function refreshPending() { pendingCache = await idbAll(); }
+
+let flushing = false;
+async function flushPending() {
+    if (flushing || !cloudKey || !navigator.onLine) return;
+    flushing = true;
+    try {
+        const items = await idbAll();
+        for (const it of items) {
+            const ok = await uploadRec(it.nodeId, it.blob, it.dur, { fromQueue: true });
+            if (ok) await idbDel(it.id); else break;   // still no real signal — try again on the next 'online'
+        }
+    } finally { flushing = false; await refreshPending(); if (selectedId) renderRecs(tree.nodes.find((x) => x.id === selectedId)); }
+}
+
+async function uploadRec(nodeId, blob, dur, opts) {
+    // No signal: the note waits in the phone, plays from there, and goes up
+    // (and gets its transcript) when the signal is back.
+    if (!navigator.onLine) {
+        if (!(opts && opts.fromQueue)) {
+            await idbPut({ id: uid(), nodeId, blob, dur, at: Date.now() });
+            await refreshPending();
+            if (selectedId === nodeId) renderRecs(tree.nodes.find((x) => x.id === nodeId));
+            toast('אין קליטה — ההקלטה שמורה בטלפון ותעלה כשתחזור');
+        }
+        return false;
+    }
     // The bubble must already be in the cloud before a note can hang on it.
     await cloudSave();
     setSync('מעלה הקלטה…', false);
@@ -514,7 +569,7 @@ async function uploadRec(nodeId, blob, dur) {
             method: 'POST', headers: { 'Content-Type': blob.type || 'audio/webm' }, body: blob,
         });
         const body = await res.json();
-        if (!res.ok) { setSync('לא נשמר', false); toast((body.error && body.error.message) || 'ההקלטה לא נשמרה'); return; }
+        if (!res.ok) { setSync('לא נשמר', false); toast((body.error && body.error.message) || 'ההקלטה לא נשמרה'); return false; }
         const n = tree.nodes.find((x) => x.id === nodeId);
         if (n) { n.recs = [...(n.recs || []), body.rec]; n.u = Date.now(); localStorage.setItem(STORAGE_KEY, JSON.stringify(tree)); }
         if (selectedId === nodeId) renderRecs(n);
@@ -522,7 +577,13 @@ async function uploadRec(nodeId, blob, dur) {
         setSync('מסונכרן', true);
         toast(body.rec.tx ? 'נשמר ותומלל' : 'נשמר (בלי תמלול)');
         if (n && !n.t.trim() && body.rec.tx) autoTitle(nodeId, { quiet: true });
-    } catch { setSync('לא מקוון', false); toast('ההקלטה לא הועלתה'); }
+        return true;
+    } catch {
+        // The radio said "online" and lied. Keep the note, try again later.
+        if (!(opts && opts.fromQueue)) { await idbPut({ id: uid(), nodeId, blob, dur, at: Date.now() }); await refreshPending(); if (selectedId === nodeId) renderRecs(tree.nodes.find((x) => x.id === nodeId)); }
+        setSync('לא מקוון', false); toast('אין קליטה — ההקלטה שמורה בטלפון ותעלה כשתחזור');
+        return false;
+    }
 }
 
 async function deleteRec(id) {

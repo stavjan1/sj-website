@@ -8,7 +8,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/tokens.css?v=486">
+    <link rel="stylesheet" href="/assets/tokens.css?v=487">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#F7F6F3">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="תובנות">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='%236ABF3C'/%3E%3C/svg%3E">
     <style>
         /* A notebook you walk around in. Nothing here competes with the
@@ -175,6 +179,8 @@
         .rec-meta .btn { margin-inline-start: auto; }
         .rec-tx { margin-top: 6px; font-size: var(--fs-sm); line-height: 1.5; white-space: pre-wrap; -webkit-user-select: text; user-select: text; }
         .rec-tx.muted { color: var(--text-3); font-style: normal; }
+        .rec.pending { border-style: dashed; }
+        .rec.pending .rec-meta { color: var(--warn-text); }
         .bubble.has-rec::before {
             content: ''; position: absolute; inset-inline-end: 6px; bottom: 6px; width: 6px; height: 6px;
             border-radius: 50%; background: var(--danger); opacity: .8;
@@ -237,6 +243,6 @@
 
     <div class="toast" id="toast"></div>
 
-    <script src="thing.js?v=486"></script>
+    <script src="thing.js?v=487"></script>
 </body>
 </html>

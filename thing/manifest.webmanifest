@@ -1,0 +1,14 @@
+{
+  "name": "עץ התובנות",
+  "short_name": "תובנות",
+  "start_url": "/thing/",
+  "scope": "/thing/",
+  "display": "standalone",
+  "dir": "rtl",
+  "lang": "he",
+  "background_color": "#F7F6F3",
+  "theme_color": "#F7F6F3",
+  "icons": [
+    { "src": "/thing/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

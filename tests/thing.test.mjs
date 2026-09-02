@@ -87,3 +87,16 @@ test('with no engine at hand, the first words become the title, never a blank', 
     assert.equal(fallbackTitle('דקל הוא מחירון מכרז, לא שוק פרטי. ההוכחה: שיפוצים גבוה מבנייה ב-5% בלבד.'), 'דקל הוא מחירון מכרז, לא שוק');
     assert.equal(fallbackTitle('   '), '');
 });
+
+test('the tree opens without a signal: a worker caches its shell, never the API, and the CSP lets a local note play', () => {
+    const sw = readFileSync(new URL('../thing/sw.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    const headers = readFileSync(new URL('../_headers', import.meta.url), 'utf8');
+    for (const f of ['/thing/', '/thing/index.html', '/thing/thing.js', '/assets/tokens.css']) assert.ok(sw.includes(`'${f}'`), `${f} missing from the offline shell`);
+    assert.ok(/pathname\.startsWith\('\/api\/'\)\) return/.test(sw), 'the API must never be served from cache');
+    assert.ok(/cache: 'reload'/.test(sw), 'a deploy must reach the phone on the next open');
+    assert.ok(js.includes("serviceWorker.register('/thing/sw.js')"), 'the worker is never registered');
+    assert.ok(html.includes('rel="manifest"') && existsSync(new URL('../thing/manifest.webmanifest', import.meta.url)), 'no manifest — no icon on the phone');
+    assert.match(headers, /media-src 'self' blob:/, 'a note that only exists on the phone cannot play');
+});
