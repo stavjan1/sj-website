@@ -16,7 +16,7 @@
     <!-- FontAwesome, SELF-HOSTED: app.js templates render fa-* icons, and the
          CDN copy proved unreliable on real devices (glyphs loading empty). The
          css + woff2 live in vendor/ so icons work offline and forever. -->
-    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=483">
+    <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=484">
 
     <!-- html2pdf.js for high-quality client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -26,15 +26,15 @@
     <script src="https://apis.google.com/js/api.js" async defer></script>
 
     <!-- V3 styling: shared tokens + primitives, then the app layers -->
-    <link rel="stylesheet" href="../assets/tokens.css?v=483">
-    <link rel="stylesheet" href="../assets/ui.css?v=483">
-    <link rel="stylesheet" href="css/shell.css?v=483">
-    <link rel="stylesheet" href="css/panels.css?v=483">
-    <link rel="stylesheet" href="controlroom.css?v=483">
-    <link rel="stylesheet" href="periodic.css?v=483">
-    <link rel="stylesheet" href="nextstep.css?v=483">
-    <link rel="stylesheet" href="css/pdf.css?v=483">
-    <link rel="stylesheet" href="css/quote-templates.css?v=483">
+    <link rel="stylesheet" href="../assets/tokens.css?v=484">
+    <link rel="stylesheet" href="../assets/ui.css?v=484">
+    <link rel="stylesheet" href="css/shell.css?v=484">
+    <link rel="stylesheet" href="css/panels.css?v=484">
+    <link rel="stylesheet" href="controlroom.css?v=484">
+    <link rel="stylesheet" href="periodic.css?v=484">
+    <link rel="stylesheet" href="nextstep.css?v=484">
+    <link rel="stylesheet" href="css/pdf.css?v=484">
+    <link rel="stylesheet" href="css/quote-templates.css?v=484">
 
     <!-- PWA: installable to the home screen ("זרם"), full-screen, offline shell -->
     <link rel="manifest" href="manifest.webmanifest">
@@ -2926,30 +2926,30 @@
     <div class="reminder-pop" id="reminder-pop" role="dialog" aria-label="תזכורות לקוחות" hidden></div>
 
     <!-- Application Script -->
-    <script src="/assets/checkups-core.js?v=483"></script>
-    <script src="/assets/listcards.js?v=483"></script>
+    <script src="/assets/checkups-core.js?v=484"></script>
+    <script src="/assets/listcards.js?v=484"></script>
     <!-- Coverage checklists load first: app.js reads COVERAGE_CHECKLISTS at call time,
          but keeping it a separate file makes the product's core data reviewable
          and editable without touching the application code. -->
-    <script src="coverage.js?v=483"></script>
-    <script src="app.js?v=483"></script>
+    <script src="coverage.js?v=484"></script>
+    <script src="app.js?v=484"></script>
     <!-- app.js was 18,760 lines — a quarter of the repo in one file, and the
          file every parallel session collided in. These five are lifts out of
          it, byte for byte, and they load AFTER it because that is where the
          state they read is declared. -->
-    <script src="chat.js?v=483"></script>
-    <script src="checkups.js?v=483"></script>
-    <script src="market.js?v=483"></script>
-    <script src="reports.js?v=483"></script>
-    <script src="admin.js?v=483"></script>
-    <script src="helper.js?v=483"></script>
+    <script src="chat.js?v=484"></script>
+    <script src="checkups.js?v=484"></script>
+    <script src="market.js?v=484"></script>
+    <script src="reports.js?v=484"></script>
+    <script src="admin.js?v=484"></script>
+    <script src="helper.js?v=484"></script>
     <!-- Finance dashboard (admin) + Telegram report import — separate module -->
-    <script src="finance.js?v=483"></script>
+    <script src="finance.js?v=484"></script>
     <!-- The guide that points at the screen (first-run tour + milestone hints) -->
-    <script src="coach.js?v=483"></script>
-    <script src="nextstep.js?v=483"></script>
+    <script src="coach.js?v=484"></script>
+    <script src="nextstep.js?v=484"></script>
     <!-- In-app helper assistant (teaches how to operate the tool) -->
     <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
-    <script src="/track.js?v=483" defer></script>
+    <script src="/track.js?v=484" defer></script>
 </body>
 </html>
