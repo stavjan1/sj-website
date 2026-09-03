@@ -11,11 +11,11 @@
 import {
   ADMIN_EMAIL, adminGate, jsonResponse, getTierForEmail,
 } from './_tiers.js';
+import { safeParse } from './_http.js';
 import { sendMailTracked } from './_mail.js';
 
 const USER_PREFIX = 'user:';
 
-function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
 function projectAmount(p) {
   const qd = (p && p.quoteData) || {};
   return Number(qd.finalPrice || qd.total || 0) || 0;

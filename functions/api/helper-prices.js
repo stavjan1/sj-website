@@ -26,8 +26,9 @@
 //   PUT  /api/helper-prices            (admin)   { email, on }
 
 import {
-  ADMIN_EMAIL, adminGate, verifyGoogleEmail, bearerToken, jsonResponse, rateLimit,
+  ADMIN_EMAIL, adminGate, requireUser, jsonResponse, rateLimit,
 } from './_tiers.js';
+import { MSG, safeParse } from './_http.js';
 import { SJ_ITEMS, SJ_GROUPS } from './_sj_catalog.js';
 
 const HELPER_PREFIX = 'helper:';
@@ -56,8 +57,6 @@ export const SEED_ITEMS = [
   { id: 'hour-certified',   name: 'שעת עבודה חשמלאי מוסמך',                unit: 'שעה' },
   { id: 'hour-assistant',   name: 'שעת עבודה עוזר',                        unit: 'שעה' },
 ];
-
-function safeParse(s, fallback) { try { return JSON.parse(s); } catch { return fallback; } }
 
 // Turn a free-text item name into a stable id: lowercase, spaces → dashes,
 // Hebrew kept as-is (KV keys are UTF-8), everything else dropped.
@@ -107,11 +106,10 @@ async function isHelper(env, email) {
 // Same two answers as adminGate, for the same reason: 401 is "sign in again"
 // and the client fixes it silently; 403 is "not you".
 async function helperGate(request, env) {
-  const email = await verifyGoogleEmail(bearerToken(request));
-  const deny = (status, body) => ({ ok: false, status, body, response: jsonResponse(body, status) });
-  if (!email) return deny(401, { error: { message: 'ההתחברות פגה, התחבר שוב לגוגל.', code: 'auth-expired' } });
-  if (!(await isHelper(env, email))) return deny(403, { error: { message: 'המסך הזה פתוח רק לעוזרים.' } });
-  return { ok: true, email: email.toLowerCase() };
+  const who = await requireUser(request, { error: { message: MSG.AUTH_EXPIRED, code: 'auth-expired' } });
+  if (who instanceof Response) return { ok: false, response: who };
+  if (!(await isHelper(env, who.email))) return { ok: false, response: jsonResponse({ error: { message: 'המסך הזה פתוח רק לעוזרים.' } }, 403) };
+  return { ok: true, email: who.email.toLowerCase() };
 }
 
 // The list a helper prices: SJ's own catalogue of work items (683 rows, each
@@ -181,7 +179,7 @@ async function get({ request, env }) {
 
 async function post({ request, env }) {
   if (!(await rateLimit(env, request, 'helper-prices', 60))) {
-    return jsonResponse({ error: { message: 'יותר מדי שמירות בזמן קצר.' } }, 429);
+    return jsonResponse({ error: { message: MSG.TOO_MANY_SAVES } }, 429);
   }
   const gate = await helperGate(request, env);
   if (!gate.ok) return gate.response;

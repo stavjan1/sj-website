@@ -6,6 +6,7 @@
 
 import { generate } from './_ai.js';
 import { rateLimit, dailyQuota, loadModelClass } from './_tiers.js';
+import { json } from './_http.js';
 
 const PUBLIC_PROMPT = `אתה "העוזר ההנדסי של SJ": עוזר חכם מבית SJ הנדסת חשמל, משרד תכנון, ייעוץ ושרטוט מערכות חשמל בישראל בסמכות מהנדס חשמל רשום בפנקס המהנדסים.
 
@@ -143,8 +144,4 @@ async function handleAssistant(context) {
                        // doesn't eat the 700-token budget and truncate mid-word.
     stream: true,
   });
-}
-
-function json(obj, status) {
-  return new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
 }

@@ -7,13 +7,14 @@
 // service ZEREM produces documents through) and credentials. Secrets are never
 // returned to the client — GET reports only whether credentials are stored.
 
-import { verifyGoogleEmail, bearerToken, jsonResponse } from './_tiers.js';
+import { requireUser, jsonResponse } from './_tiers.js';
 import { publicProviderList, getUserBilling, saveUserBilling, PROVIDERS } from './_providers.js';
 
 export async function onRequestGet(context) {
   const { request, env } = context;
-  const email = await verifyGoogleEmail(bearerToken(request));
-  if (!email) return jsonResponse({ error: { message: 'נדרשת התחברות.' } }, 401);
+  const who = await requireUser(request);
+  if (who instanceof Response) return who;
+  const { email } = who;
   const cfg = await getUserBilling(env, email);
   return jsonResponse({
     providers: publicProviderList(),
@@ -23,8 +24,9 @@ export async function onRequestGet(context) {
 
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const email = await verifyGoogleEmail(bearerToken(request));
-  if (!email) return jsonResponse({ error: { message: 'נדרשת התחברות.' } }, 401);
+  const who = await requireUser(request);
+  if (who instanceof Response) return who;
+  const { email } = who;
   if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
 
   let body;

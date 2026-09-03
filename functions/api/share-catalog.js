@@ -18,6 +18,8 @@
 // The key is handed to the browser on purpose: web3forms access keys are public
 // by design, and its free plan rejects server-to-server submissions outright.
 // See lead.js for why rotating it is a five-file change, not an env var.
+import { json } from './_http.js';
+
 const WEB3FORMS_KEY_FALLBACK = 'da99a67b-ae1d-40b1-9354-74af5ee6d62d';
 const WEB3FORMS_ENDPOINT = 'https://api.web3forms.com/submit';
 
@@ -75,8 +77,4 @@ export async function onRequestPost(context) {
   };
 
   return json({ ok: true, count: items.length, notify });
-}
-
-function json(obj, status) {
-  return new Response(JSON.stringify(obj), { status: status || 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
 }
