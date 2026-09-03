@@ -1341,8 +1341,10 @@ function handleExpiredCloudToken() {
 async function cloudSaveNow() {
     if (!isCloudIdentity()) return;
     try {
-        const tok = (typeof ensureGoogleToken === 'function') ? await ensureGoogleToken() : googleAccessToken;
-        if (!tok) return false;
+        // ensureGoogleToken() returns at once for a live token; it is never
+        // asked to mint here — that opened Google's window on every page.
+        const tok = _tokenIsFresh() ? await ensureGoogleToken() : null;
+        if (!tok) { if (typeof armGoogleTokenRefreshOnGesture === 'function') armGoogleTokenRefreshOnGesture(); return false; }
         googleAccessToken = tok;
         const res = await fetch('/api/data', {
             method: 'PUT',
@@ -1446,8 +1448,8 @@ async function cloudLoadAndMerge(silent) {
     if (_mergeBusy) { _mergePending = true; return; }
     _mergeBusy = true;
     try {
-        const tok = (typeof ensureGoogleToken === 'function') ? await ensureGoogleToken() : googleAccessToken;
-        if (!tok) return;
+        const tok = _tokenIsFresh() ? await ensureGoogleToken() : null;
+        if (!tok) { if (typeof armGoogleTokenRefreshOnGesture === 'function') armGoogleTokenRefreshOnGesture(); return; }
         googleAccessToken = tok;
         const res = await fetch('/api/data', { headers: { 'Authorization': 'Bearer ' + tok } });
         if (res.status === 501) {
@@ -1488,8 +1490,14 @@ async function cloudLoadAndMerge(silent) {
 // on top of an edit.
 const CLOUD_REFRESH_MS = 60000;
 let _cloudRefreshArmed = false;
+const _bootAt = Date.now();
 function cloudRefreshIfIdle() {
     if (!isCloudIdentity() || !navigator.onLine) return;
+    // Only with a token that is alive. Asking Google for a new one from here
+    // is what flashed the sign-in window on every page (Stav, 4.9.2026); a
+    // lapsed hour is re-minted by the next tap, as before, not by the clock.
+    if (!_tokenIsFresh()) return;
+    if (Date.now() - _bootAt < 10000) return;   // the boot path already synced
     if (document.visibilityState !== 'visible') return;
     if (_cloudSaveTimer) return;
     const a = document.activeElement;

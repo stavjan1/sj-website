@@ -72,11 +72,6 @@
 /thing/sw.js
   Cache-Control: no-cache
 
-# The insight tree records voice notes. Site-wide the microphone is off (above);
-# here, and only here, the page itself may ask for it.
-/thing/*
-  ! Permissions-Policy
-  Permissions-Policy: geolocation=(), microphone=(self), camera=()
 
 /thing/index.html
   Cache-Control: no-cache
@@ -114,3 +109,9 @@
 # filename. Revalidate each visit; unchanged is a 304, changed is the new face.
 /assets/team/*
   Cache-Control: no-cache
+
+# The insight tree records voice notes. Site-wide the microphone is off (above);
+# here, and only here, the page itself may ask for it.
+/thing/*
+  ! Permissions-Policy
+  Permissions-Policy: geolocation=(), microphone=(self), camera=()
