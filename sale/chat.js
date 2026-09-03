@@ -1490,14 +1490,6 @@ function renderStageRail(proj) {
 
 
 // A clear "next step" after pricing has answers: continue to the draft.
-// Last model-message text of a chat history (or '' when the last turn isn't a reply).
-function _lastModelText(history) {
-    const arr = Array.isArray(history) ? history : [];
-    const last = arr[arr.length - 1];
-    if (!last || last.role !== 'model') return '';
-    return (last.parts && last.parts[0] && last.parts[0].text) || '';
-}
-
 // "מעבר לטיוטה" only once the pricing agent actually delivered numbers
 // (a סה"כ with digits), not while it's still asking/characterizing.
 // updatePriceActionBar lived here. When its bar was removed from the markup this
@@ -1608,7 +1600,6 @@ const PROFESSIONS = [
     { key: 'solar_installer',   label: 'מערכות סולאריות (PV)',     ai: 'מתקין מערכות סולאריות', hidden: true },
     { key: 'charger_installer', label: 'עמדות טעינה לרכב חשמלי',   ai: 'מתקין עמדות טעינה', hidden: true },
 ];
-function professionLabel(key) { const p = PROFESSIONS.find((x) => x.key === key); return p ? p.label : (key || ''); }
 function professionAiRole(key) { const p = PROFESSIONS.find((x) => x.key === key); return p ? p.ai : (key || 'איש מקצוע'); }
 // Populate every profession <select> from the one list, so options never drift.
 function fillProfessionOptions() {
@@ -1773,6 +1764,7 @@ async function runPlanningAgent(activeProject) {
         // of this answer is that it is short.
         // The planning turn always prices, so the money books always ride; the
         // tool bag only when tools are the subject.
+        await sjPricesSettled();   // the SJ strip must be in memory before the prompt is built
         const planSystem = getPlanningSystemInstruction()
             + getSternLaborPromptBlock() + getSjPriceBlock()
             + getMarketAnchorsPromptBlock()
@@ -2011,9 +2003,10 @@ async function runPricingAgent(activeProject, promptChars) {
         .filter(m => m.role === 'user').slice(-2)
         .map(m => (m.parts && m.parts[0] && m.parts[0].text) || '').join(' ');
     // The itemised quote is the turn that produces the numbers, so it carries
-        // everything by definition — except the tool bag, which is still only for
-        // when tools are being asked about.
-        const systemInstructionText = getProfessionSystemInstruction() + getSternLaborPromptBlock() + getSjPriceBlock() + getPriceCatalogPromptBlock(recentUserText) + getMarketAnchorsPromptBlock() + (wantsToolKnowledge(recentUserText) ? getToolsPromptBlock() : '') + getPricingInstinctPromptBlock();
+    // everything by definition — except the tool bag, which is still only for
+    // when tools are being asked about.
+    await sjPricesSettled();   // the SJ strip must be in memory before the prompt is built
+    const systemInstructionText = getProfessionSystemInstruction() + getSternLaborPromptBlock() + getSjPriceBlock() + getPriceCatalogPromptBlock(recentUserText) + getMarketAnchorsPromptBlock() + (wantsToolKnowledge(recentUserText) ? getToolsPromptBlock() : '') + getPricingInstinctPromptBlock();
     const _t0 = performance.now();
     setQuotaCharging(true);
     try {
@@ -2733,7 +2726,6 @@ function postPriceFeedback(proj, verdict, note) {
         // still perfectly usable.
         const headers = { 'Content-Type': 'application/json' };
         if (googleAccessToken) headers.Authorization = 'Bearer ' + googleAccessToken;
-        else { const a = typeof anonId === 'function' ? anonId() : ''; if (a) headers['X-Zerem-Anon'] = a; }
         fetch('/api/feedback', {
             method: 'POST',
             headers,
@@ -2862,10 +2854,6 @@ function stopChatDictation() {
 // Everything after the edited message is dropped before re-running: an answer
 // built on the old wording is not an answer to the new one, and leaving it
 // there would let the agent contradict itself inside one thread.
-function activeChatArray(proj) {
-    return activeChatMode === 'plan' ? ensurePlanHistory(proj) : proj.chatHistory;
-}
-
 function startEditMessage(stage, index) {
     const proj = projectsList.find(p => p.id === activeProjectId);
     if (!proj) return;
@@ -4415,6 +4403,7 @@ async function runAskAgent(proj) {
     setQuotaCharging(true);
     try {
         // What this question needs, not everything the app knows.
+        await sjPricesSettled();   // the SJ strip must be in memory before the prompt is built
         const system = getAskSystemInstruction()
             + knowledgeFor(lastUserSaid(proj.planChatHistory));
         const response = await callAI(effectiveModel, {
@@ -4478,18 +4467,6 @@ function updateAskActionBar(proj) {
     const chip = document.getElementById('ask-promote-chip');
     if (!chip) return;
     chip.hidden = !(proj && isAsk(proj) && proj.looksLikeJob === true);
-}
-
-// The pricing bar keeps one action on the row; the three side-errands open from
-// the ⋯, the same gesture the work list uses. One pattern, learned once.
-function togglePabMore(btn) {
-    const bar = btn.closest('.plan-action-bar');
-    const extra = bar && bar.querySelector('.pab-extra');
-    if (!extra) return;
-    const open = extra.hidden;
-    extra.hidden = !open;
-    btn.setAttribute('aria-expanded', String(open));
-    btn.classList.toggle('is-open', open);
 }
 
 // Promotion: the field changes, the thread stays. This is the whole reason the

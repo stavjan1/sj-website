@@ -50,43 +50,25 @@ function signupMailNote(d) {
         : `(⚠ המייל האחרון נכשל ב-${when}: ${escapeHtml(String(m.detail || 'שגיאה'))})`;
 }
 
+// The one HTML escaper of the app. Quotes are escaped too: this is used inside
+// double-quoted attributes (value="...", title="...", data-email="...") in
+// several places, and without quote-escaping a value like `" onfocus=alert(1)
+// x="` breaks straight out of the attribute without ever needing a "<". In text
+// position `&quot;` simply renders as a normal quote, so escaping it everywhere
+// is free. Lives here, in the first script, so every later file finds it.
+function escapeHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function escapeAttr(s) {
+    return escapeHtml(s);
+}
+
 function showAdminTabIfNeeded() {
-    const adminTab = document.getElementById('tab-admin');
-    if (adminTab) adminTab.style.display = isAdmin() ? 'flex' : 'none';
     // Signing in as the owner excludes this device from the traffic counters
     // from here on — otherwise Stav's own visits are the traffic.
     if (isAdmin()) { try { localStorage.setItem('sj_notrack', '1'); } catch (e) {} }
-}
-
-// The "עוד" drawer is gone: four destinations fit in the rail, and a drawer
-// with ten entries is a menu that gave up. These stay as no-ops/aliases so any
-// leftover caller keeps working instead of throwing.
-function toggleMoreDrawer() { /* no drawer any more */ }
-function openMoreDrawer() { /* no drawer any more */ }
-function closeMoreDrawer() { /* no drawer any more */ }
-function navFromDrawer(tabId) { switchTab(tabId); }
-
-function adminSaveGeminiKey() {
-    const key = (document.getElementById('admin-gemini-key')?.value || '').trim();
-    const key2 = (document.getElementById('admin-gemini-key-2')?.value || '').trim();
-    if (!key && !key2) { showToast('הזן לפחות מפתח אחד', 'error'); return; }
-    for (const k of [key, key2]) {
-        if (k && /googleusercontent\.com/i.test(k)) {
-            showToast('אחד הערכים הוא מזהה OAuth (Client ID) ולא מפתח API. צור מפתח Gemini ב-aistudio.google.com/apikey.', 'error');
-            return;
-        }
-        if (k && k.length < 20) {
-            showToast('אחד המפתחות נראה קצר מדי, ודא שהעתקת אותו במלואו ללא רווחים.', 'error');
-            return;
-        }
-    }
-    if (key) { saveGlobalGeminiKey(key); appState.settings.geminiApiKey = key; }
-    saveGlobalGeminiKeyBackup(key2);
-    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
-    const status = document.getElementById('admin-key-status');
-    if (status) status.style.display = 'block';
-    showToast('מפתחות Gemini נשמרו');
-    adminRefreshStatus();
 }
 
 function adminRefreshStatus() {
@@ -102,12 +84,6 @@ function adminRefreshStatus() {
     // this is the hour-long browser session that syncs projects to Drive. The
     // old label sent its reader hunting for a broken database that was fine.
     if (cloudEl) { cloudEl.textContent = googleAccessToken ? 'פעיל ✓' : 'לא מחובר'; cloudEl.style.color = googleAccessToken ? 'var(--color-success)' : 'var(--warn-text)'; }
-
-    // Pre-fill existing values
-    const keyInput = document.getElementById('admin-gemini-key');
-    if (keyInput && !keyInput.value) keyInput.value = getGeminiApiKey() || '';
-    const key2Input = document.getElementById('admin-gemini-key-2');
-    if (key2Input && !key2Input.value) key2Input.value = getGeminiApiKeyBackup() || '';
 }
 
 // ===== System catalog (admin) =====
@@ -341,15 +317,6 @@ async function adminToggleUser(btn) {
     } catch (e) {
         body.innerHTML = adminErrorHtml(e);
     }
-}
-
-function toggleManualLogin() {
-    const sec = document.getElementById('manual-login-section');
-    const icon = document.getElementById('manual-toggle-icon');
-    if (!sec) return;
-    const open = sec.style.display !== 'none';
-    sec.style.display = open ? 'none' : 'block';
-    if (icon) icon.style.transform = open ? '' : 'rotate(180deg)';
 }
 
 // ==========================================================================
@@ -798,10 +765,6 @@ function getGeminiApiKeyBackup() {
 function saveGlobalGeminiKey(key) {
     localStorage.setItem('sj_gemini_key_global', key);
 }
-function saveGlobalGeminiKeyBackup(key) {
-    if (key) localStorage.setItem('sj_gemini_key_global_2', key);
-    else localStorage.removeItem('sj_gemini_key_global_2');
-}
 
 // Statuses that mean "this key can't serve right now — try the backup":
 // 429 quota/rate, 401/403 bad/expired key, 5xx upstream.
@@ -1100,7 +1063,8 @@ let clientsList = [];    // { id, name, phone, email, dealerNumber, address, cit
 
 // Global variables for Stern Pricing and Google OAuth
 let sternPricingDatabase = [];
-let sjPriceBook = null;   // sale/data/sj-prices.json — SJ's own catalogue of prices, loaded at boot
+let sjPriceBook = null;   // sale/data/sj-prices.core.json — the agent's slice of SJ's price book, loaded at boot
+let sjPricesReady = null; // resolves once loadSjPrices settled, so a prompt never races the fetch
 let priceCatalog = [];  // user-curated supplier price catalog (manual/import/scrape)
 let systemCatalog = []; // shared baseline published by the admin (read-only here);
                         // a personal item with the same name OVERRIDES the system price
@@ -1394,25 +1358,6 @@ async function cloudSaveNow() {
         // Offline / transient, local copy stays authoritative until reconnect.
         return false;
     }
-}
-
-// Union two lists by a stable identity key so no unique item is ever lost.
-// On an id-collision the `preferCloud` side wins (it's the more-recently-synced
-// copy). Works for projects/history/trash (id), catalog (name) and users.
-function _mergeListById(localArr, cloudArr, preferCloud) {
-    const keyOf = (it) => (it && (it.id || it.username || it.name)) || null;
-    const byKey = new Map();
-    const add = (arr, isPreferred) => {
-        (Array.isArray(arr) ? arr : []).forEach((item) => {
-            const k = keyOf(item);
-            if (k == null) return;               // skip un-keyable junk
-            if (!byKey.has(k) || isPreferred) byKey.set(k, item);
-        });
-    };
-    // Add the losing side first, then the preferred side overwrites collisions.
-    if (preferCloud) { add(localArr, false); add(cloudArr, true); }
-    else { add(cloudArr, false); add(localArr, true); }
-    return Array.from(byKey.values());
 }
 
 // Merge the cloud blob INTO the current local state (union by id) rather than
@@ -2577,7 +2522,6 @@ function setMoneyView(view) {
     const docs = document.getElementById('money-view-docs');
     const board = document.getElementById('money-view-board');
     // Cash flow moved out to its own PRO tab; כסף is the board + documents.
-    const flow = document.getElementById('money-view-flow');
     if (!docs) return;
     const soon = document.getElementById('money-soon');
     const subtabs = document.getElementById('money-subtabs');
@@ -2586,7 +2530,6 @@ function setMoneyView(view) {
         if (subtabs) subtabs.hidden = true;
         docs.hidden = true;
         if (board) board.hidden = true;
-        if (flow) flow.hidden = true;
         return;
     }
     if (soon) soon.hidden = true;
@@ -2594,7 +2537,6 @@ function setMoneyView(view) {
     const onBoard = view !== 'docs';   // the board is where כסף opens
     docs.hidden = onBoard;
     if (board) board.hidden = !onBoard;
-    if (flow) flow.hidden = true;
     document.querySelectorAll('#panel-money .subtab').forEach((b) => {
         const on = b.dataset.sub === (onBoard ? 'board' : 'docs');
         b.classList.toggle('active', on);
@@ -3359,6 +3301,8 @@ function startWorkFromHome() {
 // being created, a price landing, a quote going out — so it must never be able
 // to take down the thing it is celebrating. A missing function, a renamed one,
 // a file that failed to load: all of them end here, silently.
+// Nothing calls it today (the milestones moved to the next-step cards);
+// tests/site.test.mjs still reads it, so it stays until that test is updated.
 function coachSay(id, delay) {
     try {
         if (typeof window.coachMilestone === 'function') window.coachMilestone(id, delay);
@@ -3615,10 +3559,6 @@ function loadProject(id, navigate = true) {
     if (toggleCheckbox) {
         toggleCheckbox.checked = appState.currentQuote.showItemizedPrices || false;
     }
-    const settingsToggle = document.getElementById('set-show-itemized-prices');
-    if (settingsToggle) {
-        settingsToggle.checked = appState.currentQuote.showItemizedPrices || false;
-    }
     
     // Re-render form grid layout based on state
     toggleItemizedPrices(appState.currentQuote.showItemizedPrices, false);
@@ -3791,15 +3731,6 @@ function updateProjectRail() {
     const cur = ((document.querySelector('.content-panel.active') || {}).id || '').replace('panel-', '');
     const onStage = !!activeProjectId && PROJECT_RAIL_STAGES.some(s => s.tab === cur);
     document.body.classList.toggle('in-project-stage', onStage);
-
-    if (!onStage) return;
-    // Pin the rail below the top bar AND the active-project banner, so it never
-    // rides up over them (measure the banner's bottom when it's visible).
-    const tn = document.getElementById('topnav');
-    const banner = document.getElementById('project-banner');
-    let top = tn ? tn.getBoundingClientRect().bottom : 92;
-    if (banner && banner.offsetParent !== null) top = Math.max(top, banner.getBoundingClientRect().bottom);
-    document.documentElement.style.setProperty('--topnav-h', Math.round(top) + 'px');
 }
 
 // Sort state: which field ('date'|'name') and direction ('desc'|'asc').
@@ -5888,7 +5819,6 @@ function loadSettings() {
             _setVal('pdf-line-height', appState.settings.pdfLineHeight || '1.4');
             _setVal('pdf-primary-color', appState.settings.pdfPrimaryColor || '#1e3a8a');
             _setVal('pdf-secondary-color', appState.settings.pdfSecondaryColor || '#3b82f6');
-            _setCheck('pdf-show-watermark', appState.settings.pdfShowWatermark ?? true);
             // Default ON, not off. The footer of every sheet states that the
             // document becomes a binding agreement "עם אישור וחתימת הלקוח" —
             // and the page it was printed on had nowhere to sign. The promise
@@ -6020,25 +5950,9 @@ function applySystemTheme(pref) {
         el.style.backgroundColor = on ? 'var(--color-accent)' : '';
         el.style.color = on ? '#fff' : '';
     });
-
-    // Sidebar icon (shows where the next tap goes) + top-bar flip (shows current).
-    const nextPref = THEME_CYCLE[(THEME_CYCLE.indexOf(pref) + 1) % THEME_CYCLE.length];
-    const toggleIcon = document.getElementById('theme-toggle-icon');
-    if (toggleIcon) toggleIcon.className = 'fa-solid ' + (nextPref === 'auto' ? 'fa-circle-half-stroke' : THEME_META[nextPref].icon);
-    const flipIcon = document.getElementById('theme-flip-icon');
-    const flipLabel = document.getElementById('theme-flip-label');
-    const flip = document.getElementById('theme-flip');
-    if (flipIcon) flipIcon.className = 'fa-solid ' + (pref === 'auto' ? 'fa-circle-half-stroke' : THEME_META[theme].icon);
-    if (flipLabel) flipLabel.textContent = pref === 'auto' ? 'AUTO' : THEME_META[theme].label;
-    if (flip) {
-        flip.classList.toggle('is-dark', theme !== 'light');
-        flip.setAttribute('aria-label', 'החלף מצב תצוגה (לפי המחשב / בהיר / אמצע / כהה)');
-        flip.title = pref === 'auto' ? 'לפי הגדרת המחשב (' + THEME_META[theme].name + ')' : THEME_META[theme].name;
-    }
 }
 
-// Top-bar toggle cycles auto → light → mid → dark → auto.
-function flipTheme() { toggleSystemTheme(); }
+// Cycles auto → light → dark → auto.
 function toggleSystemTheme() {
     const cur = themePref();
     setSystemTheme(THEME_CYCLE[(THEME_CYCLE.indexOf(cur) + 1) % THEME_CYCLE.length]);
@@ -6088,15 +6002,6 @@ function applyBoxTheme(mode) {
     });
 }
 
-function setBoxTheme(mode) {
-    if (!appState.settings) appState.settings = {};
-    appState.settings.boxTheme = mode;
-    applyBoxTheme(mode);
-    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
-    const label = mode === 'auto' ? 'כמו הרקע' : (mode === 'light' ? 'תיבות בהירות' : 'תיבות כהות');
-    showToast('צבע תיבות: ' + label);
-}
-
 function applySystemBackground(bg) {
     if (bg && bg !== 'none') {
         document.body.style.backgroundImage = `url('${bg}')`;
@@ -6122,24 +6027,6 @@ function applySystemBackground(bg) {
             matchedOpt.style.borderColor = 'var(--color-accent)';
             matchedOpt.classList.add('active');
         }
-    } else {
-        const noneOpt = document.getElementById('bg-opt-none');
-        if (noneOpt) {
-            noneOpt.style.borderColor = 'var(--color-accent)';
-            noneOpt.classList.add('active');
-        }
-    }
-}
-
-function selectSystemBackground(bg, elementId) {
-    if (!appState.settings) appState.settings = {};
-    appState.settings.selectedBackground = bg;
-    applySystemBackground(bg);
-    localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
-    if (bg === 'none') {
-        showToast('רקע תמונה הוסר');
-    } else {
-        showToast('רקע קולנועי הוחל בהצלחה!');
     }
 }
 
@@ -7052,7 +6939,6 @@ function saveBusinessSettings() {
     appState.settings.pdfLineHeight = document.getElementById('pdf-line-height')?.value || '1.4';
     appState.settings.pdfPrimaryColor = document.getElementById('pdf-primary-color')?.value || '#1e3a8a';
     appState.settings.pdfSecondaryColor = document.getElementById('pdf-secondary-color')?.value || '#3b82f6';
-    appState.settings.pdfShowWatermark = document.getElementById('pdf-show-watermark')?.checked ?? true;
     appState.settings.pdfShowSignature = document.getElementById('pdf-show-signature')?.checked ?? true;
 
     localStorage.setItem(getStorageKey('sj_quote_settings'), JSON.stringify(appState.settings));
@@ -8039,13 +7925,6 @@ function renderQuoteSignature() {
     }
 }
 
-function updatePriceDisplayMode() {
-    // Legacy hook (the business-panel duplicate toggle was removed), the
-    // editor's own checkbox drives toggleItemizedPrices directly now.
-    const el = document.getElementById('set-show-itemized-prices');
-    if (el) toggleItemizedPrices(el.checked);
-}
-
 // ==========================================================================
 // Logo Styling settings
 // ==========================================================================
@@ -8211,12 +8090,27 @@ async function loadSternPricing() {
 
 // SJ's price catalogue: every everyday item with a decided price, the chase
 // curve and the two modes. The agent gets only the anchors (the starter strip
-// and the rules) — the whole book would be 3,000 lines in every prompt.
-async function loadSjPrices() {
-    try {
-        const response = await fetch('data/sj-prices.json');
-        if (response.ok) sjPriceBook = await response.json();
-    } catch (err) { console.warn('sj-prices.json not loaded', err); }
+// and the rules) — the whole book would be 3,000 lines in every prompt — so
+// boot fetches only that slice (scripts/build_sj_prices_core.mjs, ~8 KB). The
+// full 685 KB file is the catalogue view's, and market.js loads it on demand.
+function loadSjPrices() {
+    sjPricesReady = (async () => {
+        try {
+            const response = await fetch('data/sj-prices.core.json', { cache: 'no-cache' });
+            if (response.ok) sjPriceBook = await response.json();
+        } catch (err) { console.warn('sj-prices.core.json not loaded', err); }
+    })();
+    return sjPricesReady;
+}
+// The first chat turn used to build its prompt while the book was still on the
+// wire, and getSjPriceBlock() returned '' for a turn that was about money. A
+// send path waits here first; a slow network still gets an answer after 3 s,
+// just without the strip.
+function sjPricesSettled(ms) {
+    return Promise.race([
+        sjPricesReady || Promise.resolve(),
+        new Promise((resolve) => setTimeout(resolve, ms == null ? 3000 : ms)),
+    ]);
 }
 function getSjPriceBlock() {
     const book = sjPriceBook;
@@ -9390,9 +9284,6 @@ function authTrail(event, detail) {
         localStorage.setItem('sj_auth_trail', JSON.stringify(log.slice(-20)));
     } catch (e) { /* a diagnostic must never break the thing it diagnoses */ }
 }
-function dumpAuthTrail() {
-    try { return JSON.parse(localStorage.getItem('sj_auth_trail') || '[]'); } catch (e) { return []; }
-}
 
 function mintGoogleAccessToken() {
     const clientId = localStorage.getItem('sj_global_google_client_id');
@@ -9427,21 +9318,6 @@ function mintGoogleAccessToken() {
 
 
 
-function _userFolderName() {
-    const u = (getActiveUser() || 'user').split('@')[0];
-    return u.replace(/[^a-zA-Z0-9֐-׿._-]/g, '_').slice(0, 60);
-}
-
-
-
-
-
-
-function getCloudDatabaseFilename() {
-    const activeUser = getActiveUser();
-    if (!activeUser) return '.sys_config.dat';
-    return `.sys_config_${activeUser.toLowerCase().replace(/[^a-z0-9_]/g, '_')}.dat`;
-}
 
 
 
@@ -9802,17 +9678,6 @@ function updateUserProfileProfession() {
 // ==========================================================================
 // Google OAuth Sign-In & Session Persistence
 // ==========================================================================
-function toggleGoogleConfig() {
-    const configSection = document.getElementById('google-config-section');
-    if (configSection) {
-        if (configSection.style.display === 'none' || !configSection.style.display) {
-            configSection.style.display = 'block';
-        } else {
-            configSection.style.display = 'none';
-        }
-    }
-}
-
 function handleGoogleLogin() {
     let clientId = document.getElementById('lock-google-client-id').value.trim();
     if (!clientId) {

@@ -35,7 +35,7 @@
 
     const fmtILS = (n) => (typeof nisFmt === 'function') ? nisFmt(n) : '₪' + Math.round(Number(n) || 0).toLocaleString('he-IL');
     const todayISO = () => new Date().toISOString().slice(0, 10);
-    const esc = (s) => (typeof escapeHtml === 'function' ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s));
+    const esc = (s) => escapeHtml(s);   // app.js's one escaper; null and undefined come back as ''
 
     let finMonth = null;     // 'YYYY-MM' shown in the monthly view (default: this month)
     let fin = null;          // the KV record

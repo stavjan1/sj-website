@@ -34,6 +34,7 @@ const SHELL = [
   '/sale/css/shell.css',
   '/sale/css/panels.css',
   '/sale/css/pdf.css',
+  '/sale/css/quote-templates.css',
   '/sale/controlroom.css',
   '/sale/periodic.css',
   '/sale/nextstep.css',
@@ -46,7 +47,6 @@ const SHELL = [
   '/sale/manifest.webmanifest',
   '/sale/icons/icon-192.png',
   '/sale/icons/icon-512.png',
-  '/assistant.js',
   '/assets/listcards.js',
   '/assets/checkups-core.js',
 ];
@@ -93,7 +93,7 @@ self.addEventListener('fetch', (e) => {
   }
 
   if (url.origin !== location.origin) return;            // anything else third-party: browser default
-  if (!url.pathname.startsWith('/sale/') && !url.pathname.startsWith('/assets/') && url.pathname !== '/assistant.js') return;
+  if (!url.pathname.startsWith('/sale/') && !url.pathname.startsWith('/assets/')) return;
 
   // "Network-first" is only as fresh as the fetch underneath it, and a plain
   // fetch() is still allowed to be answered by the browser's HTTP cache. That
@@ -113,9 +113,13 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(
     fetch(request)
       .then((res) => {
-        const copy = res.clone();
-        // Keyed on the original request, so the offline lookup below still finds it.
-        caches.open(CACHE).then((c) => c.put(e.request, copy));
+        // Only a good answer is worth keeping: a 404 or a 5xx written into the
+        // cache would be served again offline in place of the last good copy.
+        if (res && res.ok) {
+          const copy = res.clone();
+          // Keyed on the original request, so the offline lookup below still finds it.
+          caches.open(CACHE).then((c) => c.put(e.request, copy));
+        }
         return res;
       })
       // ignoreSearch everywhere under /sale/: the shell is versioned with ?v=NN,

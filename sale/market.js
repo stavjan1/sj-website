@@ -40,16 +40,21 @@ function setCatalogView(view) {
 // Mode A (default): the item's price, all in. Mode B: hours × the hourly
 // rate + materials — shown for the same rows, so the customer sees why.
 let sjMode = 'A';
+// The whole book, ~3,000 rows. Loaded the first time this tab opens and kept
+// apart from sjPriceBook (app.js), which holds only the agent's slice — the
+// starter strip and the chase curve — and would render as a thirty-row
+// catalogue if it were mistaken for this one.
+let sjPriceBookFull = null;
 function setSjMode(m) { sjMode = m === 'B' ? 'B' : 'A'; document.querySelectorAll('#sj-modes .chip').forEach((c) => c.classList.toggle('on', c.dataset.mode === sjMode)); renderSjCatalog(); }
 async function renderSjCatalog() {
     const box = document.getElementById('sj-list');
     if (!box) return;
-    if (!sjPriceBook) {
+    if (!sjPriceBookFull) {
         box.innerHTML = '<p class="input-help">טוען…</p>';
-        try { const r = await fetch('data/sj-prices.json'); if (r.ok) sjPriceBook = await r.json(); } catch (e) { /* offline */ }
-        if (!sjPriceBook) { box.innerHTML = '<p class="input-help">המחירון לא נטען. נסה שוב עם קליטה.</p>'; return; }
+        try { const r = await fetch('data/sj-prices.json'); if (r.ok) sjPriceBookFull = await r.json(); } catch (e) { /* offline */ }
+        if (!sjPriceBookFull) { box.innerHTML = '<p class="input-help">המחירון לא נטען. נסה שוב עם קליטה.</p>'; return; }
     }
-    const book = sjPriceBook, d = book.decisions || {};
+    const book = sjPriceBookFull, d = book.decisions || {};
     const rate = (d.hourly_mode && d.hourly_mode.rate) || 250, visit = d.visit || 350;
     const q = ((document.getElementById('sj-search') || {}).value || '').trim();
     const rows = book.rows.filter((r) => r.price && (!q || r.name.includes(q) || (book.subs && book.subs[r.s] || '').includes(q)));
@@ -402,19 +407,8 @@ function fillFormFromState() {
 
 // Escape user/AI text before inserting via innerHTML / attributes, so a quote,
 // "<", or "&" in a title/description can't break the editor or the PDF.
-// Quotes are escaped too: this helper is used inside double-quoted attributes
-// (value="...", title="...", data-email="...") in several places, and without
-// quote-escaping a value like `" onfocus=alert(1) x="` breaks straight out of
-// the attribute without ever needing a "<". In text position `&quot;` simply
-// renders as a normal quote, so escaping it everywhere is free.
-function escapeHtml(s) {
-    return String(s == null ? '' : s)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-function escapeAttr(s) {
-    return escapeHtml(s);
-}
+// escapeHtml / escapeAttr live in app.js, the first script, so every file
+// shares the one escaper.
 
 // Reorder quote work items with up/down arrows (deliberate: arrows, not
 // drag-and-drop — reliable with a thumb on a phone).
@@ -1196,9 +1190,6 @@ function toggleItemizedPrices(checked, syncProject = true) {
     const editToggle = document.getElementById('form-itemized-prices-toggle');
     if (editToggle) editToggle.checked = checked;
 
-    const settingsToggle = document.getElementById('set-show-itemized-prices');
-    if (settingsToggle) settingsToggle.checked = checked;
-    
     const items = getWorkItemsFromForm();
     
     const container = document.getElementById('work-items-container');

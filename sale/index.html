@@ -18,8 +18,9 @@
          css + woff2 live in vendor/ so icons work offline and forever. -->
     <link rel="stylesheet" href="vendor/fontawesome/css/all.min.css?v=503">
 
-    <!-- html2pdf.js for high-quality client-side PDF generation -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- html2pdf.js for high-quality client-side PDF generation. Deferred: ~1 MB
+         that is only needed at export, and both exporters cope when it is absent. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
 
     <!-- Google Identity Services + Drive Picker API -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -595,22 +596,22 @@
                     <h3 id="ck-editor-title">לקוח חדש</h3>
                     <form method="dialog" onsubmit="ckSaveClient(event)">
                         <div class="ck-field">
-                            <label>שם הלקוח / המתקן *</label>
+                            <label for="ck-f-name">שם הלקוח / המתקן *</label>
                             <input id="ck-f-name" required maxlength="120" placeholder='למשל: מוסך רם-לוי בע"מ'>
                         </div>
                         <div class="ck-field-pair">
                             <div class="ck-field">
-                                <label>טלפון</label>
+                                <label for="ck-f-phone">טלפון</label>
                                 <input id="ck-f-phone" maxlength="20" inputmode="tel" placeholder="050-0000000">
                             </div>
                             <div class="ck-field">
-                                <label>אימייל</label>
+                                <label for="ck-f-email">אימייל</label>
                                 <input id="ck-f-email" type="email" maxlength="120" placeholder="client@mail.com">
                             </div>
                         </div>
                         <div class="ck-field-pair">
                             <div class="ck-field">
-                                <label>סוג בדיקה</label>
+                                <label for="ck-f-type">סוג בדיקה</label>
                                 <select id="ck-f-type">
                                     <option>בדיקה תקופתית</option>
                                     <option>בדיקת הארקות</option>
@@ -620,13 +621,13 @@
                                 </select>
                             </div>
                             <div class="ck-field">
-                                <label>כתובת / מיקום המתקן</label>
+                                <label for="ck-f-site">כתובת / מיקום המתקן</label>
                                 <input id="ck-f-site" maxlength="160">
                             </div>
                         </div>
                         <div class="ck-field-pair">
                             <div class="ck-field">
-                                <label>תדירות *</label>
+                                <label for="ck-f-months">תדירות *</label>
                                 <select id="ck-f-months" onchange="document.getElementById('ck-f-custom-wrap').style.display = this.value === 'custom' ? '' : 'none'">
                                     <option value="12">כל שנה</option>
                                     <option value="24">כל שנתיים</option>
@@ -636,23 +637,23 @@
                                 </select>
                             </div>
                             <div class="ck-field" id="ck-f-custom-wrap" style="display:none">
-                                <label>מספר חודשים</label>
+                                <label for="ck-f-custom">מספר חודשים</label>
                                 <input id="ck-f-custom" type="number" min="1" max="120" value="6">
                             </div>
                         </div>
                         <div class="ck-field-pair">
                             <div class="ck-field">
-                                <label>תאריך הבדיקה האחרונה</label>
+                                <label for="ck-f-last">תאריך הבדיקה האחרונה</label>
                                 <input id="ck-f-last" type="date">
                             </div>
                             <div class="ck-field">
-                                <label>או: מועד הבדיקה הבאה</label>
+                                <label for="ck-f-next">או: מועד הבדיקה הבאה</label>
                                 <input id="ck-f-next" type="date">
                                 <div class="ck-hint">מלא אחד מהשניים · השני יחושב לבד</div>
                             </div>
                         </div>
                         <div class="ck-field">
-                            <label>הערות</label>
+                            <label for="ck-f-notes">הערות</label>
                             <textarea id="ck-f-notes" rows="2" maxlength="500"></textarea>
                         </div>
                         <div class="ck-dlg-actions">
@@ -2155,14 +2156,6 @@
                 </div>
             </section>
 
-            <!-- Admin Panel — visible only to stavjan19989@gmail.com -->
-            <style>
-                .helper-group { margin: 14px 0 6px; font-size: var(--fs-sm); color: var(--text-2); }
-                .helper-sj { font-size: var(--fs-xs); color: var(--accent); margin-inline-start: 6px; white-space: nowrap; }
-                .sj-group summary { cursor: pointer; padding: 8px 0; font-weight: 700; }
-                .sj-group .market-row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); font-size: var(--fs-sm); }
-                .sj-group .market-nums { white-space: nowrap; }
-            </style>
             <section id="panel-helper" class="content-panel">
                 <div class="section-header">
                     <h2>עוזר · המחירים שלך</h2>
@@ -2977,8 +2970,6 @@
     <!-- The guide that points at the screen (first-run tour + milestone hints) -->
     <script src="coach.js?v=503"></script>
     <script src="nextstep.js?v=503"></script>
-    <!-- In-app helper assistant (teaches how to operate the tool) -->
-    <script>window.SJ_ASSISTANT_MODE = 'sale';</script>
     <script src="/track.js?v=503" defer></script>
 </body>
 </html>
