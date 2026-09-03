@@ -109,3 +109,8 @@
   Cache-Control: no-cache
 /sale/sw.js
   Cache-Control: no-cache
+
+# Team portraits change while everything else in /assets/ is versioned by
+# filename. Revalidate each visit; unchanged is a 304, changed is the new face.
+/assets/team/*
+  Cache-Control: no-cache
