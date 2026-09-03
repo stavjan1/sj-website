@@ -182,7 +182,7 @@
                         <span class="team-more">ההסמכות <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></span>
                     </div>
                     <div class="card card-hover team-card rv" role="button" tabindex="0" data-person="matan" aria-haspopup="dialog">
-                        <div class="team-photo" aria-hidden="true">מ</div>
+                        <div class="team-photo"><img src="assets/team/matan.jpg" alt="מתן" loading="lazy" decoding="async" width="132" height="132"></div>
                         <div class="team-name">מתן</div>
                         <div class="team-role">חשמלאי הנדסאי</div>
                         <span class="team-more">ההסמכות <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></span>
@@ -313,7 +313,7 @@
                 { name: 'יום עיון בדיקות הארקה', issuer: 'לשכת המהנדסים' },
                 { name: 'אישור תכנון בסיסטם לוחות עד 3×4000A', issuer: 'תמחש תעשיות מתכת וארונות חשמל' }
             ] },
-            matan: { name: 'מתן', role: 'חשמלאי הנדסאי', initial: 'מ', certs: [
+            matan: { name: 'מתן', role: 'חשמלאי הנדסאי', initial: 'מ', photo: 'assets/team/matan.jpg', certs: [
                 { name: 'רישיון עיסוק · חשמלאי הנדסאי 3×630A', issuer: 'משרד העבודה, אגף בכיר אסדרת עיסוקים' },
                 { name: 'רישום בפנקס ההנדסאים והטכנאים', issuer: 'משרד העבודה' },
                 { name: 'קורס מתח גבוה', issuer: 'השתלמות מקצועית' },
@@ -327,7 +327,8 @@
             var p = TEAM[key]; if (!p) return;
             document.getElementById('team-dialog-name').textContent = p.name;
             document.getElementById('team-dialog-role').textContent = p.role;
-            document.getElementById('team-dialog-photo').textContent = p.initial;
+            var ph = document.getElementById('team-dialog-photo');
+            ph.innerHTML = p.photo ? '<img src="' + p.photo + '" alt="">' : esc(p.initial);
             document.getElementById('team-dialog-certs').innerHTML = p.certs.length
                 ? p.certs.map(function (c) { return '<li><div><div class="tc-name">' + esc(c.name) + '</div><div class="tc-issuer">' + esc(c.issuer) + '</div></div></li>'; }).join('')
                 : '<li><span class="tc-soon">ההסמכות של ' + esc(p.name) + ' יתווספו בקרוב.</span></li>';
