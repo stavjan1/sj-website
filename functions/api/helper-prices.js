@@ -28,6 +28,7 @@
 import {
   ADMIN_EMAIL, adminGate, verifyGoogleEmail, bearerToken, jsonResponse, rateLimit,
 } from './_tiers.js';
+import { SJ_ITEMS, SJ_GROUPS } from './_sj_catalog.js';
 
 const HELPER_PREFIX = 'helper:';
 const ITEMS_KEY = 'hp:items';
@@ -113,11 +114,19 @@ async function helperGate(request, env) {
   return { ok: true, email: email.toLowerCase() };
 }
 
+// The list a helper prices: SJ's own catalogue of work items (683 rows, each
+// with our price as the reference — Stav, 4.9.2026: "תכניס הכל לאתר"), and
+// after it whatever the helpers added themselves (KV). Ids never collide:
+// catalogue ids are Dekel-style codes, added items are Hebrew slugs.
 async function loadItems(env) {
-  if (!env.SJ_DATA) return SEED_ITEMS.slice();
+  const custom = await loadCustomItems(env);
+  return SJ_ITEMS.concat(custom);
+}
+async function loadCustomItems(env) {
+  if (!env.SJ_DATA) return [];
   const raw = await env.SJ_DATA.get(ITEMS_KEY);
   const list = raw ? safeParse(raw, null) : null;
-  return Array.isArray(list) && list.length ? list : SEED_ITEMS.slice();
+  return Array.isArray(list) ? list.filter((it) => it && it.id && !SJ_ITEMS.some((s) => s.id === it.id)) : [];
 }
 
 async function loadAllPrices(env) {
@@ -160,14 +169,14 @@ async function get({ request, env }) {
       for (const k of res.keys) helpers.push(k.name.slice(HELPER_PREFIX.length));
     } while (cursor);
     const [items, prices] = await Promise.all([loadItems(env), loadAllPrices(env)]);
-    return jsonResponse({ ok: true, helpers, items, prices });
+    return jsonResponse({ ok: true, helpers, items, groups: SJ_GROUPS, prices });
   }
 
   const gate = await helperGate(request, env);
   if (!gate.ok) return gate.response;
   const [items, all] = await Promise.all([loadItems(env), loadAllPrices(env)]);
   const mine = all[gate.email] || {};
-  return jsonResponse({ ok: true, email: gate.email, items, mine, others: othersFor(all, gate.email, mine) });
+  return jsonResponse({ ok: true, email: gate.email, items, groups: SJ_GROUPS, mine, others: othersFor(all, gate.email, mine) });
 }
 
 async function post({ request, env }) {
@@ -190,12 +199,12 @@ async function post({ request, env }) {
     const id = slugify(name);
     if (!id) return jsonResponse({ error: { message: 'שם לא תקין.' } }, 400);
     const items = await loadItems(env);
-    if (items.length >= MAX_ITEMS) return jsonResponse({ error: { message: 'הרשימה מלאה.' } }, 400);
+    if (items.length - SJ_ITEMS.length >= MAX_ITEMS) return jsonResponse({ error: { message: 'הרשימה מלאה.' } }, 400);
     let item = items.find((x) => x.id === id);
     if (!item) {
       item = { id, name, unit, by: gate.email, at: new Date().toISOString() };
       items.push(item);
-      await env.SJ_DATA.put(ITEMS_KEY, JSON.stringify(items));
+      await env.SJ_DATA.put(ITEMS_KEY, JSON.stringify(items.filter((it) => !SJ_ITEMS.some((x) => x.id === it.id))));
     }
     return jsonResponse({ ok: true, item, items });
   }

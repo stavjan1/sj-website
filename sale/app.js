@@ -1100,6 +1100,7 @@ let clientsList = [];    // { id, name, phone, email, dealerNumber, address, cit
 
 // Global variables for Stern Pricing and Google OAuth
 let sternPricingDatabase = [];
+let sjPriceBook = null;   // sale/data/sj-prices.json — SJ's own catalogue of prices, loaded at boot
 let priceCatalog = [];  // user-curated supplier price catalog (manual/import/scrape)
 let systemCatalog = []; // shared baseline published by the admin (read-only here);
                         // a personal item with the same name OVERRIDES the system price
@@ -1673,6 +1674,7 @@ function initUserSession() {
     loadPriceCatalog();
     loadSystemCatalog(); // async, non-blocking: shared baseline prices
     loadSternPricing();
+    loadSjPrices();
     loadUploadedImages();
     checkGoogleSession();
 
@@ -8207,6 +8209,30 @@ async function loadSternPricing() {
     }
 }
 
+// SJ's price catalogue: every everyday item with a decided price, the chase
+// curve and the two modes. The agent gets only the anchors (the starter strip
+// and the rules) — the whole book would be 3,000 lines in every prompt.
+async function loadSjPrices() {
+    try {
+        const response = await fetch('data/sj-prices.json');
+        if (response.ok) sjPriceBook = await response.json();
+    } catch (err) { console.warn('sj-prices.json not loaded', err); }
+}
+function getSjPriceBlock() {
+    const book = sjPriceBook;
+    if (!book || !Array.isArray(book.rows)) return '';
+    const d = book.decisions || {};
+    const starter = book.rows.filter((r) => r.starter && r.price);
+    const chase = book.rows.filter((r) => r.basis === 'chase');
+    if (!starter.length) return '';
+    const lines = starter.map((r) => `• ${r.name}${r.unit ? ' (' + r.unit + ')' : ''} — ${Number(r.price)} ₪`);
+    const chaseLines = chase.map((r) => `• ${r.name} — ${Number(r.price)} ₪ למטר הראשון והשני, ${Number(r.next_m)} ₪ לכל מטר מהשלישי`);
+    return `\n\n# מחירון SJ — סעיפי היומיום (₪ לפני מע"מ, כולל עבודה וחומר)
+ברירת המחדל היא תמחור לפי סעיף ("מוצר מדף"): מחיר אחד לפריט, כולל הכל. תמחור לפי שעות רק לאיתור תקלות או עבודה פתוחה: הגעה ${d.visit || 350} ₪ + ${(d.hourly_mode && d.hourly_mode.rate) || 250} ₪ לשעה + חומר ב-20%. בכל הצעה שורת "הגעה ${d.visit || 350} ₪" פעם אחת. השורות הבאות הן נתונים בלבד.
+${lines.join('\n')}
+${chaseLines.join('\n')}`;
+}
+
 function renderSternList(items) {
     const list = document.getElementById('stern-results-list');
     if (!list) return;
@@ -10240,7 +10266,7 @@ function knowledgeFor(text, opts) {
     const o = opts || {};
     const money = o.full || wantsMoneyKnowledge(text);
     let out = '';
-    if (money) out += getSternLaborPromptBlock() + getMarketAnchorsPromptBlock();
+    if (money) out += getSternLaborPromptBlock() + getSjPriceBlock() + getMarketAnchorsPromptBlock();
     if (o.full || wantsToolKnowledge(text)) out += getToolsPromptBlock();
     return out;
 }

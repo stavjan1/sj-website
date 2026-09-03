@@ -4,7 +4,7 @@
 // only once yours is on it (the server decides that, not this file). Kept
 // deliberately small: Stav, 2.9.2026 — "תעשה את המינימום ונזרום".
 
-let helperState = { items: [], mine: {}, others: {}, loaded: false };
+let helperState = { items: [], groups: [], mine: {}, others: {}, loaded: false };
 
 function helperEsc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -32,7 +32,7 @@ async function refreshHelperAccess() {
         btn.hidden = !res.ok;
         if (res.ok) {
             const data = await res.json();
-            helperState = { items: data.items || [], mine: data.mine || {}, others: data.others || {}, loaded: true };
+            helperState = { items: data.items || [], groups: data.groups || [], mine: data.mine || {}, others: data.others || {}, loaded: true };
         }
         helperAccessRetries = 0;
     } catch (e) {
@@ -52,7 +52,7 @@ async function renderHelperPanel(force) {
             const res = await adminRes('/api/helper-prices');
             const data = await res.json();
             if (!res.ok) { root.innerHTML = '<p class="input-help">' + helperEsc((data.error && data.error.message) || 'אין גישה.') + '</p>'; return; }
-            helperState = { items: data.items || [], mine: data.mine || {}, others: data.others || {}, loaded: true };
+            helperState = { items: data.items || [], groups: data.groups || [], mine: data.mine || {}, others: data.others || {}, loaded: true };
         } catch (e) {
             // A helper who is not the admin never sees the admin strip, so this
             // is his one way back in. Same reconnect as the strip's button —
@@ -66,11 +66,24 @@ async function renderHelperPanel(force) {
     }
     const q = (document.getElementById('helper-q') || {}).value || '';
     const needle = q.trim();
-    const rows = helperState.items.filter((it) => !needle || it.name.includes(needle));
+    const rows = helperState.items.filter((it) => !needle || it.name.includes(needle) || (it.sub || '').includes(needle));
     const done = Object.keys(helperState.mine).length;
     const counter = document.getElementById('helper-progress');
     if (counter) counter.textContent = done + ' מתוך ' + helperState.items.length + ' סעיפים עם המחיר שלך';
-    root.innerHTML = rows.map(helperRow).join('') || '<p class="input-help">לא נמצא סעיף כזה — תוסיף אותו למטה.</p>';
+    if (!rows.length) { root.innerHTML = '<p class="input-help">לא נמצא סעיף כזה — תוסיף אותו למטה.</p>'; return; }
+    // The list reads like the catalogue: the everyday strip first, then the
+    // groups in the order an electrician opens them, the helpers' own items last.
+    const groups = helperState.groups || [];
+    const sections = [];
+    const starter = rows.filter((it) => it.starter);
+    if (starter.length && !needle) sections.push({ name: 'הכי בשימוש', rows: starter });
+    for (const g of groups) {
+        const inG = rows.filter((it) => it.group === g.id && !(it.starter && !needle));
+        if (inG.length) sections.push({ name: g.name, rows: inG });
+    }
+    const custom = rows.filter((it) => !it.group);
+    if (custom.length) sections.push({ name: 'סעיפים שהוספתם', rows: custom });
+    root.innerHTML = sections.map((sec) => `<h4 class="helper-group">${helperEsc(sec.name)} <span class="input-help">· ${sec.rows.length}</span></h4>` + sec.rows.map(helperRow).join('')).join('');
 }
 
 function helperRow(it) {
@@ -78,7 +91,7 @@ function helperRow(it) {
     const others = helperState.others[it.id];
     return `
     <div class="helper-row${mine ? ' has-price' : ''}" id="helper-row-${helperEsc(it.id)}">
-        <div class="helper-row-name">${helperEsc(it.name)} <span class="helper-unit">${helperEsc(it.unit)}</span></div>
+        <div class="helper-row-name">${helperEsc(it.name)} <span class="helper-unit">${helperEsc(it.unit)}</span>${it.sj ? ` <span class="helper-sj" title="המחיר של SJ, לפי ${helperEsc(it.sub || '')}">SJ: ${helperFmt(it.sj)} ₪</span>` : ''}</div>
         <div class="helper-row-input">
             <input type="number" inputmode="numeric" min="1" step="1" class="model-select-input" style="width:110px"
                    value="${mine ? helperEsc(mine.price) : ''}" placeholder="₪"

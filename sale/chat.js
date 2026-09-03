@@ -1774,7 +1774,7 @@ async function runPlanningAgent(activeProject) {
         // The planning turn always prices, so the money books always ride; the
         // tool bag only when tools are the subject.
         const planSystem = getPlanningSystemInstruction()
-            + getSternLaborPromptBlock()
+            + getSternLaborPromptBlock() + getSjPriceBlock()
             + getMarketAnchorsPromptBlock()
             + (wantsToolKnowledge(lastUserSaid(activeProject.planChatHistory)) ? getToolsPromptBlock() : '');
         const response = await callAI(effectiveModel, {
@@ -2013,7 +2013,7 @@ async function runPricingAgent(activeProject, promptChars) {
     // The itemised quote is the turn that produces the numbers, so it carries
         // everything by definition — except the tool bag, which is still only for
         // when tools are being asked about.
-        const systemInstructionText = getProfessionSystemInstruction() + getSternLaborPromptBlock() + getPriceCatalogPromptBlock(recentUserText) + getMarketAnchorsPromptBlock() + (wantsToolKnowledge(recentUserText) ? getToolsPromptBlock() : '') + getPricingInstinctPromptBlock();
+        const systemInstructionText = getProfessionSystemInstruction() + getSternLaborPromptBlock() + getSjPriceBlock() + getPriceCatalogPromptBlock(recentUserText) + getMarketAnchorsPromptBlock() + (wantsToolKnowledge(recentUserText) ? getToolsPromptBlock() : '') + getPricingInstinctPromptBlock();
     const _t0 = performance.now();
     setQuotaCharging(true);
     try {

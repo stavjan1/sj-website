@@ -29,6 +29,7 @@ function load() {
     const ctx = createContext({
         // Each book announces itself, so a test can see which ones rode along.
         getSternLaborPromptBlock: () => '[LABOUR]',
+        getSjPriceBlock: () => '[SJ]',
         getMarketAnchorsPromptBlock: () => '[ANCHORS]',
         getToolsPromptBlock: () => '[TOOLS]',
         String, RegExp,

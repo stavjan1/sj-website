@@ -20,11 +20,14 @@ let marketSort = 'gap';
 let catalogView = 'market';
 
 function setCatalogView(view) {
-    catalogView = view === 'market' ? 'market' : 'mine';
+    catalogView = view === 'market' ? 'market' : view === 'sj' ? 'sj' : 'mine';
     const mine = document.getElementById('catalog-view-mine');
     const market = document.getElementById('catalog-view-market');
-    if (mine) mine.hidden = catalogView === 'market';
+    const sj = document.getElementById('catalog-view-sj');
+    if (mine) mine.hidden = catalogView !== 'mine';
     if (market) market.hidden = catalogView !== 'market';
+    if (sj) sj.hidden = catalogView !== 'sj';
+    if (catalogView === 'sj') renderSjCatalog();
     document.querySelectorAll('#catalog-subtabs .subtab').forEach(b => {
         const on = b.dataset.sub === catalogView;
         b.classList.toggle('active', on);
@@ -32,6 +35,51 @@ function setCatalogView(view) {
     });
     if (catalogView === 'market') renderMarketPrices();
 }
+
+// ── מחירון SJ: the decided price for every everyday item, in two modes ──
+// Mode A (default): the item's price, all in. Mode B: hours × the hourly
+// rate + materials — shown for the same rows, so the customer sees why.
+let sjMode = 'A';
+function setSjMode(m) { sjMode = m === 'B' ? 'B' : 'A'; document.querySelectorAll('#sj-modes .chip').forEach((c) => c.classList.toggle('on', c.dataset.mode === sjMode)); renderSjCatalog(); }
+async function renderSjCatalog() {
+    const box = document.getElementById('sj-list');
+    if (!box) return;
+    if (!sjPriceBook) {
+        box.innerHTML = '<p class="input-help">טוען…</p>';
+        try { const r = await fetch('data/sj-prices.json'); if (r.ok) sjPriceBook = await r.json(); } catch (e) { /* offline */ }
+        if (!sjPriceBook) { box.innerHTML = '<p class="input-help">המחירון לא נטען. נסה שוב עם קליטה.</p>'; return; }
+    }
+    const book = sjPriceBook, d = book.decisions || {};
+    const rate = (d.hourly_mode && d.hourly_mode.rate) || 250, visit = d.visit || 350;
+    const q = ((document.getElementById('sj-search') || {}).value || '').trim();
+    const rows = book.rows.filter((r) => r.price && (!q || r.name.includes(q) || (book.subs && book.subs[r.s] || '').includes(q)));
+    const note = document.getElementById('sj-note');
+    if (note) note.textContent = sjMode === 'A'
+        ? `לפי סעיפים: מספר אחד לפריט, כולל עבודה וחומר. הגעה ${visit} ₪ פעם אחת לביקור.`
+        : `לפי שעות: הגעה ${visit} ₪ + ${rate} ₪ לשעה + חומר. לאיתור תקלות ועבודה פתוחה.`;
+    const groups = book.groups || [];
+    const fmt = (n) => Number(n).toLocaleString('he-IL');
+    const line = (r) => {
+        const sub = book.subs ? (book.subs[r.s] || '') : '';
+        let price;
+        if (sjMode === 'B' && r.basis === 'work' && r.hours != null) price = `${r.hours} שע׳ × ${rate} + חומר ${fmt(r.materials || 0)} = <b>${fmt(Math.round(r.hours * rate + (r.materials || 0)))}</b>`;
+        else if (r.basis === 'chase') price = `<b>${fmt(r.price)}</b> למטר 1–2, ${fmt(r.next_m)} מהשלישי`;
+        else price = `<b>${fmt(r.price)}</b>`;
+        return `<div class="market-row"><div class="market-name">${escapeHtml(r.name)} <span class="input-help">${escapeHtml(r.unit || '')}${sub ? ' · ' + escapeHtml(sub) : ''}</span></div><div class="market-nums">${price} ₪</div></div>`;
+    };
+    const sections = [];
+    const starter = rows.filter((r) => r.starter);
+    if (starter.length && !q) sections.push({ name: 'הכי בשימוש', rows: starter });
+    for (const g of groups) {
+        const inG = rows.filter((r) => r.group === g.id && !(r.starter && !q));
+        if (inG.length) sections.push({ name: g.name, rows: inG });
+    }
+    box.innerHTML = sections.length
+        ? sections.map((sec) => `<details class="sj-group" ${sec.name === 'הכי בשימוש' || q ? 'open' : ''}><summary>${escapeHtml(sec.name)} <span class="input-help">· ${sec.rows.length}</span></summary>${sec.rows.map(line).join('')}</details>`).join('')
+        : '<p class="input-help">אין סעיף כזה.</p>';
+}
+window.setSjMode = setSjMode;
+window.renderSjCatalog = renderSjCatalog;
 
 // My price for an item name, from the personal catalog (system catalog is
 // merged into priceCatalog on boot, so this is "what I would quote").
