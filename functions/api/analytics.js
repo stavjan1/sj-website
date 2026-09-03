@@ -18,6 +18,7 @@
 // real one — an excluded hit is still counted somewhere, never silently lost.
 
 import { adminGate, rateLimit, dayKey, jsonResponse } from './_tiers.js';
+import { safeParse } from './_http.js';
 
 // The AI pools the ledger in _ai.js writes under. Listed rather than scanned:
 // Pages KV list() is paginated and slow, and this set changes about once a year.
@@ -43,8 +44,6 @@ const DAILY_HIT_CAP = 300;
 const BOT_RE = /bot|crawl|spider|slurp|bingpreview|headless|phantom|puppeteer|playwright|selenium|lighthouse|curl|wget|python-requests|axios|monitoring|uptime|pingdom|gtmetrix|ahrefs|semrush|mj12|dotbot|petal|bytespider|gptbot|claudebot|ccbot|perplexity|applebot/i;
 
 function dayHitsKey(site, day) { return `hits:${site}:${day}`; }
-
-function safeParse(s, fallback) { try { return JSON.parse(s); } catch { return fallback; } }
 
 // Stable per-day visitor id with no stored identifier: hash(ip + ua + day) and
 // keep only the first 8 hex chars. Rotates daily by construction, so it counts

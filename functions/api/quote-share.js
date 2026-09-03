@@ -10,7 +10,12 @@
 // PUT ?t=<token> (public): the customer approving the quote from that page.
 //   Body { name?, note? } → stamps `approved` once and returns it.
 
-import { ADMIN_EMAIL, verifyGoogleEmail, loadTierConfig, getTierForEmail } from './_tiers.js';
+import { ADMIN_EMAIL, verifyGoogleEmail, bearerToken, loadTierConfig, getTierForEmail } from './_tiers.js';
+import { json as reply, corsHeaders, preflight, safeParse } from './_http.js';
+
+const METHODS = 'GET, POST, PUT, OPTIONS';
+const CORS = corsHeaders(METHODS);
+const json = (obj, status) => reply(obj, status, CORS);
 
 const MAX_PAYLOAD = 300 * 1024; // logo included only if small; no watermark
 const MAX_ITEMS = 200;
@@ -73,7 +78,7 @@ export async function onRequest(context) {
   const { request, env } = context;
   const method = request.method.toUpperCase();
 
-  if (method === 'OPTIONS') return new Response(null, { status: 204, headers: cors() });
+  if (method === 'OPTIONS') return preflight(request, METHODS);
   if (!env.SJ_DATA) return json({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
 
   if (method === 'GET') {
@@ -115,7 +120,7 @@ export async function onRequest(context) {
 
   if (method === 'POST') {
     // Only a signed-in (verified) user can create share links.
-    const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+    const token = bearerToken(request);
     if (!token) return json({ error: { message: 'שיתוף בקישור זמין למשתמשי Google בלבד.' } }, 401);
     const email = await verifyGoogleEmail(token);
     if (!email) return json({ error: { message: 'הזדהות Google לא תקפה.' } }, 401);
@@ -159,19 +164,3 @@ function randomToken(len) {
   return out;
 }
 
-function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
-
-function cors() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
-}
-
-function json(obj, status) {
-  return new Response(JSON.stringify(obj), {
-    status: status || 200,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', ...cors() },
-  });
-}

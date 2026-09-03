@@ -17,8 +17,13 @@
 //   GET  /api/feedback   (admin) → recent verdicts + rates per job type
 
 import { adminGate, rateLimit, verifyGoogleEmail, bearerToken, dayKey } from './_tiers.js';
+import { json as reply, corsHeaders, preflight } from './_http.js';
 import { recordContribution, listContributors } from './_contrib.js';
 import { cleanAnonId } from './_anon.js';
+
+const METHODS = 'GET, POST, OPTIONS';
+const CORS = corsHeaders(METHODS);
+const json = (obj, status) => reply(obj, status, CORS);
 
 const VERDICTS = {
   way_off:  { he: 'ממש לא',              alert: true,  weight: -2 },
@@ -33,7 +38,7 @@ const LIST_LIMIT = 200;
 export async function onRequest(context) {
   const { request, env } = context;
   const method = request.method.toUpperCase();
-  if (method === 'OPTIONS') return new Response(null, { status: 204, headers: cors() });
+  if (method === 'OPTIONS') return preflight(request, METHODS);
   if (method === 'POST') return submit(context);
   if (method === 'GET') return report(context);
   return json({ error: { message: 'מתודה לא נתמכת.' } }, 405);
@@ -178,21 +183,6 @@ async function report({ request, env }) {
     rates: byJob,
     entries: entries.slice(0, 50),
     contributors,
-  });
-}
-
-function cors() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
-}
-
-function json(obj, status) {
-  return new Response(JSON.stringify(obj), {
-    status: status || 200,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', ...cors() },
   });
 }
 

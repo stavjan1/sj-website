@@ -27,6 +27,7 @@
 // five-figure read bill.
 
 import { adminGate, jsonResponse } from './_tiers.js';
+import { safeParse } from './_http.js';
 
 const USER_PREFIX = 'user:';
 // 150, not 500. Measured: one refresh costs one list plus one read per user,
@@ -39,8 +40,6 @@ const USER_PREFIX = 'user:';
 const MAX_USERS = 150;
 const MAX_THREADS = 300;    // the feed is for reading, not for archiving
 const PREVIEW = 160;
-
-function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
 
 // The text of one turn. The client stores Gemini's shape — { role, parts:[{text}] }
 // — and older records sometimes carry a bare string.

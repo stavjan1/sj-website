@@ -18,15 +18,20 @@
 // keeps everything locally (PDF export still works) and shows the upgrade
 // screen. Counted by history-entry IDs that don't exist in the stored blob.
 
-import { loadTierConfig, getTierForEmail, monthKey, verifyGoogleEmail, ADMIN_EMAIL } from './_tiers.js';
+import { loadTierConfig, getTierForEmail, monthKey, verifyGoogleEmail, bearerToken, ADMIN_EMAIL } from './_tiers.js';
+import { json as reply, corsHeaders, preflight, safeParse } from './_http.js';
 import { sendMailTracked } from './_mail.js';
+
+const METHODS = 'GET, PUT, POST, DELETE, OPTIONS';
+const CORS = corsHeaders(METHODS);
+const json = (obj, status) => reply(obj, status, CORS);
 
 export async function onRequest(context) {
   const { request, env } = context;
   const method = request.method.toUpperCase();
 
   if (method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: cors() });
+    return preflight(request, METHODS);
   }
 
   if (!env.SJ_DATA) {
@@ -34,7 +39,7 @@ export async function onRequest(context) {
     return json({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
   }
 
-  const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  const token = bearerToken(request);
   if (!token) return json({ error: { message: 'חסר אסימון הזדהות.' } }, 401);
 
   const email = await verifyGoogleEmail(token);
@@ -226,19 +231,3 @@ function isEmptyDb(db) {
   return len('history') === 0 && len('projects') === 0 && len('trash') === 0 && len('catalog') === 0;
 }
 
-function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
-
-function cors() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, PUT, POST, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
-}
-
-function json(obj, status) {
-  return new Response(JSON.stringify(obj), {
-    status: status || 200,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', ...cors() },
-  });
-}

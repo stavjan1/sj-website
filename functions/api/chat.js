@@ -23,6 +23,7 @@ import {
   ADMIN_EMAIL, loadModelClass, loadTierConfig, getTierForEmail,
   verifyGoogleEmail, bearerToken, dayKey, rateLimit,
 } from './_tiers.js';
+import { json } from './_http.js';
 
 // The endpoint every visitor actually hits, and until now it had no error
 // boundary at all: anything that threw here escaped the Function, and
@@ -293,8 +294,4 @@ function recentUserText(messages, turns) {
 // end with "תודה" and get no map.
 function lastUserText(messages) {
   return recentUserText(messages, 2).slice(0, 2000);
-}
-
-function json(obj, status) {
-  return new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
 }

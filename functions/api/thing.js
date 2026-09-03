@@ -22,6 +22,7 @@
 //   PUT /api/thing?k=<key>  { tree } → { ok, tree }        (merged result)
 
 import { jsonResponse, rateLimit } from './_tiers.js';
+import { MSG, safeParse } from './_http.js';
 import { keyFor } from './_ai.js';
 
 const MAX_BYTES = 900 * 1024;
@@ -49,8 +50,6 @@ const REC_MIMES = /^audio\/(webm|ogg|mp4|mpeg|mp3|wav|x-wav|aac|m4a|x-m4a)$/;
 const IMG_MAX_BYTES = 2 * 1024 * 1024;
 const IMG_MAX_PER_NODE = 6;
 const IMG_MIMES = /^image\/(jpeg|png|webp)$/;
-
-function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
 
 // A blob leaves as bytes of the type we validated, never as a document: the
 // Content-Type is re-checked against the allow-list on the way out, sniffing is
@@ -206,6 +205,37 @@ const b64 = (buf) => {
   return btoa(s);
 };
 
+// Every Gemini call this file makes, in one place. Deliberately NOT routed
+// through _ai.js: these are one-shot utility calls (a title, a transcript, a
+// colour per bubble) with their own model and their own request shape —
+// one user part made of the instruction and the text joined, an optional
+// inline blob after it, no systemInstruction. `maxTokens` caps the answer and
+// switches thinking off with it: Gemini 2.5 spends "thinking" tokens out of the
+// same budget as the answer, and with a 40-token cap the thought ate the title
+// and two letters came back. `json` asks for JSON response mode. The answer is
+// the first candidate's text; '' when the key is missing, the call fails or
+// the answer is empty — which every caller already treats as "next engine".
+async function askGemini(env, { system, user, inline, temperature, maxTokens, json }) {
+  const key = keyFor(env, 'gemini');
+  if (!key) return '';
+  const parts = [{ text: system ? system + '\n\n' + user : user }];
+  if (inline) parts.push({ inline_data: inline });
+  const generationConfig = { temperature };
+  if (maxTokens) generationConfig.maxOutputTokens = maxTokens;
+  if (json) generationConfig.responseMimeType = 'application/json';
+  if (maxTokens) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig }),
+    });
+    if (!res.ok) return '';
+    const data = await res.json();
+    return ((data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [])
+      .map((p) => p.text || '').join('');
+  } catch { return ''; }
+}
+
 // Hebrew speech → text. Workers AI's Whisper first (free, bound already, takes
 // the browser's webm/opus as-is); Gemini as the fallback when the binding is
 // missing, with the same audio inline. Either way an empty string is a valid
@@ -218,24 +248,12 @@ export async function transcribe(env, bytes, mime) {
       if (typeof text === 'string') return text.trim();
     } catch { /* fall through to Gemini */ }
   }
-  const key = keyFor(env, 'gemini');
-  if (!key) return '';
-  try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [
-          { text: 'תמלל את ההקלטה הזו מילה במילה בעברית. החזר רק את התמלול, בלי הקדמה ובלי הערות.' },
-          { inline_data: { mime_type: mime.split(';')[0], data: b64(bytes) } },
-        ] }],
-        generationConfig: { temperature: 0 },
-      }),
-    });
-    if (!res.ok) return '';
-    const data = await res.json();
-    return ((data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [])
-      .map((p) => p.text || '').join('').trim();
-  } catch { return ''; }
+  const text = await askGemini(env, {
+    user: 'תמלל את ההקלטה הזו מילה במילה בעברית. החזר רק את התמלול, בלי הקדמה ובלי הערות.',
+    inline: { mime_type: mime.split(';')[0], data: b64(bytes) },
+    temperature: 0,
+  });
+  return text.trim();
 }
 
 // A title for a bubble that has none, from what it says. Stav, 2.9.2026:
@@ -265,25 +283,8 @@ export function plausibleTitle(t) {
 export async function suggestTitle(env, text) {
   const body = String(text || '').slice(0, 6000);
   if (body.trim().length < 3) return '';
-  const key = keyFor(env, 'gemini');
-  if (key) {
-    try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: TITLE_PROMPT + '\n\n' + body }] }],
-          // Gemini 2.5 spends "thinking" tokens out of the same budget as the answer;
-          // with a 40-token cap the thought ate the title and two letters came back.
-          generationConfig: { temperature: 0.2, maxOutputTokens: 96, thinkingConfig: { thinkingBudget: 0 } },
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const t = cleanTitle(((data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || []).map((p) => p.text || '').join(''));
-        if (plausibleTitle(t)) return t;
-      }
-    } catch { /* next engine */ }
-  }
+  const t = cleanTitle(await askGemini(env, { system: TITLE_PROMPT, user: body, temperature: 0.2, maxTokens: 96 }));
+  if (plausibleTitle(t)) return t;
   if (env.AI) {
     try {
       const out = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
@@ -315,23 +316,8 @@ export async function classifyBubbles(env, items, legend) {
       return (Array.isArray(arr) ? arr : []).map((r) => ({ id: String(r.id || ''), c: Math.round(Number(r.c)) })).filter((r) => ids.has(r.id) && allowed.has(r.c));
     } catch { return []; }
   };
-  const key = keyFor(env, 'gemini');
-  if (key) {
-    try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: PAINT_PROMPT + '\n\n' + body }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 4096, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const out = parse(((data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || []).map((p) => p.text || '').join(''));
-        if (out.length) return out;
-      }
-    } catch { /* next engine */ }
-  }
+  const painted = parse(await askGemini(env, { system: PAINT_PROMPT, user: body, temperature: 0.1, maxTokens: 4096, json: true }));
+  if (painted.length) return painted;
   if (env.AI) {
     try {
       const out = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', { messages: [{ role: 'system', content: PAINT_PROMPT }, { role: 'user', content: body }], max_tokens: 4096, temperature: 0.1 });
@@ -480,7 +466,7 @@ export async function onRequestPut(context) {
   const { request, env } = context;
   const k = keyFrom(request);
   if (!validKey(k)) return jsonResponse({ error: { message: 'לא נמצא.' } }, 404);
-  if (!(await rateLimit(env, request, 'thing', 60))) return jsonResponse({ error: { message: 'יותר מדי שמירות בזמן קצר.' } }, 429);
+  if (!(await rateLimit(env, request, 'thing', 60))) return jsonResponse({ error: { message: MSG.TOO_MANY_SAVES } }, 429);
   if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
   let body;
   try { body = await request.json(); } catch { return jsonResponse({ error: { message: 'בקשה לא תקינה.' } }, 400); }

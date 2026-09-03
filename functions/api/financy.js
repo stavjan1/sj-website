@@ -10,26 +10,22 @@
 // plan). They live in the user's finance record in KV and are never echoed. Sync writes accounts (bank + cards, with balances) and entries
 // (transactions, de-duplicated by external id) — manual data is left alone.
 
-import { verifyGoogleEmail, bearerToken, getTierForEmail, jsonResponse, ADMIN_EMAIL, rateLimit } from './_tiers.js';
+import { proGate, jsonResponse, rateLimit, financeKey, readFinanceRecord } from './_tiers.js';
 
-const PRO_TIERS = ['pro', 'business', 'admin'];
-const keyFor = (email) => email === ADMIN_EMAIL ? 'finance:admin' : `finance:${email}`;
-
-async function proGate(env, request) {
-    const email = await verifyGoogleEmail(bearerToken(request));
-    if (!email) return { ok: false, response: jsonResponse({ error: { message: 'נדרשת התחברות.', code: 'auth-expired' } }, 401) };
-    const tier = await getTierForEmail(env, email);
-    if (!PRO_TIERS.includes(tier)) return { ok: false, response: jsonResponse({ error: { message: 'חיבור בנקים הוא תכונת PRO.' } }, 403) };
-    return { ok: true, email };
-}
+// The same record finance.js serves, under the same lower-cased key. This file
+// used to key on the raw address Google returned, so a Workspace user whose
+// address came back capitalised had one record the dashboard read and another
+// the bank sync wrote into. Reads still fall back to the raw-address key for
+// records from before the fix; writes go to the canonical key only.
+const PRO_DENIED = { message: 'חיבור בנקים הוא תכונת PRO.' };
 
 async function loadRecord(env, email) {
-    try { return JSON.parse(await env.SJ_DATA.get(keyFor(email)) || 'null') || { accounts: [], entries: [], recurring: [], settings: {} }; }
+    try { return JSON.parse(await readFinanceRecord(env, email) || 'null') || { accounts: [], entries: [], recurring: [], settings: {} }; }
     catch { return { accounts: [], entries: [], recurring: [], settings: {} }; }
 }
 function saveRecord(env, email, rec) {
     rec.lastUpdated = Date.now();
-    return env.SJ_DATA.put(keyFor(email), JSON.stringify(rec));
+    return env.SJ_DATA.put(financeKey(email), JSON.stringify(rec));
 }
 function publicStatus(rec) {
     const fz = (rec.settings && rec.settings.financy) || {};
@@ -45,7 +41,7 @@ import { financySync, financyRefresh } from './_financy.js';
 export async function onRequestGet(context) {
     const { request, env } = context;
     if (!env.SJ_DATA) return jsonResponse({ error: { message: 'KV לא מוגדר.' } }, 501);
-    const gate = await proGate(env, request);
+    const gate = await proGate(env, request, PRO_DENIED);
     if (!gate.ok) return gate.response;
     const rec = await loadRecord(env, gate.email);
     return jsonResponse(publicStatus(rec));
@@ -54,7 +50,7 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
     const { request, env } = context;
     if (!env.SJ_DATA) return jsonResponse({ error: { message: 'KV לא מוגדר.' } }, 501);
-    const gate = await proGate(env, request);
+    const gate = await proGate(env, request, PRO_DENIED);
     if (!gate.ok) return gate.response;
     if (!(await rateLimit(env, request, 'financy', 20))) return jsonResponse({ error: { message: 'יותר מדי בקשות, נסו בעוד דקה.' } }, 429);
 

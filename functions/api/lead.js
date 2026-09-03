@@ -15,6 +15,7 @@
 
 import { generate } from './_ai.js';
 import { rateLimit, dailyQuota } from './_tiers.js';
+import { json } from './_http.js';
 import { sendMail, SJ_FROM } from './_mail.js';
 
 // web3forms key: prefer the env var (Cloudflare → Settings → Env vars,
@@ -163,8 +164,4 @@ export async function onRequestPost(context) {
       ? 'הסיכום נשלח אליך למייל ✓ נשמח לעזור בכל שאלה.'
       : 'קיבלנו את הפנייה ✓ ניצור איתך קשר בהקדם.',
   });
-}
-
-function json(obj, status) {
-  return new Response(JSON.stringify(obj), { status: status || 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
 }
