@@ -1352,7 +1352,7 @@ async function openAdminConvo(i) {
         body.innerHTML = (d.messages || []).map((m) => `
             <div class="cr-msg ${m.role === 'user' ? 'is-user' : 'is-ai'}">
                 <span class="cr-who">${m.role === 'user' ? 'הוא' : 'הסוכן'}</span>
-                <p>${escapeHtml(m.text).replace(/\n/g, '<br>')}</p>
+                <p style="white-space:pre-wrap">${escapeHtml(m.text)}</p>
             </div>`).join('') || '<p class="input-help">אין הודעות בשיחה הזאת.</p>';
     } catch (e) {
         const body = dlg.querySelector('#cr-body');

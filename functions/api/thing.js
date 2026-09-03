@@ -39,15 +39,31 @@ const MAX_TRASH = 500;
 const REC_MAX_BYTES = 4 * 1024 * 1024;   // ~15 minutes of opus
 const REC_MAX_PER_NODE = 10;
 const MAX_PAGES = 60;
-const REC_MIMES = /^audio\/(webm|ogg|mp4|mpeg|mp3|wav|x-wav|aac|m4a|x-m4a)/;
+// Anchored on both ends: the header is the caller's, and a value like
+// "image/png, text/html" would pass a prefix match, be stored, and come back as
+// the served Content-Type — which a browser reads as HTML on our origin.
+const REC_MIMES = /^audio\/(webm|ogg|mp4|mpeg|mp3|wav|x-wav|aac|m4a|x-m4a)$/;
 
 // Pictures. The page shrinks them to ~1280px JPEG before sending, so a photo
 // from the phone is a few hundred kilobytes; the cap is a guard, not a budget.
 const IMG_MAX_BYTES = 2 * 1024 * 1024;
 const IMG_MAX_PER_NODE = 6;
-const IMG_MIMES = /^image\/(jpeg|png|webp)/;
+const IMG_MIMES = /^image\/(jpeg|png|webp)$/;
 
 function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
+
+// A blob leaves as bytes of the type we validated, never as a document: the
+// Content-Type is re-checked against the allow-list on the way out, sniffing is
+// off, and a sandboxing CSP makes anything that still looked like HTML inert.
+function blobResponse(bytes, mime, allow, fallback) {
+  const m = allow.test(String(mime || '')) ? String(mime) : fallback;
+  return new Response(bytes, { status: 200, headers: {
+    'Content-Type': m, 'Content-Length': String(bytes.byteLength),
+    'Cache-Control': 'private, max-age=31536000, immutable',
+    'X-Content-Type-Options': 'nosniff',
+    'Content-Security-Policy': "default-src 'none'; sandbox",
+  } });
+}
 
 // The key never touches KV as itself. Its hash is the record name, so a KV
 // listing (admin console, a backup) shows nothing that opens the page.
@@ -415,11 +431,7 @@ async function postImage(context, k, name) {
 async function getImage(env, name, id) {
   const got = await env.SJ_DATA.getWithMetadata(`${name}:img:${id}`, 'arrayBuffer');
   if (!got || !got.value) return jsonResponse({ error: { message: 'לא נמצא.' } }, 404);
-  const mime = (got.metadata && got.metadata.m) || 'image/jpeg';
-  return new Response(got.value, { status: 200, headers: {
-    'Content-Type': mime, 'Content-Length': String(got.value.byteLength),
-    'Cache-Control': 'private, max-age=31536000, immutable',
-  } });
+  return blobResponse(got.value, got.metadata && got.metadata.m, IMG_MIMES, 'image/jpeg');
 }
 
 async function deleteImage(context, name) {
@@ -436,11 +448,7 @@ async function deleteImage(context, name) {
 async function getRecording(env, name, id) {
   const got = await env.SJ_DATA.getWithMetadata(`${name}:rec:${id}`, 'arrayBuffer');
   if (!got || !got.value) return jsonResponse({ error: { message: 'לא נמצא.' } }, 404);
-  const mime = (got.metadata && got.metadata.m) || 'audio/webm';
-  return new Response(got.value, { status: 200, headers: {
-    'Content-Type': mime, 'Content-Length': String(got.value.byteLength),
-    'Cache-Control': 'private, max-age=31536000, immutable',
-  } });
+  return blobResponse(got.value, got.metadata && got.metadata.m, REC_MIMES, 'audio/webm');
 }
 
 async function deleteRecording(context, name) {

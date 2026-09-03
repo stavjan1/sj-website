@@ -253,3 +253,19 @@ test('a page can stay out of הכל, and one button paints every bubble by the l
     const { classifyBubbles } = await import('../functions/api/thing.js');
     assert.deepEqual(await classifyBubbles({}, [{ id: 'a', text: 'x' }], [{ c: 5, name: 'תובנה' }]), [], 'with no engine at hand nothing is painted — never a guess');
 });
+
+// Security review 4.9.2026: the upload Content-Type is the caller's. It is
+// validated whole (anchored), and a stored blob is served with the type
+// re-checked, sniffing off and a sandboxing CSP — never as a document.
+test('a blob can only leave as the exact type that was allowed in', () => {
+    const api = readFileSync(new URL('../functions/api/thing.js', import.meta.url), 'utf8');
+    assert.ok(api.includes('const IMG_MIMES = /^image\\/(jpeg|png|webp)$/;'), 'IMG_MIMES must be anchored at both ends');
+    assert.ok(api.includes('const REC_MIMES = /^audio\\/(webm|ogg|mp4|mpeg|mp3|wav|x-wav|aac|m4a|x-m4a)$/;'), 'REC_MIMES must be anchored at both ends');
+    assert.ok(api.includes("'X-Content-Type-Options': 'nosniff'"), 'blob responses must switch sniffing off');
+    assert.ok(api.includes("default-src 'none'; sandbox"), 'blob responses must carry a sandboxing CSP');
+    assert.ok(!api.includes("'Content-Type': mime,"), 'a stored mime must not be echoed without re-validation');
+    const mw = readFileSync(new URL('../functions/_middleware.js', import.meta.url), 'utf8');
+    assert.ok(mw.includes('X-Content-Type-Options'), 'every /api/* response gets nosniff from the middleware');
+    const admin = readFileSync(new URL('../sale/admin.js', import.meta.url), 'utf8');
+    assert.ok(!admin.includes("escapeHtml(m.text).replace(/\\n/g, '<br>')"), 'the admin reader must not re-insert markup after escaping');
+});
