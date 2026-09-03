@@ -263,10 +263,14 @@ test('there is one step rail, and it is the sidebar', () => {
     // The flag it used to own outlives it, and three rules depend on that —
     // the project banner's visibility among them. Reading the element first
     // and returning early made the flag a property of the rail's existence.
+    // The rail's own height math (a #topnav that no longer exists, a CSS
+    // variable nothing read) went with it, so today the function is the flag
+    // and nothing else — but a return before the flag would still be the bug.
     const i = APP.indexOf('function updateProjectRail(');
     const body = APP.slice(i, APP.indexOf('\n}', i));
     const flag = body.indexOf("classList.toggle('in-project-stage'");
-    const early = body.indexOf('if (!onStage) return;');
-    assert.ok(flag > -1 && early > flag,
+    assert.ok(flag > -1, 'updateProjectRail no longer sets in-project-stage');
+    assert.ok(!/\breturn\b/.test(body.slice(0, flag)),
         'in-project-stage must be set before anything can return early, or the banner disappears with it');
+    assert.ok(!/topnav/.test(body), 'the dead #topnav measurement is back');
 });

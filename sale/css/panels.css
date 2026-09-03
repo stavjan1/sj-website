@@ -6164,3 +6164,12 @@ th.pv-price { text-align: end; }
 .helper-row-others { grid-column: 1 / -1; }
 .helper-row-others:empty { display: none; }
 @media (max-width: 600px) { .helper-row { grid-template-columns: 1fr; } }
+
+/* The helper list's group headings and the SJ price tag on a row, plus the
+   collapsible groups of the מחירון SJ catalogue view (market.js). Used to sit
+   in a <style> block inside index.html, above #panel-helper. */
+.helper-group { margin: 14px 0 6px; font-size: var(--fs-sm); color: var(--text-2); }
+.helper-sj { font-size: var(--fs-xs); color: var(--accent); margin-inline-start: 6px; white-space: nowrap; }
+.sj-group summary { cursor: pointer; padding: 8px 0; font-weight: 700; }
+.sj-group .market-row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); font-size: var(--fs-sm); }
+.sj-group .market-nums { white-space: nowrap; }
