@@ -24,10 +24,15 @@ import { safeParse } from './_http.js';
 // Pages KV list() is paginated and slow, and this set changes about once a year.
 const AI_POOLS = ['gemini:primary', 'gemini:backup', 'gemini:paid', 'grok', 'cloudflare', 'all'];
 
-// Three properties, because they answer three different questions: the office
-// site sells engineering, the זרם page sells the product, and the app itself is
-// people using it. Days before the split carry app traffic inside 'zerem'.
-const SITES = ['site', 'zerem', 'app'];
+// Four properties, because they answer four different questions: the office
+// site sells engineering, the זרם page sells the product, the app itself is
+// people using it, and a shared quote (/q/) is a CUSTOMER opening what an
+// electrician sent. Days before the split carry app traffic inside 'zerem';
+// days before the quote bucket carry /q/ views inside 'site'.
+// track.js's site() must only ever return one of these — a value not listed
+// here is answered 200 skipped:'bad-site' and never counted, which is silent.
+// tests/analytics.test.mjs holds the two lists to the same set.
+export const SITES = ['site', 'zerem', 'app', 'quote'];
 const UNIQ_CAP = 4000;          // hashed ids kept per day — a counter, not an audience
 const PATH_CAP = 200;           // distinct paths tracked per day
 // Every counted hit costs TWO KV writes, not one: the rate limiter writes its
@@ -517,8 +522,9 @@ async function weeklyInsights(env) {
   };
 
   const notes = [];
+  const labels = { site: 'האתר', zerem: 'זרם', app: 'המערכת', quote: 'הצעות ששותפו' };
   for (const site of SITES) {
-    const label = site === 'site' ? 'האתר' : 'זרם';
+    const label = labels[site] || site;
     const cur = await readWeek(site, 0);
     const prev = await readWeek(site, 7);
 
