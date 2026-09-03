@@ -184,7 +184,7 @@
                     <div class="card card-hover team-card rv" role="button" tabindex="0" data-person="matan" aria-haspopup="dialog">
                         <div class="team-photo" aria-hidden="true">מ</div>
                         <div class="team-name">מתן</div>
-                        <div class="team-role">צוות SJ</div>
+                        <div class="team-role">חשמלאי הנדסאי</div>
                         <span class="team-more">ההסמכות <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></span>
                     </div>
                 </div>
@@ -306,12 +306,19 @@
             stav: { name: 'סתיו ג\'אן', role: 'מייסד · הנדסת חשמל', initial: 'ס', certs: [
                 { name: 'רישיון עיסוק · חשמלאי ראשי', issuer: 'משרד העבודה, אגף בכיר אסדרת עיסוקים' },
                 { name: 'רישום בפנקס המהנדסים והאדריכלים', issuer: 'משרד העבודה והכלכלה' },
-                { name: 'הנדסאי חשמל מוסמך', issuer: 'הטכניון / מכון טכנולוגי' },
+                { name: 'מהנדס חשמל', issuer: 'תואר בהנדסת חשמל · רשום בפנקס המהנדסים' },
+                { name: 'קורס תכנון מתקני חשמל', issuer: 'מרצה: אריאל סגל, ראש לשכת מהנדסי החשמל · לקראת בחינת חשמלאי-מהנדס' },
+                { name: 'הנדסאי חשמל מוסמך', issuer: 'גמנסיה ריאלית, ראשון לציון · מסלול מצוינות בשנה אחת' },
                 { name: 'קורס מתח גבוה', issuer: 'חברת החשמל לישראל' },
                 { name: 'יום עיון בדיקות הארקה', issuer: 'לשכת המהנדסים' },
                 { name: 'אישור תכנון בסיסטם לוחות עד 3×4000A', issuer: 'תמחש תעשיות מתכת וארונות חשמל' }
             ] },
-            matan: { name: 'מתן', role: 'צוות SJ', initial: 'מ', certs: [] }
+            matan: { name: 'מתן', role: 'חשמלאי הנדסאי', initial: 'מ', certs: [
+                { name: 'רישיון עיסוק · חשמלאי הנדסאי 3×630A', issuer: 'משרד העבודה, אגף בכיר אסדרת עיסוקים' },
+                { name: 'רישום בפנקס ההנדסאים והטכנאים', issuer: 'משרד העבודה' },
+                { name: 'קורס מתח גבוה', issuer: 'השתלמות מקצועית' },
+                { name: 'קורס בודקים', issuer: 'לקראת בחינת בודק חשמל סוג 2' }
+            ] }
         };
         var dlg = document.getElementById('team-dialog');
         if (!dlg || typeof dlg.showModal !== 'function') return;
