@@ -1,3 +1,8 @@
+# NOTE (4.9.2026): Cloudflare Pages ignores 404 rules in this file — verified live:
+# /scripts/* answered 200 with a 404 rule in place. Every 404 line below is
+# therefore a *map*, and the real block is a Function stub under functions/
+# re-exporting functions/_deny.js. tests/site.test.mjs fails if a 404 path
+# here has no stub.
 # Only non-obvious redirects live here.
 # CF Pages serves .html files and index.html in subdirs automatically.
 
