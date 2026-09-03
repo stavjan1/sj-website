@@ -323,6 +323,10 @@
         var dlg = document.getElementById('team-dialog');
         if (!dlg || typeof dlg.showModal !== 'function') return;
         function esc(t) { return String(t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+        // "3×630A" inside Hebrew comes out as "630A×3" unless the browser is told
+        // the token reads left to right. Wrapped after escaping — the token has
+        // nothing to escape.
+        function ltrNums(h) { return h.replace(/(\d+×\d+A)/g, '<bdi dir="ltr">$1</bdi>'); }
         function open(key) {
             var p = TEAM[key]; if (!p) return;
             document.getElementById('team-dialog-name').textContent = p.name;
@@ -330,7 +334,7 @@
             var ph = document.getElementById('team-dialog-photo');
             ph.innerHTML = p.photo ? '<img src="' + p.photo + '" alt="">' : esc(p.initial);
             document.getElementById('team-dialog-certs').innerHTML = p.certs.length
-                ? p.certs.map(function (c) { return '<li><div><div class="tc-name">' + esc(c.name) + '</div><div class="tc-issuer">' + esc(c.issuer) + '</div></div></li>'; }).join('')
+                ? p.certs.map(function (c) { return '<li><div><div class="tc-name">' + ltrNums(esc(c.name)) + '</div><div class="tc-issuer">' + esc(c.issuer) + '</div></div></li>'; }).join('')
                 : '<li><span class="tc-soon">ההסמכות של ' + esc(p.name) + ' יתווספו בקרוב.</span></li>';
             dlg.showModal();
         }
