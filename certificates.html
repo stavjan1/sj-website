@@ -63,6 +63,11 @@
             background: var(--surface); color: var(--text); cursor: pointer;
         }
         .cert-lightbox-close svg { width: 18px; height: 18px; }
+
+        /* A line across the gallery, then the next person's papers. */
+        .cert-divider { display: flex; align-items: center; gap: var(--space-4); margin: var(--space-8) 0 var(--space-5); color: var(--text-2); font-family: var(--font-display); font-weight: 700; font-size: var(--fs-md); }
+        .cert-divider::before, .cert-divider::after { content: ''; flex: 1; height: 1px; background: var(--border-strong); }
+        .cert-soon { grid-column: 1 / -1; text-align: center; padding: var(--space-6); color: var(--text-3); border: 1px dashed var(--border-strong); border-radius: var(--r-lg); }
     </style>
     <script>try{var t=localStorage.getItem("sj_theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 </head>
@@ -225,6 +230,11 @@
                         </div>
                     </div>
 
+                </div>
+
+                <h3 class="cert-divider" id="matan">ההסמכות של מתן</h3>
+                <div class="grid-3">
+                    <div class="cert-soon rv">ההסמכות של מתן יתווספו כאן בקרוב.</div>
                 </div>
             </div>
         </section>
