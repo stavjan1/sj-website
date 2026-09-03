@@ -122,6 +122,9 @@
   border: 1px solid var(--accent); border-radius: var(--r-sm);
   color: var(--accent); font-weight: 700; font-size: var(--fs-sm);
   text-decoration: none; white-space: nowrap;
+  /* The header row squeezed the pill on a phone with large text and the word
+     walked out of its box. It may not shrink: it is as wide as its word. */
+  flex: 0 0 auto; width: max-content; min-width: max-content;
 }
 .zerem-quick:hover, .zerem-quick:focus-visible { color: var(--accent-strong); border-color: var(--accent-strong); }
 .zerem-quick svg { width: 15px; height: 15px; flex: none; }
