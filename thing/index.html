@@ -342,7 +342,7 @@
         </div>
         <div class="spacer"></div>
         <div id="search">
-            <input type="search" id="q" placeholder="חיפוש בתובנות…" autocomplete="off" oninput="onSearchInput()" onfocus="onSearchInput()" onkeydown="onSearchKey(event)">
+            <input type="search" id="q" aria-label="חיפוש בתובנות" placeholder="חיפוש בתובנות…" autocomplete="off" oninput="onSearchInput()" onfocus="onSearchInput()" onkeydown="onSearchKey(event)">
             <button type="button" class="btn quiet" id="btn-search" onclick="openSearch()" aria-label="חיפוש">🔍</button>
             <div id="results" hidden></div>
         </div>
@@ -388,7 +388,7 @@
             </div>
             <p>הדרך הקלה: פתח את העץ בספארי מהכתובת המלאה ותוסיף משם למסך הבית — האייקון כבר יהיה מחובר. או הדבק כאן את הכתובת המלאה.</p>
             <div class="row">
-                <input type="text" id="nokey-input" placeholder="https://www.sj-eng.co.il/thing/#k=…" autocomplete="off" inputmode="url">
+                <input type="text" id="nokey-input" aria-label="הכתובת המלאה של העץ" placeholder="https://www.sj-eng.co.il/thing/#k=…" autocomplete="off" inputmode="url">
                 <button type="button" class="btn primary" onclick="connectKey()">חבר</button>
             </div>
             <p class="meta" id="nokey-local"></p>
@@ -425,10 +425,10 @@
 
     <div id="sheet" role="dialog" aria-label="תובנה">
         <div class="row">
-            <input type="text" id="f-title" placeholder="כותרת — מה התובנה במשפט" maxlength="120" oninput="onFieldInput()" style="flex:1">
+            <input type="text" id="f-title" aria-label="כותרת" placeholder="כותרת — מה התובנה במשפט" maxlength="120" oninput="onFieldInput()" style="flex:1">
             <button type="button" class="btn" id="btn-title" onclick="autoTitle(selectedId)" title="כותרת מהטקסט וההקלטות">✨</button>
         </div>
-        <textarea id="f-body" placeholder="הגוף — למה, מאיפה זה בא, מה עושים עם זה" maxlength="4000" oninput="onFieldInput()"></textarea>
+        <textarea id="f-body" aria-label="גוף התובנה" placeholder="הגוף — למה, מאיפה זה בא, מה עושים עם זה" maxlength="4000" oninput="onFieldInput()"></textarea>
         <div class="row">
             <div id="f-colors" role="group" aria-label="צבע"></div>
             <span class="meta" id="f-color-name"></span>
@@ -441,7 +441,7 @@
             <button type="button" class="btn" id="btn-rec" onclick="toggleRecord()">🎙 הקלט</button>
             <button type="button" class="btn" onclick="pickImage()" title="הוסף תמונה לתובנה">📷 תמונה</button>
             <button type="button" class="btn quiet" onclick="pickTree()" title="בחר את כל מה שמחובר לתובנה הזו — ואז גרור">בחר את העץ</button>
-            <input type="file" id="f-img-input" accept="image/*" onchange="onImagePicked(this)" hidden>
+            <input type="file" id="f-img-input" aria-label="בחירת תמונה" accept="image/*" onchange="onImagePicked(this)" hidden>
             <span class="meta">הקלטה קולית נשמרת לתובנה ומתומללת</span>
         </div>
         <div id="f-imgs"></div>

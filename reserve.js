@@ -88,11 +88,15 @@
     badge.innerHTML = emblem('sj-mil-emblem') +
       '<span class="sj-mil-label">' + COPY.label + '</span>';
 
-    var overlay = document.createElement('div');
+    // A native <dialog> opened with showModal(): focus stays inside and Escape
+    // closes it without a hand-rolled trap. The overlay element IS the scrim
+    // (styles.css strips the UA dialog box), the certificate sits inside it.
+    var overlay = document.createElement('dialog');
     overlay.className = 'sj-mil-overlay';
     overlay.id = 'sj-mil-overlay';
+    overlay.setAttribute('aria-labelledby', 'sj-mil-h');
     overlay.innerHTML =
-      '<div class="sj-mil-cert" role="dialog" aria-modal="true" aria-labelledby="sj-mil-h">' +
+      '<div class="sj-mil-cert">' +
         '<button type="button" class="sj-mil-close" aria-label="סגירה">' + ICON_X + '</button>' +
         // The two saluting figures, if the artwork has been added. Each <img>
         // removes the whole strip if it cannot load, so a missing file leaves
@@ -154,29 +158,41 @@
       cert.style.transform = s < 0.999 ? 'scale(' + Math.max(0.62, s).toFixed(3) + ')' : 'none';
     }
 
+    var native = typeof overlay.showModal === 'function';
+
     function open() {
       prevOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
       overlay.classList.add('open');
+      if (native && !overlay.open) overlay.showModal();
       fit();
       window.addEventListener('resize', fit);
       closeBtn.focus();
     }
-    function close() {
+    // Everything that undoes open(). Runs from the dialog's own 'close' event,
+    // so Escape (handled by the browser) and the buttons end up in one place.
+    function teardown() {
       window.removeEventListener('resize', fit);
       overlay.classList.remove('open');
       document.body.style.overflow = prevOverflow;
       badge.focus();
     }
+    function close() {
+      if (native && overlay.open) overlay.close();
+      else teardown();
+    }
 
     badge.addEventListener('click', open);
     closeBtn.addEventListener('click', close);
+    overlay.addEventListener('close', teardown);
     overlay.addEventListener('click', function (e) {
       if (!cert.contains(e.target)) close();
     });
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && overlay.classList.contains('open')) close();
-    });
+    if (!native) {
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && overlay.classList.contains('open')) close();
+      });
+    }
   }
 
   if (document.readyState === 'loading') {

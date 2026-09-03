@@ -73,7 +73,8 @@ test('merging a tree with itself changes nothing', () => {
 test('the page is private, needs no Google, revalidates, and /mind/ is gone', () => {
     const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
     const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
-    const headers = readFileSync(new URL('../_headers', import.meta.url), 'utf8');
+    // CRLF normalised: a Windows checkout (autocrlf) puts \r before every \n and the block matches below silently fail.
+    const headers = readFileSync(new URL('../_headers', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
     assert.match(html, /name="robots" content="noindex/);
     assert.ok(!/gsi\/client|google\.accounts/.test(html + js), 'the tree must not depend on a Google login');
     assert.ok(/\/thing\/\n\s+Cache-Control: no-cache/.test(headers));
@@ -94,7 +95,8 @@ test('the tree opens without a signal: a worker caches its shell, never the API,
     const sw = readFileSync(new URL('../thing/sw.js', import.meta.url), 'utf8');
     const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
     const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
-    const headers = readFileSync(new URL('../_headers', import.meta.url), 'utf8');
+    // CRLF normalised: a Windows checkout (autocrlf) puts \r before every \n and the block matches below silently fail.
+    const headers = readFileSync(new URL('../_headers', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
     for (const f of ['/thing/', '/thing/index.html', '/thing/thing.js', '/assets/tokens.css']) assert.ok(sw.includes(`'${f}'`), `${f} missing from the offline shell`);
     assert.ok(/pathname\.startsWith\('\/api\/'\)\) return/.test(sw), 'the API must never be served from cache');
     assert.ok(/cache: 'reload'/.test(sw), 'a deploy must reach the phone on the next open');

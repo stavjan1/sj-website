@@ -337,7 +337,6 @@ function ensureCalendarToken() {
     });
 }
 
-function rruleFor(months) { return SJ_CK.rrule(months); }
 function eventBody(c) { return SJ_CK.eventBody(c, '(נוצר אוטומטית ממעקב הבדיקות של SJ הנדסת חשמל)'); }
 function addDays(dateStr, n) { return SJ_CK.addDays(dateStr, n); }
 

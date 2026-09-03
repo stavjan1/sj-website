@@ -104,7 +104,7 @@ test('both screens delegate — no second copy of the arithmetic', () => {
     for (const name of ['ckRrule', 'ckEventBody', 'ckIcsText', 'ckAddMonths', 'ckNextDue', 'ckStatusOf']) {
         assert.match(fn(sale, name), /SJ_CK\./, 'sale/app.js ' + name + ' has its own copy again');
     }
-    for (const name of ['rruleFor', 'eventBody', 'icsText', 'addMonths', 'nextDue', 'statusOf']) {
+    for (const name of ['eventBody', 'icsText', 'addMonths', 'nextDue', 'statusOf']) {
         assert.match(fn(checkups, name), /SJ_CK\./, 'checkups/app.js ' + name + ' has its own copy again');
     }
     for (const src of [sale, checkups]) {
