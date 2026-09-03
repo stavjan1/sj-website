@@ -420,7 +420,13 @@
   position: fixed; inset: 0; background: var(--scrim);
   align-items: center; justify-content: center;
   padding: var(--sp-4); z-index: var(--z-modal); overflow-y: auto;
+  /* It is a native <dialog> (reserve.js opens it with showModal): strip the
+     UA box — centred fit-content, border, canvas colours — so the element
+     itself is the full-screen scrim, exactly as the old div was. */
+  width: 100%; height: 100%; max-width: none; max-height: none;
+  margin: 0; border: 0; color: inherit;
 }
+.sj-mil-overlay::backdrop { background: transparent; }
 /* The certificate is a document, not a dialog: olive field fading from top to
    bottom, a double rule like a diploma, and everything visible at once — you
    do not scroll a certificate, you look at it. Fixed dark colours in both

@@ -16,6 +16,16 @@
 /ELECTRICAL_KIT.md    /404.html   404
 /README.md            /404.html   404
 /data/clarity/*       /404.html   404
+# Build-only inputs: the IEC tables feed scripts/build_iec_block.py and the
+# field-research notes feed the eval scripts. Nothing at runtime fetches them.
+# data/materials/* and data/coverage/* stay public — the Functions read those.
+/data/iec_calculator.csv  /404.html   404
+/data/iec_full.json       /404.html   404
+/data/iec_map_block.txt   /404.html   404
+/data/field-research/*    /404.html   404
+# Shared header/footer fragments: stamped into the pages at build time by
+# scripts/stamp_partials.mjs, never served on their own.
+/partials/*           /404.html   404
 # The security review's own notes: how the CSP was verified and what it does and
 # does not cover. Publishing the review of the defences alongside the defences
 # is the one file on this list that actually helps an attacker.

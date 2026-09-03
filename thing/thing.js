@@ -224,11 +224,6 @@ function dismissNoKey() {
     const el = $('nokey'); if (el) { el.hidden = true; el.style.display = 'none'; }
 }
 
-async function pasteKey() {
-    try { const t = await navigator.clipboard.readText(); $('nokey-input').value = t || ''; if (t) connectKey(); }
-    catch { toast('לא הצלחתי לקרוא מהלוח — הדבק ידנית בשדה'); $('nokey-input').focus(); }
-}
-
 // Before anything leaves the device, a copy of what it holds stays behind
 // under its own name. The merge is union-by-bubble and cannot lose a bubble,
 // but a backup that costs nothing is worth more than trusting a merge.

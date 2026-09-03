@@ -272,7 +272,9 @@
                         <h3>מכיר ספק שישמח להצטרף?</h3>
                         <p style="color: var(--text-2);">זרוק לנו שם ועיר, אנחנו כבר נגיע אליו.</p>
                         <form id="z-supplier-form" onsubmit="return zSuggestSupplier(event)">
+                            <label for="z-sup-name" class="visually-hidden">שם הספק</label>
                             <input type="text" class="input" id="z-sup-name" placeholder="שם הספק" required>
+                            <label for="z-sup-city" class="visually-hidden">עיר</label>
                             <input type="text" class="input" id="z-sup-city" placeholder="עיר" required>
                             <button type="submit" class="btn btn-primary">שלח</button>
                         </form>
@@ -364,10 +366,7 @@
     </footer>
 
     <script>
-        const obs = new IntersectionObserver((entries, o) => {
-            entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add('on'); o.unobserve(en.target); } });
-        }, { threshold: 0.12 });
-        document.querySelectorAll('.rv').forEach(el => obs.observe(el));
+        // The .rv reveal-on-scroll observer lives in /app.js (loaded below).
 
         // "מכיר ספק?" — sends the tip to SJ's inbox via web3forms.
         function zSuggestSupplier(e) {

@@ -213,7 +213,7 @@
 
     <div class="toolbar">
         <button class="btn primary" onclick="openEditor()">+ לקוח חדש</button>
-        <input type="search" id="search" placeholder="חיפוש לפי שם, טלפון או כתובת..." oninput="render()">
+        <input type="search" id="search" aria-label="חיפוש לקוחות" placeholder="חיפוש לפי שם, טלפון או כתובת..." oninput="render()">
         <button class="btn small" onclick="openImport()">ייבוא מאקסל</button>
         <button class="btn small" onclick="exportCsv()">ייצוא CSV</button>
         <button class="btn small" onclick="bulkOpen()" title="קובע ביומן את כל מה שקרוב ועדיין לא נקבע">📅 הוסף הכל ליומן</button>
@@ -225,22 +225,22 @@
         <h2 id="editor-title">לקוח חדש</h2>
         <form method="dialog" onsubmit="saveClient(event)">
             <div class="field">
-                <label>שם הלקוח / המתקן *</label>
+                <label for="f-name">שם הלקוח / המתקן *</label>
                 <input id="f-name" required maxlength="120" placeholder='למשל: מוסך רם-לוי בע"מ'>
             </div>
             <div class="field-pair">
                 <div class="field">
-                    <label>טלפון</label>
+                    <label for="f-phone">טלפון</label>
                     <input id="f-phone" maxlength="20" inputmode="tel" placeholder="050-0000000">
                 </div>
                 <div class="field">
-                    <label>אימייל</label>
+                    <label for="f-email">אימייל</label>
                     <input id="f-email" type="email" maxlength="120" placeholder="client@mail.com">
                 </div>
             </div>
             <div class="field-pair">
                 <div class="field">
-                    <label>סוג בדיקה</label>
+                    <label for="f-type">סוג בדיקה</label>
                     <select id="f-type">
                         <option>בדיקה תקופתית</option>
                         <option>בדיקת הארקות</option>
@@ -250,13 +250,13 @@
                     </select>
                 </div>
                 <div class="field">
-                    <label>כתובת / מיקום המתקן</label>
+                    <label for="f-site">כתובת / מיקום המתקן</label>
                     <input id="f-site" maxlength="160">
                 </div>
             </div>
             <div class="field-pair">
                 <div class="field">
-                    <label>תדירות *</label>
+                    <label for="f-months">תדירות *</label>
                     <select id="f-months" onchange="document.getElementById('f-custom-wrap').style.display = this.value === 'custom' ? '' : 'none'">
                         <option value="12">כל שנה</option>
                         <option value="24">כל שנתיים</option>
@@ -266,23 +266,23 @@
                     </select>
                 </div>
                 <div class="field" id="f-custom-wrap" style="display:none">
-                    <label>מספר חודשים</label>
+                    <label for="f-custom">מספר חודשים</label>
                     <input id="f-custom" type="number" min="1" max="120" value="6">
                 </div>
             </div>
             <div class="field-pair">
                 <div class="field">
-                    <label>תאריך הבדיקה האחרונה</label>
+                    <label for="f-last">תאריך הבדיקה האחרונה</label>
                     <input id="f-last" type="date">
                 </div>
                 <div class="field">
-                    <label>או: מועד הבדיקה הבאה</label>
+                    <label for="f-next">או: מועד הבדיקה הבאה</label>
                     <input id="f-next" type="date">
                     <div class="hint">מלא אחד מהשניים · השני יחושב לבד</div>
                 </div>
             </div>
             <div class="field">
-                <label>הערות</label>
+                <label for="f-notes">הערות</label>
                 <textarea id="f-notes" rows="2" maxlength="500"></textarea>
             </div>
             <div class="dlg-actions">
@@ -299,7 +299,7 @@
             <b style="color:var(--text)">שם · טלפון · כתובת · תדירות בחודשים · תאריך בדיקה אחרונה · אימייל</b><br>
             (רק השם חובה. תאריך בפורמט 31/12/2025 או 2025-12-31)
         </p>
-        <textarea id="import-text" rows="8" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:0.82rem" placeholder="מוסך רם-לוי	050-1234567	החרושת 12, בת ים	12	15/03/2026"></textarea>
+        <textarea id="import-text" aria-label="שורות מהאקסל" rows="8" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;color:var(--text);font-size:0.82rem" placeholder="מוסך רם-לוי	050-1234567	החרושת 12, בת ים	12	15/03/2026"></textarea>
         <div class="dlg-actions">
             <button type="button" class="btn" onclick="document.getElementById('importer').close()">ביטול</button>
             <button type="button" class="btn primary" onclick="runImport()">ייבוא</button>

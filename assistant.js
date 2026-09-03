@@ -5,8 +5,9 @@
 (function () {
   'use strict';
 
-  // 'sale' = the in-app helper inside /sale; otherwise the public site assistant.
-  var MODE = (typeof window !== 'undefined' && window.SJ_ASSISTANT_MODE === 'sale') ? 'sale' : 'public';
+  // This file is the PUBLIC site assistant only. /sale has its own helper and
+  // no longer loads it, so there is one mode and it is named once, here.
+  var MODE = 'public';
 
   // ---- Microsoft Clarity (free heatmaps + session recordings) ----
   // Paste the project ID from clarity.microsoft.com to activate. Loads only on
@@ -19,7 +20,7 @@
   // Dev servers must not pollute the analytics (localhost visits showed up in
   // the Clarity data as phantom sessions).
   var IS_LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname);
-  if (CLARITY_ID && !TRACKING_OFF && !IS_LOCAL && MODE !== 'sale' && window.location.pathname.indexOf('/sale') !== 0) {
+  if (CLARITY_ID && !TRACKING_OFF && !IS_LOCAL && window.location.pathname.indexOf('/sale') !== 0) {
     (function (c, l, a, r, i, t, y) {
       c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
       t = l.createElement(r); t.async = 1; t.src = 'https://www.clarity.ms/tag/' + i;
@@ -31,7 +32,7 @@
   // long-term traffic history). OFF until a measurement ID is pasted here:
   // analytics.google.com → צור נכס → Web stream for sj-eng.co.il → copy 'G-XXXXXXXXXX'.
   var GA_ID = ''; // e.g. 'G-ABC123XYZ0'
-  if (GA_ID && !TRACKING_OFF && MODE !== 'sale' && window.location.pathname.indexOf('/sale') !== 0) {
+  if (GA_ID && !TRACKING_OFF && window.location.pathname.indexOf('/sale') !== 0) {
     var gs = document.createElement('script');
     gs.async = true;
     gs.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
@@ -46,7 +47,7 @@
   // Discreet dismissible bar, not a blocking consent wall: Israeli-audience
   // site, disclosure + opt-out link is the professional standard here.
   try {
-    if (MODE !== 'sale' && window.location.pathname.indexOf('/sale') !== 0 &&
+    if (window.location.pathname.indexOf('/sale') !== 0 &&
         !localStorage.getItem('sj_cookie_ok')) {
       document.addEventListener('DOMContentLoaded', function () {
         var bar = document.createElement('div');
@@ -90,7 +91,7 @@
     phone: '053-530-2887',
     tel: 'tel:053-530-2887',
     whatsapp: 'https://wa.me/972535302887?text=%D7%94%D7%99%D7%99%20SJ%2C%20%D7%99%D7%A9%20%D7%9C%D7%99%20%D7%A9%D7%90%D7%9C%D7%94%20%D7%91%D7%97%D7%A9%D7%9E%D7%9C',
-    contactPage: MODE === 'sale' ? '../contact.html' : 'contact.html',
+    contactPage: 'contact.html',
     maxUserMessages: 40,
     // No user-facing model picker — the server picks the engine and auto-falls-back
     // (Gemini → DeepSeek → Grok → Cloudflare) when one runs out.
@@ -98,14 +99,7 @@
     providerLabels: { gemini: 'Gemini', deepseek: 'DeepSeek', grok: 'Grok', cloudflare: 'Cloudflare' },
   };
 
-  var COPY = MODE === 'sale' ? {
-    title: 'עוזר המערכת',
-    subtitle: 'איך משתמשים בכלי?',
-    welcome: 'היי! אני העוזר של מערכת הצעות המחיר של SJ. אשמח להסביר איך לעבוד עם הכלי: זרימת העבודה (תכנון ← תמחור ← הכנת טיוטה), ניהול פרויקטים, מאגר המחירים, ייצוא PDF וגיבוי הענן. מה תרצה לדעת?',
-    suggestions: ['איך יוצרים הצעת מחיר חדשה?', 'איך מוסיפים מחירים למאגר?', 'איך מייצאים PDF?'],
-    placeholder: 'שאלה על השימוש במערכת…',
-    disclaimer: 'עוזר להפעלת המערכת. לשאלות חשבונאיות/משפטיות התייעצו עם איש מקצוע.',
-  } : {
+  var COPY = {
     title: 'העוזר ההנדסי של SJ',
     subtitle: 'שאלות חשמל · תשובה מיידית',
     welcome: 'שלום וברוכים הבאים 🙂 אני העוזר ההנדסי של SJ הנדסת חשמל. אשמח לעזור בכל שאלה על חשמל: תקלות בבית, פחת ומאמ"תים, עמדות טעינה, לוחות, הארקה ובטיחות. שאלות שתלויות בחוק או ברישוי אפנה ישירות ל-SJ. אז במה אפשר לעזור?',
@@ -125,7 +119,8 @@
   var els = {};
 
   // ── Persist the conversation locally so a refresh doesn't wipe it ──
-  // Keyed per mode so the public assistant and the in-app helper stay separate.
+  // The key still carries the mode suffix: a visitor's saved conversation from
+  // before the sale branch was removed must keep loading.
   var STORE_KEY = 'sj_assist_msgs_' + MODE;
   function saveConvo() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(messages.slice(-40))); } catch (e) {}
@@ -204,12 +199,10 @@
       '</div>' +
       '<div class="sj-assist-log" id="sj-assist-log" aria-live="polite"></div>' +
       '<div class="sj-assist-suggest" id="sj-assist-suggest"></div>' +
-      (MODE === 'public'
-        ? '<div class="sj-assist-escalate" id="sj-assist-escalate">' +
-            '<span>לא מרוצה מהתשובה?</span>' +
-            '<button type="button" class="sj-assist-tosj" id="sj-assist-tosj">שליחת הודעה אל SJ</button>' +
-          '</div>'
-        : '') +
+      '<div class="sj-assist-escalate" id="sj-assist-escalate">' +
+        '<span>לא מרוצה מהתשובה?</span>' +
+        '<button type="button" class="sj-assist-tosj" id="sj-assist-tosj">שליחת הודעה אל SJ</button>' +
+      '</div>' +
       '<div class="sj-assist-inputbar">' +
         '<textarea id="sj-assist-input" rows="1" placeholder="' + COPY.placeholder + '" aria-label="הקלדת שאלה"></textarea>' +
         '<button id="sj-assist-send" class="sj-assist-send" aria-label="שליחה">' +
