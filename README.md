@@ -91,11 +91,15 @@ message (and the assistant degrades to a contact card).
 
 ## Local development
 
-No build step. Serve the folder statically, e.g.:
+No build step. The public site is the `site/` folder (the Pages build output
+directory), so serve that — not the repo root — or every root-absolute
+reference (`/assets/…`, `/sale/…`, `/data/…`) 404s:
 
 ```
-python3 -m http.server 8099   # then open http://localhost:8099
+python3 -m http.server 8099 -d site   # then open http://localhost:8099
 ```
+
+For the Functions too: `wrangler pages dev site`.
 
 Note: `/api/*` are Cloudflare Pages Functions and only run on a Pages deploy (or
 `wrangler pages dev`). Locally without them, the AI features degrade gracefully
