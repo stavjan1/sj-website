@@ -8,7 +8,7 @@
 // ==========================================================================
 // Market prices: what the trade charges for each line item, next to what you
 // charge. Fed by the anonymous per-item samples every PDF export contributes
-// (stats:items:<profession>:<name> in KV) — names and prices only, never a
+// (stats:items:electrician:<name> in KV) — names and prices only, never a
 // customer. Sorting is the whole point: the gap column is where money hides.
 // ==========================================================================
 let marketData = null;          // { items:[{name, count, median, low, high}] }
@@ -107,16 +107,15 @@ async function renderMarketPrices(force) {
     if (!marketData) {
         box.innerHTML = '<p class="input-help">טוען…</p>';
         try {
-            const prof = (appState.settings && appState.settings.profession) || 'general';
             const headers = {};
             if (googleAccessToken && !isGuestUser()) headers['Authorization'] = 'Bearer ' + googleAccessToken;
-            const res = await fetch('/api/stats?market=1&prof=' + encodeURIComponent(prof), { headers });
+            const res = await fetch('/api/stats?market=1', { headers });
             marketData = await res.json();
         } catch (e) { marketData = { items: [] }; }
     }
     const items = (marketData && marketData.items) || [];
     if (!items.length) {
-        box.innerHTML = `<div class="catalog-empty">עדיין אין מספיק נתוני שוק בתחום שלך.<br>
+        box.innerHTML = `<div class="catalog-empty">עדיין אין מספיק נתוני שוק.<br>
             <span class="input-help">כל הצעת מחיר שמופקת מהמערכת מוסיפה מחירי סעיפים אנונימיים למאגר הזה, וככל שיהיו יותר, ההשוואה כאן תהיה שווה יותר.</span></div>`;
         return;
     }
@@ -241,14 +240,13 @@ async function clearPriceCatalog() {
 function _shareSenderDetails() {
     const mode = document.querySelector('input[name="catalog-share-mode"]:checked')?.value || 'named';
     const phone = (document.getElementById('catalog-share-phone')?.value || '').trim();
-    if (mode === 'anonymous') return { name: 'אנונימי', email: '', phone, profession: '' };
+    if (mode === 'anonymous') return { name: 'אנונימי', email: '', phone };
     const activeUser = getActiveUser() || '';
     const senderEmail = isGuestUser() ? '' : (activeUser.includes('@') ? activeUser : '');
     return {
         name: isGuestUser() ? 'אורח' : (localStorage.getItem('gsi_name') || senderEmail.split('@')[0] || 'משתמש'),
         email: senderEmail,
-        phone,
-        profession: (appState.settings && appState.settings.profession) || ''
+        phone
     };
 }
 

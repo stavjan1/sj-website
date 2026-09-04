@@ -2521,7 +2521,7 @@ i[class^="fa-"], i[class*=" fa-"] {
     overflow-y: auto;
 }
 /* Modal variants of the lock container sit over the app → scrim, not page bg */
-#guest-warning-modal, #google-profession-modal, #signature-modal {
+#guest-warning-modal, #signature-modal {
     background: var(--scrim) !important;
 }
 .lock-card {

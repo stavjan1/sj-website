@@ -45,9 +45,9 @@ function detectJobType(text) {
     return hit ? hit.type : 'generic';
 }
 
-// The fallback checklist, used for job types we have not authored yet and for
-// professions outside electrical. Deliberately short: a generic list that asks
-// too much is friction without accuracy.
+// The fallback checklist, used for job types we have not authored yet.
+// Deliberately short: a generic list that asks too much is friction without
+// accuracy.
 const GENERIC_CHECKLIST = {
     jobType: 'generic',
     label: 'עבודה כללית',
@@ -1585,35 +1585,10 @@ function updatePlanActionBar(proj) {
     bar.style.display = show ? 'flex' : 'none';
 }
 
-// Single source of truth for trade/profession options, a CLOSED list keeps the
-// AI agent's expertise selectable and easy to manage. `ai` is the Hebrew role
-// the agent prompts address themselves as.
-const PROFESSIONS = [
-    { key: 'electrician',       label: 'חשמל (כולל עמדות טעינה וסולארי)', ai: 'חשמלאי מוסמך' },
-    { key: 'plumber',           label: 'אינסטלציה',              ai: 'אינסטלטור מוסמך' },
-    { key: 'hvac',              label: 'מיזוג אוויר וקירור',      ai: 'טכנאי מיזוג אוויר' },
-    { key: 'contractor',        label: 'בנייה, בטון ושלד',        ai: 'קבלן בנייה ושלד' },
-    { key: 'renovator',         label: 'שיפוצים וגמר פנים',        ai: 'קבלן שיפוצים' },
-    { key: 'general',           label: 'כללי / תחום אחר',          ai: 'איש מקצוע מנוסה' },
-    // Folded into "חשמל" (Stav, 04/07): kept ONLY so accounts that picked them
-    // before keep their prompts working; hidden from the selection lists.
-    { key: 'solar_installer',   label: 'מערכות סולאריות (PV)',     ai: 'מתקין מערכות סולאריות', hidden: true },
-    { key: 'charger_installer', label: 'עמדות טעינה לרכב חשמלי',   ai: 'מתקין עמדות טעינה', hidden: true },
-];
-function professionAiRole(key) { const p = PROFESSIONS.find((x) => x.key === key); return p ? p.ai : (key || 'איש מקצוע'); }
-// Populate every profession <select> from the one list, so options never drift.
-function fillProfessionOptions() {
-    ['settings-profession-input', 'google-reg-profession'].forEach((id) => {
-        const sel = document.getElementById(id);
-        if (!sel || sel.tagName !== 'SELECT') return;
-        const cur = sel.value;
-        sel.innerHTML = PROFESSIONS.filter((p) => !p.hidden)
-            .map((p) => `<option value="${p.key}">${p.label}</option>`).join('');
-        // A legacy choice (solar/charger) falls back to electrician in the UI.
-        if (cur && PROFESSIONS.some((p) => p.key === cur && !p.hidden)) sel.value = cur;
-        else if (cur === 'solar_installer' || cur === 'charger_installer') sel.value = 'electrician';
-    });
-}
+// One product, one trade: every agent prompt addresses itself as the
+// electrician's right hand. (A closed multi-trade list lived here until
+// 04/09/2026; Stav: "we are a product ONLY for electricians".)
+const AI_ROLE = 'חשמלאי מוסמך';
 
 // Characterization persona: fills OUR coverage checklist, then builds the BOM.
 // Explicitly NO prices at this stage — until 25/08, when a friend of Stav's
@@ -1634,7 +1609,6 @@ function fillProfessionOptions() {
 // to use a word of any of it. runPlanningAgent now adds Stav's own labor book
 // and the field anchors on top, so the number has a source and not a hunch.
 function getPlanningSystemInstruction() {
-    const profession = (appState.settings && appState.settings.profession) || 'electrician';
     const proj = projectsList.find(p => p.id === activeProjectId);
     const list = getChecklist(proj);
     const answers = (proj && proj.spec && proj.spec.answers) || {};
@@ -1647,7 +1621,7 @@ function getPlanningSystemInstruction() {
     const open = applicable.filter(f => !answers[f.id])
         .map(f => `• [${f.id}] ${f.question}${f.chips ? ', אפשרויות: ' + f.chips.join(' / ') : ''}${specFieldCritical(f, answers) ? ' (חובה)' : ''}`).join('\n');
 
-    return `אתה מתמחר עבודות עבור ${professionAiRole(profession)} בישראל. מי שכותב לך הוא בעל המקצוע עצמו, לא הלקוח.
+    return `אתה מתמחר עבודות עבור ${AI_ROLE} בישראל. מי שכותב לך הוא בעל המקצוע עצמו, לא הלקוח.
 
 # חוק ראשון · תענה על שאלת הכסף, כבר בהודעה הראשונה
 כל תיאור של עבודה הוא בקשת מחיר: גם "התקנת עמדת טעינה 15 מטר מהלוח", גם משפט עם שגיאות כתיב, גם תיאור דל בפרטים.
@@ -4348,8 +4322,7 @@ ${extrasText ? `תוספות שסתיו סימן (כל אחת סעיף נפרד 
 // user has to be in, and he was never asked which one he wanted.
 // ============================================================================
 function getAskSystemInstruction() {
-    const profession = (appState.settings && appState.settings.profession) || 'electrician';
-    return `אתה היד הימנית של ${professionAiRole(profession)} בישראל. הוא בעל המקצוע, לא הלקוח, והוא באמצע יום עבודה.
+    return `אתה היד הימנית של ${AI_ROLE} בישראל. הוא בעל המקצוע, לא הלקוח, והוא באמצע יום עבודה.
 
 # החוק היחיד: תענה על מה שנשאלת, באורך שהשאלה מצדיקה
 קרא את ההודעה והחלט לבד מה היא. אל תשאל אותו באיזה מצב הוא רוצה להיות.

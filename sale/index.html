@@ -1663,26 +1663,6 @@
                                     <span>שם משתמש:</span>
                                     <span id="profile-field-username">-</span>
                                 </div>
-                                <div class="user-profile-field">
-                                    <span>תחום עיסוק נוכחי:</span>
-                                    <span id="profile-field-profession">-</span>
-                                </div>
-                                <!-- profession update — sets the AI agent's expertise (available to all users) -->
-                                <div id="settings-profession-section" style="margin-top:14px;">
-                                    <label for="settings-profession-input" style="font-size:.85rem;color:var(--text-muted);">תחום עיסוק (קובע את התמחות סוכן ה-AI)</label>
-                                    <div style="display:flex;gap:8px;margin-top:6px;">
-                                        <select id="settings-profession-input" style="flex-grow:1;background:rgba(255,255,255,0.05);border:1px solid var(--border-color);color:#fff;padding:8px 12px;border-radius:8px;font-family:inherit;cursor:pointer;">
-                                            <!-- options populated from PROFESSIONS via fillProfessionOptions() -->
-                                            <option value="electrician">חשמל (כולל עמדות טעינה וסולארי)</option>
-                                            <option value="plumber">אינסטלציה</option>
-                                            <option value="hvac">מיזוג אוויר וקירור</option>
-                                            <option value="contractor">בנייה, בטון ושלד</option>
-                                            <option value="renovator">שיפוצים וגמר פנים</option>
-                                            <option value="general">כללי / תחום אחר</option>
-                                        </select>
-                                        <button type="button" class="btn btn-accent" onclick="updateUserProfileProfession()" style="padding:8px 14px;font-size:.9rem;white-space:nowrap;">עדכן</button>
-                                    </div>
-                                </div>
                                 <!-- hidden inputs for security card compatibility -->
                                 <button type="button" class="btn btn-danger btn-full" onclick="handleUserLogout()" style="margin-top:16px;">
                                     <i class="fa-solid fa-power-off"></i> התנתק ונעילת מערכת
@@ -1719,7 +1699,7 @@
                         <div class="card-header"><h3><i class="fa-solid fa-circle-info text-accent"></i> אודות ומידע</h3></div>
                         <div class="card-body">
                             <p class="input-help" style="line-height:1.7;margin:0 0 14px;">
-                                <strong>זרם ⚡</strong> · תוכנת הצעות המחיר החכמה לאנשי מקצוע.
+                                <strong>זרם ⚡</strong> · תוכנת הצעות המחיר החכמה לחשמלאים.
                                 נבנתה ופותחה על ידי <strong>סתיו ג'אן</strong>, מהנדס חשמל מוסמך, מבית <strong>SJ הנדסת חשמל</strong>.
                             </p>
                             <div class="about-links">
@@ -2692,27 +2672,6 @@
 
             <!-- Google OAuth client id, populated from localStorage on init -->
             <input type="hidden" id="lock-google-client-id">
-        </div>
-    </div>
-
-    <!-- Profession prompt modal for new Google users -->
-    <div id="google-profession-modal" class="lock-screen-container" style="display: none; z-index: 100000; background: radial-gradient(circle at center, rgba(15, 23, 42, 0.98) 0%, rgba(2, 6, 23, 0.99) 100%);">
-        <div class="lock-card">
-            <div class="lock-logo">
-                <i class="fa-solid fa-circle-user lock-icon"></i>
-                <h2>שלום! ברוך הבא</h2>
-                <p>כדי שסוכן ה-AI יוכל להתאים את עצמו אליך במדויק, אנא הזן את תחום העיסוק שלך:</p>
-            </div>
-            <form onsubmit="saveGoogleUserProfession(event)" style="text-align: right; display: flex; flex-direction: column; gap: 16px;">
-                <div class="form-group" style="margin-bottom: 0;">
-                    <label for="google-reg-profession">תחום עיסוק / התמחות</label>
-                    <select id="google-reg-profession" required style="width: 100%; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(15, 23, 42, 0.5); padding: 12px 16px; color: #fff; font-family: inherit; font-size: 0.95rem; cursor: pointer;">
-                        <!-- options populated from PROFESSIONS via fillProfessionOptions() -->
-                    </select>
-                    <p style="font-size:.78rem;color:var(--text-muted);margin:8px 2px 0;line-height:1.5;">אפשר לשנות בכל רגע בהגדרות. הבחירה מכוונת את סוכן ה-AI לתחום שלך.</p>
-                </div>
-                <button type="submit" class="btn btn-accent btn-full" style="margin-top: 10px;">סיום והמשך לאפליקציה</button>
-            </form>
         </div>
     </div>
 
