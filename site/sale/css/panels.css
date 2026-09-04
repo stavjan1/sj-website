@@ -2497,6 +2497,16 @@ i[class^="fa-"], i[class*=" fa-"] {
 }
 .splash-brand { font-size: var(--fs-xl); font-weight: 800; color: var(--text); }
 .splash-sub { font-size: var(--fs-sm); color: var(--text-2); }
+/* The studio that built the product: a credit, set smaller than the product. */
+.splash-credit, .brand-credit { font-size: var(--fs-xs); color: var(--text-3); }
+.lock-logo .brand-credit { margin-block-start: var(--sp-2); }
+/* What the code can promise about the data, on the lock card and in settings. */
+.trust-line {
+    margin: var(--sp-3) 0 0; font-size: var(--fs-xs); line-height: 1.6;
+    color: var(--text-3); text-align: center;
+}
+.trust-line a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+#mydata-card .trust-line { text-align: start; }
 .splash-spinner {
     width: 28px;
     height: 28px;
@@ -3236,6 +3246,34 @@ i[class^="fa-"], i[class*=" fa-"] {
 .ctx-back svg { width: 18px; height: 18px; }
 .ctx-back[hidden] { display: none; }
 
+/* "← כל העבודות": the named way out of a project. Same family as .ctx-back,
+   but it never loses its word — the word is the point. */
+.ctx-works {
+    display: inline-flex; align-items: center; gap: var(--sp-2); flex: none;
+    min-height: 34px; padding: 0 var(--sp-3);
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-pill);
+    color: var(--text); font: 700 var(--fs-xs) var(--font-ui); cursor: pointer;
+}
+.ctx-works:hover { background: var(--surface-2); border-color: var(--accent); }
+.ctx-works svg { width: 18px; height: 18px; color: var(--accent); }
+.ctx-works[hidden] { display: none; }
+/* One line, ellipsised: עבודות / לקוח — עבודה / שלב N: שם */
+.ctx-crumb {
+    flex: 1 1 auto; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font: 500 var(--fs-xs) var(--font-ui); color: var(--text-3);
+}
+.ctx-crumb[hidden] { display: none; }
+/* The theme toggle: a twin of the bell, at the end of the row. */
+.ctx-theme {
+    position: relative; width: 36px; height: 36px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: none; border: 1px solid transparent; border-radius: var(--r-pill);
+    color: var(--text-3); cursor: pointer;
+}
+.ctx-theme:hover { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+.ctx-theme svg { width: 19px; height: 19px; }
+
 /* The "+" beside the new-category field was a small square outlined box — the
    shape Windows drew for a spin button. It is the round accent affordance the
    rest of the app uses. */
@@ -3403,6 +3441,7 @@ i[class^="fa-"], i[class*=" fa-"] {
 /* The bell sits in the corner of the screen, not in the middle of the greeting. */
 .home-hi.has-ctx-btns { position: static; }
 .home-main .ctx-bell { position: absolute; inset-block-start: 0; inset-inline-end: 0; margin: 0; }
+.home-main .ctx-theme { position: absolute; inset-block-start: 0; inset-inline-end: 40px; margin: 0; }
 .home-main .ctx-back { position: absolute; inset-block-start: 0; inset-inline-start: 0; margin: 0; }
 
 /* A desk has room: the column spreads with the screen instead of staying a
@@ -3772,6 +3811,12 @@ i[class^="fa-"], i[class*=" fa-"] {
     margin-inline-start: auto;
     width: 32px; height: 32px; flex: none;
 }
+.section-header h2.has-ctx-btns .ctx-theme,
+.home-hi.has-ctx-btns .ctx-theme { width: 32px; height: 32px; flex: none; }
+.section-header h2.has-ctx-btns .ctx-theme + .ctx-bell,
+.home-hi.has-ctx-btns .ctx-theme + .ctx-bell { margin-inline-start: 0; }
+.section-header h2.has-ctx-btns .ctx-theme,
+.home-hi.has-ctx-btns .ctx-theme { margin-inline-start: auto; }
 /* On the home screen the greeting is the title line, and it is large: the
    controls in it stay small so they read as tools, not as part of the words. */
 .home-hi.has-ctx-btns .ctx-back { align-self: center; }
@@ -4406,6 +4451,8 @@ i[class^="fa-"], i[class*=" fa-"] {
     .ctx-back { min-height: 30px; padding: 0 var(--sp-2); }
     .ctx-bell { width: 30px; height: 30px; }
     .ctx-bell svg { width: 17px; height: 17px; }
+    .ctx-theme { width: 30px; height: 30px; }
+    .ctx-theme svg { width: 17px; height: 17px; }
 
     /* 2. Project name, status and client on one line. */
     #project-banner { padding-block: var(--sp-1); gap: var(--sp-2); font-size: var(--fs-xs); }
@@ -4800,6 +4847,11 @@ body.convo-open { overflow: hidden; }
        arrow already says it. */
     .ctx-bar .ctx-back span { display: none; }
     .ctx-bar .ctx-back { min-height: 34px; width: 34px; padding: 0; justify-content: center; }
+    /* The way out of a project is a thumb target: 44px tall, and it keeps its
+       word — an arrow alone is "back somewhere", this is "back to the list". */
+    .ctx-bar .ctx-works { min-height: 44px; min-width: 44px; padding: 0 var(--sp-3); }
+    .ctx-bar .ctx-crumb { font-size: 11px; }
+    .home-main .ctx-theme { position: static; }
 
     /* The greeting gets its line back. These moved the two controls on top of
        the words when they rode in the title, and on the home screen the title
@@ -6180,3 +6232,57 @@ th.pv-price { text-align: end; }
 .sj-group summary { cursor: pointer; padding: 8px 0; font-weight: 700; }
 .sj-group .market-row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); font-size: var(--fs-sm); }
 .sj-group .market-nums { white-space: nowrap; }
+
+/* ============================================================================
+   PRO tag — drawn by applyProTags() on every [data-pro] control the current
+   plan refuses, so the paywall is announced before the tap, not after the form.
+   Gold, because the plan it points at is גולד.
+   ============================================================================ */
+.pro-tag {
+    display: inline-flex; align-items: center; flex: none;
+    margin-inline-start: var(--sp-1); padding: 1px 6px;
+    border: 1px solid currentColor; border-radius: var(--r-pill);
+    color: var(--warn-text); font: 800 10px/1.4 var(--font-ui); letter-spacing: .06em;
+    pointer-events: none;
+}
+/* The lock icon owns the top corner of the camera button; the tag takes the bottom one. */
+.chat-attach-btn .pro-tag { position: absolute; inset-block-end: -8px; inset-inline-end: -6px; margin: 0; background: var(--surface); }
+
+/* ============================================================================
+   Touch targets in the pricing table on a coarse pointer (phone, tablet):
+   the quantity field, the row's delete/bookmark buttons and the include-
+   checkbox all reach 44px. Desktop density is untouched — this only applies
+   where a finger is doing the pressing.
+   ============================================================================ */
+@media (pointer: coarse) {
+    #panel-pricing .pt-row input.pt-qty { min-height: 44px; }
+    #panel-pricing .pt-qtybox .pt-qty { min-width: 56px; }
+    .pt-del { width: 44px; height: 44px; }
+    .pt-rowbtns { gap: 0; }
+    /* The native box is 16px and cannot grow its hit area with padding, so on
+       touch it is drawn by hand: a 44px control with a 22px box in the middle. */
+    .pt-chk {
+        appearance: none; -webkit-appearance: none;
+        width: 44px; height: 44px; margin: 0; padding: 0; flex: none;
+        display: inline-grid; place-content: center;
+        background: none; border: none; cursor: pointer;
+    }
+    .pt-chk::before {
+        content: ''; width: 22px; height: 22px; box-sizing: border-box;
+        border: 2px solid var(--border-strong, var(--border)); border-radius: var(--r-sm);
+        background: var(--surface);
+    }
+    .pt-chk:checked::before {
+        border-color: var(--accent); background: var(--accent);
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'><path d='M5 12.5l4.5 4.5L19 7.5'/></svg>");
+        background-size: 16px 16px; background-position: center; background-repeat: no-repeat;
+    }
+    .pt-chk:focus-visible { outline: 2px solid var(--accent); outline-offset: -6px; border-radius: var(--r-pill); }
+    /* The grid lane that holds the checkbox grows with it (tablet widths keep
+       the grid; phones already wrap rows into flex). */
+    .pt-cols-mat, .pt-block .pt-row:not(.pt-row-labor):not(.pt-row-extra) {
+        grid-template-columns: 44px minmax(0, 1.8fr) minmax(0, 1.1fr) 128px 88px 96px 84px 92px;
+    }
+    .pt-cols-extra, .pt-row-extra { grid-template-columns: 44px minmax(0, 1fr) 96px 128px 84px; }
+    .pt-cols-labor, .pt-row-labor { grid-template-columns: minmax(0, 1fr) 110px 84px 44px; }
+}

@@ -543,6 +543,7 @@ function applyTierGates() {
     if (credit) credit.style.display = tierLimits().pdfCredit === false || isAdmin() ? 'none' : '';
 
     applyReportsLock();
+    applyProTags();
     try { renderFollowupReminders(); } catch (e) {}
     try { renderMaintDueStrip(); } catch (e) {}
 }
@@ -587,6 +588,31 @@ function applyReportsLock() {
             </div>`;
         panel.appendChild(overlay);
     }
+}
+
+// A control that will open the upgrade screen says so BEFORE it is pressed.
+// Every [data-pro="<feature>"] element in the markup names the tier feature it
+// is gated on (the same keys tierAllows() reads); when the plan denies it, a
+// small gold "PRO" tag is drawn on the control. The UX review (4.9.2026):
+// people filled the form, pressed, and met a paywall — the tag is the warning
+// that was missing. Quota gates (projects, PDFs per month) are not tagged: they
+// depend on how much was used, not on the plan.
+function applyProTags() {
+    document.querySelectorAll('[data-pro]').forEach((el) => {
+        const feature = el.getAttribute('data-pro');
+        const locked = !!feature && !tierAllows(feature);
+        let tag = el.querySelector(':scope > .pro-tag');
+        if (locked && !tag) {
+            tag = document.createElement('span');
+            tag.className = 'pro-tag';
+            tag.textContent = 'PRO';
+            tag.title = 'זמין במסלול גולד ומעלה';
+            el.appendChild(tag);
+        } else if (!locked && tag) {
+            tag.remove();
+        }
+        el.classList.toggle('is-pro-locked', locked);
+    });
 }
 
 // ---- Upgrade screen ----
@@ -1798,8 +1824,46 @@ function updateBackButton() {
     // keep, and it was sitting on the greeting in Stav's screenshot. A screen
     // with nowhere to go back to shows no back.
     const onHome = document.querySelector('.content-panel.active')?.id === 'panel-home';
-    if (btn) btn.hidden = onHome || navBackStack.length === 0;
+    // On a project's own screens the arrow gives way to "← כל העבודות": one
+    // named place to return to beats "wherever you came from", and the row is
+    // too narrow on a phone to hold both.
+    const onStage = document.body.classList.contains('in-project-stage');
+    if (btn) btn.hidden = onHome || navBackStack.length === 0 || onStage;
+    renderCtxCrumb();
     placeBackButton();
+}
+
+// ── The back anchor and the breadcrumb ──────────────────────────────────────
+// Inside a project, the ctx-bar says where you are in one line —
+//   עבודות / <לקוח — שם העבודה> / שלב N: <שם>
+// — and offers the one way out, "← כל העבודות" (switchTab('projects'), which is
+// also what closes the project). The UX review (4.9.2026) found that on a
+// phone, three screens deep in a job, nothing on screen said how to get back
+// to the list; the arrow only walked history, which is not the same thing.
+const CTX_STEPS = {
+    wizard:  { n: 1, name: 'אפיון' },
+    pricing: { n: 2, name: 'תמחור' },
+    create:  { n: 3, name: 'הצעה' },
+};
+function ctxCrumbText(proj, tabId) {
+    if (!proj) return '';
+    const step = CTX_STEPS[tabId];
+    const client = (typeof projectClient === 'function' && projectClient(proj)) || null;
+    const job = String(proj.name || (proj.quoteData && proj.quoteData.subject) || 'עבודה').trim();
+    const who = client && client.name ? `${client.name} — ${job}` : job;
+    return `עבודות / ${who}` + (step ? ` / שלב ${step.n}: ${step.name}` : '');
+}
+function renderCtxCrumb() {
+    const works = document.getElementById('ctx-works');
+    const crumb = document.getElementById('ctx-crumb');
+    if (!works || !crumb) return;
+    const cur = ((document.querySelector('.content-panel.active') || {}).id || '').replace('panel-', '');
+    const proj = activeProjectId ? (projectsList || []).find((p) => p.id === activeProjectId) : null;
+    const show = !!proj && !!CTX_STEPS[cur];
+    works.hidden = !show;
+    crumb.hidden = !show;
+    crumb.textContent = show ? ctxCrumbText(proj, cur) : '';
+    crumb.title = crumb.textContent;
 }
 
 // The button used to sit alone in a bar of its own, which cost a whole row on
@@ -1815,6 +1879,10 @@ function placeBackButton() {
     // Stav, 28/08: entered as a guest, had one conversation, and then "פתאום
     // לא רואים כלום" — the thread was fine, the door to it was gone.
     const convo = document.querySelector('.convo-open-btn');
+    // The theme toggle goes wherever the bell goes: it is the same kind of
+    // control — a small tool at the end of the row — and it must be one tap
+    // from every screen, which means from the title line on a desktop too.
+    const theme = document.getElementById('ctx-theme');
     const bar = document.querySelector('.ctx-bar');
     if (!btn || !bar) return;
     const panel = document.querySelector('.content-panel.active');
@@ -1848,9 +1916,11 @@ function placeBackButton() {
         if (wrap && wrap.classList.contains('section-header') === false) wrap.classList.add('ctx-title-wrap');
         if (convo && convo.parentElement !== h2) h2.insertBefore(convo, h2.firstChild);
         if (btn.parentElement !== h2) h2.insertBefore(btn, convo ? convo.nextSibling : h2.firstChild);
+        if (theme && theme.parentElement !== h2) h2.appendChild(theme);
         if (bell && bell.parentElement !== h2) h2.appendChild(bell);
         btn.classList.add('in-title');
         if (convo) convo.classList.add('in-title');
+        if (theme) theme.classList.add('in-title');
         if (bell) bell.classList.add('in-title');
     } else {
         // No visible heading on this screen (the chat on a phone): the strip
@@ -1859,9 +1929,11 @@ function placeBackButton() {
         document.querySelectorAll('.ctx-title-wrap').forEach((el) => el.classList.remove('ctx-title-wrap'));
         if (convo && convo.parentElement !== bar) bar.insertBefore(convo, bar.firstChild);
         if (btn.parentElement !== bar) bar.insertBefore(btn, convo ? convo.nextSibling : bar.firstChild);
+        if (theme && theme.parentElement !== bar) bar.appendChild(theme);
         if (bell && bell.parentElement !== bar) bar.appendChild(bell);
         btn.classList.remove('in-title');
         if (convo) convo.classList.remove('in-title');
+        if (theme) theme.classList.remove('in-title');
         if (bell) bell.classList.remove('in-title');
     }
     // Emptiness is now MEASURED, not assumed. The old line said "the header is
@@ -3652,6 +3724,7 @@ function updateActiveProjectBanner(proj) {
     const navName = document.getElementById('nav-project-name');
     if (navName) navName.textContent = proj ? proj.name : '';
     updateProjectRail();
+    try { renderCtxCrumb(); } catch (e) {}
 }
 
 // ── In-project stage rail (desktop) ──────────────────────────────────────────
@@ -8484,27 +8557,117 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-function shareWhatsApp() {
+// ── Sharing the quote on WhatsApp ───────────────────────────────────────────
+// A wa.me link carries text and nothing else. The old message told the customer
+// the PDF was attached, and no file ever arrived (UX review, 4.9.2026). Two
+// honest paths now:
+//   1. Where the browser can share files (phones, mostly), the PDF itself goes
+//      through the OS share sheet with the text — a real attachment.
+//   2. Otherwise WhatsApp opens with a text that promises only what it holds:
+//      the secure link (/q/?t=…) when the quote was shared to the cloud, or a
+//      note that the PDF follows in a separate message.
+function _quoteShareLines() {
     const clientName = document.getElementById('form-client-name').value.trim();
     const subject = document.getElementById('form-quote-subject').value.trim();
     const finalPrice = document.getElementById('form-final-price').value;
     const vatType = document.getElementById('form-vat-type').value;
-    
+
     let vatLabel = 'פטור ממע"מ';
     if (vatType === 'exclude') vatLabel = 'לא כולל מע"מ';
     if (vatType === 'include') vatLabel = 'כולל מע"מ';
-    
-    if (!clientName || !subject) {
+
+    const biz = (appState.settings && appState.settings.businessDetails) || {};
+    const signName = [biz.owner, biz.name].filter(Boolean).join(' - ') || 'SJ הנדסת חשמל';
+    const head = `שלום ${clientName},\n\nהפקתי עבורך הצעת מחיר מפורטת בנושא: *${subject}*.\nסה"כ לתשלום: *${finalPrice}* (${vatLabel}).`;
+    const sign = `\n\nבברכה,\n*${signName}*`;
+    return { clientName, subject, head, sign };
+}
+
+// The text for a wa.me link: it names what it actually carries.
+function whatsappShareText(lines, shareLink) {
+    const middle = shareLink
+        ? `\n\nההצעה המלאה מחכה לך בקישור המאובטח:\n${shareLink}\n\nאשמח לעבור עליה יחד איתך.`
+        : `\n\nה-PDF יישלח בהודעה נפרדת. אשמח לעבור עליו יחד איתך.`;
+    return lines.head + middle + lines.sign;
+}
+
+// Can this browser hand a PDF to the share sheet? (navigator.share exists on
+// desktops that cannot share files, so the file check is the one that counts.)
+function canShareQuoteFile() {
+    try {
+        if (!navigator.share || !navigator.canShare) return false;
+        const probe = new File([new Uint8Array(1)], 'quote.pdf', { type: 'application/pdf' });
+        return navigator.canShare({ files: [probe] });
+    } catch (e) { return false; }
+}
+
+// The same sheet, the same options as downloadPDF — as a File rather than a
+// download. Returns null when the PDF engine is not loaded.
+async function _quotePdfFileForShare(filename) {
+    if (typeof html2pdf === 'undefined') return null;
+    const element = document.getElementById('quote-pdf-sheet');
+    if (!element) return null;
+    const options = {
+        margin: 10,
+        filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false, letterRendering: true, backgroundColor: '#ffffff', scrollY: 0 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+    await ensurePdfFonts();
+    const restoreSheet = _unscaleSheetForCapture(element);
+    try {
+        const blob = await html2pdf().set(options).from(element).outputPdf('blob');
+        return new File([blob], filename, { type: 'application/pdf' });
+    } finally {
+        restoreSheet();
+    }
+}
+
+async function shareWhatsApp() {
+    const lines = _quoteShareLines();
+    if (!lines.clientName || !lines.subject) {
         showToast('אנא מלא שם לקוח ונושא כדי להפיק הודעה', 'error');
         return;
     }
-    
-    const biz = (appState.settings && appState.settings.businessDetails) || {};
-    const signName = [biz.owner, biz.name].filter(Boolean).join(' - ') || 'SJ הנדסת חשמל';
-    const msg = `שלום ${clientName},\n\nהפקתי עבורך הצעת מחיר מפורטת בנושא: *${subject}*.\nסה"כ לתשלום: *${finalPrice}* (${vatLabel}).\n\nמצורף קובץ ה-PDF המפורט. אשמח לעבור עליו יחד איתך.\n\nבברכה,\n*${signName}*`;
-    const encodedMsg = encodeURIComponent(msg);
-    
-    window.open(`https://api.whatsapp.com/send?text=${encodedMsg}`, '_blank');
+    const proj = (projectsList || []).find((p) => p.id === activeProjectId);
+    const shareLink = (proj && proj.shareLink) || '';
+
+    // 1. A real attachment, where the device can do it. The PDF goes through
+    //    the same export gate as the download button: a share IS an export.
+    if (canShareQuoteFile()) {
+        const gate = await checkPdfExportAllowed();
+        if (!(gate && gate.allow === false)) {
+            ensureQuoteNumber();
+            updatePreviewFromForm();
+            const quoteNumber = document.getElementById('form-quote-number').value.trim() || '000';
+            const filename = `הצעת מחיר_${quoteNumber}_${lines.clientName.replace(/\s+/g, '_')}.pdf`;
+            showToast('מכין את ה-PDF לשיתוף…');
+            let file = null;
+            try { file = await _quotePdfFileForShare(filename); } catch (e) { console.error('PDF share error:', e); }
+            if (file) {
+                try {
+                    await navigator.share({
+                        files: [file],
+                        title: `הצעת מחיר · ${lines.subject}`,
+                        text: lines.head + `\n\nמצורפת ההצעה המלאה. אשמח לעבור עליה יחד איתך.` + lines.sign,
+                    });
+                    markQuoteOut();
+                    saveToHistory(false);
+                    return;
+                } catch (e) {
+                    // The share sheet was dismissed: nothing else should open.
+                    if (e && e.name === 'AbortError') return;
+                    console.error('share error:', e);
+                }
+            }
+        }
+    }
+
+    // 2. Text only, and it says so.
+    const encodedMsg = encodeURIComponent(whatsappShareText(lines, shareLink));
+    window.open(`https://api.whatsapp.com/send?text=${encodedMsg}`, '_blank', 'noopener');
     markQuoteOut();
 }
 
@@ -9387,7 +9550,10 @@ function showToast(message, type = 'success') {
     
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    
+    // The container is a polite live region (index.html). An error toast is an
+    // alert on its own, so assistive tech reads it at once rather than in turn.
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+
     let icon = '<i class="fa-solid fa-circle-check" style="color: var(--color-success)"></i>';
     if (type === 'error') {
         icon = '<i class="fa-solid fa-circle-exclamation" style="color: var(--color-danger)"></i>';
