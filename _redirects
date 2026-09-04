@@ -38,6 +38,12 @@
 
 /app    /sale/    301
 
+# The standalone periodic-checkups page was retired (4.9.2026): the screen
+# lives inside the app. The URL was already sent to customers on WhatsApp and
+# sits in bookmarks, so it keeps landing somewhere.
+/checkups    /sale/    301
+/checkups/*  /sale/    301
+
 # Case tolerance for the shared /ask/ link (people type it by hand from WhatsApp)
 /ASK    /ask/    301
 /ASK/*  /ask/    301

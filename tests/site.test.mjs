@@ -541,3 +541,28 @@ test('every 404 path in _redirects has a Function stub that actually denies it',
     });
     assert.deepEqual(missing, [], 'these 404 rules have no Function stub, so they are public: ' + missing.join(', '));
 });
+
+// The standalone /checkups/ page was retired on 4.9.2026: the periodic-service
+// screen lives inside the app. The URL had already gone out to customers on
+// WhatsApp, so it must keep landing somewhere — and nothing on the site may
+// point at it again, or the redirect quietly becomes the page.
+test('/checkups/ redirects into the app, and nothing links to it any more', () => {
+    const rules = readFileSync(join(ROOT, '_redirects'), 'utf8').split(/\r?\n/)
+        .map((l) => l.trim()).filter((l) => l && !l.startsWith('#')).map((l) => l.split(/\s+/));
+    for (const from of ['/checkups', '/checkups/*']) {
+        const rule = rules.find((r) => r[0] === from);
+        assert.ok(rule, from + ' has no rule — old bookmarks and the WhatsApp links land on a 404');
+        assert.deepEqual(rule.slice(1), ['/sale/', '301'], from);
+    }
+    assert.ok(!existsSync(join(ROOT, 'checkups', 'index.html')), 'the page itself is back');
+
+    const files = execSync('git ls-files', { cwd: ROOT }).toString().split('\n')
+        .map((f) => f.trim()).filter(Boolean)
+        .filter((f) => f !== '_redirects' && !/\.(png|jpe?g|webp|gif|ico|woff2?|ttf|pdf|zip)$/i.test(f));
+    // A link is an href/src, a sitemap <loc>, a markdown link, a full URL, a
+    // location assignment or a robots rule. Prose that names the old page
+    // (comments, the changelog) is history, not a link.
+    const link = /(?:href|src|action)=["']?\/checkups\/|<loc>[^<]*\/checkups\/|\]\(\/checkups\/|https?:\/\/[^\s"'<)]+\/checkups\/|location(?:\.href)?\s*=\s*["']\/checkups\/|(?:Dis)?[Aa]llow:\s*\/checkups/;
+    const linking = files.filter((f) => link.test(readFileSync(join(ROOT, f), 'utf8')));
+    assert.deepEqual(linking, [], 'these still link to the retired page');
+});

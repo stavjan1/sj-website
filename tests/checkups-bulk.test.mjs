@@ -20,7 +20,6 @@ import { createContext, runInContext } from 'node:vm';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
 const APP = readApp();
-const CK = read('checkups', 'app.js');           // the standalone tracker at /checkups/
 const HTML = read('sale', 'index.html');
 
 // The body of one function, by brace counting from its declaration.
@@ -143,60 +142,50 @@ test('a run that half-worked reports both halves by name', () => {
     assert.match(fn(APP, 'pdueReasonText'), /ייתכן שכן נוצר/);
 });
 
-// ── the same feature on the standalone page ──────────────────────────────
-// /checkups/ is a separate app with its own copy of the plumbing (its own token
-// key, its own storage). The rules that make a bulk calendar run safe are not
-// copied by having the same author twice; they are copied by being checked.
+// ── the single-client path and the editor ────────────────────────────────
+// The standalone /checkups/ page carried a second copy of this plumbing until
+// it was retired (4.9.2026; the URL redirects into the app). What its tests
+// protected — one upsert path, one calendar builder, an editor whose fields
+// exist — now has one home, and is checked there.
 
-test('the standalone page asks for consent once, before its loop', () => {
-    const body = fn(CK, 'bulkRun');
-    assert.equal((body.match(/ensureCalendarToken/g) || []).length, 1);
-    assert.ok(body.indexOf('ensureCalendarToken') < body.indexOf('for ('),
-        'minted before the loop, or the popup is blocked halfway through');
+test('the per-row calendar button and the bulk run share one upsert', () => {
+    // Two upsert paths that can drift is how one of them quietly stops
+    // patching — and a push that creates instead of patches is a second copy
+    // of the visit in the calendar.
+    const push = fn(APP, 'ckPushToGoogle');
+    assert.equal((push.match(/method: 'PATCH'/g) || []).length, 1, 'the upsert patches the existing event');
+    assert.match(push, /res\.status === 404 \|\| res\.status === 410/, 'and recreates one deleted by hand');
+    assert.match(fn(APP, 'ckSyncCalendar'), /ckPushToGoogle\(/, 'the per-row button uses it');
+    assert.match(fn(APP, 'pdueRun'), /ckPushToGoogle\(/, 'and so does the bulk run');
 });
 
-test('the standalone page writes once per run, not once per client', () => {
-    const body = fn(CK, 'bulkRun');
-    assert.equal((body.match(/persist\(\)/g) || []).length, 1);
-    assert.doesNotMatch(body, /cloudSave\(/, 'the cloud write is debounced behind persist()');
+test('the single-client .ics comes from the shared core', () => {
+    const body = fn(APP, 'ckDownloadIcs');
+    assert.match(body, /SJ_CK\.icsFile\(/);
+    assert.doesNotMatch(body, /BEGIN:VCALENDAR/, 'no hand-rolled wrapper');
 });
 
-test('the standalone queue skips what is already in the calendar', () => {
-    const body = fn(CK, 'bulkQueue');
-    assert.match(body, /!c\.eventId/, 'a client already booked is not booked again');
-    assert.match(body, /daysUntil\(d\) <= 28/, 'and next year is not booked today');
+test('the editor reads only fields the markup has', () => {
+    // ckOpenEditor and ckSaveClient address the form by id. A field renamed in
+    // the markup and not in the code is a TypeError on "לקוח חדש" — the button
+    // that adds a client — with nothing on screen to say why.
+    const ids = new Set();
+    for (const name of ['ckOpenEditor', 'ckSaveClient']) {
+        for (const m of fn(APP, name).matchAll(/getElementById\('(ck-[a-z-]+)'\)/g)) ids.add(m[1]);
+    }
+    assert.ok(ids.size >= 12, 'the editor lost its fields');
+    const missing = [...ids].filter((id) => !HTML.includes('id="' + id + '"'));
+    assert.deepEqual(missing, [], 'the code asks for ids the markup does not have');
+    assert.match(HTML, /<dialog id="ck-editor"/);
+    assert.match(HTML, /onsubmit="ckSaveClient\(event\)"/);
+    assert.match(HTML, /onclick="ckOpenEditor\(\)"/, 'the "לקוח חדש" button');
 });
 
-test('the standalone run stops on an expired token and says what it skipped', () => {
-    const body = fn(CK, 'bulkRun');
-    assert.match(body, /'auth'[\s\S]{0,300}break/);
-    assert.match(body, /reason: 'skipped'/);
-    assert.match(fn(CK, 'bulkReason'), /ייתכן שכן נוצר/,
-        'a network failure is not proof that nothing was created');
+test('the import and export buttons still have their handlers', () => {
+    for (const handler of ['ckOpenImport', 'ckRunImport', 'ckExportCsv']) {
+        assert.match(HTML, new RegExp('onclick="' + handler + '\\(\\)"'), handler + ' has no button');
+        fn(APP, handler); // asserts it is still defined
+    }
+    assert.match(HTML, /<dialog id="ck-importer"/);
+    assert.match(HTML, /id="ck-import-text"/);
 });
-
-test('the standalone page has one calendar builder, and it is the shared one', () => {
-    // Prose that mentions the header is not a builder of one — the comment
-    // explaining WHY there is no second wrapper would otherwise fail the rule
-    // it is explaining.
-    const code = CK.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
-    assert.equal((code.match(/BEGIN:VCALENDAR/g) || []).length, 0, 'no hand-rolled wrapper');
-    assert.match(fn(CK, 'bulkIcs'), /SJ_CK\.icsWrap/);
-    assert.match(fn(CK, 'downloadIcs'), /SJ_CK\.icsFile/);
-});
-
-test('the standalone single-client path still goes through the same core', () => {
-    // The refactor must not have left the old inline fetch behind: two upsert
-    // paths that can drift is how one of them quietly stops patching.
-    assert.equal((CK.match(/method: 'PATCH'/g) || []).length, 1, 'exactly one upsert in the file');
-    assert.match(fn(CK, 'syncCalendar'), /pushToGoogle/);
-});
-
-test('the standalone button and dialog exist', () => {
-    const html = read('checkups', 'index.html');
-    assert.match(html, /onclick="bulkOpen\(\)"/);
-    assert.match(html, /id="bulk-cal"/);
-    assert.match(html, /id="bulk-body"/);
-    assert.match(html, /id="bulk-foot"/);
-});
-
