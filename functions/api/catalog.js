@@ -14,6 +14,11 @@
 // checked the token's audience, so a token minted for another OAuth app was
 // accepted. One implementation only, so hardening it can never miss a caller.
 import { adminGate } from './_tiers.js';
+import { json as reply, corsHeaders, preflight, safeParse } from './_http.js';
+
+const METHODS = 'GET, PUT, POST, OPTIONS';
+const CORS = corsHeaders(METHODS);
+const json = (obj, status) => reply(obj, status, CORS);
 
 const KEY = 'system:catalog';
 const MAX_ITEMS = 2000; // full supplier imports (e.g. Arkha) can be large;
@@ -23,7 +28,7 @@ export async function onRequest(context) {
   const { request, env } = context;
   const method = request.method.toUpperCase();
 
-  if (method === 'OPTIONS') return new Response(null, { status: 204, headers: cors() });
+  if (method === 'OPTIONS') return preflight(request, METHODS);
 
   if (method === 'GET') {
     if (!env.SJ_DATA) return json({ items: [], updatedAt: 0 });
@@ -60,21 +65,4 @@ export async function onRequest(context) {
   }
 
   return json({ error: { message: 'מתודה לא נתמכת.' } }, 405);
-}
-
-function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
-
-function cors() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, PUT, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
-}
-
-function json(obj, status) {
-  return new Response(JSON.stringify(obj), {
-    status: status || 200,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', ...cors() },
-  });
 }

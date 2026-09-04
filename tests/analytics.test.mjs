@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { readApp } from './_app-source.mjs';
-import { periodWindows, daysOfMonth } from '../functions/api/analytics.js';
+import { periodWindows, daysOfMonth, SITES } from '../functions/api/analytics.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
@@ -64,6 +64,25 @@ test('a month knows its own length, leap year included, and never runs past toda
     assert.equal(daysOfMonth('2026-04').length, 30);
     assert.equal(daysOfMonth('2026-12').length, 31);
     assert.deepEqual(daysOfMonth('2026-08', '2026-08-03'), ['2026-08-01', '2026-08-02', '2026-08-03']);
+});
+
+test('every property track.js can report is one the server counts and the dashboard shows', () => {
+    // The client, the server and the dashboard each hold their own list of
+    // properties. When track.js grew a 'quote' bucket for shared quotes, the
+    // server still answered its hits 200 skipped:'bad-site' and dropped them —
+    // a silent failure in every direction, so the three lists are held equal.
+    const track = read('track.js');
+    const fn = track.slice(track.indexOf('function site()'), track.indexOf('function send()'));
+    assert.ok(fn.length > 0, 'track.js site() moved — this guard is looking at the wrong code');
+    const reported = [...fn.matchAll(/return '([a-z]+)'/g)].map((m) => m[1]);
+    assert.ok(reported.length >= 3, 'track.js site() stopped returning string literals');
+    const unknown = reported.filter((s) => !SITES.includes(s));
+    assert.deepEqual(unknown, [], `track.js reports properties the server drops as bad-site: ${unknown.join(', ')}`);
+
+    const admin = read('sale/admin.js');
+    const list = admin.slice(admin.indexOf('const TRAFFIC_SITES = ['), admin.indexOf('];', admin.indexOf('const TRAFFIC_SITES = [')));
+    const shown = [...list.matchAll(/key: '([a-z]+)'/g)].map((m) => m[1]);
+    assert.deepEqual(shown, SITES, 'the admin dashboard does not show the same properties the server counts');
 });
 
 test('every class the traffic card renders is styled by the stylesheet the app loads', () => {

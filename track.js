@@ -40,16 +40,23 @@
 
   function site() {
     var p = location.pathname.toLowerCase();
-    // Three properties, three questions. The app is people USING זרם; the זרם
-    // page is people deciding whether to; everything else is the office site.
+    // Four properties, four questions. The app is people USING זרם; the זרם
+    // page is people deciding whether to; a shared quote (/q/) is a CUSTOMER
+    // opening what an electrician sent, which is neither of those and not
+    // the office site either; everything else is the office site.
+    // /thing/ is Stav's private tree — not traffic, so it is not counted.
+    if (p.indexOf('/thing') === 0) return null;
     if (p.indexOf('/sale') === 0 || p.indexOf('/ask') === 0 || p.indexOf('/checkups') === 0) return 'app';
     if (p.indexOf('/zerem') === 0) return 'zerem';
+    if (p.indexOf('/q/') === 0 || p === '/q') return 'quote';
     return 'site';
   }
 
   function send() {
+    var s = site();
+    if (!s) return;
     var payload = JSON.stringify({
-      s: site(),
+      s: s,
       p: location.pathname,
       r: document.referrer || '',
     });

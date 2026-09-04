@@ -17,6 +17,11 @@
 
 import { priceBom } from './_price_match.js';
 import { rateLimit } from './_tiers.js';
+import { MSG, json as reply, corsHeaders, preflight } from './_http.js';
+
+const METHODS = 'POST, OPTIONS';
+const CORS = corsHeaders(METHODS);
+const json = (obj, status) => reply(obj, status, CORS);
 
 const MAX_ITEMS = 60;
 
@@ -25,7 +30,7 @@ export async function onRequestPost(context) {
 
   // Cheap, but it reads a 7,361-item catalogue per call, so it is not free.
   if (!(await rateLimit(env, request, 'pricebom', 30))) {
-    return json({ error: { message: 'יותר מדי בקשות בזמן קצר.' } }, 429);
+    return json({ error: { message: MSG.TOO_MANY_REQUESTS } }, 429);
   }
 
   let body;
@@ -48,21 +53,6 @@ export async function onRequestPost(context) {
   }
 }
 
-export async function onRequestOptions() {
-  return new Response(null, { status: 204, headers: cors() });
-}
-
-function cors() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
-}
-
-function json(obj, status) {
-  return new Response(JSON.stringify(obj), {
-    status: status || 200,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', ...cors() },
-  });
+export async function onRequestOptions({ request }) {
+  return preflight(request, METHODS);
 }

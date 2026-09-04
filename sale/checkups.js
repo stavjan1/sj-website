@@ -1634,6 +1634,8 @@ function ckEnsureCalToken() {
     });
 }
 
+// Unreferenced in the app; tests/checkups-core.test.mjs pins it as the
+// delegation seam to the shared core, so it stays until that test is updated.
 function ckRrule(months) { return SJ_CK.rrule(months); }
 
 function ckEventBody(c) {

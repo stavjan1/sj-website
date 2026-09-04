@@ -10,7 +10,7 @@
 // a real per-user cost) and is capped at ₪5,000/doc for now (see _smartbee.js).
 
 import {
-  ADMIN_EMAIL, adminGate, getTierForEmail, loadTierConfig, verifyGoogleEmail, bearerToken, jsonResponse,
+  ADMIN_EMAIL, adminGate, getTierForEmail, loadTierConfig, requireUser, jsonResponse,
 } from './_tiers.js';
 import { smartbeeAuth, smartbeeCall, sbVatOption, SB_MAX_DOC } from './_smartbee.js';
 import { getUserBilling, isProviderActive, providerMeta } from './_providers.js';
@@ -20,8 +20,9 @@ import { ezCreateDocument } from './_ezcount.js';
 import { sumitCreateDocument } from './_sumit.js';
 
 async function requirePayingUser(context) {
-  const email = await verifyGoogleEmail(bearerToken(context.request));
-  if (!email) return { error: jsonResponse({ error: { message: 'נדרשת התחברות.' } }, 401) };
+  const who = await requireUser(context.request);
+  if (who instanceof Response) return { error: who };
+  const { email } = who;
   const isAdmin = email.toLowerCase() === ADMIN_EMAIL;
   const tier = await getTierForEmail(context.env, email);
   // Reads the capability rather than naming tiers: invoicing moved from

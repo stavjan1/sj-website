@@ -18,15 +18,21 @@
 // real one — an excluded hit is still counted somewhere, never silently lost.
 
 import { adminGate, rateLimit, dayKey, jsonResponse } from './_tiers.js';
+import { safeParse } from './_http.js';
 
 // The AI pools the ledger in _ai.js writes under. Listed rather than scanned:
 // Pages KV list() is paginated and slow, and this set changes about once a year.
 const AI_POOLS = ['gemini:primary', 'gemini:backup', 'gemini:paid', 'grok', 'cloudflare', 'all'];
 
-// Three properties, because they answer three different questions: the office
-// site sells engineering, the זרם page sells the product, and the app itself is
-// people using it. Days before the split carry app traffic inside 'zerem'.
-const SITES = ['site', 'zerem', 'app'];
+// Four properties, because they answer four different questions: the office
+// site sells engineering, the זרם page sells the product, the app itself is
+// people using it, and a shared quote (/q/) is a CUSTOMER opening what an
+// electrician sent. Days before the split carry app traffic inside 'zerem';
+// days before the quote bucket carry /q/ views inside 'site'.
+// track.js's site() must only ever return one of these — a value not listed
+// here is answered 200 skipped:'bad-site' and never counted, which is silent.
+// tests/analytics.test.mjs holds the two lists to the same set.
+export const SITES = ['site', 'zerem', 'app', 'quote'];
 const UNIQ_CAP = 4000;          // hashed ids kept per day — a counter, not an audience
 const PATH_CAP = 200;           // distinct paths tracked per day
 // Every counted hit costs TWO KV writes, not one: the rate limiter writes its
@@ -43,8 +49,6 @@ const DAILY_HIT_CAP = 300;
 const BOT_RE = /bot|crawl|spider|slurp|bingpreview|headless|phantom|puppeteer|playwright|selenium|lighthouse|curl|wget|python-requests|axios|monitoring|uptime|pingdom|gtmetrix|ahrefs|semrush|mj12|dotbot|petal|bytespider|gptbot|claudebot|ccbot|perplexity|applebot/i;
 
 function dayHitsKey(site, day) { return `hits:${site}:${day}`; }
-
-function safeParse(s, fallback) { try { return JSON.parse(s); } catch { return fallback; } }
 
 // Stable per-day visitor id with no stored identifier: hash(ip + ua + day) and
 // keep only the first 8 hex chars. Rotates daily by construction, so it counts
@@ -518,8 +522,9 @@ async function weeklyInsights(env) {
   };
 
   const notes = [];
+  const labels = { site: 'האתר', zerem: 'זרם', app: 'המערכת', quote: 'הצעות ששותפו' };
   for (const site of SITES) {
-    const label = site === 'site' ? 'האתר' : 'זרם';
+    const label = labels[site] || site;
     const cur = await readWeek(site, 0);
     const prev = await readWeek(site, 7);
 

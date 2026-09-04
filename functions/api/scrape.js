@@ -9,6 +9,7 @@
 
 import { generate } from './_ai.js';
 import { rateLimit, isPublicHttpUrl } from './_tiers.js';
+import { json } from './_http.js';
 
 const MAX_CONTENT = 35000; // chars of page text fed to the extractor (token guard)
 
@@ -206,8 +207,4 @@ function extractJson(text) {
   if (fenced) return fenced[1].trim();
   const a = text.indexOf('{'), b = text.lastIndexOf('}');
   return a !== -1 && b > a ? text.slice(a, b + 1) : text.trim();
-}
-
-function json(obj, status) {
-  return new Response(JSON.stringify(obj), { status: status || 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
 }

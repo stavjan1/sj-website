@@ -16,7 +16,7 @@ export const APP_FILES = [
     'sale/checkups.js',
     'sale/market.js',
     'sale/reports.js',
-    'sale/admin.js',
+    'sale/admin.js', 'sale/helper.js',
 ];
 
 export function readApp() {

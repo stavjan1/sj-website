@@ -19,6 +19,7 @@
 
 import { generate } from './_ai.js';
 import { rateLimit } from './_tiers.js';
+import { json } from './_http.js';
 
 // One read per request, cached for the life of the invocation.
 async function loadConfig(env) {
@@ -59,12 +60,6 @@ const HELP_TEXT = [
     'הבוט מסדר הכל לדוח מוכן: עם קישור לצפייה ולהדפסה, וכפתור ייבוא למערכת.',
     'לביטול באמצע: בטל',
 ].join('\n');
-
-function json(data, status = 200) {
-    return new Response(JSON.stringify(data), {
-        status, headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    });
-}
 
 function newToken(len = 12) {
     const bytes = crypto.getRandomValues(new Uint8Array(len));

@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>עץ התובנות</title>
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/tokens.css?v=504">
+    <link rel="manifest" id="manifest-link" href="/thing/manifest.webmanifest">
+    <meta name="theme-color" content="#F7F6F3">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="תובנות">
+    <!-- Safari ignores the manifest icon; the home-screen tile comes from here, PNG only. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/thing/icon-180.png">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='%236ABF3C'/%3E%3C/svg%3E">
+    <style>
+        /* A notebook you walk around in. Nothing here competes with the
+           bubbles: one accent for lines and the selected bubble, paper behind. */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+        body {
+            background: var(--bg); color: var(--text);
+            font-family: var(--font-ui); font-size: var(--fs-md); line-height: var(--lh-body);
+            touch-action: none; -webkit-user-select: none; user-select: none;
+        }
+        button, input, textarea { font-family: inherit; font-size: inherit; color: inherit; }
+        button { cursor: pointer; }
+
+        .top {
+            position: fixed; inset-inline: 0; top: 0; z-index: 30;
+            display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+            background: color-mix(in srgb, var(--bg) 82%, transparent);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--border);
+        }
+        .top h1 { font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 700; }
+        .top .sub { font-size: var(--fs-xs); color: var(--text-3); }
+        .top .spacer { flex: 1; }
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px;
+            border-radius: var(--r-pill); border: 1px solid var(--border-strong); background: var(--surface);
+            font-weight: 600; font-size: var(--fs-sm); transition: background var(--t-fast), border-color var(--t-fast);
+        }
+        .btn:hover { border-color: var(--accent); }
+        .btn.primary { background: var(--action); border-color: transparent; color: var(--on-action); }
+        .btn.quiet { background: transparent; border-color: transparent; color: var(--text-2); }
+        .btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+        .sync { font-size: var(--fs-xs); color: var(--text-3); min-width: 60px; text-align: start; }
+        .sync.on { color: var(--ok-text); }
+        @media (max-width: 480px) {
+            .top { gap: 8px; padding: 8px 10px; }
+            .top h1 { font-size: var(--fs-md); white-space: nowrap; }
+            .top .sub { font-size: 11px; }
+            .sync { display: none; }
+            .btn { padding: 0 10px; min-height: 34px; }
+        }
+
+        /* The world. #world is translated/scaled; everything inside is in world units. */
+        /* Eight colours, each a hue the bubble mixes into its own fill and border.
+           Dark paper wants deeper fills with light text; light paper wants pastels. */
+        :root {
+            --c1: #F5B342; --c2: #F0704A; --c3: #E85D8A; --c4: #9B6BF2;
+            --c5: #3FA7F5; --c6: #2EC4A6; --c7: #8BD13F;
+            --dot: color-mix(in srgb, var(--text) 12%, transparent);
+        }
+        #stage {
+            position: fixed; inset: 0; cursor: grab;
+            --dot-alpha: 1;
+            background-image: radial-gradient(color-mix(in srgb, var(--dot) calc(100% * var(--dot-alpha)), transparent) 1.2px, transparent 1.4px);
+            background-size: 28px 28px;
+        }
+        #stage.panning { cursor: grabbing; }
+        #world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+        #wires { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+        #wires .wire { stroke: var(--accent); stroke-width: 2; fill: none; opacity: .75; }
+        #wires .wire-hit { stroke: transparent; stroke-width: 22; fill: none; pointer-events: stroke; cursor: pointer; }
+        #wires .wire.sel { stroke: var(--danger); opacity: 1; stroke-width: 3; }
+        #wires .wire.ghost { stroke-dasharray: 6 6; opacity: .5; }
+
+        /* A bubble is as wide as its title. That is the whole design: the world
+           shows titles, the sheet shows the body. */
+        .bubble {
+            position: absolute; transform: translate(-50%, -50%);
+            width: max-content; max-width: 240px; padding: 10px 16px; border-radius: var(--r-pill);
+            background: var(--surface); border: 1.5px solid var(--border-strong);
+            box-shadow: 0 2px 10px rgba(0,0,0,.08);
+            font-weight: 600; font-size: var(--fs-sm); line-height: 1.3; text-align: center;
+            cursor: grab; touch-action: none;
+            transition: box-shadow var(--t-fast), border-color var(--t-fast);
+        }
+        .bubble[data-c="1"] { --hue: var(--c1); } .bubble[data-c="2"] { --hue: var(--c2); }
+        .bubble[data-c="3"] { --hue: var(--c3); } .bubble[data-c="4"] { --hue: var(--c4); }
+        .bubble[data-c="5"] { --hue: var(--c5); } .bubble[data-c="6"] { --hue: var(--c6); }
+        .bubble[data-c="7"] { --hue: var(--c7); }
+        .bubble[data-c]:not([data-c="0"]) {
+            background: color-mix(in srgb, var(--hue) 30%, var(--surface));
+            border-color: color-mix(in srgb, var(--hue) 70%, var(--surface));
+        }
+        .bubble[data-c]:not([data-c="0"]) .knob::before { background: var(--hue); box-shadow: 0 0 0 1.5px var(--hue); }
+        .bubble[data-c]:not([data-c="0"]).sel { box-shadow: 0 0 0 4px color-mix(in srgb, var(--hue) 35%, transparent), 0 4px 16px rgba(0,0,0,.12); border-color: var(--hue); }
+        #wires .wire[data-c="1"] { stroke: var(--c1); } #wires .wire[data-c="2"] { stroke: var(--c2); }
+        #wires .wire[data-c="3"] { stroke: var(--c3); } #wires .wire[data-c="4"] { stroke: var(--c4); }
+        #wires .wire[data-c="5"] { stroke: var(--c5); } #wires .wire[data-c="6"] { stroke: var(--c6); }
+        #wires .wire[data-c="7"] { stroke: var(--c7); }
+        #wires .wire { stroke-width: 2.5; }
+        .bubble .label { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bubble.long .label { white-space: normal; }
+        .bubble:hover { border-color: var(--accent); }
+        .bubble.sel { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft), 0 4px 16px rgba(0,0,0,.12); }
+        .bubble.drag { cursor: grabbing; box-shadow: 0 8px 24px rgba(0,0,0,.18); z-index: 5; }
+        .bubble.has-body::after {
+            content: ''; position: absolute; inset-inline-end: 6px; top: 6px; width: 6px; height: 6px;
+            border-radius: 50%; background: var(--accent); opacity: .7;
+        }
+        /* The connect handle: drag from here to another bubble to draw a line. */
+        .bubble .knob {
+            position: absolute; inset-inline-start: -14px; top: 50%; transform: translateY(-50%);
+            width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+            opacity: 0; transition: opacity var(--t-fast); cursor: crosshair; touch-action: none;
+        }
+        .bubble .knob::before { content: ''; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); box-shadow: 0 0 0 1.5px var(--accent); }
+        .bubble:hover .knob, .bubble.sel .knob { opacity: 1; }
+        @media (pointer: coarse) { .bubble .knob { opacity: .55; } }
+        .bubble.target { border-color: var(--action); box-shadow: 0 0 0 4px color-mix(in srgb, var(--action) 30%, transparent); }
+
+        /* Search: the field lives in the top bar; results drop under it. While a
+           query is typed, everything that does not match fades and the matches
+           stay lit — the world itself is the result list, the dropdown is the index. */
+        #search { position: relative; display: flex; align-items: center; gap: 4px; }
+        #q {
+            width: 220px; min-height: 36px; padding: 0 14px; border-radius: var(--r-pill); border: 1px solid var(--border-strong);
+            background: var(--surface); -webkit-user-select: text; user-select: text;
+        }
+        #q:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+        #btn-search { display: none; }
+        #results {
+            position: absolute; top: 42px; inset-inline-start: 0; width: min(420px, calc(100vw - 24px)); max-height: 60vh; overflow: auto;
+            background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: 0 10px 30px rgba(0,0,0,.15);
+            padding: 6px; z-index: 50;
+        }
+        .hit { display: block; width: 100%; text-align: start; border: 0; background: transparent; padding: 8px 10px; border-radius: var(--r-sm); cursor: pointer; }
+        .hit:hover, .hit.on { background: var(--surface-2); }
+        .hit-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: var(--fs-sm); }
+        .hit-title .swatch { width: 12px; height: 12px; flex: none; pointer-events: none; }
+        .hit-page { color: var(--text-3); font-weight: 500; font-size: var(--fs-xs); margin-inline-start: auto; }
+        .hit-snip { color: var(--text-2); font-size: var(--fs-xs); line-height: 1.45; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .hit mark { background: color-mix(in srgb, var(--c1) 55%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+        .hit-none { padding: 10px; color: var(--text-3); font-size: var(--fs-sm); }
+        .bubble.dim { opacity: .18; }
+        #wires .wire.dim { opacity: .12; }
+        #marquee { position: fixed; z-index: 35; border: 1.5px dashed var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); pointer-events: none; border-radius: 4px; }
+        #marquee[hidden] { display: none; }
+        .bubble.picked { box-shadow: 0 0 0 3px var(--accent), 0 4px 16px rgba(0,0,0,.12); }
+        #stage.marquee-mode { cursor: crosshair; }
+        #btn-marquee.on { background: var(--accent); color: #fff; border-color: transparent; }
+        #edge-del { position: fixed; z-index: 30; transform: translate(-50%, -50%); background: var(--surface); box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+        #edge-del[hidden] { display: none; }
+        .cluster.dim { opacity: .3; }
+        @media (max-width: 640px) {
+            #q { display: none; width: 100%; }
+            #btn-search { display: inline-flex; }
+            .top.searching #q { display: block; }
+            .top.searching h1, .top.searching .sub, .top.searching #btn-search, .top.searching #btn-theme { display: none; }
+            .top.searching #search { flex: 1; }
+            #results { width: calc(100vw - 20px); inset-inline-start: 0; }
+        }
+
+        /* Tabs */
+        #tabbar {
+            position: fixed; inset-inline: 0; top: 58px; z-index: 29; display: flex; align-items: center; gap: 8px;
+            padding: 6px 10px; background: color-mix(in srgb, var(--bg) 82%, transparent);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid var(--border);
+        }
+        #tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 1; }
+        #tabs::-webkit-scrollbar { display: none; }
+        .tab {
+            flex: none; min-height: 32px; padding: 0 14px; border-radius: var(--r-pill); border: 1px solid var(--border-strong);
+            background: var(--surface); font-weight: 600; font-size: var(--fs-sm); white-space: nowrap;
+        }
+        .tab.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+        .tab.add { padding: 0 10px; color: var(--text-2); }
+        #tab-tools { display: flex; gap: 6px; flex: none; }
+        @media (max-width: 480px) { #tabbar { top: 52px; } }
+
+        /* Page groups in "הכל" carry their name */
+        .cluster {
+            position: absolute; font-family: var(--font-display); font-weight: 700; font-size: var(--fs-md);
+            color: var(--text-3); letter-spacing: .02em; padding: 4px 10px; border-radius: var(--r-sm);
+            background: color-mix(in srgb, var(--text) 6%, transparent); cursor: pointer; white-space: nowrap;
+        }
+        #wires .wire.cross { stroke-dasharray: 8 7; opacity: .55; }
+        #wires .wire.ghost.cross { stroke-dasharray: 3 5; }
+
+        /* Legend */
+        #legend {
+            position: fixed; inset-inline-start: 12px; top: 112px; z-index: 28; display: flex; flex-direction: column; gap: 4px;
+            padding: 8px; border-radius: var(--r-md); background: color-mix(in srgb, var(--surface) 88%, transparent);
+            border: 1px solid var(--border); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+        }
+        #legend-toggle { display: none; }
+        .legend-row {
+            display: flex; align-items: center; gap: 8px; padding: 4px 8px 4px 6px; border: 0; background: transparent;
+            border-radius: var(--r-pill); font-size: var(--fs-sm); font-weight: 600; text-align: start;
+        }
+        .legend-row:hover { background: var(--surface-2); }
+        .legend-row .swatch { width: 18px; height: 18px; pointer-events: none; }
+        @media (max-width: 900px) {
+            #legend { top: auto; bottom: 90px; inset-inline-start: 12px; padding: 4px; }
+            #legend-toggle { display: inline-flex; }
+            #legend-list { display: none; }
+            #legend.open #legend-list { display: flex; flex-direction: column; }
+        }
+
+        .legend-tools { display: flex; gap: 6px; justify-content: flex-end; padding: 0 4px 4px; }
+        .toast-act { margin-inline-start: 12px; border: 0; border-radius: 999px; padding: 2px 10px; background: var(--accent); color: #fff; font-weight: 700; cursor: pointer; }
+        .tab-tools .btn.on { background: var(--surface-2); border-color: var(--border-strong); }
+        #btn-legend-edit.on { background: var(--accent); color: #fff; border-color: transparent; }
+        .legend-row.editing { display: flex; align-items: center; gap: 8px; padding: 4px 6px; }
+        .legend-input { flex: 1; min-width: 0; border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--bg); padding: 4px 8px; font-size: var(--fs-sm); -webkit-user-select: text; user-select: text; }
+        .legend-input:focus { outline: none; border-color: var(--accent); }
+
+        /* The bin */
+        #trash {
+            position: fixed; top: 64px; inset-inline-start: 10px; z-index: 44; width: min(380px, calc(100vw - 20px)); max-height: 70vh; overflow: auto;
+            background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,.18); padding: 10px;
+        }
+        #trash[hidden] { display: none; }
+        .trash-head { display: flex; align-items: center; gap: 8px; padding: 2px 4px 8px; }
+        .trash-head strong { flex: 1; font-size: var(--fs-md); }
+        .trash-row { display: flex; align-items: center; gap: 8px; padding: 8px 6px; border-top: 1px solid var(--border); }
+        .trash-row .swatch { width: 12px; height: 12px; flex: none; pointer-events: none; }
+        .trash-text { flex: 1; min-width: 0; }
+        .trash-title { font-weight: 700; font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .trash-meta { font-size: var(--fs-xs); color: var(--text-3); }
+        .trash-empty { padding: 14px 6px; color: var(--text-3); font-size: var(--fs-sm); }
+        .btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+
+        /* The no-address card */
+        /* A banner at the bottom, never a wall: the tree stays usable while the
+           device is local-only, and ✕ puts it away. */
+        #nokey { position: fixed; inset-inline: 10px; bottom: 88px; z-index: 45; display: flex; justify-content: center; pointer-events: none; }
+        #nokey[hidden] { display: none; }
+        .nokey-card { pointer-events: auto; width: min(520px, 100%); background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 12px 14px; box-shadow: 0 12px 40px rgba(0,0,0,.18); display: flex; flex-direction: column; gap: 8px; }
+        .nokey-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: var(--fs-sm); }
+        .nokey-card p { font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5; }
+        .nokey-card code { font-size: var(--fs-xs); background: var(--surface-2); padding: 1px 5px; border-radius: 4px; direction: ltr; unicode-bidi: embed; }
+        .nokey-card .row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .nokey-card input { flex: 1; min-width: 200px; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--bg); padding: 10px 12px; direction: ltr; text-align: left; -webkit-user-select: text; user-select: text; font-size: var(--fs-sm); }
+        .nokey-card .meta { font-size: var(--fs-xs); color: var(--text-3); }
+
+        /* Empty-world hint and the floating + */
+        #hint {
+            position: fixed; inset-inline: 0; bottom: 140px; text-align: center; color: var(--text-3);
+            font-size: var(--fs-sm); pointer-events: none; z-index: 20;
+        }
+        #fab {
+            position: fixed; inset-inline-end: 18px; bottom: 22px; z-index: 30;
+            width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--action); color: var(--on-action);
+            font-size: 30px; line-height: 1; box-shadow: 0 6px 20px rgba(0,0,0,.2);
+        }
+        #zoom { position: fixed; inset-inline-start: 14px; bottom: 22px; z-index: 30; display: flex; gap: 6px; }
+        #zoom .btn { min-width: 36px; padding: 0; justify-content: center; }
+
+        /* The sheet: the body of the selected bubble. Bottom sheet on the phone,
+           side panel on a desk. */
+        #sheet {
+            position: fixed; z-index: 40; background: var(--surface); border: 1px solid var(--border);
+            box-shadow: 0 -8px 30px rgba(0,0,0,.15); display: flex; flex-direction: column; gap: 10px; padding: 14px;
+            inset-inline: 0; bottom: 0; max-height: 72vh; border-radius: 18px 18px 0 0;
+            transform: translateY(105%); transition: transform var(--t-med);
+        }
+        #sheet.open { transform: translateY(0); }
+        @media (min-width: 900px) {
+            #sheet { inset-inline-end: 0; inset-inline-start: auto; top: 104px; bottom: 0; width: 380px; max-height: none;
+                     border-radius: 0; transform: translateX(-105%); }
+            #sheet.open { transform: translateX(0); }
+        }
+        #sheet input, #sheet textarea {
+            width: 100%; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--bg);
+            padding: 10px 12px; -webkit-user-select: text; user-select: text;
+        }
+        #sheet input { font-weight: 700; font-size: var(--fs-lg); }
+        #sheet textarea { min-height: 120px; resize: vertical; flex: 1; line-height: 1.55; }
+        #sheet .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        #sheet .meta { font-size: var(--fs-xs); color: var(--text-3); }
+        #f-colors { display: flex; gap: 8px; flex-wrap: wrap; }
+        .swatch {
+            width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: var(--surface-2);
+            box-shadow: inset 0 0 0 1.5px var(--border-strong); cursor: pointer; transition: transform var(--t-fast);
+        }
+        .swatch[data-c="1"] { background: var(--c1); } .swatch[data-c="2"] { background: var(--c2); }
+        .swatch[data-c="3"] { background: var(--c3); } .swatch[data-c="4"] { background: var(--c4); }
+        .swatch[data-c="5"] { background: var(--c5); } .swatch[data-c="6"] { background: var(--c6); }
+        .swatch[data-c="7"] { background: var(--c7); }
+        .swatch:not([data-c="0"]) { box-shadow: none; }
+        .swatch.on { border-color: var(--text); transform: scale(1.15); }
+        .swatch:hover { transform: scale(1.1); }
+        #btn-rec.live { background: var(--danger); color: #fff; border-color: transparent; }
+        .btn.small { min-height: 28px; padding: 0 10px; font-size: var(--fs-xs); }
+        #f-recs { display: flex; flex-direction: column; gap: 10px; }
+        .rec { border: 1px solid var(--border); border-radius: var(--r-md); padding: 8px 10px; background: var(--bg); }
+        .rec audio { width: 100%; height: 36px; }
+        .rec-meta { display: flex; align-items: center; gap: 8px; font-size: var(--fs-xs); color: var(--text-3); margin-top: 4px; }
+        .rec-meta .btn { margin-inline-start: auto; }
+        .rec-tx { margin-top: 6px; font-size: var(--fs-sm); line-height: 1.5; white-space: pre-wrap; -webkit-user-select: text; user-select: text; }
+        .rec-tx.muted { color: var(--text-3); font-style: normal; }
+        .rec.pending { border-style: dashed; }
+        #f-imgs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        #f-imgs:empty { display: none; }
+        .pic { position: relative; aspect-ratio: 1; border-radius: var(--r-md); overflow: hidden; background: var(--surface-2); }
+        .pic img { width: 100%; height: 100%; object-fit: cover; cursor: zoom-in; display: block; }
+        .pic-x { position: absolute; top: 4px; inset-inline-end: 4px; width: 24px; height: 24px; border-radius: 50%; border: 0; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; cursor: pointer; }
+        #lightbox { position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,.88); display: grid; place-items: center; padding: 16px; cursor: zoom-out; }
+        #lightbox[hidden] { display: none; }
+        #lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+        .bubble.has-img::after {
+            content: ''; position: absolute; inset-inline-end: 14px; bottom: 6px; width: 6px; height: 6px;
+            border-radius: 50%; background: var(--c5); opacity: .9;
+        }
+        .rec.pending .rec-meta { color: var(--warn-text); }
+        .bubble.has-rec::before {
+            content: ''; position: absolute; inset-inline-end: 6px; bottom: 6px; width: 6px; height: 6px;
+            border-radius: 50%; background: var(--danger); opacity: .8;
+        }
+
+        .toast {
+            position: fixed; inset-inline: 0; bottom: 92px; margin: 0 auto; width: max-content; max-width: 90vw; z-index: 50;
+            background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: var(--r-pill); font-size: var(--fs-sm);
+            opacity: 0; transition: opacity var(--t-med); pointer-events: none;
+        }
+        .toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+    <div class="top">
+        <div>
+            <h1>עץ התובנות</h1>
+            <div class="sub" id="count">—</div>
+        </div>
+        <div class="spacer"></div>
+        <div id="search">
+            <input type="search" id="q" aria-label="חיפוש בתובנות" placeholder="חיפוש בתובנות…" autocomplete="off" oninput="onSearchInput()" onfocus="onSearchInput()" onkeydown="onSearchKey(event)">
+            <button type="button" class="btn quiet" id="btn-search" onclick="openSearch()" aria-label="חיפוש">🔍</button>
+            <div id="results" hidden></div>
+        </div>
+        <span class="sync" id="sync">מקומי</span>
+        <button class="btn quiet" id="btn-trash" onclick="toggleTrash()" title="סל מחזור" aria-label="סל מחזור">🗑</button>
+        <button class="btn quiet" id="btn-theme" onclick="toggleTheme()" title="יום / לילה" aria-label="יום או לילה">🌙</button>
+    </div>
+
+    <!-- Tabs: "הכל" and one chip per page. Under the top bar, scrolls sideways on a phone. -->
+    <div id="tabbar">
+        <div id="tabs" role="tablist"></div>
+        <div id="tab-tools"></div>
+    </div>
+
+    <!-- The legend: what each colour means. Tapping a row colours the selected bubble. -->
+    <aside id="legend" aria-label="מקרא צבעים">
+        <button type="button" id="legend-toggle" class="btn quiet small" onclick="toggleLegend()">מקרא</button>
+        <div class="legend-tools">
+            <button type="button" class="btn quiet small" id="btn-paint" onclick="paintAll()" title="צבע את כל הפתקים שרואים, כל אחד לפי מה שכתוב בו">🎨</button>
+            <button type="button" class="btn quiet small" id="btn-legend-edit" onclick="toggleLegendEdit()" title="ערוך את שמות המקרא">✎</button>
+            <button type="button" class="btn quiet small" id="btn-legend-reset" onclick="resetLegend()" hidden>איפוס</button>
+        </div>
+        <div id="legend-list"></div>
+    </aside>
+
+    <div id="stage">
+        <div id="world">
+            <svg id="wires"></svg>
+            <div id="nodes"></div>
+        </div>
+    </div>
+
+    <!-- A device that has never seen the key. The home-screen app on iPhone is
+         such a device: it opens /thing/ without the address, and it does not
+         share Safari's storage, so everything typed in it stayed local. Paste the
+         address once here and it joins the cloud — nothing on the device is
+         thrown away, the server merges bubble by bubble. -->
+    <div id="nokey" hidden>
+        <div class="nokey-card">
+            <div class="nokey-head">
+                <strong>המכשיר הזה לא מחובר לענן</strong>
+                <button type="button" class="btn quiet small" onclick="dismissNoKey()" aria-label="סגור">✕</button>
+            </div>
+            <p>הדרך הקלה: פתח את העץ בספארי מהכתובת המלאה ותוסיף משם למסך הבית — האייקון כבר יהיה מחובר. או הדבק כאן את הכתובת המלאה.</p>
+            <div class="row">
+                <input type="text" id="nokey-input" aria-label="הכתובת המלאה של העץ" placeholder="https://www.sj-eng.co.il/thing/#k=…" autocomplete="off" inputmode="url">
+                <button type="button" class="btn primary" onclick="connectKey()">חבר</button>
+            </div>
+            <p class="meta" id="nokey-local"></p>
+        </div>
+    </div>
+
+    <!-- The bin: what was deleted in the last 30 days, with a way back. -->
+    <div id="trash" hidden>
+        <div class="trash-head">
+            <strong>סל מחזור</strong>
+            <button type="button" class="btn quiet small danger" id="btn-empty-trash" onclick="emptyTrash()" hidden>רוקן</button>
+            <button type="button" class="btn quiet small" onclick="toggleTrash()" aria-label="סגור">✕</button>
+        </div>
+        <div id="trash-list"></div>
+    </div>
+
+    <!-- A picture, full size. -->
+    <div id="lightbox" hidden onclick="closePic()"><img alt=""></div>
+
+    <!-- The selection box (Shift-drag on a computer, the 🔲 mode on a phone). -->
+    <div id="marquee" hidden></div>
+
+    <!-- One button for a tapped line, at its middle. -->
+    <button type="button" id="edge-del" class="btn danger small" onclick="deleteSelectedEdge()" hidden>מחק קו</button>
+
+    <div id="hint" hidden>לחיצה כפולה על הרקע פותחת תובנה חדשה · גרירה מהנקודה הכחולה מחברת קו</div>
+    <div id="zoom">
+        <button class="btn" onclick="zoomBy(1.2)" title="הגדל">+</button>
+        <button class="btn" onclick="zoomBy(1/1.2)" title="הקטן">−</button>
+        <button class="btn" id="btn-marquee" onclick="toggleMarquee()" title="בחירת כמה תובנות (או Shift+גרירה)" aria-label="מצב בחירה">🔲</button>
+        <button class="btn" onclick="fitAll()" title="הצג הכל">⤢</button>
+    </div>
+    <button id="fab" onclick="addNodeAtCenter()" title="תובנה חדשה" aria-label="תובנה חדשה">+</button>
+
+    <div id="sheet" role="dialog" aria-label="תובנה">
+        <div class="row">
+            <input type="text" id="f-title" aria-label="כותרת" placeholder="כותרת — מה התובנה במשפט" maxlength="120" oninput="onFieldInput()" style="flex:1">
+            <button type="button" class="btn" id="btn-title" onclick="autoTitle(selectedId)" title="כותרת מהטקסט וההקלטות">✨</button>
+        </div>
+        <textarea id="f-body" aria-label="גוף התובנה" placeholder="הגוף — למה, מאיפה זה בא, מה עושים עם זה" maxlength="4000" oninput="onFieldInput()"></textarea>
+        <div class="row">
+            <div id="f-colors" role="group" aria-label="צבע"></div>
+            <span class="meta" id="f-color-name"></span>
+        </div>
+        <div class="row">
+            <label class="meta" for="f-page">לשונית</label>
+            <select id="f-page" onchange="onPageSelect()" style="flex:1;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--bg);padding:8px 10px"></select>
+        </div>
+        <div class="row">
+            <button type="button" class="btn" id="btn-rec" onclick="toggleRecord()">🎙 הקלט</button>
+            <button type="button" class="btn" onclick="pickImage()" title="הוסף תמונה לתובנה">📷 תמונה</button>
+            <button type="button" class="btn quiet" onclick="pickTree()" title="בחר את כל מה שמחובר לתובנה הזו — ואז גרור">בחר את העץ</button>
+            <input type="file" id="f-img-input" aria-label="בחירת תמונה" accept="image/*" onchange="onImagePicked(this)" hidden>
+            <span class="meta">הקלטה קולית נשמרת לתובנה ומתומללת</span>
+        </div>
+        <div id="f-imgs"></div>
+        <div id="f-recs"></div>
+        <div class="row">
+            <button class="btn primary" onclick="closeSheet()">סגור</button>
+            <button class="btn" id="btn-link" onclick="startLinkFromSheet()">חבר ל…</button>
+            <span class="spacer" style="flex:1"></span>
+            <button class="btn danger" onclick="deleteSelected()">מחק</button>
+        </div>
+        <div class="meta" id="f-meta"></div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="thing.js?v=504"></script>
+</body>
+</html>

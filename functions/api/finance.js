@@ -18,41 +18,14 @@
 // Bank passwords/credentials never touch this system. When Financy (open
 // banking, read-only) is registered, its keys will live in env vars — not KV.
 
-import { verifyGoogleEmail, bearerToken, getTierForEmail, jsonResponse, ADMIN_EMAIL } from './_tiers.js';
+import { proGate, jsonResponse, financeKey, readFinanceRecord } from './_tiers.js';
 
 // PRO feature: every paying account (pro/business) plus the owner gets its OWN
 // record; the owner's key stays 'finance:admin' so nothing he entered moves.
-const PRO_TIERS = ['pro', 'business', 'admin'];
-// Lower-cased, like every other per-user key in this project (data.js writes
-// 'user:' + email.toLowerCase(), pdf.js and tier.js do the same). This file was
-// the only one keying on the raw address Google returned, and verifyGoogleEmail
-// hands back whatever Google sent — canonical lowercase for gmail.com, but not
-// guaranteed for a Workspace domain. A user whose address came back capitalised
-// differently on a later sign-in would find an empty cash-flow screen, and the
-// admin check below would miss too.
-function keyFor(email) {
-    const e = String(email || '').toLowerCase();
-    return e === ADMIN_EMAIL ? 'finance:admin' : `finance:${e}`;
-}
-// Records written before the line above existed live under the raw address.
-// Read the canonical key first and fall back, so nobody's data disappears on
-// the deploy that fixed the casing.
-function legacyKeyFor(email) {
-    return email === ADMIN_EMAIL ? 'finance:admin' : `finance:${email}`;
-}
-async function readFinanceRecord(env, email) {
-    const raw = await env.SJ_DATA.get(keyFor(email));
-    if (raw) return raw;
-    const legacy = legacyKeyFor(email);
-    return legacy === keyFor(email) ? null : await env.SJ_DATA.get(legacy);
-}
-async function proGate(env, request) {
-    const email = await verifyGoogleEmail(bearerToken(request));
-    if (!email) return { ok: false, response: jsonResponse({ error: { message: 'נדרשת התחברות.', code: 'auth-expired' } }, 401) };
-    const tier = await getTierForEmail(env, email);
-    if (!PRO_TIERS.includes(tier)) return { ok: false, response: jsonResponse({ error: { message: 'תזרים מזומנים הוא תכונת PRO.', code: 'pro-required' } }, 403) };
-    return { ok: true, email, tier };
-}
+// The key (lower-cased, with the legacy raw-address fallback on read) and the
+// PRO gate are shared with financy.js through _tiers.js — one record per
+// account, whichever of the two routes touches it.
+const PRO_DENIED = { message: 'תזרים מזומנים הוא תכונת PRO.', code: 'pro-required' };
 const MAX_BYTES = 2 * 1024 * 1024;
 
 function emptyRecord() {
@@ -62,9 +35,9 @@ function emptyRecord() {
 export async function onRequestGet(context) {
     const { request, env } = context;
     if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) לא מוגדר.' } }, 501);
-    const gate = await proGate(env, request);
+    const gate = await proGate(env, request, PRO_DENIED);
     if (!gate.ok) return gate.response;
-    const KEY = keyFor(gate.email);
+    const KEY = financeKey(gate.email);
 
     let record;
     try { record = JSON.parse(await readFinanceRecord(env, gate.email) || 'null') || emptyRecord(); }
@@ -150,9 +123,9 @@ export async function onRequestPost(context) { return savePut(context); }
 async function savePut(context) {
     const { request, env } = context;
     if (!env.SJ_DATA) return jsonResponse({ error: { message: 'אחסון הענן (KV) לא מוגדר.' } }, 501);
-    const gate = await proGate(env, request);
+    const gate = await proGate(env, request, PRO_DENIED);
     if (!gate.ok) return gate.response;
-    const KEY = keyFor(gate.email);
+    const KEY = financeKey(gate.email);
 
     let body;
     try { body = await request.json(); } catch { return jsonResponse({ error: { message: 'JSON שגוי.' } }, 400); }

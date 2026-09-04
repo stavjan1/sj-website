@@ -525,3 +525,19 @@ test('every internal doc in the deploy root is blocked, not just the remembered 
   assert.deepEqual(unblocked, [],
     'these internal documents are publicly served — add them to _redirects');
 });
+
+// `_redirects` cannot return 404 on Cloudflare Pages (verified 4.9.2026: /scripts/*
+// answered 200 with a 404 rule in place). The 404 lines in that file are the map of
+// what must stay private; the block itself is a Function stub. This keeps the two
+// in step, so a new 404 line without a stub fails here instead of on the web.
+test('every 404 path in _redirects has a Function stub that actually denies it', () => {
+    const rules = readFileSync(new URL('../_redirects', import.meta.url), 'utf8').split(/\r?\n/)
+        .map((l) => l.trim()).filter((l) => l && !l.startsWith('#') && /\s404\s*$/.test(l))
+        .map((l) => l.split(/\s+/)[0]);
+    assert.ok(rules.length >= 5, 'the map of private paths shrank');
+    const missing = rules.filter((p) => {
+        const rel = p.replace(/^\//, '').replace(/\/\*$/, '/[[path]]');
+        return !existsSync(new URL('../functions/' + rel + '.js', import.meta.url));
+    });
+    assert.deepEqual(missing, [], 'these 404 rules have no Function stub, so they are public: ' + missing.join(', '));
+});

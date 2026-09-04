@@ -17,7 +17,13 @@
  *   - only GET/HEAD — a 301 turns a POST into a GET, and /api/telegram is a
  *     webhook Telegram POSTs to at whatever origin it was registered with;
  *   - never /api/* — same reason, for every integration that holds a URL.
+ *
+ * Also the one place that can put security headers on Function responses:
+ * `_headers` applies to static files only, so an /api/* reply used to leave
+ * with no nosniff at all. Every API response now carries the two headers
+ * that matter for bytes a browser might be tricked into rendering.
  */
+const API_HEADERS = { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' };
 export async function onRequest(context) {
     const { request, next } = context;
     const url = new URL(request.url);
@@ -35,5 +41,9 @@ export async function onRequest(context) {
         });
     }
 
-    return next();
+    if (!isApi) return next();
+    const res = await next();
+    const headers = new Headers(res.headers);
+    for (const [k, v] of Object.entries(API_HEADERS)) if (!headers.has(k)) headers.set(k, v);
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }

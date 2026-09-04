@@ -16,9 +16,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Heebo:wght@400;500;700&family=Rubik:wght@500;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/tokens.css?v=481">
-    <link rel="stylesheet" href="../assets/ui.css?v=481">
-    <link rel="stylesheet" href="../styles.css?v=481">
+    <link rel="stylesheet" href="../assets/tokens.css?v=504">
+    <link rel="stylesheet" href="../assets/ui.css?v=504">
+    <link rel="stylesheet" href="../styles.css?v=504">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2L4.5 13h6l-1.5 9L18.5 10h-6z' fill='%236ABF3C'/%3E%3C/svg%3E">
     <script type="application/ld+json">
     {
@@ -272,7 +272,9 @@
                         <h3>מכיר ספק שישמח להצטרף?</h3>
                         <p style="color: var(--text-2);">זרוק לנו שם ועיר, אנחנו כבר נגיע אליו.</p>
                         <form id="z-supplier-form" onsubmit="return zSuggestSupplier(event)">
+                            <label for="z-sup-name" class="visually-hidden">שם הספק</label>
                             <input type="text" class="input" id="z-sup-name" placeholder="שם הספק" required>
+                            <label for="z-sup-city" class="visually-hidden">עיר</label>
                             <input type="text" class="input" id="z-sup-city" placeholder="עיר" required>
                             <button type="submit" class="btn btn-primary">שלח</button>
                         </form>
@@ -364,10 +366,7 @@
     </footer>
 
     <script>
-        const obs = new IntersectionObserver((entries, o) => {
-            entries.forEach(en => { if (en.isIntersecting) { en.target.classList.add('on'); o.unobserve(en.target); } });
-        }, { threshold: 0.12 });
-        document.querySelectorAll('.rv').forEach(el => obs.observe(el));
+        // The .rv reveal-on-scroll observer lives in /app.js (loaded below).
 
         // "מכיר ספק?" — sends the tip to SJ's inbox via web3forms.
         function zSuggestSupplier(e) {
@@ -414,7 +413,7 @@
             })(window, document, 'clarity', 'script', 'xgux1eczkt');
         })();
     </script>
-    <script src="/app.js?v=481"></script>
-    <script src="/track.js?v=481" defer></script>
+    <script src="/app.js?v=504"></script>
+    <script src="/track.js?v=504" defer></script>
 </body>
 </html>

@@ -12,13 +12,16 @@
 // Two columns, always: the office site and זרם are different businesses with
 // different questions, and a single merged number answers neither.
 // ==========================================================================
-// Three properties, because the same number means three different things:
-// people looking for an engineer, people deciding whether זרם is for them, and
-// people actually working inside it.
+// Four properties, because the same number means four different things:
+// people looking for an engineer, people deciding whether זרם is for them,
+// people actually working inside it, and customers opening a quote an
+// electrician shared with them (/q/). The keys mirror SITES in
+// functions/api/analytics.js; tests/analytics.test.mjs keeps them equal.
 const TRAFFIC_SITES = [
     { key: 'site', label: 'אתר המשרד', icon: 'fa-globe' },
     { key: 'zerem', label: 'דף זרם', icon: 'fa-bolt' },
     { key: 'app', label: 'המערכת', icon: 'fa-screwdriver-wrench' },
+    { key: 'quote', label: 'הצעות ששותפו', icon: 'fa-file-invoice' },
 ];
 
 // A dependency-free sparkline: an inline SVG polyline. A charting library for
@@ -129,7 +132,7 @@ function visitorsPanelHtml(summary, siteKey) {
     const empty = !s.year.visitors && !s.month.visitors;
     const body = empty
         ? `<div class="vempty">
-               <b>עוד לא נספרה אף כניסה ${escapeHtml(siteKey === 'zerem' ? 'לדף זרם' : siteKey === 'app' ? 'למערכת' : 'לאתר')} השנה.</b>
+               <b>עוד לא נספרה אף כניסה ${escapeHtml(siteKey === 'zerem' ? 'לדף זרם' : siteKey === 'app' ? 'למערכת' : siteKey === 'quote' ? 'להצעות ששותפו' : 'לאתר')} השנה.</b>
                <span>המונה עובד, פשוט עוד לא נכנס אף אחד. הכניסות שלך לא נספרות בכוונה, אז בדיקה עצמית לא תזיז אותו.</span>
            </div>`
         : `<div class="vsum-kpis">
@@ -345,7 +348,7 @@ function crPaintTraffic() {
     const pts = [...byDay.entries()].sort().map(([date, v]) => ({ date, v }));
     const total = pts.reduce((x, p) => x + p.v, 0);
     const peak = pts.reduce((best, p) => (!best || p.v > best.v ? p : best), null);
-    const colors = { site: '#6BA8F5', zerem: '#6ABF3C', app: '#FCD34D' };
+    const colors = { site: '#6BA8F5', zerem: '#6ABF3C', app: '#FCD34D', quote: '#FB923C' };
     const legend = TRAFFIC_SITES.map((t) => {
         const d = (a.sites || {})[t.key] || {};
         return `<span class="cr-leg" style="color:${colors[t.key] || '#A8BAD4'}">
@@ -1352,7 +1355,7 @@ async function openAdminConvo(i) {
         body.innerHTML = (d.messages || []).map((m) => `
             <div class="cr-msg ${m.role === 'user' ? 'is-user' : 'is-ai'}">
                 <span class="cr-who">${m.role === 'user' ? 'הוא' : 'הסוכן'}</span>
-                <p>${escapeHtml(m.text).replace(/\n/g, '<br>')}</p>
+                <p style="white-space:pre-wrap">${escapeHtml(m.text)}</p>
             </div>`).join('') || '<p class="input-help">אין הודעות בשיחה הזאת.</p>';
     } catch (e) {
         const body = dlg.querySelector('#cr-body');

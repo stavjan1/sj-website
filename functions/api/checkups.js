@@ -3,21 +3,26 @@
 // a Google token, we verify it and derive the email, KV key `checkups:<email>`.
 // Works for ANY Google account — each user sees only their own client list.
 
-import { verifyGoogleEmail } from './_tiers.js';
+import { verifyGoogleEmail, bearerToken } from './_tiers.js';
+import { json as reply, corsHeaders, preflight, safeParse } from './_http.js';
+
+const METHODS = 'GET, PUT, POST, OPTIONS';
+const CORS = corsHeaders(METHODS);
+const json = (obj, status) => reply(obj, status, CORS);
 
 export async function onRequest(context) {
   const { request, env } = context;
   const method = request.method.toUpperCase();
 
   if (method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: cors() });
+    return preflight(request, METHODS);
   }
 
   if (!env.SJ_DATA) {
     return json({ error: { message: 'אחסון הענן (KV) עדיין לא הוגדר.' } }, 501);
   }
 
-  const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+  const token = bearerToken(request);
   if (!token) return json({ error: { message: 'חסר אסימון הזדהות.' } }, 401);
 
   const email = await verifyGoogleEmail(token);
@@ -56,21 +61,4 @@ export async function onRequest(context) {
   }
 
   return json({ error: { message: 'מתודה לא נתמכת.' } }, 405);
-}
-
-function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
-
-function cors() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, PUT, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
-}
-
-function json(obj, status) {
-  return new Response(JSON.stringify(obj), {
-    status: status || 200,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', ...cors() },
-  });
 }

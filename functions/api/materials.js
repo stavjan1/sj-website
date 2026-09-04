@@ -20,11 +20,19 @@ import {
   norm, MAX_LIMIT,
 } from './_materials.js';
 import { rateLimit } from './_tiers.js';
+import { json as reply, corsHeaders, preflight } from './_http.js';
+
+// Unauthenticated, so no Authorization header to allow. Prices move slowly;
+// a 10-minute edge cache makes repeat lookups free.
+const METHODS = 'GET, OPTIONS';
+const ALLOW_HEADERS = 'Content-Type';
+const HEADERS = { ...corsHeaders(METHODS, ALLOW_HEADERS), 'Cache-Control': 'public, max-age=600' };
+const json = (obj, status) => reply(obj, status, HEADERS);
 
 export async function onRequest(context) {
   const { request, env } = context;
   const method = request.method.toUpperCase();
-  if (method === 'OPTIONS') return new Response(null, { status: 204, headers: cors() });
+  if (method === 'OPTIONS') return preflight(request, METHODS, ALLOW_HEADERS);
   if (method !== 'GET') return json({ error: { message: 'מתודה לא נתמכת.' } }, 405);
 
   // This endpoint is unauthenticated and does real CPU work per call. The cap
@@ -90,7 +98,7 @@ export async function onRequest(context) {
     const block = renderMaterialsBlock(db, hits, categoryStats(db, q));
     return new Response(block, {
       status: 200,
-      headers: { 'Content-Type': 'text/plain; charset=utf-8', ...cors(), ...cache() },
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', ...HEADERS },
     });
   }
 
@@ -110,22 +118,3 @@ function clamp(n, lo, hi) {
   return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : lo;
 }
 
-function cors() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  };
-}
-
-// Prices move slowly; a 10-minute edge cache makes repeat lookups free.
-function cache() {
-  return { 'Cache-Control': 'public, max-age=600' };
-}
-
-function json(obj, status) {
-  return new Response(JSON.stringify(obj), {
-    status: status || 200,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', ...cors(), ...cache() },
-  });
-}

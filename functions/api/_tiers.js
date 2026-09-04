@@ -212,6 +212,63 @@ export function bearerToken(request) {
   return (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
 }
 
+// The replies several routes give in the same words. One wording per meaning;
+// the client matches on some of these, so they change here or not at all.
+// (_http.js re-exports this for the routes.)
+export const MSG = {
+  LOGIN_REQUIRED: 'נדרשת התחברות.',
+  FORBIDDEN: 'אין הרשאה.',
+  AUTH_EXPIRED: 'ההתחברות פגה, התחבר שוב לגוגל.',
+  TOO_MANY_SAVES: 'יותר מדי שמירות בזמן קצר.',
+  TOO_MANY_REQUESTS: 'יותר מדי בקשות בזמן קצר.',
+};
+
+// "Who is this?" for the routes that need a signed-in Google account and
+// nothing more. Returns { email } — or a ready 401 Response, so a caller writes
+//   const who = await requireUser(request); if (who instanceof Response) return who;
+// `body` overrides the 401 payload for a route that says it in its own words.
+export async function requireUser(request, body) {
+  const email = await verifyGoogleEmail(bearerToken(request));
+  if (email) return { email };
+  return jsonResponse(body || { error: { message: MSG.LOGIN_REQUIRED } }, 401);
+}
+
+// The PRO gate finance.js and financy.js each carried: a signed-in account on
+// a paying plan (pro, business, or the owner). Same shape as adminGate —
+// { ok: true, email, tier } or { ok: false, response } — and `denied` is the
+// 403 error body, because each route names its own feature in the refusal.
+const PRO_TIERS = ['pro', 'business', 'admin'];
+export async function proGate(env, request, denied) {
+  const who = await requireUser(request, { error: { message: MSG.LOGIN_REQUIRED, code: 'auth-expired' } });
+  if (who instanceof Response) return { ok: false, response: who };
+  const tier = await getTierForEmail(env, who.email);
+  if (!PRO_TIERS.includes(tier)) return { ok: false, response: jsonResponse({ error: denied }, 403) };
+  return { ok: true, email: who.email, tier };
+}
+
+// The cash-flow record's KV key, lower-cased like every other per-user key
+// here (data.js writes 'user:' + email.toLowerCase(), pdf.js and tier.js do
+// the same). verifyGoogleEmail hands back whatever Google sent — canonical
+// lowercase for gmail.com, but not guaranteed for a Workspace domain — and
+// finance.js and financy.js used to disagree on this, so a mixed-case address
+// had two records: one the dashboard read, one the bank sync wrote.
+export function financeKey(email) {
+  const e = String(email || '').toLowerCase();
+  return e === ADMIN_EMAIL ? 'finance:admin' : `finance:${e}`;
+}
+// Records written before the key was lower-cased live under the raw address.
+// Read the canonical key first and fall back, so nobody's data disappears on
+// the deploy that fixed the casing. Writes go to the canonical key only.
+function legacyFinanceKey(email) {
+  return email === ADMIN_EMAIL ? 'finance:admin' : `finance:${email}`;
+}
+export async function readFinanceRecord(env, email) {
+  const raw = await env.SJ_DATA.get(financeKey(email));
+  if (raw) return raw;
+  const legacy = legacyFinanceKey(email);
+  return legacy === financeKey(email) ? null : await env.SJ_DATA.get(legacy);
+}
+
 // The admin gate, with the two failures kept apart.
 //
 // They were one answer before — "אין הרשאה", 403 — for both "your token
@@ -229,10 +286,10 @@ export async function adminGate(request) {
   const email = await verifyGoogleEmail(bearerToken(request));
   const deny = (status, body) => ({ ok: false, status, body, response: jsonResponse(body, status) });
   if (!email) {
-    return deny(401, { error: { message: 'ההתחברות פגה, התחבר שוב לגוגל.', code: 'auth-expired' } });
+    return deny(401, { error: { message: MSG.AUTH_EXPIRED, code: 'auth-expired' } });
   }
   if (email.toLowerCase() !== ADMIN_EMAIL) {
-    return deny(403, { error: { message: 'אין הרשאה.' } });
+    return deny(403, { error: { message: MSG.FORBIDDEN } });
   }
   return { ok: true, email };
 }
