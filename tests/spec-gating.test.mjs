@@ -87,7 +87,11 @@ test('the charger fork still fires on the supply that needs it', () => {
   assert.ok(fu, 'the 3×25 follow-up is gone');
   assert.equal(fu.id, 'connection_size');
   assert.ok(fu.when.includes('3×25 תלת-פאזי'));
-  assert.equal(fu.options.length, 3);
+  // Two ways out, not three: the 'ניהול עומסים' option went with Stav's
+  // 4.9.2026 ruling (DLM is out of the product), so the fork now offers
+  // a bigger supply or the charger alone.
+  assert.equal(fu.options.length, 2);
+  assert.ok(!fu.options.some((o) => /ניהול עומסים/.test(o)), 'the DLM option came back');
   assert.ok(/ניתוקים בשעות העומס/.test(fu.prompt));
 });
 
