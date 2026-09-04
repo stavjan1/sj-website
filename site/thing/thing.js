@@ -776,7 +776,6 @@ function renderWires() {
 function renderLegend() {
     const box = $('legend-list'); if (!box) return;
     const eb = $('btn-legend-edit'); if (eb) { eb.textContent = legendEditing ? 'סיום' : '✎'; eb.classList.toggle('on', legendEditing); }
-    const rb = $('btn-legend-reset'); if (rb) rb.hidden = !legendEditing || !(tree.legend || []).length;
     box.innerHTML = LEGEND.map((l) => legendEditing ? `
         <div class="legend-row editing" data-c="${l.c}">
             <span class="swatch" data-c="${l.c}"></span>
@@ -801,10 +800,6 @@ function renameLegend(c, value) {
     tree.legend = (tree.legend || []).filter((l) => l.c !== c);
     if (name && name !== LEGEND_BY_C[c].name) tree.legend.push({ c, name, u: Date.now() });
     touch(); renderLegend(); renderNodes();
-}
-function resetLegend() {
-    if (!confirm('להחזיר את שמות המקרא לברירת המחדל?')) return;
-    tree.legend = []; touch(); renderLegend(); renderNodes();
 }
 function toggleLegend() { $('legend').classList.toggle('open'); }
 

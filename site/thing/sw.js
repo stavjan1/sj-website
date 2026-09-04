@@ -6,7 +6,7 @@
 // (a deploy still arrives on the next open with signal) and from the cache
 // when the network is gone. The API is never cached — a stale tree served as
 // fresh would be worse than "לא מקוון".
-const CACHE = 'thing-shell-v4';
+const CACHE = 'thing-shell-v5';
 const SHELL = ['/thing/', '/thing/index.html', '/thing/thing.js', '/assets/tokens.css'];
 
 self.addEventListener('install', (e) => {
