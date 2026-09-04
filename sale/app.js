@@ -2595,6 +2595,9 @@ function switchTab(tabId, opts) {
         switchTab('projects');
         return;
     }
+    // The editor shows the live sheet and the pricing table opens the route
+    // sketch: both draw the paper faces on screen, so they load as the tab opens.
+    if (tabId === 'create' || tabId === 'pricing') ensurePdfFonts();
 
     // Returning to the projects list CLOSES the open project (Stav: the
     // project tabs should exist only while you're inside a specific project).
@@ -6033,6 +6036,8 @@ function applySystemBackground(bg) {
 
 function updatePdfCustomStyles() {
     const fontFamily = document.getElementById('pdf-font-family')?.value || "'Heebo', sans-serif";
+    // A serif choice (or a template that makes one) needs its face on screen now.
+    if (PDF_FONT_FAMILIES.test(fontFamily)) ensurePdfFonts();
     const fontSizeBody = document.getElementById('pdf-font-size-body')?.value || '12';
     const lineHeight = document.getElementById('pdf-line-height')?.value || '1.4';
     const primaryColor = document.getElementById('pdf-primary-color')?.value || '#1e3a8a';
@@ -6724,6 +6729,49 @@ async function resetQuoteDesign() {
     saveQuoteLayout(); applyQuoteLayout(); renderDesignerBlocks();
     const eng = document.getElementById('designer-english'); if (eng) eng.checked = false;
     showToast('העיצוב אופס לברירת המחדל');
+}
+
+// ==========================================================================
+// The paper faces, loaded on demand.
+// ==========================================================================
+// David Libre and Frank Ruhl Libre (the serif choices in the PDF font picker,
+// and what the "קלאסית" template asks for) and Gveret Levin (the hand-written
+// labels of the route sketch) used to ride in the <head> of every visit —
+// three families, eight files — for screens most visits never reach. Now the
+// stylesheet is injected once, the first time a screen that draws them opens,
+// and always before a PDF is captured: html2canvas paints whatever face is on
+// screen at that moment, and a Hebrew quote in a fallback face is a quote that
+// went out wrong. tests/caching.test.mjs pins both export paths to this.
+const PDF_FONTS_HREF = 'https://fonts.googleapis.com/css2?family=David+Libre:wght@400;700&family=Frank+Ruhl+Libre:wght@300;400;500;700;900&family=Gveret+Levin+AlefAlefAlef&display=swap';
+const PDF_FONT_FAMILIES = /David Libre|Frank Ruhl Libre|Gveret Levin/;
+let _pdfFontsLink = null;
+
+function ensurePdfFonts() {
+    if (!_pdfFontsLink) {
+        _pdfFontsLink = new Promise((resolve) => {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.id = 'pdf-fonts';
+            link.href = PDF_FONTS_HREF;
+            // Resolve either way. Offline at a job site the worker may still hold
+            // the faces from an earlier visit; if it does not, the export must
+            // run anyway rather than wait on a network that is not there.
+            link.onload = () => resolve(true);
+            link.onerror = () => resolve(false);
+            document.head.appendChild(link);
+        });
+    }
+    // The stylesheet only declares the faces; a file is fetched when text asks
+    // for it. Ask for the two weights every sheet uses, then wait for whatever
+    // is in flight — bounded, so a slow link delays an export, never blocks it.
+    const settle = _pdfFontsLink.then((loaded) => {
+        if (!loaded || !document.fonts) return loaded;
+        const faces = ["400 16px 'David Libre'", "700 16px 'David Libre'", "400 16px 'Frank Ruhl Libre'", "700 16px 'Frank Ruhl Libre'", "400 16px 'Gveret Levin AlefAlefAlef'"];
+        return Promise.all(faces.map((f) => document.fonts.load(f).catch(() => null)))
+            .then(() => document.fonts.ready)
+            .then(() => true, () => true);
+    });
+    return Promise.race([settle, new Promise((resolve) => setTimeout(() => resolve(false), 8000))]);
 }
 
 // ==========================================================================
@@ -8334,6 +8382,9 @@ async function downloadPDF() {
 
     showToast('מכין קובץ PDF להורדה...');
 
+    // The sheet may wear David or Frank Ruhl; html2canvas paints whatever is on
+    // screen, so the faces are awaited here even when the tab already asked.
+    await ensurePdfFonts();
     const restoreSheet = _unscaleSheetForCapture(element);
     return html2pdf().set(options).from(element).save()
         .then(() => {
