@@ -3345,6 +3345,48 @@ function tradeDiscountNote() {
     return d ? `מחירי החומרים כבר כוללים את הנחת הסוחר שלך, ${d}%.` : '';
 }
 
+// ── Consumables: the 5% nobody itemises ─────────────────────────────────────
+//
+// Screws, anchors, tape, cable ties, terminal blocks, the odd metre of wire:
+// no electrician lists them and every one of them pays for them. Stav's rule
+// (4.9.2026): an automatic line, 5% of labour + materials, that he can switch
+// off or retune per job. It is stored on the project as consumablesPct.
+//
+// A project that predates the field gets the default ONLY while it is still a
+// draft. A quote already sent or approved is a number a customer holds, and a
+// deploy must not grow it by 5% overnight — so for those the missing field
+// reads as 0, and the total stays exactly what was sent.
+const CONSUMABLES_DEFAULT_PCT = 5;
+const CONSUMABLES_MAX_PCT = 15;
+const CONSUMABLES_LABEL = 'חומרי עזר, קיבוע ומתכלים';
+
+function isDraftProject(proj) {
+    return !proj || !proj.status || proj.status === 'טיוטה';
+}
+function consumablesPct(proj) {
+    const raw = proj && proj.consumablesPct;
+    if (raw !== undefined && raw !== null && raw !== '' && Number.isFinite(Number(raw))) {
+        return Math.min(CONSUMABLES_MAX_PCT, Math.max(0, Number(raw)));
+    }
+    return isDraftProject(proj) ? CONSUMABLES_DEFAULT_PCT : 0;
+}
+function consumablesLabel(pct) {
+    return `${CONSUMABLES_LABEL} (${heNum(pct)}%)`;
+}
+function setConsumablesOn(on) {
+    const proj = _ptProj(); if (!proj) return;
+    // Switching back on restores the last percentage he used, or the default.
+    proj.consumablesPct = on ? (Number(proj._consumablesLast) || CONSUMABLES_DEFAULT_PCT) : 0;
+    _ptSave(proj);
+}
+function setConsumablesPct(value) {
+    const proj = _ptProj(); if (!proj) return;
+    const pct = Math.min(CONSUMABLES_MAX_PCT, Math.max(0, Number(value) || 0));
+    proj.consumablesPct = pct;
+    if (pct > 0) proj._consumablesLast = pct;
+    _ptSave(proj);
+}
+
 function pricingTotals(proj) {
     const ticked = (proj.materials || []).filter((m) => m && m.checked);
     // `materials` stays the COST, because the pricing engine reads it into
@@ -3355,11 +3397,16 @@ function pricingTotals(proj) {
     const materialsPrice = ticked.reduce((sum, m) => sum + matLinePrice(m, markup), 0);
     const lab = laborSummary(proj);
     const extras = QUOTE_EXTRAS.reduce((sum, x) => sum + extraLineTotal(proj, x), 0);
+    // Consumables ride on labour + materials only; the extras (an inspector,
+    // a rented lift) do not use up screws.
+    const pct = consumablesPct(proj);
+    const consumables = (materialsPrice + lab.total) * pct / 100;
     return {
         materials, materialsPrice, markup,
         labor: lab.total, extras,
+        consumables, consumablesPct: pct,
         // The total the customer is quoted uses the PRICE of the materials.
-        total: materialsPrice + lab.total + extras,
+        total: materialsPrice + lab.total + extras + consumables,
         cost: materials + lab.total + extras,
         lab,
     };
@@ -3470,11 +3517,17 @@ function renderPricingTable() {
         </div>`;
     }).join('');
 
+    const consPct = consumablesPct(proj);
     box.innerHTML = `
         <section class="pt-block">
             <header class="pt-head">
                 <h3>חומרים וציוד</h3>
                 <div class="pt-head-actions">
+                    <label class="pt-cons${consPct > 0 ? ' on' : ''}" title="אחוז קבוע על עבודה וחומרים: ברגים, דיבלים, אזיקונים, מהדקים">
+                        <input type="checkbox" class="pt-chk" ${consPct > 0 ? 'checked' : ''} onchange="setConsumablesOn(this.checked)" aria-label="להוסיף שורת חומרי עזר">
+                        <span>חומרי עזר</span>
+                        <input type="number" class="pt-cons-pct" min="0" max="${CONSUMABLES_MAX_PCT}" step="1" value="${consPct}" ${consPct > 0 ? '' : 'disabled'} onchange="setConsumablesPct(this.value)" aria-label="אחוז חומרי עזר">%
+                    </label>
                     <button type="button" class="btn btn-secondary btn-small" onclick="openCatalogPicker()">
                         <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> הוספה מהמאגר
                     </button>
@@ -3517,6 +3570,7 @@ function renderPricingTable() {
                 <span>עבודה <b>${heNum(Math.round(t.labor))} ₪</b>${t.lab && t.lab.mode !== 'sum' && t.lab.hours
                     ? `<em class="ptf-time">${heNum(t.lab.hours)} שעות${t.lab.mode === 'days' ? `, ${heNum(t.lab.days)} ימים` : ''}</em>` : ''}</span>
                 <span>תוספות <b>${heNum(Math.round(t.extras))} ₪</b></span>
+                ${t.consumablesPct > 0 ? `<span class="ptf-cons">${escapeHtml(consumablesLabel(t.consumablesPct))} <b>${heNum(Math.round(t.consumables))} ₪</b></span>` : ''}
                 <span class="ptf-sum">סה"כ לפני מע"מ <b>${heNum(Math.round(t.total))} ₪</b></span>
             </div>
             ${tradeDiscountNote() ? `<p class="ptf-disc">${escapeHtml(tradeDiscountNote())}</p>` : ''}
@@ -3782,11 +3836,14 @@ function quoteItemsFromTable(proj) {
     if (quoteBuildMode(proj) === 'komplet') {
         const t = pricingTotals(proj);
         if (t.total <= 0) return [];
+        // The consumables line stays its own line even here: it is a
+        // percentage, and a percentage folded into "קומפלט" is one nobody
+        // can switch off later without rebuilding the quote.
         return [{
             title: kompletTitle(proj),
             description: kompletText(proj),
-            price: Math.round(t.total),
-        }];
+            price: Math.round(t.total - t.consumables),
+        }].concat(consumablesQuoteItem(t));
     }
 
     const lab = laborSummary(proj);
@@ -3838,7 +3895,19 @@ function quoteItemsFromTable(proj) {
         });
     });
 
-    return items;
+    return items.concat(consumablesQuoteItem(pricingTotals(proj)));
+}
+
+// The consumables line as the quote sees it: one row, or nothing when it is
+// switched off. Rounding the line the same way as the others keeps the
+// itemised sum equal to the printed total.
+function consumablesQuoteItem(t) {
+    if (!(t.consumablesPct > 0) || !(t.consumables > 0)) return [];
+    return [{
+        title: consumablesLabel(t.consumablesPct),
+        description: 'ברגים, דיבלים, אזיקונים, מהדקים ושאר הקטנות שכל עבודה צורכת.',
+        price: Math.round(t.consumables),
+    }];
 }
 
 async function ptToQuote() {
@@ -3937,6 +4006,112 @@ function requestToolsList() {
     switchTab('wizard');
     setChatMode('price');
     askListInChat('tools');
+}
+
+// ── The two quiet panels at the end of the pricing tab ──────────────────────
+//
+// Stav (4.9.2026): the product is about the price. What can block a price —
+// "make sure there is room in the panel" — is real, but it is not chat
+// material and not main-screen material; it lives behind "הערות". The
+// toolbox and the materials list live behind "כלים וחומרים". Both slide in
+// from the side, both close on Escape, neither is ever shown unprompted.
+function _pricingSide(id) {
+    const el = document.getElementById(id);
+    return el && el.classList.contains('pt-side') ? el : null;
+}
+// Escape closes whichever panel is open. The listener lives only while one
+// is open, so the rest of the app never sees it.
+function _pricingSideEsc(e) { if (e.key === 'Escape') closePricingSide(); }
+function openPricingSide(id) {
+    closePricingSide();
+    const el = _pricingSide(id);
+    if (!el) return;
+    el.classList.add('open');
+    const btn = document.querySelector(`[aria-controls="${id}"]`);
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+    document.addEventListener('keydown', _pricingSideEsc);
+    const close = el.querySelector('.pt-side-close');
+    if (close) close.focus({ preventScroll: true });
+}
+function closePricingSide() {
+    document.removeEventListener('keydown', _pricingSideEsc);
+    document.querySelectorAll('.pt-side.open').forEach((el) => {
+        el.classList.remove('open');
+        const btn = document.querySelector(`[aria-controls="${el.id}"]`);
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+    });
+}
+
+// The blockers for this job type, if the coverage data has any. notesFor()
+// belongs to coverage.js and may not exist yet; the panel works without it.
+function pricingBlockerNotes(proj) {
+    const job = (proj && proj.spec && proj.spec.jobType) || '';
+    if (typeof notesFor !== 'function') return [];
+    try {
+        const notes = notesFor(job);
+        return (Array.isArray(notes) ? notes : []).map((n) => String((n && n.text) || n || '').trim()).filter(Boolean);
+    } catch (e) { return []; }
+}
+function openPricingNotes() {
+    const proj = _ptProj();
+    if (!proj) { showToast('אין פרויקט פתוח', 'error'); return; }
+    const list = document.getElementById('pricing-notes-list');
+    const notes = pricingBlockerNotes(proj);
+    if (list) {
+        list.innerHTML = notes.length
+            ? notes.map((n) => `<li><label class="pt-side-check"><input type="checkbox"><span>${escapeHtml(n)}</span></label></li>`).join('')
+            : '<li class="pt-side-empty">אין הערות קבועות לסוג העבודה הזה.</li>';
+    }
+    const ta = document.getElementById('pricing-notes-text');
+    if (ta) ta.value = String(proj.notes || '');
+    openPricingSide('pricing-notes');
+}
+function savePricingNotes(value) {
+    const proj = _ptProj(); if (!proj) return;
+    proj.notes = String(value || '').trim();
+    touchProject(proj);
+    saveProjects();
+}
+
+// The base kit, read out of the tool vocabulary the agent is given, so the
+// panel and the prompt can never name the same tool two different ways.
+function baseToolKit() {
+    if (typeof getToolsPromptBlock !== 'function') return [];
+    const text = String(getToolsPromptBlock() || '');
+    const start = text.indexOf('## מה שביד');
+    if (start < 0) return [];
+    const end = text.indexOf('\n## ', start + 1);
+    return text.slice(start, end > start ? end : undefined).split('\n')
+        .filter((l) => l.startsWith('• '))
+        .map((l) => l.slice(2).split('. ')[0].trim())
+        .filter(Boolean);
+}
+function openPricingTools() {
+    const proj = _ptProj();
+    if (!proj) { showToast('אין פרויקט פתוח', 'error'); return; }
+    const body = document.getElementById('pricing-tools-body');
+    if (body) {
+        const tools = proj.tools || [];
+        const toolsHtml = tools.length
+            ? `<ul class="pt-side-list">${tools.map((t, i) =>
+                `<li><label class="pt-side-check"><input type="checkbox" ${t.checked ? 'checked' : ''} onchange="toggleWizardTool(${i})"><span>${escapeHtml(t.name || t)}</span></label></li>`).join('')}</ul>`
+            : `<ul class="pt-side-list">${baseToolKit().map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
+               <button type="button" class="btn btn-secondary btn-small" onclick="requestToolsList()">
+                   <i class="fa-solid fa-comments" aria-hidden="true"></i> רשימה לעבודה הזאת מהסוכן
+               </button>`;
+        const mats = (proj.materials || []).filter((m) => m && m.checked && String(m.name || '').trim());
+        const matsHtml = mats.length
+            ? `<ul class="pt-side-list">${mats.map((m) =>
+                `<li>${escapeHtml(m.name)}${matQty(m) > 1 || matUnit(m) !== MATERIAL_UNITS[0] ? ` <small>· ${heNum(matQty(m))} ${escapeHtml(matUnit(m))}</small>` : ''}</li>`).join('')}</ul>`
+            : '<p class="pt-side-empty">אין חומרים מסומנים בטבלה.</p>';
+        body.innerHTML = `
+            <h4 class="pt-side-h">כלים</h4>
+            <p class="input-help pt-side-help">${tools.length ? 'סמן בזמן העמסת הרכב.' : 'הבסיס שביד כמעט בכל עבודה. רשימה לעבודה הזאת אפשר לבקש מהסוכן.'}</p>
+            ${toolsHtml}
+            <h4 class="pt-side-h">חומרים</h4>
+            ${matsHtml}`;
+    }
+    openPricingSide('pricing-tools');
 }
 
 function openListDialog(title, text) {

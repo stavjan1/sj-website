@@ -794,3 +794,18 @@
 .pdf-term-row { display: flex; gap: 8px; align-items: baseline; font-size: 0.82rem; line-height: 1.5; }
 .pdf-term-k { flex: none; min-width: 88px; font-weight: 700; color: var(--pdf-primary, #1e3a8a); }
 .pdf-term-v { color: var(--pdf-text-main, #334155); }
+
+/* The VAT arithmetic around the big number. calculateTotal() fills the box
+   above it (private customer: net, VAT, then the total he pays) or the box
+   below it (business: the net is big, VAT and gross follow). An empty box is
+   hidden, so the layout does not move for the customer types that use only
+   one. Class-scoped like the rest of the sheet: the previews clone it. */
+.pdf-price-lines { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
+.pdf-price-lines[hidden] { display: none; }
+.pdf-price-line {
+    display: flex; justify-content: center; gap: 10px;
+    font-size: 0.85rem; font-weight: 600; color: var(--pdf-text-muted, #64748b);
+}
+.pdf-price-line.is-strong { font-weight: 700; color: var(--pdf-text-main, #334155); }
+.pdf-price-num { font-family: 'Outfit', 'Rubik', sans-serif; direction: ltr; unicode-bidi: isolate; }
+.price-sub-label[hidden] { display: none; }

@@ -1083,7 +1083,8 @@ let appState = {
         vatType: 'exclude',
         finalPrice: 0,
         summary: '',
-        showItemizedPrices: false
+        showItemizedPrices: false,
+        customerType: 'private'
     },
     history: []
 };
@@ -3516,7 +3517,8 @@ function createNewProject(opts) {
             vatType: lastQuotePref('vatType', 'plus'),
             finalPrice: 0,
             summary: appState.settings.businessDetails.terms,
-            showItemizedPrices: lastQuotePref('showItemizedPrices', false)
+            showItemizedPrices: lastQuotePref('showItemizedPrices', false),
+            customerType: 'private'
         }
     };
     
@@ -5850,6 +5852,8 @@ function syncCurrentQuoteToProject() {
             finalPrice: appState.currentQuote.finalPrice,
             summary: document.getElementById('form-summary').value,
             showItemizedPrices: appState.currentQuote.showItemizedPrices || false,
+            // Private or business: decides which number the document prints big.
+            customerType: appState.currentQuote.customerType === 'business' ? 'business' : 'private',
             signature: appState.currentQuote.signature || null,
             // The terms travel with the quote. They are rebuilt from the live
             // quote rather than from a form field, because they are edited on
@@ -7947,6 +7951,9 @@ async function shareQuoteLink() {
         clientName: q.clientName, clientSub: q.clientSub, quoteNumber: q.quoteNumber,
         date: q.date, subject: q.subject, items: q.items || [],
         finalPrice: q.finalPrice, showItemizedPrices: q.showItemizedPrices,
+        // Which number the customer page should print big. The server's
+        // allowlist (functions/api/quote-share.js) must carry it through.
+        customerType: q.customerType === 'business' ? 'business' : 'private',
         summary: q.summary, signature: q.signature || null,
         // The terms travel with the link, so the customer decides with the
         // whole picture in front of him and not just a number.

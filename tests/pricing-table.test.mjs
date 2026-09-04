@@ -57,6 +57,9 @@ const proj = () => ({
     laborPrice: 2200,
     laborItems: [{ name: 'השחלה', price: 700 }, { name: 'התקנה', price: 900 }, { name: 'לוח', price: 600 }],
     extras: { inspector: true },
+    // Consumables off on purpose: these fixtures pin the arithmetic of the
+    // rows themselves. The 5% line has its own tests in quote-rules.test.mjs.
+    consumablesPct: 0,
 });
 
 test('a quantity multiplies, and a missing one means one', () => {
@@ -181,6 +184,7 @@ const dayProject = () => ({
         { name: 'עבודה באתר', mode: 'hours', qty: 5 },
     ],
     extras: {},
+    consumablesPct: 0,
 });
 
 test('nine hours is two days, and two days is four thousand', () => {

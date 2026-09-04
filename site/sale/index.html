@@ -873,15 +873,47 @@
                     <button type="button" class="btn btn-secondary" onclick="openShoppingList()">
                         <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i> רשימת חומרים לקנייה
                     </button>
-                    <button type="button" class="btn btn-secondary" onclick="requestToolsList()">
-                        <i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i> רשימת כלי עבודה
-                    </button>
                     <!-- The run, drawn segment by segment from the same answers
                          and the same priced lines. -->
                     <button type="button" class="btn btn-secondary" onclick="openRouteSketch()">
                         <i class="fa-solid fa-pen-ruler" aria-hidden="true"></i> שרטוט המסלול
                     </button>
+                    <!-- Stav (4.9.2026): the things that block a price ("make
+                         sure there is room in the panel") are real and low
+                         priority — never in the chat, never on the main screen,
+                         behind a quiet button. Same for the toolbox. -->
+                    <span class="pt-quiet">
+                        <button type="button" class="pt-quiet-btn" id="btn-pricing-notes" onclick="openPricingNotes()" aria-controls="pricing-notes" aria-expanded="false">
+                            <i class="fa-regular fa-note-sticky" aria-hidden="true"></i> הערות
+                        </button>
+                        <button type="button" class="pt-quiet-btn" id="btn-pricing-tools" onclick="openPricingTools()" aria-controls="pricing-tools" aria-expanded="false">
+                            <i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i> כלים וחומרים
+                        </button>
+                    </span>
                 </div>
+
+                <!-- The two side panels behind those buttons. Same chrome as
+                     the pricing drawer (.stern-drawer); opened by class, closed
+                     by their button or Escape. -->
+                <aside class="stern-drawer pt-side" id="pricing-notes" role="dialog" aria-modal="false" aria-labelledby="pricing-notes-title">
+                    <div class="drawer-header">
+                        <h3 id="pricing-notes-title"><i class="fa-regular fa-note-sticky" aria-hidden="true"></i> הערות לתמחור</h3>
+                        <button type="button" class="btn-close pt-side-close" onclick="closePricingSide()" aria-label="סגירה">&times;</button>
+                    </div>
+                    <div class="drawer-body">
+                        <p class="input-help pt-side-help">מה כדאי לוודא לפני שהמחיר סופי. לא נשלח ללקוח.</p>
+                        <ul class="pt-side-list" id="pricing-notes-list"></ul>
+                        <label for="pricing-notes-text" class="pt-side-label">הערות שלי לעבודה הזאת</label>
+                        <textarea id="pricing-notes-text" rows="6" placeholder="למשל: לבדוק אם יש מקום בלוח לפני שסוגרים מחיר" onchange="savePricingNotes(this.value)"></textarea>
+                    </div>
+                </aside>
+                <aside class="stern-drawer pt-side" id="pricing-tools" role="dialog" aria-modal="false" aria-labelledby="pricing-tools-title">
+                    <div class="drawer-header">
+                        <h3 id="pricing-tools-title"><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i> כלים וחומרים</h3>
+                        <button type="button" class="btn-close pt-side-close" onclick="closePricingSide()" aria-label="סגירה">&times;</button>
+                    </div>
+                    <div class="drawer-body" id="pricing-tools-body"></div>
+                </aside>
 
                 <!-- Card 3: toolkit checklist (from AI 'tools' in stage 3) -->
                             <div id="wizard-tools-card" class="wizard-dash-card" style="display:none;">
@@ -1003,6 +1035,13 @@
                                         <div class="form-group">
                                             <label for="form-client-name">שם הלקוח / חברה</label>
                                             <input type="text" id="form-client-name" required placeholder="למשל: משה לוי">
+                                            <!-- Who is paying decides which number is big on the
+                                                 document: a household reads the total it will hand
+                                                 over, a business reads the number it books. -->
+                                            <div class="cust-type" id="form-customer-type" role="group" aria-label="סוג הלקוח">
+                                                <button type="button" class="pt-mode on" data-type="private" onclick="setCustomerType('private')" title="המספר הגדול בהצעה: סה&quot;כ כולל מע&quot;מ">לקוח פרטי</button>
+                                                <button type="button" class="pt-mode" data-type="business" onclick="setCustomerType('business')" title="המספר הגדול בהצעה: סה&quot;כ לפני מע&quot;מ">עסק</button>
+                                            </div>
                                         </div>
                                         <div class="form-group">
                                             <label for="form-client-sub">פרטי לקוח נוספים (כתובת/טלפון)</label>
@@ -1264,10 +1303,17 @@
                                     
                                     <!-- Pricing and Footer -->
                                     <div class="pdf-footer-section">
+                                        <!-- The VAT arithmetic, in small type. calculateTotal()
+                                             fills the box ABOVE the big number for a private
+                                             customer (net, VAT, then the total he pays) and the
+                                             box BELOW it for a business (net is the big number,
+                                             VAT and gross follow). The other box stays empty. -->
+                                        <div class="pdf-price-lines" id="pdf-price-above"></div>
                                         <div class="pdf-price-row">
-                                            <span class="price-label">סה"כ לתשלום:</span>
+                                            <span class="price-label" id="pdf-total-label">סה"כ לתשלום:</span>
                                             <span class="price-val" id="pdf-total-price">0 ש"ח</span>
                                         </div>
+                                        <div class="pdf-price-lines" id="pdf-price-below"></div>
                                         <div class="price-sub-label" id="pdf-vat-label">פטור ממע"מ ; ישולם בסוף העבודה</div>
                                         
                                         <!-- Footer lines -->
