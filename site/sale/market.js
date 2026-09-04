@@ -387,7 +387,11 @@ function fillFormFromState() {
     document.getElementById('form-quote-date').value = val(q.date, getTodayDateString());
     document.getElementById('form-quote-subject').value = val(q.subject);
     document.getElementById('form-base-price').value = val(q.basePrice, 0);
-    document.getElementById('form-vat-type').value = val(q.vatType, 'exempt');
+    // The select knows exempt / exclude / include only. A project born with the
+    // old 'plus' constant (or anything else unknown) reads as 'exclude' — the
+    // value it meant — instead of a blank select and the exempt branch.
+    const vatType = ['exempt', 'exclude', 'include'].includes(q.vatType) ? q.vatType : (q.vatType ? 'exclude' : 'exempt');
+    document.getElementById('form-vat-type').value = vatType;
     document.getElementById('form-summary').value = val(q.summary);
     
     const container = document.getElementById('work-items-container');

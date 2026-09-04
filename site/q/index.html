@@ -175,6 +175,21 @@
             }
         }
 
+        // The same layout as the editor: a household reads the gross big; a
+        // business reads the net big with the VAT and the gross under it.
+        function totalsHtml(q) {
+            const net = Number(q.netPrice) || 0;
+            const gross = Number(q.finalPrice) || 0;
+            if (q.customerType === 'business' && net > 0 && gross > net) {
+                return `
+                <div class="qs-total"><span>סה"כ לפני מע"מ:</span><span>${fmt(net)} ₪</span></div>
+                <div class="qs-vat">מע"מ 18%: ${fmt(gross - net)} ₪ · סה"כ כולל מע"מ: <strong>${fmt(gross)} ₪</strong></div>`;
+            }
+            return `
+                <div class="qs-total"><span>סה"כ לתשלום:</span><span>${fmt(gross)} ₪</span></div>
+                <div class="qs-vat">${esc(q.vatLabel || '')}</div>`;
+        }
+
         function render(q, sheet) {
             const biz = q.business || {};
             document.title = 'הצעת מחיר ' + (q.quoteNumber || '') + (biz.name ? ', ' + biz.name : '');
@@ -205,8 +220,7 @@
                 <div class="qs-divider"></div>
                 <h1>הצעת מחיר ל${esc(q.subject || '')}</h1>
                 ${items}
-                <div class="qs-total"><span>סה"כ לתשלום:</span><span>${fmt(q.finalPrice)} ₪</span></div>
-                <div class="qs-vat">${esc(q.vatLabel || '')}</div>
+                ${totalsHtml(q)}
                 ${termsHtml(q)}
                 ${q.summary ? `<div class="qs-summary"><strong>פירוט תנאים נוספים:</strong>\n${esc(q.summary)}</div>` : ''}
                 ${q.exclusions ? `<div class="qs-excl"><strong>מה לא כלול:</strong> ${esc(q.exclusions)}</div>` : ''}

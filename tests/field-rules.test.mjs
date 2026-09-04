@@ -23,6 +23,8 @@ import { readApp } from './_app-source.mjs';
 import { DEFAULT_PRICING_MAP } from '../functions/api/_pricing_map.js';
 import { renderCoverageBlock } from '../functions/api/_coverage.js';
 import { SEED_ITEMS } from '../functions/api/helper-prices.js';
+import { ELECTRICAL_KITS } from '../functions/api/_electrical_kit.js';
+import { renderQuoteChecklist } from '../functions/api/_materials.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
@@ -61,9 +63,10 @@ function loadPricing(settings, decisions) {
 }
 
 // Everything a model can read: the three prompt builders and the knowledge
-// blocks in app.js/chat.js, the server pricing map, and the coverage block the
-// server renders for every job type. Notes are deliberately NOT here — the
-// test below asserts they never get in.
+// blocks in app.js/chat.js, the server pricing map, the coverage block the
+// server renders for every job type, the per-family equipment kits and the
+// closing quote checklist (both server-side system blocks). Notes are
+// deliberately NOT here — the test below asserts they never get in.
 function promptCorpus() {
     const parts = [
         DEFAULT_PRICING_MAP,
@@ -78,6 +81,7 @@ function promptCorpus() {
         APP.slice(APP.indexOf('const GENERIC_CHECKLIST'), APP.indexOf('\n};', APP.indexOf('const GENERIC_CHECKLIST'))),
     ];
     for (const job of Object.keys(SHIPPED)) parts.push(renderCoverageBlock(SHIPPED, job));
+    parts.push(...Object.values(ELECTRICAL_KITS), renderQuoteChecklist());
     return parts.join('\n');
 }
 
@@ -161,6 +165,13 @@ test('minimums and faults read as Stav ruled them', () => {
     assert.ok(/התיקון מתומחר בשטח/.test(block));
     // Consumables: the app adds the 5% line, the model must not.
     assert.ok(/חומרי עזר ומתכלים 5%/.test(block) && /אל תוסיף שורת מתכלים/.test(block));
+
+    // The reference figures are Stav's for a 350 ₪ visit. A user whose visit
+    // is 500 ₪ must not read "a short call is 250–350, that is the visit
+    // (visit = 500)" — the ranges follow his price.
+    const own = loadPricing({ visitPrice: 500 }, { visit: 350, hourly_mode: { rate: 260 } }).getSjPriceBlock();
+    assert.ok(/קריאה קצרה 250–500 ₪/.test(own), 'the short-call range ignores the visit price');
+    assert.ok(/760–810 ₪ בלי חומר/.test(own) && !/600–650/.test(own), 'the fault hour ignores the visit price');
 });
 
 test('no prompt or checklist carries third-party bureaucracy', () => {

@@ -3932,6 +3932,12 @@ async function ptToQuote() {
     })) return;
 
     const totals = pricingTotals(proj);
+    // The percentage the quote was built with is written down. Without this a
+    // project that never touched the switch has no field, and the moment its
+    // status leaves 'טיוטה' the legacy guard in consumablesPct reads the
+    // absent field as 0 — the table then shows a total 5% under the quote the
+    // customer holds.
+    proj.consumablesPct = totals.consumablesPct;
     proj.quoteData = proj.quoteData || {};
     proj.quoteData.items = items;
     // The table knows how long the job takes, so the document says it without
@@ -4444,6 +4450,7 @@ function renderEstimateTotal() {
         <div class="et-row"><span>חומרים מסומנים</span><b>${heNum(Math.round(mats))} ₪</b>${t.markup ? `<small class="pt-cost-note"> (עלות ${heNum(Math.round(t.materials))} + ${Math.round(t.markup)}%)</small>` : ''}</div>
         <div class="et-row"><span>עבודה</span><b>${heNum(labor)} ₪</b></div>
         ${extras.length ? `<div class="et-row"><span>תוספות (${extras.map((x) => escapeHtml(x.label)).join(', ')})</span><b>${heNum(extrasSum)} ₪</b></div>` : ''}
+        ${t.consumablesPct > 0 ? `<div class="et-row"><span>${escapeHtml(consumablesLabel(t.consumablesPct))}</span><b>${heNum(Math.round(t.consumables))} ₪</b></div>` : ''}
         <div class="et-row et-sum"><span>סה"כ לפני מע"מ</span><b>${heNum(Math.round(t.total))} ₪</b></div>`;
 }
 
@@ -4561,7 +4568,7 @@ ${extrasText ? `תוספות שסתיו סימן (כל אחת סעיף נפרד 
 משימתך היא להפיק קובץ JSON מובנה המפרט את סעיפי הצעת המחיר הסופיים. 
 כל סעיף צריך לכלול כותרת ותיאור מורחב ומקצועי (בעברית רשמית ותקנית, המזכירה את סגנון הניסוחים במאגר).
 אם יש מספר עבודות או שלבים שונים, פצל אותם ל-2-4 סעיפים נפרדים (למשל: סעיף הכנות וכבילה, סעיף אביזרים והתקנות).
-לכל סעיף קבע מחיר משוער הגיוני שסכומו הכללי (או מחיר הבסיס) ישקף את עלות העבודה והחומרים המצטברים (שסכומם כרגע הוא ${estimatedCost} ש"ח).
+לכל סעיף קבע מחיר משוער הגיוני שסכומו הכללי (או מחיר הבסיס) ישקף את עלות העבודה והחומרים המצטברים (שסכומם כרגע הוא ${estimatedCost} ש"ח). אל תוסיף סעיף "חומרי עזר/מתכלים", האפליקציה מוסיפה אותו לבד.
 
 הפלט שלך חייב להיות אך ורק JSON במבנה הבא, ללא שום טקסט נוסף לפניו או אחריו:
 {
@@ -4601,8 +4608,15 @@ ${extrasText ? `תוספות שסתיו סימן (כל אחת סעיף נפרד 
 
         // Sync quote editor
         proj.quoteData.subject = result.subject || proj.quoteData.subject;
-        proj.quoteData.items = result.items || [];
-        proj.quoteData.basePrice = quoteBasePrice(result);
+        // The consumables line is the app's, on this path as on the table's:
+        // the pricing prompt tells the model not to write one because "the
+        // app adds it", so the app adds it. The percentage is persisted for
+        // the same reason as in ptToQuote.
+        const totals = pricingTotals(proj);
+        proj.consumablesPct = totals.consumablesPct;
+        const consumablesLine = consumablesQuoteItem(totals);
+        proj.quoteData.items = (result.items || []).concat(consumablesLine);
+        proj.quoteData.basePrice = quoteBasePrice(result) + (consumablesLine.length ? consumablesLine[0].price : 0);
         // Remember the block verbatim so it can be refreshed later without
         // guessing which lines were ours.
         proj.specTermsWritten = specTermsBlock(proj);

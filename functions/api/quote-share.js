@@ -53,6 +53,12 @@ function sanitizeQuote(d) {
     warranty: str(d.warranty, 600),
     exclusions: str(d.exclusions, 1200),
     finalPrice: Number(d.finalPrice) || 0,
+    // Which number the customer page prints big: a household reads the gross,
+    // a business reads the net with the VAT and the gross under it. netPrice
+    // is the app's own net (not re-derived from the rounded gross), so the
+    // page shows exactly what the editor showed.
+    customerType: d.customerType === 'business' ? 'business' : 'private',
+    netPrice: Number(d.netPrice) || 0,
     showItemizedPrices: d.showItemizedPrices === true,
     logo: img(d.logo),
     business: {

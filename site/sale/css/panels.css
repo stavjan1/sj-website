@@ -197,7 +197,7 @@ i[class^="fa-"], i[class*=" fa-"] {
 .ck-dialog textarea,
 .convo-panel input:not([type="checkbox"]):not([type="radio"]),
 .convo-panel select,
-.stern-drawer input,
+.stern-drawer input:not([type="checkbox"]):not([type="radio"]),
 .lock-card input:not([type="hidden"]),
 .lock-card select {
     width: 100%;
@@ -214,7 +214,7 @@ i[class^="fa-"], i[class*=" fa-"] {
 .convo-panel input:focus,
 .content-panel input:focus, .content-panel select:focus, .content-panel textarea:focus,
 .ck-dialog input:focus, .ck-dialog select:focus, .ck-dialog textarea:focus,
-.stern-drawer input:focus, .lock-card input:focus, .lock-card select:focus {
+.stern-drawer input:not([type="checkbox"]):not([type="radio"]):focus, .lock-card input:focus, .lock-card select:focus {
     outline: none;
     border-color: var(--accent);
 }
