@@ -11,6 +11,9 @@ What comes out (data/materials/):
   erco.json        full normalized rows — the human/tooling-readable source
   index.json       compact runtime payload the API + client search over
   taxonomy.json    the category tree with price statistics per node
+  raw/dropped.json the rows the deny-list removed (tools, appliances, phone
+                   accessories — see "What is not a material") with the rule
+                   that removed each; not committed, kept for review
 
 The single most important judgement call in here is UNIT. ERCO's own pages say
 "המחיר הנקוב ... והוא למטר או ליחידה" — the site itself does not commit per row
@@ -196,6 +199,140 @@ def tokens(text):
 
 
 # --------------------------------------------------------------------------
+# What is not a material
+# --------------------------------------------------------------------------
+
+# ERCO sells to electricians, and about a sixth of its catalog is what an
+# electrician BUYS rather than what he INSTALLS: hand and power tools, meters,
+# gloves, ladders — plus a corner of pure consumer goods (kettles, vacuums,
+# phone chargers, space heaters, TV arms) that sit in the same "home
+# electricity" anchors as the transformers and doorbells the trade does quote.
+#
+# None of that belongs in a pricing database, and it does more harm than
+# taking up space: the search scores on words and numbers, so a bag of 3X25
+# screws answers "מא\"ז 3x25" and two IP65 space heaters answer "מפסק מוגן מים
+# IP65". The cut lives here, in the build, on purpose. The raw harvest stays
+# complete (a later product call can bring tools back without touching the
+# supplier), and the weekly CI refresh re-applies the cut every time.
+#
+# Rules match CATEGORY NAMES — any name in the row's category chain — never
+# path strings. ERCO's chains are polluted with promo buckets ("פסח בארכה
+# 2025", "מחיר בלעדי לאתר") that can land anywhere, including as the deepest
+# entry, so "the leaf" is not a reliable handle; the real department names
+# are, wherever they sit. Each rule carries a label so the build summary can
+# say how many rows it removed, and a rule that suddenly removes far more or
+# far fewer than it used to is the signal that ERCO renamed something.
+
+# Categories that win over any drop rule. A ceiling fan is filed under both
+# "מאווררי תקרה" and the consumer-fan bucket; labels and signage live inside
+# the technical-supply department that also holds label printers.
+KEEP_CAT = frozenset(("מאווררי תקרה", "סימון ושילוט"))
+
+# A name that is bulk cable is bulk cable wherever ERCO filed it. The 16
+# UV-rated N2XY ranges sit under power-tool accessories (see infer_unit); the
+# cross-section is what proves the name is not a phone lead or an HDMI cable.
+KEEP_NAME = re.compile(r"^(כבל|חוט|מוליך)\s.*\d\s*[xX×*]\s*\d")
+
+# Each rule: label, the category names that trigger it, and an optional
+# exception pattern for the few legitimate items that share the bucket.
+DROP_CAT = (
+    ("kitchen/home appliances", frozenset((
+        "למטבח", "מיחמים", "קומקומים", "טוסטר לחיצה", "מיקרוגלים",
+        "פלטות שבת", "מכונות קרח ביתיות", "מגהצים", "מכונות תספורת",
+        "מייבשי ידיים", "קטלני יתושים", "קטלנים", "קטלנים ומלכודות חרקים",
+        "מקררים משרדיים", "מקררים ומקפיאים", "מנגלים ואביזרים",
+        "מוצרים לבית ולגינה", "מבצעי סופ''ש - מוצרים לבית ולגינה",
+        "שואבי אבק SHARK", "NINJA",
+    )), None),
+    ("phone/TV/computer accessories", frozenset((
+        "אביזרי סלולר", "מסכי טלוויזיה ומחשב", "כבלי HDMI",
+    )), None),
+    ("household heaters", frozenset(("חימום", "תנורים", "מפזרי חום")), None),
+    ("consumer fans, coolers, car fridges", frozenset((
+        "מאווררי קיר, עמוד, רצפה, מצננים, מקררים לרכב",
+        "מאווררי עמוד, רצפה וקיר", "מאווררים לבית ולמשרד", "מאווררי מגדל",
+        "מצננים", "מצנני מים אוויר", "מקררים לרכב", "מקררים ומקפיאים לרכב",
+     )),
+     # ...but a wall-mounted industrial fan is a fixed installation with its
+     # own supply point, unlike the pedestal and box fans in the same bucket.
+     re.compile(r"^מאוורר קיר\b.*תעשייתי")),
+    ("TV/monitor arms", frozenset(("זרועות לטלויזיה ומסכי מחשב",)),
+     # ...except the street-light arms misfiled among the TV brackets.
+     re.compile(r"לפנס|לעמוד")),
+    ("hand tools", frozenset((
+        "כלי עבודה ידניים", "מברגים", "מפתחות", "פליירים", "בוקסות",
+        "מסורים", "סכינים יפנים ולהבים", "מקלפים", "לוחצים", "מספריים",
+        "פטישים", "קליבות", "אקדחי סיליקון", "שפכטלים", "כלים הידראולים",
+        "אביזרים לכלי עבודה ידניים", "כלים ידניים TTC", "תיקי וארגזי כלים",
+    )), None),
+    ("power tools and their accessories", frozenset((
+        "כלי עבודה חשמליים", "אביזרים לכלים חשמליים", "מקדחות ומברגות",
+        "אקדחי מסמרים", "אקדחי חום", "ביטים", "ביטים ומוביל ביט",
+        "דיסקים ולהבים", "מקדחים", "מסורים חשמליים", "משחזות זווית",
+        "פטישונים ופטישי חציבה", "חותכים ולוחצים חשמליים",
+        "כלי עבודה של Makita", "כלים נטענים 18V", "DEVON",
+    )), None),
+    ("measuring instruments", frozenset((
+        "מכשירי מדידה", "מודדים", "רב מודד", "צבת זרם", "מד התנגדות",
+        "מד בידוד", "גלאי מתח", "מטרים", "פלסים", "מדידה וסימון",
+        "אביזרי כלי מדידה", "תקשורת כלי מדידה", "מצלמות UNI-T",
+        "תיקים למכשירי מדידה ואביזרים",
+    )), None),
+    ("PPE, extinguishers, cable-pulling rigs", frozenset((
+        "ביגוד ,אביזרי בטיחות ומטפים", "בטיחות במתח גבוה", "כפפות הגנה",
+        "קסדות בטיחות", "מטפים לכיבוי אש", "שונות- ביגוד ואביזרי בטיחות",
+        "פרישת כבלים", "מתקנים לפרישת כבלים", "אביזרים לעזרים לפרישת כבלים",
+        "סטלבנד ומכשיר משיכה", "סטלבנד פיבר", "סטלבנד שזור", "ג'ל השחלה",
+        "גרב רשת", "ניילון",
+    )), None),
+    ("ladders and carts", frozenset(("סולמות", "עגלות")), None),
+    ("label printers and tapes", frozenset(("מדפסת מדבקות וסרטים",)), None),
+)
+
+# Name rules catch what the category rules cannot see: the rows the backfill
+# harvested with no category at all, and the odd tool filed under a promo
+# bucket or a consumables department.
+DROP_NAME = (
+    ("phone accessories by name",
+     re.compile(r"iphone|לפלאפון|אוזניות|מטען נייד|לסמסונג|מעמד טלפון",
+                re.IGNORECASE)),
+    ("household heaters by name",
+     re.compile(r"תנור חימום|תנור אינפרא|תנור פטריה|מפזר חום|רגל לתנור")),
+    ("consumer batteries and junk by name",
+     re.compile(r"גודל (?:VEGA )?LR|סוללת כפתור|CR2032|למכשירי שמיעה|"
+                r"נוזל ניקוי|פחית ריח|למנגל")),
+    ("power-tool brands by name",
+     re.compile(r"makita|מקיטה|devon|milwaukee|מילווקי|dewalt|דיוולט|"
+                r"\bבוש\b", re.IGNORECASE)),
+    # "סוללה 20V 4.0Ah" / "מטען מהיר 4 סוללות 18V" — the tool battery
+    # platform, never a lead-acid מצבר (which starts with the word מצבר).
+    ("power-tool batteries and chargers by name",
+     re.compile(r"^(סוללה|סוללת)\b.*\b\d+V\b.*\d(\.\d)?\s*Ah|"
+                r"^מטען\b.*\b(12|14|18|20)V\b", re.IGNORECASE)),
+    ("tools and instruments by name",
+     re.compile(r"מולטימטר|רב מודד|מד התנגדות|טלפון טכנאים|שואב אבק|"
+                r"^סטלבנד|^עגלת|מקלדת ועכבר|מכונת גילוח|שעון קיר|"
+                r"^סט \d+ מברגים|ממגנט")),
+    # Dymo, not the "ריי דיימונד" light fixture that shares its first letters.
+    ("label tapes by name", re.compile(r"דיימו\b|brother", re.IGNORECASE)),
+)
+
+
+def drop_reason(name, cat_names):
+    """The label of the rule that removes this row, or None to keep it."""
+    chain = set(cat_names)
+    if chain & KEEP_CAT or KEEP_NAME.search(name):
+        return None
+    for label, cats, keep in DROP_CAT:
+        if chain & cats and not (keep and keep.search(name)):
+            return label
+    for label, rx in DROP_NAME:
+        if rx.search(name):
+            return label
+    return None
+
+
+# --------------------------------------------------------------------------
 # Normalisation
 # --------------------------------------------------------------------------
 
@@ -253,6 +390,7 @@ def build():
     raw = load_raw()
     page_units = load_page_units()
     items = []
+    dropped = []  # the rows the deny-list removed, with the rule that did it
     seen = set()
 
     for p in raw:
@@ -283,6 +421,10 @@ def build():
                 name = (vp.get("name") or "").strip() or parent_name
                 if not usable_name(name):
                     continue
+                rule = drop_reason(name, cat_names)
+                if rule:
+                    dropped.append(_dropped(sku, name, cat_names, rule))
+                    continue
                 unit, unit_src = _unit_for(sku, name, cat_paths, page_units)
                 items.append(_row(sku, name, price_incl, unit, unit_src,
                                   cat_names, cat_paths, attrs, url,
@@ -297,12 +439,22 @@ def build():
             if not usable_name(parent_name):
                 continue
             seen.add(sku)
+            rule = drop_reason(parent_name, cat_names)
+            if rule:
+                dropped.append(_dropped(sku, parent_name, cat_names, rule))
+                continue
             unit, unit_src = _unit_for(sku, parent_name, cat_paths, page_units)
             items.append(_row(sku, parent_name, price_incl, unit, unit_src,
                               cat_names, cat_paths, {}, url, None, None))
 
     items.sort(key=lambda r: (r["cat_path"], r["name"]))
-    return items
+    dropped.sort(key=lambda r: (r["rule"], r["name"]))
+    return items, dropped
+
+
+def _dropped(sku, name, cat_names, rule):
+    return {"sku": sku, "name": name, "cat_path": " / ".join(cat_names),
+            "rule": rule}
 
 
 def _unit_for(sku, name, cat_paths, page_units):
@@ -472,7 +624,7 @@ def check_invariants(items):
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
-    items = build()
+    items, dropped = build()
     if not items:
         sys.exit("Harvest produced no usable items.")
     check_invariants(items)
@@ -492,8 +644,22 @@ def main():
     write(os.path.join(OUT_DIR, "taxonomy.json"),
           {"meta": index["meta"], "categories": taxonomy})
     write(os.path.join(OUT_DIR, "index.json"), index, compact=True)
+    # Not served, not committed (raw/ is gitignored) — kept so a rule that
+    # over-cuts can be read back by name instead of guessed at from a count.
+    write(os.path.join(RAW_DIR, "dropped.json"), dropped)
 
     inferred = sum(1 for it in items if it["unit_src"] == "category")
+    total = len(items) + len(dropped)
+    print("harvested      : %d" % total)
+    print("dropped        : %d (%.1f%%) — not materials" % (
+        len(dropped), 100.0 * len(dropped) / total))
+    per_rule = defaultdict(int)
+    for d in dropped:
+        per_rule[d["rule"]] += 1
+    for label, _cats, _keep in DROP_CAT:
+        print("  %-42s %4d" % (label, per_rule.get(label, 0)))
+    for label, _rx in DROP_NAME:
+        print("  %-42s %4d" % (label, per_rule.get(label, 0)))
     print("items          : %d" % len(items))
     print("unit accuracy  : %s" % ("%.1f%% (vs page truth)" % (acc * 100) if acc is not None else "n/a"))
     print("categories     : %d" % len(taxonomy))
