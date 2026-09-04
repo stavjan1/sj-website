@@ -203,7 +203,7 @@ test('three small things: an untitled bubble shows its first words, a tapped lin
     const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
     const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
     assert.ok(/firstWords\(n\) \|\| 'ללא כותרת'/.test(js), 'the label must fall back to the body before "ללא כותרת"');
-    assert.ok(html.includes('id="edge-del"') && /function deleteSelectedEdge/.test(js), 'no delete button for a line');
+    assert.ok(html.includes('id="edge-bar"') && /function deleteSelectedEdge/.test(js), 'no delete button for a line');
     assert.ok(!/confirm\(`למחוק את הקו/.test(js), 'the line dialog should be gone');
     const min = Number((js.match(/MIN_ZOOM = ([0-9.]+)/) || [])[1]);
     assert.ok(min > 0 && min <= 0.1, 'the map must zoom out well past the old 0.25');
@@ -270,4 +270,110 @@ test('a blob can only leave as the exact type that was allowed in', () => {
     assert.ok(mw.includes('X-Content-Type-Options'), 'every /api/* response gets nosniff from the middleware');
     const admin = readFileSync(new URL('../sale/admin.js', import.meta.url), 'utf8');
     assert.ok(!admin.includes("escapeHtml(m.text).replace(/\\n/g, '<br>')"), 'the admin reader must not re-insert markup after escaping');
+});
+
+// A second colour (c2), a big bubble (s = 'L') and an arrow on a line (d) are
+// optional marks: valid ones are kept as they are, anything else is left off
+// the record rather than stored as a zero. The bin carries them too, so a
+// restore brings the bubble back as it was.
+test('a second colour, a big bubble and an arrow are kept when valid and dropped when not', () => {
+    const t = cleanTree({
+        nodes: [
+            { id: 'a', c: 1, c2: 3, s: 'L', u: 1 },
+            { id: 'b', c2: 0, s: 'M', u: 1 },
+            { id: 'c', c2: 9, u: 1 },
+            { id: 'd', c2: '5', s: 'l', u: 1 },
+        ],
+        edges: [{ a: 'a', b: 'b', d: 'ab', u: 1 }, { a: 'b', b: 'c', d: 'both', u: 1 }, { a: 'c', b: 'd', d: 'xy', u: 1 }, { a: 'a', b: 'd', d: 'ba', u: 1 }],
+        trash: [{ id: 'gone', c2: 2, s: 'L', edges: [{ a: 'gone', b: 'a', d: 'ba' }, { a: 'gone', b: 'b', d: 'nope' }], dAt: Date.now() }],
+    });
+    const by = Object.fromEntries(t.nodes.map((n) => [n.id, n]));
+    assert.equal(by.a.c2, 3);
+    assert.equal(by.a.s, 'L');
+    assert.ok(!('c2' in by.b) && !('s' in by.b), 'c2=0 is one colour and s=M is the usual size: neither is stored');
+    assert.ok(!('c2' in by.c), 'a second colour past 7 is dropped, not clamped');
+    assert.equal(by.d.c2, 5, 'a numeric string is still a colour');
+    assert.ok(!('s' in by.d), 'only a capital L is big');
+    const dir = Object.fromEntries(t.edges.map((e) => [e.a + '|' + e.b, e.d]));
+    assert.deepEqual(dir, { 'a|b': 'ab', 'b|c': 'both', 'c|d': undefined, 'a|d': 'ba' });
+    assert.ok(!('d' in t.edges.find((e) => e.a === 'c')), 'an unknown direction is no arrow, not an empty field');
+    assert.equal(t.trash[0].c2, 2);
+    assert.equal(t.trash[0].s, 'L');
+    assert.equal(t.trash[0].edges[0].d, 'ba', 'the bin keeps the arrow');
+    assert.ok(!('d' in t.trash[0].edges[1]));
+});
+
+// Stav, 4.9.2026: "זה לא נותן לי לרוקן את סל המחזור" — the bin emptied on one
+// device came back from the other's copy on the next sync. A purge is now a
+// tombstone "trash:<id>", and the bin entry it covers stays gone everywhere.
+test('emptying the bin sticks across devices, and a later re-delete is a new bin entry', () => {
+    const now = Date.now();
+    // Deleted (synced to both), then the bin emptied on the phone. The
+    // computer still holds the bin copy; a stale phone copy would too.
+    const phone = { nodes: [{ id: 'b', u: 1 }], del: [{ id: 'a', at: now - 2000 }, { id: 'trash:a', at: now - 1000 }], trash: [{ id: 'a', t: 'A', dAt: now - 2000 }] };
+    const desk = { nodes: [{ id: 'b', u: 1 }], del: [{ id: 'a', at: now - 2000 }], trash: [{ id: 'a', t: 'A', dAt: now - 2000 }] };
+    assert.equal(mergeTrees(phone, desk).trash.length, 0, 'the purge removes the entry from both sides');
+    assert.equal(mergeTrees(desk, phone).trash.length, 0, 'in either order');
+    assert.ok(mergeTrees(desk, phone).del.some((d) => d.id === 'trash:a' && d.at === now - 1000), 'the purge tombstone rides on for the next device');
+    assert.ok(mergeTrees(desk, phone).nodes.every((n) => n.id !== 'a'), 'and the bubble itself stays deleted');
+    // Restored on the computer after the purge, then deleted again: a fresh
+    // entry, newer than the purge, and it belongs in the bin.
+    const again = { nodes: [{ id: 'b', u: 1 }], del: [{ id: 'a', at: now }], trash: [{ id: 'a', t: 'A again', dAt: now }] };
+    const m = mergeTrees(mergeTrees(phone, desk), again);
+    assert.deepEqual(m.trash.map((x) => [x.id, x.t]), [['a', 'A again']], 'a deletion newer than the purge survives it');
+    assert.equal(m.trash.length, mergeTrees(m, m).trash.length, 'and stays put on the next merge');
+});
+
+test('merging a tree that uses every new field with itself changes nothing', () => {
+    const now = Date.now();
+    const X = cleanTree({
+        pages: [{ id: 'p1', name: 'עבודה', u: 1 }],
+        nodes: [{ id: 'a', t: 'A', c: 1, c2: 4, s: 'L', p: 'p1', u: 2 }, { id: 'b', t: 'B', c: 2, u: 2 }],
+        edges: [{ a: 'a', b: 'b', d: 'ab', k: 'x', u: 2 }],
+        trash: [{ id: 'z', t: 'Z', c2: 6, s: 'L', edges: [{ a: 'z', b: 'a', d: 'both' }], dAt: now - 100 }],
+        del: [{ id: 'z', at: now - 100 }, { id: 'trash:y', at: now - 50 }],
+        legend: [{ c: 1, name: 'רעיון', u: 1 }],
+    });
+    assert.equal(X.nodes[0].c2, 4, 'the fixture must actually carry the new fields');
+    assert.equal(X.edges[0].d, 'ab');
+    assert.equal(X.trash[0].edges[0].d, 'both');
+    assert.deepEqual(mergeTrees(X, X), X);
+    assert.deepEqual(mergeTrees(X, cleanTree(JSON.parse(JSON.stringify(X)))), X, 'a copy that went through the wire is the same tree');
+});
+
+// 4.9.2026 — Stav's second round on the tree: undo, clipboard, arrows, two
+// colours, big bubbles, and four bugs. These pin the shapes that fixed them.
+test('one bubble per double tap: the pointer path decides, there is no dblclick listener', () => {
+    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    assert.ok(!js.includes("addEventListener('dblclick'"), 'a dblclick listener next to the tap detector makes two bubbles per double-click');
+    assert.ok(js.includes('lastTapX') && js.includes('< 30'), 'a double tap must be two taps in the same place');
+});
+test('a reply from the cloud is merged in, never dropped over what happened meanwhile', () => {
+    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    assert.ok(js.includes('tree = mergeLocal(tree, merged)'), 'adopt must merge, not replace');
+    assert.ok(js.includes('const seq = localSeq;') && js.includes('localSeq === seq'), 'a save that started before a change may not clear dirty');
+    assert.ok(js.includes('keepalive: true'), 'a save started while the page closes must still land');
+    assert.ok(js.includes("'trash:' + x.id"), 'a purge must leave a tombstone or the bin refills from the other device');
+});
+test('undo covers every edit, the media never', () => {
+    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    for (const fn of ['function addNodeAt', 'function connect(a, b)', 'function deleteSelected', 'function deletePicked', 'function setColor', 'function setColor2', 'function toggleBig', 'function cycleEdgeDir', 'function deleteSelectedEdge', 'function pasteClipboard', 'function cutPicked', 'function nudgePicked', 'function assignPage']) {
+        const i = js.indexOf(fn); assert.ok(i > -1, fn + ' missing');
+        const body = js.slice(i, js.indexOf('\n}', i));
+        assert.ok(body.includes('remember('), fn + ' does not record history');
+    }
+    assert.ok(js.includes("remember('text:' + n.id)"), 'typing coalesces into one history entry per field');
+    assert.ok(js.includes('n.recs = m ? (m.recs || []) : []'), 'a restored bubble keeps the media it has now');
+    assert.ok(js.includes("mod && k === 'z'") && js.includes("k === 'v'"), 'Ctrl+Z / Ctrl+V are wired');
+});
+test('a line wears the colour of the bubble it was drawn from, and can carry an arrow', () => {
+    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    assert.ok(js.includes('const c = a.c || 0;'), 'a white source gives a plain line, never the target colour');
+    assert.ok(js.includes("e.d === 'ab' || e.d === 'both'") && js.includes("e.d === 'ba' || e.d === 'both'"), 'both arrow ends are drawn');
+    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
+    for (const id of ['btn-undo', 'btn-redo', 'pickbar', 'btn-paste', 'f-colors2', 'btn-big', 'edge-bar', 'edge-dir', 'confirm']) assert.ok(html.includes('id="' + id + '"'), id + ' missing from the page');
+});
+test('an empty note goes away when it is closed', () => {
+    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    assert.ok(js.includes('function closeIfEmpty') && js.includes("closeIfEmpty();\n    $('sheet').classList.remove"), 'closeSheet must discard an empty note first');
 });

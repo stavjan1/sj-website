@@ -75,6 +75,23 @@ export function validKey(k) {
   return typeof k === 'string' && k.length >= 32 && k.length <= 64 && /^[A-Za-z0-9_-]+$/.test(k);
 }
 
+// Optional marks on a bubble: `c2` a second colour (1..7), `s` = 'L' a big
+// bubble. Absent means one colour / the usual size, so an invalid value is not
+// stored as 0 or '' — it is left off the record. They ride on the bubble's
+// `u` like everything else: the merge picks a whole bubble, marks included.
+function bubbleMarks(n) {
+  const out = {};
+  const c2 = Math.round(Number(n.c2)) || 0;
+  if (c2 >= 1 && c2 <= 7) out.c2 = c2;
+  if (n.s === 'L') out.s = 'L';
+  return out;
+}
+
+// A line's arrow: 'ab' points from a to b, 'ba' the other way, 'both' both
+// ways. Absent is a plain line.
+const ARROWS = new Set(['ab', 'ba', 'both']);
+function edgeMarks(e) { return ARROWS.has(e.d) ? { d: e.d } : {}; }
+
 // Keep only what the page understands, clamped. Every bubble carries `u`, the
 // time it last changed, which is what the merge decides by.
 export function cleanTree(raw) {
@@ -105,12 +122,14 @@ export function cleanTree(raw) {
       id: String(g.id || '').slice(0, 24), m: String(g.m || '').slice(0, 40),
       n: Math.max(0, Math.round(Number(g.n)) || 0), w: Math.round(Number(g.w)) || 0, h: Math.round(Number(g.h)) || 0, at: Number(g.at) || 0,
     })).filter((g) => g.id),
+    ...bubbleMarks(n),
   })).filter((n) => n.id);
   const ids = new Set(nodes.map((n) => n.id));
   const seen = new Set();
   const edges = (Array.isArray(t.edges) ? t.edges : []).map((e) => ({
     a: String(e.a || '').slice(0, 24), b: String(e.b || '').slice(0, 24), u: Number(e.u) || 0,
     k: e.k === 'x' ? 'x' : 'in',   // 'in' assigns the far bubble to this page; 'x' only connects
+    ...edgeMarks(e),
   })).filter((e) => e.a && e.b && e.a !== e.b && ids.has(e.a) && ids.has(e.b))
     .filter((e) => { const k = edgeKey(e); if (seen.has(k)) return false; seen.add(k); return true; });
   // The bin: the whole bubble, plus the lines it had, so a restore brings
@@ -124,8 +143,9 @@ export function cleanTree(raw) {
     p: String(x.p || '').slice(0, 24),
     recs: (Array.isArray(x.recs) ? x.recs : []).slice(0, REC_MAX_PER_NODE).map((r) => ({ id: String(r.id || '').slice(0, 24), m: String(r.m || '').slice(0, 40), n: Number(r.n) || 0, d: Number(r.d) || 0, tx: String(r.tx || '').slice(0, 4000), at: Number(r.at) || 0 })).filter((r) => r.id),
     imgs: (Array.isArray(x.imgs) ? x.imgs : []).slice(0, IMG_MAX_PER_NODE).map((g) => ({ id: String(g.id || '').slice(0, 24), m: String(g.m || '').slice(0, 40), n: Number(g.n) || 0, w: Number(g.w) || 0, h: Number(g.h) || 0, at: Number(g.at) || 0 })).filter((g) => g.id),
-    edges: (Array.isArray(x.edges) ? x.edges : []).slice(0, 200).map((e) => ({ a: String(e.a || '').slice(0, 24), b: String(e.b || '').slice(0, 24), k: e.k === 'x' ? 'x' : 'in' })).filter((e) => e.a && e.b),
+    edges: (Array.isArray(x.edges) ? x.edges : []).slice(0, 200).map((e) => ({ a: String(e.a || '').slice(0, 24), b: String(e.b || '').slice(0, 24), k: e.k === 'x' ? 'x' : 'in', ...edgeMarks(e) })).filter((e) => e.a && e.b),
     dAt: Number(x.dAt) || 0,
+    ...bubbleMarks(x),
   })).filter((x) => x.id && x.dAt > tcut && !ids.has(x.id));
   // The legend as Stav renamed it: one entry per colour he touched.
   const legend = (Array.isArray(t.legend) ? t.legend : []).slice(0, 8).map((l) => ({
@@ -143,7 +163,9 @@ function edgeKey(e) { return [e.a, e.b].sort().join('|'); }
 
 // Union by id, newest change wins per bubble; a tombstone beats anything
 // older than it. Lines follow the same rule keyed by their two ends
-// (tombstone id "a|b"). The result of merging X with itself is X.
+// (tombstone id "a|b"), pages by "page:<id>", and an emptied bin by
+// "trash:<id>" — otherwise a bin emptied on the phone refilled from the
+// computer's copy on the next sync. The result of merging X with itself is X.
 export function mergeTrees(a, b) {
   const A = cleanTree(a), B = cleanTree(b);
   const tomb = new Map();
@@ -177,6 +199,8 @@ export function mergeTrees(a, b) {
   const trash = new Map();
   for (const x of [...A.trash, ...B.trash]) {
     if (nodes.has(x.id)) continue;                      // it lives again somewhere — not in the bin
+    const purged = tomb.get('trash:' + x.id);
+    if (purged && purged >= x.dAt) continue;            // emptied on some device; a newer deletion is a new entry
     const cur = trash.get(x.id);
     if (!cur || x.dAt > cur.dAt) trash.set(x.id, x);
   }

@@ -68,6 +68,12 @@ let lastServerAt = 0;                    // updatedAt of the last tree the cloud
 let pollTimer = null;
 let hitIndex = -1;
 let picked = new Set();                  // bubbles chosen together — they move together
+let localSeq = 0;                        // grows on every local change; a request that started before a change may not overwrite it
+const CLIP_KEY = 'sj_thing_clip';        // the copied bubbles live here, so a paste survives a reload
+const HISTORY_MAX = 60;
+let undoStack = [], redoStack = [];      // snapshots of the tree before each change, and the ones undone
+let histKey = null;                      // consecutive keystrokes in one field are one entry
+let lastClip = null;                     // the last copy, for a session where localStorage is full
 let marqueeMode = false;                 // phone: the 🔲 button turns a drag on the ground into a selection box
 
 const $ = (id) => document.getElementById(id);
@@ -103,6 +109,13 @@ function init() {
     if (navigator.onLine && cloudKey) setTimeout(flushPending, 2500);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && cloudKey) { cloudLoad(); startPolling(); } });
     window.addEventListener('focus', () => { if (cloudKey) cloudLoad(); });
+    // Stav asked whether a refresh mid-sentence loses the sentence. It does
+    // not: every keystroke is in the tree, and the tree reaches localStorage
+    // within 150 ms — and right now if the page is about to go.
+    const flush = () => { closeIfEmpty(); clearTimeout(saveTimer); localStorage.setItem(STORAGE_KEY, JSON.stringify(tree)); if (dirty && cloudKey && navigator.onLine) { clearTimeout(cloudTimer); cloudSave(); } };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+    renderHistoryButtons(); renderClipButton();
 }
 
 function keyFromAddress() {
@@ -119,13 +132,15 @@ function normalize(t) {
     const nodes = (Array.isArray(n.nodes) ? n.nodes : []).filter((x) => x && x.id).map((x) => ({
         id: String(x.id), t: String(x.t || ''), b: String(x.b || ''), x: Number(x.x) || 0, y: Number(x.y) || 0, u: Number(x.u) || 0,
         c: Math.min(7, Math.max(0, Number(x.c) || 0)),
+        ...(Number(x.c2) >= 1 && Number(x.c2) <= 7 ? { c2: Number(x.c2) } : {}),   // a second colour: half/half
+        ...(x.s === 'L' ? { s: 'L' } : {}),                                         // a big bubble
         p: pageIds.has(String(x.p || '')) ? String(x.p) : '',
         recs: (Array.isArray(x.recs) ? x.recs : []).filter((r) => r && r.id),
         imgs: (Array.isArray(x.imgs) ? x.imgs : []).filter((g) => g && g.id),
     }));
     const ids = new Set(nodes.map((x) => x.id));
     const edges = (Array.isArray(n.edges) ? n.edges : []).filter((e) => e && ids.has(e.a) && ids.has(e.b) && e.a !== e.b)
-        .map((e) => ({ a: e.a, b: e.b, u: Number(e.u) || 0, k: e.k === 'x' ? 'x' : 'in' }));
+        .map((e) => ({ a: e.a, b: e.b, u: Number(e.u) || 0, k: e.k === 'x' ? 'x' : 'in', ...(['ab', 'ba', 'both'].includes(e.d) ? { d: e.d } : {}) }));
     const del = (Array.isArray(n.del) ? n.del : []).filter((d) => d && d.id).map((d) => ({ id: String(d.id), at: Number(d.at) || 0 }));
     const trash = (Array.isArray(n.trash) ? n.trash : []).filter((x) => x && x.id && !ids.has(String(x.id))).map((x) => ({ ...x, id: String(x.id), edges: Array.isArray(x.edges) ? x.edges : [], recs: Array.isArray(x.recs) ? x.recs : [], dAt: Number(x.dAt) || 0 }));
     const legend = (Array.isArray(n.legend) ? n.legend : []).filter((l) => l && l.name).map((l) => ({ c: Math.min(7, Math.max(0, Number(l.c) || 0)), name: String(l.name).slice(0, 30), u: Number(l.u) || 0 }));
@@ -139,6 +154,7 @@ function touch(changed) {
     if (changed) changed.u = now;
     tree.updatedAt = now;
     dirty = true;
+    localSeq++;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(tree)), 150);
     clearTimeout(cloudTimer);
@@ -148,24 +164,228 @@ function touch(changed) {
 
 function saveView() { localStorage.setItem(STORAGE_KEY + ':view:' + tab, JSON.stringify(view)); }
 
+// ---------- undo / redo ----------
+//
+// A snapshot of the tree before every change; Ctrl+Z puts it back. Media
+// (recordings, pictures) is outside history — a blob cannot be un-deleted —
+// so a restored bubble keeps whatever media it has now. What comes back is
+// stamped as a new change, so the other device takes it too.
+
+function snapshot() { return JSON.stringify({ nodes: tree.nodes, edges: tree.edges, pages: tree.pages, legend: tree.legend, trash: tree.trash }); }
+function remember(coalesce) {
+    if (coalesce && histKey && histKey.key === coalesce && Date.now() - histKey.at < 1500) { histKey.at = Date.now(); return; }
+    undoStack.push(snapshot());
+    if (undoStack.length > HISTORY_MAX) undoStack.shift();
+    redoStack = [];
+    histKey = coalesce ? { key: coalesce, at: Date.now() } : null;
+    renderHistoryButtons();
+}
+function renderHistoryButtons() {
+    const u = $('btn-undo'), r = $('btn-redo');
+    if (u) u.disabled = !undoStack.length;
+    if (r) r.disabled = !redoStack.length;
+}
+function stripMedia(n) { const { recs, imgs, u, ...rest } = n; return rest; }
+function restoreSnapshot(json) {
+    const snap = safeParse(json); if (!snap) return;
+    const now = Date.now();
+    const prev = tree;
+    const next = normalize({ ...snap, del: prev.del, updatedAt: now });
+    const have = new Map();
+    for (const n of prev.nodes) have.set(n.id, n);
+    for (const x of prev.trash || []) if (!have.has(x.id)) have.set(x.id, x);
+    for (const n of next.nodes) { const m = have.get(n.id); n.recs = m ? (m.recs || []) : []; n.imgs = m ? (m.imgs || []) : []; }
+    next.trash = next.trash.filter((x) => have.has(x.id)).map((x) => { const m = have.get(x.id); return { ...x, recs: m.recs || [], imgs: m.imgs || [] }; });
+    const same = (a, b) => JSON.stringify(stripMedia(a)) === JSON.stringify(stripMedia(b));
+    const prevNodes = new Map(prev.nodes.map((n) => [n.id, n]));
+    for (const n of next.nodes) { const p = prevNodes.get(n.id); if (!p || !same(p, n)) n.u = now; }
+    for (const p of prev.nodes) if (!next.nodes.some((n) => n.id === p.id)) next.del.push({ id: p.id, at: now });
+    const prevEdges = new Map(prev.edges.map((e) => [ekey(e), e]));
+    for (const e of next.edges) { const p = prevEdges.get(ekey(e)); if (!p || p.a !== e.a || p.k !== e.k || (p.d || '') !== (e.d || '')) e.u = now; }
+    for (const p of prev.edges) if (!next.edges.some((e) => ekey(e) === ekey(p))) next.del.push({ id: ekey(p), at: now });
+    const prevPages = new Map(prev.pages.map((p) => [p.id, p]));
+    for (const p of next.pages) { const q = prevPages.get(p.id); if (!q || q.name !== p.name || q.x !== p.x) p.u = now; }
+    for (const q of prev.pages) if (!next.pages.some((p) => p.id === q.id)) next.del.push({ id: 'page:' + q.id, at: now });
+    for (const l of next.legend) { const q = prev.legend.find((z) => z.c === l.c); if (!q || q.name !== l.name) l.u = now; }
+    for (const q of prev.legend) if (!next.legend.some((l) => l.c === q.c)) next.legend.push({ c: q.c, name: '', u: now });
+    next.legend = next.legend.filter((l) => l.name);
+    tree = next;
+    picked = new Set([...picked].filter((id) => tree.nodes.some((n) => n.id === id)));
+    if (tab !== 'all' && !tree.pages.some((p) => p.id === tab)) { tab = 'all'; localStorage.setItem(TAB_KEY, tab); }
+    render(); touch();
+    if (selectedId) { if (tree.nodes.some((n) => n.id === selectedId)) select(selectedId); else closeSheet(); }
+    renderTrash();
+}
+function undo() {
+    if (!undoStack.length) return;
+    redoStack.push(snapshot());
+    const snap = undoStack.pop(); histKey = null;
+    restoreSnapshot(snap); renderHistoryButtons(); toast('בוטל');
+}
+function redo() {
+    if (!redoStack.length) return;
+    undoStack.push(snapshot());
+    const snap = redoStack.pop(); histKey = null;
+    restoreSnapshot(snap); renderHistoryButtons(); toast('בוצע שוב');
+}
+
+// ---------- copy / cut / paste ----------
+//
+// The clipboard is a set of bubbles with the lines among them, kept in
+// localStorage so it survives a tab switch and a reload. Positions are kept
+// relative to each other; a paste lands beside the originals when they are on
+// screen, else in the middle of the view. Titles also go to the system
+// clipboard as plain text, so a bubble can be pasted into a message.
+function readClip() { return safeParse(localStorage.getItem(CLIP_KEY)); }
+function renderClipButton() { const b = $('btn-paste'); if (b) b.disabled = !readClip(); }
+function idsInHand() { return picked.size ? [...picked] : (selectedId ? [selectedId] : []); }
+function copyIds(ids, quiet) {
+    const set = new Set(ids);
+    const nodes = tree.nodes.filter((n) => set.has(n.id)).map((n) => { const q = pos(n); return { id: n.id, t: n.t, b: n.b, x: q.x, y: q.y, c: n.c || 0, c2: n.c2, s: n.s }; });
+    if (!nodes.length) return null;
+    const edges = tree.edges.filter((e) => set.has(e.a) && set.has(e.b)).map((e) => ({ a: e.a, b: e.b, k: e.k, d: e.d }));
+    const clip = { nodes, edges, tab, at: Date.now() };
+    try { localStorage.setItem(CLIP_KEY, JSON.stringify(clip)); } catch { /* the in-memory copy below still works this session */ }
+    lastClip = clip;
+    try { if (navigator.clipboard) navigator.clipboard.writeText(nodes.map((n) => n.t || firstWords(n)).filter(Boolean).join(String.fromCharCode(10))).catch(() => {}); } catch { /* not important */ }
+    renderClipButton();
+    if (!quiet) toast(nodes.length === 1 ? 'הועתק' : `הועתקו ${nodes.length}`);
+    return clip;
+}
+function copyPicked() { copyIds(idsInHand()); }
+function copySelected() { if (selectedId) copyIds([selectedId]); }
+function cutPicked() {
+    const ids = idsInHand(); if (!ids.length) return;
+    if (!copyIds(ids, true)) return;
+    remember(); deleteNodes(ids);
+    toast(ids.length === 1 ? 'נגזר — Ctrl+V מדביק' : `נגזרו ${ids.length} — Ctrl+V מדביק`);
+}
+function pasteClipboard(nudge) {
+    const clip = readClip() || lastClip; if (!clip || !clip.nodes.length) { toast('אין מה להדביק'); return; }
+    remember();
+    const now = Date.now();
+    const p = tab !== 'all' ? tab : '';
+    const o = off(p);
+    const cx = clip.nodes.reduce((a, n) => a + n.x, 0) / clip.nodes.length, cy = clip.nodes.reduce((a, n) => a + n.y, 0) / clip.nodes.length;
+    const sx = cx * view.k + view.x, sy = cy * view.k + view.y;
+    const onScreen = clip.tab === tab && sx > 0 && sy > 0 && sx < stage.clientWidth && sy < stage.clientHeight;
+    let dx, dy;
+    if (onScreen) { const step = 40 * (nudge || 1); dx = step; dy = step; }
+    else { const c = toWorld(stage.clientWidth / 2, stage.clientHeight / 2 - 40); dx = c.x - cx; dy = c.y - cy; }
+    const map = new Map();
+    const made = [];
+    for (const n of clip.nodes) {
+        const id = uid(); map.set(n.id, id);
+        const node = { id, t: n.t, b: n.b, x: Math.round(n.x + dx - o.x), y: Math.round(n.y + dy - o.y), u: now, c: n.c || 0, p, recs: [], imgs: [] };
+        if (n.c2 >= 1 && n.c2 <= 7) node.c2 = n.c2;
+        if (n.s === 'L') node.s = 'L';
+        tree.nodes.push(node); made.push(id);
+    }
+    for (const e of clip.edges) {
+        const a = map.get(e.a), b = map.get(e.b); if (!a || !b) continue;
+        const edge = { a, b, u: now, k: e.k === 'x' ? 'x' : 'in' }; if (['ab', 'ba', 'both'].includes(e.d)) edge.d = e.d;
+        tree.edges.push(edge);
+    }
+    // The next paste of the same thing lands one step further, like a stack of cards.
+    if (onScreen) { const shifted = { ...clip, nodes: clip.nodes.map((n) => ({ ...n, x: n.x + dx, y: n.y + dy })) }; try { localStorage.setItem(CLIP_KEY, JSON.stringify(shifted)); } catch { /* fine */ } lastClip = shifted; }
+    picked = new Set(made); selectedId = null; $('sheet').classList.remove('open');
+    render(); touch();
+    toast(made.length === 1 ? 'הודבק' : `הודבקו ${made.length}`);
+}
+function duplicatePicked() {
+    const ids = idsInHand(); if (!ids.length) return;
+    const keep = readClip();
+    if (!copyIds(ids, true)) return;
+    pasteClipboard();
+    if (keep) { try { localStorage.setItem(CLIP_KEY, JSON.stringify(keep)); } catch { /* fine */ } lastClip = keep; }
+    renderClipButton();
+}
+function nudgePicked(dx, dy) {
+    const ids = idsInHand(); if (!ids.length) return;
+    remember('nudge');
+    const now = Date.now();
+    for (const id of ids) { const n = tree.nodes.find((x) => x.id === id); if (n) { n.x += dx; n.y += dy; n.u = now; } }
+    render(); touch();
+}
+
+// A yes/no that looks like the page and works in the installed app on the
+// phone, where the browser's own confirm() is at its ugliest.
+function askConfirm(text, okLabel) {
+    const d = $('confirm');
+    if (!d || typeof d.showModal !== 'function') return Promise.resolve(window.confirm(text));
+    return new Promise((resolve) => {
+        $('confirm-text').textContent = text;
+        const ok = $('confirm-ok'), cancel = $('confirm-cancel');
+        ok.textContent = okLabel || 'כן';
+        const done = (v) => { d.removeEventListener('close', onClose); d.close(); resolve(v); };
+        const onClose = () => { d.removeEventListener('close', onClose); resolve(false); };
+        ok.onclick = () => done(true); cancel.onclick = () => done(false);
+        d.addEventListener('close', onClose);
+        d.showModal();
+    });
+}
+
 function setSync(text, ok) {
     const el = $('sync'); if (!el) return;
     el.textContent = text; el.classList.toggle('on', !!ok);
 }
 
-// Whatever comes back from the server is the merged truth: it already holds
-// everything this device sent plus everything the other one did.
+// Whatever comes back from the server is merged INTO what is here now, bubble
+// by bubble, newest change wins — the same rule the server uses. It used to
+// replace the tree outright, and that was the "jumps back" bug (Stav,
+// 4.9.2026): a drag made while a save was in flight was overwritten by the
+// reply, which did not know about it, and `dirty` went false so it was never
+// sent. Merging keeps the newer local change, and the seq check below keeps
+// it dirty until a save that started after it comes back.
 function adopt(merged) {
     if (!merged) return;
-    tree = normalize(merged);
+    tree = mergeLocal(tree, merged);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(tree));
     if (tab !== 'all' && !tree.pages.some((p) => p.id === tab)) { tab = 'all'; localStorage.setItem(TAB_KEY, tab); }
     render();
     if (selectedId && !tree.nodes.some((n) => n.id === selectedId)) closeSheet();
 }
 
+function ekey(e) { return [e.a, e.b].sort().join('|'); }
+function mergeLocal(a, b) {
+    const A = normalize(a), B = normalize(b);
+    const tomb = new Map();
+    for (const d of [...A.del, ...B.del]) if (!tomb.has(d.id) || tomb.get(d.id) < d.at) tomb.set(d.id, d.at);
+    const nodes = new Map();
+    for (const n of [...B.nodes, ...A.nodes]) {
+        const dead = tomb.get(n.id); if (dead && dead >= n.u) continue;
+        const cur = nodes.get(n.id); if (!cur || n.u > cur.u) nodes.set(n.id, n);
+    }
+    const edges = new Map();
+    for (const e of [...B.edges, ...A.edges]) {
+        if (!nodes.has(e.a) || !nodes.has(e.b)) continue;
+        const k = ekey(e); const dead = tomb.get(k); if (dead && dead >= e.u) continue;
+        const cur = edges.get(k); if (!cur || e.u > cur.u) edges.set(k, e);
+    }
+    const pages = new Map();
+    for (const p of [...B.pages, ...A.pages]) {
+        const dead = tomb.get('page:' + p.id); if (dead && dead >= p.u) continue;
+        const cur = pages.get(p.id); if (!cur || p.u > cur.u) pages.set(p.id, p);
+    }
+    const alive = [...nodes.values()].map((n) => (n.p && !pages.has(n.p)) ? { ...n, p: '' } : n);
+    const trash = new Map();
+    for (const x of [...B.trash, ...A.trash]) {
+        if (nodes.has(x.id)) continue;
+        const purged = tomb.get('trash:' + x.id); if (purged && purged >= x.dAt) continue;   // emptied on some device — stays empty
+        const cur = trash.get(x.id); if (!cur || x.dAt > cur.dAt) trash.set(x.id, x);
+    }
+    const legend = new Map();
+    for (const l of [...B.legend, ...A.legend]) { const cur = legend.get(l.c); if (!cur || l.u > cur.u) legend.set(l.c, l); }
+    return normalize({
+        nodes: alive, edges: [...edges.values()], pages: [...pages.values()], trash: [...trash.values()],
+        legend: [...legend.values()], del: [...tomb].map(([id, at]) => ({ id, at })),
+        updatedAt: Math.max(A.updatedAt, B.updatedAt),
+    });
+}
+
 async function cloudLoad() {
     if (!cloudKey) return;
+    const seq = localSeq;
     try {
         const res = await fetch('/api/thing?k=' + encodeURIComponent(cloudKey));
         if (res.status === 404) { setSync('כתובת לא מוכרת', false); return; }
@@ -177,9 +397,11 @@ async function cloudLoad() {
             // We hold something the cloud has not seen: send, and take the merge back.
             await cloudSave();
         } else if (cloud && cloudAt !== lastServerAt) {
-            // The other device wrote. We are clean, so the cloud's copy IS the truth.
+            // The other device wrote. Merge it in; if something changed here
+            // while we waited, the merge keeps it and it goes up next.
             lastServerAt = cloudAt;
             adopt(cloud);
+            if (localSeq !== seq) { dirty = true; clearTimeout(cloudTimer); cloudTimer = setTimeout(cloudSave, 800); }
             setSync('מסונכרן', true);
         } else {
             setSync('מסונכרן', true);
@@ -196,17 +418,18 @@ function startPolling() {
 
 async function cloudSave() {
     if (!cloudKey) return;
+    const seq = localSeq;
     try {
         const res = await fetch('/api/thing?k=' + encodeURIComponent(cloudKey), {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tree }),
+            body: JSON.stringify({ tree }), keepalive: true,   // a save started while the page closes still lands
         });
         const body = await res.json();
         if (!res.ok) { setSync('לא נשמר', false); toast((body.error && body.error.message) || 'לא נשמר'); return; }
-        dirty = false;
         lastServerAt = body.tree ? (Number(body.tree.updatedAt) || 0) : 0;
         adopt(body.tree);
-        setSync('מסונכרן', true);
+        if (localSeq === seq) { dirty = false; setSync('מסונכרן', true); }
+        else { dirty = true; clearTimeout(cloudTimer); cloudTimer = setTimeout(cloudSave, 800); setSync('שומר…', false); }
     } catch { setSync('לא מקוון', false); }
 }
 
@@ -337,6 +560,7 @@ function componentOf(id) {
 // keeping the tree's shape. Coordinates are page-local, so the tree is
 // re-based at its own top-left; in "הכל" the page's slot puts it in place.
 function assignPage(id, pageId) {
+    remember();
     const ids = componentOf(id);
     const nodes = ids.map((x) => tree.nodes.find((n) => n.id === x)).filter(Boolean);
     const minX = Math.min(...nodes.map((n) => n.x)), minY = Math.min(...nodes.map((n) => n.y));
@@ -443,6 +667,7 @@ function render() {
     const ns = visibleNodes(), es = visibleEdges();
     $('count').textContent = picked.size ? `${picked.size} נבחרו · גרור אחת וכולן זזות` : (ns.length ? `${ns.length} תובנות · ${es.length} קווים` : (tab === 'all' ? 'עדיין ריק' : 'לשונית ריקה'));
     $('hint').hidden = ns.length > 0;
+    const pb = $('pickbar'); if (pb) { pb.hidden = !picked.size; const pc = $('pick-count'); if (pc) pc.textContent = picked.size ? `${picked.size} נבחרו` : ''; }
 }
 
 function renderNodes() {
@@ -461,7 +686,9 @@ function renderNodes() {
         const label = el.querySelector('.label');
         const title = n.t.trim() || firstWords(n) || 'ללא כותרת';
         if (label.textContent !== title) label.textContent = title;
-        el.classList.toggle('long', title.length > 28);
+        el.classList.toggle('long', title.length > (n.s === 'L' ? 56 : 28));
+        el.classList.toggle('big', n.s === 'L');
+        if (n.c2 >= 1 && n.c2 <= 7 && n.c2 !== (n.c || 0)) el.dataset.c2 = n.c2; else delete el.dataset.c2;
         el.classList.toggle('has-body', !!n.b.trim());
         el.classList.toggle('has-rec', !!(n.recs && n.recs.length));
         el.classList.toggle('has-img', !!(n.imgs && n.imgs.length));
@@ -497,6 +724,28 @@ function renderClusterLabels() {
     }
 }
 
+// Where a line meets a bubble's edge, so an arrowhead is not buried under
+// the bubble. Sizes come from the drawn elements; a bubble not yet drawn is
+// treated as a point.
+function bubbleRect(id) {
+    const el = nodesEl.querySelector(`.bubble[data-id="${id}"]`);
+    return el ? { w: el.offsetWidth, h: el.offsetHeight } : { w: 0, h: 0 };
+}
+function clipToRect(from, to, rect, pad) {
+    const dx = to.x - from.x, dy = to.y - from.y;
+    if (!dx && !dy) return { x: from.x, y: from.y };
+    const hw = rect.w / 2 + pad, hh = rect.h / 2 + pad;
+    const t = Math.min(dx ? hw / Math.abs(dx) : Infinity, dy ? hh / Math.abs(dy) : Infinity);
+    return t >= 1 ? { x: from.x, y: from.y } : { x: from.x + dx * t, y: from.y + dy * t };
+}
+function arrowHead(tip, from, c, cls) {
+    const ang = Math.atan2(tip.y - from.y, tip.x - from.x);
+    const L = 14, W = 7;
+    const bx = tip.x - Math.cos(ang) * L, by = tip.y - Math.sin(ang) * L;
+    const lx = bx + Math.sin(ang) * W, ly = by - Math.cos(ang) * W;
+    const rx = bx - Math.sin(ang) * W, ry = by + Math.cos(ang) * W;
+    return `<path class="arrow${cls}" data-c="${c}" d="M${tip.x},${tip.y} L${lx},${ly} L${rx},${ry} Z"/>`;
+}
 function renderWires() {
     const parts = [];
     for (const e of visibleEdges()) {
@@ -505,9 +754,16 @@ function renderWires() {
         const pa = pos(a), pb = pos(b);
         const d = `M${pa.x},${pa.y} L${pb.x},${pb.y}`;
         const sel = selectedEdge && selectedEdge.a === e.a && selectedEdge.b === e.b;
-        const c = a.c || b.c || 0;
+        // The line wears the colour of the bubble it was drawn from; a white
+        // source gives a plain line (Stav, 4.9.2026 — it used to borrow the target's).
+        const c = a.c || 0;
         const dim = !!query && !matches(a) && !matches(b);
         parts.push(`<path class="wire${sel ? ' sel' : ''}${e.k === 'x' ? ' cross' : ''}${dim ? ' dim' : ''}" data-c="${c}" d="${d}"/><path class="wire-hit" data-a="${e.a}" data-b="${e.b}" d="${d}"/>`);
+        if (e.d) {
+            const cls = (sel ? ' sel' : '') + (dim ? ' dim' : '');
+            if (e.d === 'ab' || e.d === 'both') parts.push(arrowHead(clipToRect(pb, pa, bubbleRect(b.id), 3), pa, c, cls));
+            if (e.d === 'ba' || e.d === 'both') parts.push(arrowHead(clipToRect(pa, pb, bubbleRect(a.id), 3), pb, c, cls));
+        }
     }
     wires.innerHTML = parts.join('') + '<path id="ghost" class="wire ghost" d=""/>';
     wires.setAttribute('width', '1'); wires.setAttribute('height', '1');
@@ -555,13 +811,15 @@ function toggleLegend() { $('legend').classList.toggle('open'); }
 // ---------- selection & the sheet ----------
 
 function select(id) {
-    selectedId = id; selectedEdge = null;
+    if (selectedId && selectedId !== id) closeIfEmpty();
+    selectedId = id; selectedEdge = null; hideEdgeBar();
     renderNodes(); renderWires();
     const n = tree.nodes.find((x) => x.id === id);
     if (!n) { closeSheet(); return; }
     $('f-title').value = n.t; $('f-body').value = n.b;
     $('f-meta').textContent = n.b ? `${n.b.length} תווים` : '';
-    renderSwatches(n.c || 0);
+    renderSwatches(n.c || 0, n.c2 || 0);
+    const bb = $('btn-big'); if (bb) bb.classList.toggle('on', n.s === 'L');
     renderPageSelect(n);
     renderRecs(n);
     renderImgs(n);
@@ -569,14 +827,32 @@ function select(id) {
 }
 
 function closeSheet() {
+    closeIfEmpty();
     $('sheet').classList.remove('open');
     selectedId = null; renderNodes();
     document.activeElement && document.activeElement.blur();
 }
 
+// A note opened and left blank is not a note: closing it takes it away
+// quietly (Stav, 4.9.2026). No bin, no toast — there was nothing in it.
+function isEmptyNode(n) { return !!n && !n.t.trim() && !n.b.trim() && !(n.recs || []).length && !(n.imgs || []).length; }
+function closeIfEmpty() {
+    const n = selectedId && tree.nodes.find((x) => x.id === selectedId);
+    if (!isEmptyNode(n)) return;
+    const now = Date.now();
+    tree.del.push({ id: n.id, at: now });
+    for (const e of tree.edges) if (e.a === n.id || e.b === n.id) tree.del.push({ id: ekey(e), at: now });
+    tree.nodes = tree.nodes.filter((x) => x.id !== n.id);
+    tree.edges = tree.edges.filter((e) => e.a !== n.id && e.b !== n.id);
+    picked.delete(n.id);
+    selectedId = null;
+    render(); touch();
+}
+
 function onFieldInput() {
     const n = tree.nodes.find((x) => x.id === selectedId);
     if (!n) return;
+    if (n.t !== $('f-title').value || n.b !== $('f-body').value) remember('text:' + n.id);
     n.t = $('f-title').value; n.b = $('f-body').value;
     $('f-meta').textContent = n.b ? `${n.b.length} תווים` : '';
     renderNodes(); renderWires(); touch(n);
@@ -586,19 +862,26 @@ function onFieldInput() {
 // 30 days. The tombstones still go in — they are what stops a stale device
 // from bringing the bubble back on its own, and a restore beats them because
 // it is a newer change.
+function deleteNodes(ids) {
+    const set = new Set(ids);
+    const now = Date.now();
+    const gone = tree.nodes.filter((n) => set.has(n.id));
+    if (!gone.length) return 0;
+    const mine = tree.edges.filter((e) => set.has(e.a) || set.has(e.b));
+    tree.trash = [...gone.map((n) => ({ ...n, edges: mine.filter((e) => e.a === n.id || e.b === n.id).map((e) => ({ a: e.a, b: e.b, k: e.k, ...(e.d ? { d: e.d } : {}) })), dAt: now })), ...(tree.trash || [])];
+    for (const n of gone) tree.del.push({ id: n.id, at: now });
+    for (const e of mine) tree.del.push({ id: ekey(e), at: now });
+    tree.nodes = tree.nodes.filter((n) => !set.has(n.id));
+    tree.edges = tree.edges.filter((e) => !set.has(e.a) && !set.has(e.b));
+    for (const id of set) picked.delete(id);
+    if (selectedId && set.has(selectedId)) { selectedId = null; $('sheet').classList.remove('open'); }
+    render(); touch();
+    return gone.length;
+}
 function deleteSelected() {
     if (!selectedId) return;
-    const n = tree.nodes.find((x) => x.id === selectedId);
-    if (!n) return;
-    const now = Date.now();
-    const mine = tree.edges.filter((e) => e.a === n.id || e.b === n.id);
-    tree.trash = [{ ...n, edges: mine.map((e) => ({ a: e.a, b: e.b, k: e.k })), dAt: now }, ...(tree.trash || [])];
-    tree.del.push({ id: n.id, at: now });
-    for (const e of mine) tree.del.push({ id: [e.a, e.b].sort().join('|'), at: now });
-    tree.nodes = tree.nodes.filter((x) => x.id !== n.id);
-    tree.edges = tree.edges.filter((e) => e.a !== n.id && e.b !== n.id);
-    closeSheet(); render(); touch();
-    toast('הועבר לסל המחזור');
+    remember();
+    if (deleteNodes([selectedId])) toast('הועבר לסל המחזור');
 }
 
 function restoreFromTrash(id) {
@@ -618,12 +901,13 @@ function restoreFromTrash(id) {
     render(); touch(); renderTrash();
     toast('שוחזר');
 }
+function restoreFromTrashRemembered(id) { remember(); restoreFromTrash(id); }
 
 async function purgeFromTrash(id) {
     const i = (tree.trash || []).findIndex((x) => x.id === id);
     if (i < 0) return;
     const x = tree.trash[i];
-    if (!confirm(`למחוק לצמיתות את "${x.t || 'ללא כותרת'}"? אין דרך חזרה.`)) return;
+    if (!(await askConfirm(`למחוק לצמיתות את "${x.t || 'ללא כותרת'}"? אין דרך חזרה.`, 'מחק'))) return;
     // Its recordings and pictures go with it.
     if (cloudKey) for (const g of x.imgs || []) {
         try { await fetch('/api/thing?k=' + encodeURIComponent(cloudKey) + '&node=' + encodeURIComponent(x.id) + '&img=' + encodeURIComponent(g.id), { method: 'DELETE' }); } catch { /* harmless */ }
@@ -631,18 +915,24 @@ async function purgeFromTrash(id) {
     if (cloudKey) for (const r of x.recs || []) {
         try { await fetch('/api/thing?k=' + encodeURIComponent(cloudKey) + '&node=' + encodeURIComponent(x.id) + '&rec=' + encodeURIComponent(r.id), { method: 'DELETE' }); } catch { /* the blob will outlive its bubble — harmless */ }
     }
+    // The purge leaves a tombstone, or the other device's copy of the bin
+    // brings the entry straight back on the next sync (Stav: "זה לא נותן לי לרוקן").
+    tree.del.push({ id: 'trash:' + x.id, at: Date.now() });
     tree.trash.splice(i, 1);
     touch(); renderTrash();
 }
 
 async function emptyTrash() {
     if (!(tree.trash || []).length) return;
-    if (!confirm(`לרוקן את הסל? ${tree.trash.length} תובנות יימחקו לצמיתות.`)) return;
+    if (!(await askConfirm(`לרוקן את הסל? ${tree.trash.length} תובנות יימחקו לצמיתות.`, 'רוקן'))) return;
     for (const x of tree.trash) if (cloudKey) for (const r of x.recs || []) {
         try { await fetch('/api/thing?k=' + encodeURIComponent(cloudKey) + '&node=' + encodeURIComponent(x.id) + '&rec=' + encodeURIComponent(r.id), { method: 'DELETE' }); } catch { /* see above */ }
     }
+    const now = Date.now();
+    for (const x of tree.trash) tree.del.push({ id: 'trash:' + x.id, at: now });
     tree.trash = [];
     touch(); renderTrash();
+    toast('הסל רוקן');
 }
 
 function ago(ts) {
@@ -669,7 +959,7 @@ function renderTrash() {
                 <div class="trash-title">${escapeHtml(x.t.trim() || 'ללא כותרת')}</div>
                 <div class="trash-meta">${ago(x.dAt)}${x.p && pageName(x.p) ? ' · ' + escapeHtml(pageName(x.p)) : ''}${(x.recs || []).length ? ' · 🎙' + x.recs.length : ''}</div>
             </div>
-            <button type="button" class="btn small" onclick="restoreFromTrash('${x.id}')">שחזר</button>
+            <button type="button" class="btn small" onclick="restoreFromTrashRemembered('${x.id}')">שחזר</button>
             <button type="button" class="btn quiet small danger" onclick="purgeFromTrash('${x.id}')">מחק</button>
         </div>`).join('') : '<div class="trash-empty">הסל ריק. תובנה שנמחקת מחכה כאן 30 יום.</div>';
     $('btn-empty-trash').hidden = !items.length;
@@ -678,28 +968,47 @@ function renderTrash() {
 // A tapped line lights up and shows one button at its middle: מחק. No
 // dialog — on a phone the line is thin and the question was the annoying
 // part. Tapping the ground puts the button away.
+function edgeBar() { return $('edge-bar') || $('edge-del'); }
+function hideEdgeBar() { const b = edgeBar(); if (b) b.hidden = true; }
 function selectEdge(e) {
+    closeIfEmpty();
     selectedEdge = e; selectedId = null;
     $('sheet').classList.remove('open');
     renderNodes(); renderWires();
     placeEdgeButton();
 }
+const DIR_LABEL = { '': 'ללא חץ', ab: 'חץ קדימה', ba: 'חץ אחורה', both: 'דו-כיווני' };
 function placeEdgeButton() {
-    const btn = $('edge-del'); if (!btn) return;
+    const bar = edgeBar(); if (!bar) return;
     const e = selectedEdge;
     const a = e && tree.nodes.find((n) => n.id === e.a), b = e && tree.nodes.find((n) => n.id === e.b);
-    if (!a || !b) { btn.hidden = true; return; }
+    if (!a || !b) { bar.hidden = true; return; }
     const pa = pos(a), pb = pos(b);
     const mx = (pa.x + pb.x) / 2, my = (pa.y + pb.y) / 2;
-    btn.style.left = (mx * view.k + view.x) + 'px';
-    btn.style.top = (my * view.k + view.y) + 'px';
-    btn.hidden = false;
+    bar.style.left = (mx * view.k + view.x) + 'px';
+    bar.style.top = (my * view.k + view.y) + 'px';
+    const edge = tree.edges.find((x) => x.a === e.a && x.b === e.b);
+    const db = $('edge-dir'); if (db) db.textContent = DIR_LABEL[(edge && edge.d) || ''];
+    bar.hidden = false;
+}
+// Stav: "חצים עם כיוון — הלוך, חזור או דו". Tapping the button walks the
+// line through none → forward → back → both.
+function cycleEdgeDir() {
+    const e = selectedEdge; if (!e) return;
+    const edge = tree.edges.find((x) => x.a === e.a && x.b === e.b); if (!edge) return;
+    remember();
+    const order = ['', 'ab', 'ba', 'both'];
+    const next = order[(order.indexOf(edge.d || '') + 1) % order.length];
+    if (next) edge.d = next; else delete edge.d;
+    edge.u = Date.now();
+    renderWires(); placeEdgeButton(); touch();
 }
 function deleteSelectedEdge() {
     const e = selectedEdge; if (!e) return;
-    tree.del.push({ id: [e.a, e.b].sort().join('|'), at: Date.now() });
+    remember();
+    tree.del.push({ id: ekey(e), at: Date.now() });
     tree.edges = tree.edges.filter((x) => !(x.a === e.a && x.b === e.b));
-    selectedEdge = null; $('edge-del').hidden = true;
+    selectedEdge = null; hideEdgeBar();
     renderWires(); touch();
     toast('הקו נמחק');
 }
@@ -713,6 +1022,7 @@ function addNodeAt(wx, wy) {
     const parent = tree.nodes.find((x) => x.id === selectedId);
     const p = tab !== 'all' ? tab : (parent ? parent.p : '');
     const o = off(p);
+    remember();
     const n = { id: uid(), t: '', b: '', x: Math.round(wx - o.x), y: Math.round(wy - o.y), u: Date.now(), c: parent ? (parent.c || 0) : 0, p, recs: [] };
     tree.nodes.push(n);
     render(); touch(n);
@@ -730,6 +1040,7 @@ function connect(a, b) {
     if (!a || !b || a === b) return;
     if (tree.edges.some((e) => (e.a === a && e.b === b) || (e.a === b && e.b === a))) { toast('כבר מחובר'); return; }
     const na = tree.nodes.find((n) => n.id === a), nb = tree.nodes.find((n) => n.id === b);
+    remember();
     let kind = tab === 'all' ? linkKind : 'in';
     if (kind === 'in' && na && nb && na.p !== nb.p) {
         const pull = (src, dst) => {   // src's tree moves into dst's page, staying where it sits on screen
@@ -760,17 +1071,44 @@ function startLinkFromSheet() {
 
 // Colour is a way of grouping, chosen in the sheet or the legend. A bubble
 // created while another is selected inherits its colour.
-function renderSwatches(cur) {
+function renderSwatches(cur, cur2) {
     const box = $('f-colors'); if (!box) return;
     box.innerHTML = LEGEND.map((l) =>
-        `<button type="button" class="swatch${l.c === cur ? ' on' : ''}" data-c="${l.c}" onclick="setColor(${l.c})" title="${escapeHtml(l.name)}" aria-label="${escapeHtml(l.name)}"></button>`).join('');
-    const nm = $('f-color-name'); if (nm) nm.textContent = (LEGEND_BY_C[cur] || LEGEND[0]).name;
+        `<button type="button" class="swatch${l.c === cur ? ' on' : ''}" data-c="${l.c}" onclick="setColor(${l.c})" title="${escapeHtml(legendName(l.c))}" aria-label="${escapeHtml(legendName(l.c))}"></button>`).join('');
+    const nm = $('f-color-name'); if (nm) nm.textContent = legendName(cur) + (cur2 ? ' + ' + legendName(cur2) : '');
+    // Stav (4.9.2026): "שיהיה אפשר לבחור 2 צבעים למשהו" — a second row, with
+    // "none" first; the bubble is painted half and half.
+    const box2 = $('f-colors2'); if (!box2) return;
+    box2.innerHTML = `<button type="button" class="swatch none${cur2 ? '' : ' on'}" onclick="setColor2(0)" title="בלי צבע שני" aria-label="בלי צבע שני"></button>` +
+        LEGEND.filter((l) => l.c !== 0).map((l) =>
+            `<button type="button" class="swatch${l.c === cur2 ? ' on' : ''}${l.c === cur ? ' same' : ''}" data-c="${l.c}" onclick="setColor2(${l.c})" title="${escapeHtml(legendName(l.c))}" aria-label="${escapeHtml(legendName(l.c))}"></button>`).join('');
 }
 function setColor(i) {
     const n = tree.nodes.find((x) => x.id === selectedId);
     if (!n) return;
+    remember();
     n.c = i;
-    renderSwatches(i); renderNodes(); renderWires(); touch(n);
+    if (n.c2 === i) delete n.c2;
+    renderSwatches(i, n.c2 || 0); renderNodes(); renderWires(); touch(n);
+}
+function setColor2(i) {
+    const n = tree.nodes.find((x) => x.id === selectedId);
+    if (!n) return;
+    remember();
+    // A white bubble given a second colour simply takes it: half white is no colour.
+    if (i >= 1 && i <= 7 && !(n.c || 0)) { n.c = i; delete n.c2; }
+    else if (i >= 1 && i <= 7 && i !== (n.c || 0)) n.c2 = i; else delete n.c2;
+    renderSwatches(n.c || 0, n.c2 || 0); renderNodes(); touch(n);
+}
+// Stav: "בלון גדול יותר למקרה שהוא משהו חשוב שמוביל להרבה דברים" — wider,
+// bolder; the text size stays, as he asked.
+function toggleBig() {
+    const n = tree.nodes.find((x) => x.id === selectedId);
+    if (!n) return;
+    remember();
+    if (n.s === 'L') delete n.s; else n.s = 'L';
+    const bb = $('btn-big'); if (bb) bb.classList.toggle('on', n.s === 'L');
+    renderNodes(); renderWires(); touch(n);
 }
 
 // The label of a bubble with no title: the first few words of its body, or
@@ -799,6 +1137,7 @@ async function paintAll() {
         const res = await fetch('/api/thing?k=' + encodeURIComponent(cloudKey) + '&paint=1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items, legend }) });
         const body = await res.json();
         if (!res.ok) { toast((body.error && body.error.message) || 'הצביעה לא הצליחה'); return; }
+        remember();
         lastPaint = ns.map((n) => ({ id: n.id, c: n.c || 0 }));
         const now = Date.now(); let changed = 0;
         for (const r of body.colors || []) { const n = tree.nodes.find((x) => x.id === r.id); if (n && n.c !== r.c) { n.c = r.c; n.u = now; changed++; } }
@@ -1038,10 +1377,10 @@ function toggleMarquee() {
 function clearPicked() { picked = new Set(); render(); }
 
 function deletePicked() {
-    if (!picked.size) return;
-    const ids = [...picked]; picked = new Set();
-    for (const id of ids) { selectedId = id; deleteSelected(); }
-    selectedId = null;
+    const ids = idsInHand(); if (!ids.length) return;
+    remember();
+    const n = deleteNodes(ids);
+    if (n) toast(n === 1 ? 'הועבר לסל המחזור' : `${n} הועברו לסל המחזור`);
 }
 
 // ---------- theme ----------
@@ -1190,7 +1529,7 @@ async function deleteRec(id) {
 
 const pointers = new Map();
 let gesture = null;
-let lastTap = 0;
+let lastTap = 0, lastTapX = 0, lastTapY = 0;
 
 function bindStage() {
     stage.addEventListener('pointerdown', (ev) => {
@@ -1214,17 +1553,29 @@ function bindStage() {
         ev.preventDefault();
         zoomAt(ev.clientX, ev.clientY, ev.deltaY < 0 ? 1.1 : 1 / 1.1);
     }, { passive: false });
-    stage.addEventListener('dblclick', (ev) => {
-        if (ev.target.closest('.bubble') || ev.target.closest('.cluster')) return;
-        const w = toWorld(ev.clientX, ev.clientY);
-        addNodeAt(w.x, w.y);
-    });
+    // No dblclick listener: the double tap is recognised from the pointer
+    // events below, on mouse and finger alike. Having both made two bubbles
+    // per double-click on a computer (Stav, 4.9.2026).
     window.addEventListener('resize', applyView);
     document.addEventListener('keydown', (ev) => {
-        const typing = ev.target && (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA');
-        if (ev.key === 'Escape') { linkFrom = null; closeSheet(); if (picked.size) clearPicked(); }
-        if (!typing && (ev.key === 'Delete' || ev.key === 'Backspace') && picked.size) { ev.preventDefault(); deletePicked(); }
-        if (!typing && ev.key === 'a' && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); picked = new Set(visibleNodes().map((n) => n.id)); render(); }
+        const typing = ev.target && (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA' || ev.target.isContentEditable);
+        const mod = ev.ctrlKey || ev.metaKey;
+        if (ev.key === 'Escape') { linkFrom = null; closeSheet(); hideEdgeBar(); selectedEdge = null; renderWires(); if (picked.size) clearPicked(); }
+        if (typing) return;   // inside a field the browser's own undo/copy apply
+        const k = ev.key.toLowerCase();
+        if (mod && k === 'z' && !ev.shiftKey) { ev.preventDefault(); undo(); return; }
+        if (mod && ((k === 'z' && ev.shiftKey) || k === 'y')) { ev.preventDefault(); redo(); return; }
+        if (mod && k === 'c') { if (idsInHand().length) { ev.preventDefault(); copyPicked(); } return; }
+        if (mod && k === 'x') { if (idsInHand().length) { ev.preventDefault(); cutPicked(); } return; }
+        if (mod && k === 'v') { ev.preventDefault(); pasteClipboard(); return; }
+        if (mod && k === 'd') { if (idsInHand().length) { ev.preventDefault(); duplicatePicked(); } return; }
+        if (mod && k === 'a') { ev.preventDefault(); picked = new Set(visibleNodes().map((n) => n.id)); render(); return; }
+        if ((ev.key === 'Delete' || ev.key === 'Backspace') && idsInHand().length) { ev.preventDefault(); if (picked.size) deletePicked(); else deleteSelected(); return; }
+        const step = ev.shiftKey ? 50 : 10;
+        if (ev.key === 'ArrowLeft') { ev.preventDefault(); nudgePicked(-step, 0); }
+        if (ev.key === 'ArrowRight') { ev.preventDefault(); nudgePicked(step, 0); }
+        if (ev.key === 'ArrowUp') { ev.preventDefault(); nudgePicked(0, -step); }
+        if (ev.key === 'ArrowDown') { ev.preventDefault(); nudgePicked(0, step); }
     });
 }
 
@@ -1265,7 +1616,7 @@ function onMove(ev) {
         if (Math.hypot(dx, dy) > 4) gesture.moved = true;
         view.x = gesture.vx + dx; view.y = gesture.vy + dy; applyView();
     } else if (gesture.type === 'node') {
-        if (Math.hypot(dx, dy) > 4 && !gesture.moved) { gesture.moved = true; gesture.el.classList.add('drag'); }
+        if (Math.hypot(dx, dy) > 4 && !gesture.moved) { remember(); gesture.moved = true; gesture.el.classList.add('drag'); }
         if (!gesture.moved) return;
         if (gesture.group) {
             for (const g0 of gesture.group) {
@@ -1321,10 +1672,10 @@ function onUp(ev) {
         saveView();
         if (!g.moved) {
             const now = Date.now();
-            if (now - lastTap < 350) { const w = toWorld(ev.clientX, ev.clientY); addNodeAt(w.x, w.y); lastTap = 0; return; }
-            lastTap = now;
+            if (now - lastTap < 350 && Math.hypot(ev.clientX - lastTapX, ev.clientY - lastTapY) < 30) { const w = toWorld(ev.clientX, ev.clientY); addNodeAt(w.x, w.y); lastTap = 0; return; }
+            lastTap = now; lastTapX = ev.clientX; lastTapY = ev.clientY;
             linkFrom = null; closeSheet(); $('results').hidden = true;
-            if (selectedEdge) { selectedEdge = null; $('edge-del').hidden = true; renderWires(); }
+            if (selectedEdge) { selectedEdge = null; hideEdgeBar(); renderWires(); }
             if (picked.size) { picked = new Set(); render(); }
         }
     } else if (g.type === 'node') {

@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/tokens.css?v=504">
+    <link rel="stylesheet" href="/assets/tokens.css?v=505">
     <link rel="manifest" id="manifest-link" href="/thing/manifest.webmanifest">
     <meta name="theme-color" content="#F7F6F3">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -48,10 +48,12 @@
         .btn.primary { background: var(--action); border-color: transparent; color: var(--on-action); }
         .btn.quiet { background: transparent; border-color: transparent; color: var(--text-2); }
         .btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+        .btn[disabled] { opacity: .35; pointer-events: none; }
         .sync { font-size: var(--fs-xs); color: var(--text-3); min-width: 60px; text-align: start; }
         .sync.on { color: var(--ok-text); }
         @media (max-width: 480px) {
-            .top { gap: 8px; padding: 8px 10px; }
+            .top { gap: 6px; padding: 8px 10px; }
+            .top .btn.quiet { padding: 0 8px; }
             .top h1 { font-size: var(--fs-md); white-space: nowrap; }
             .top .sub { font-size: 11px; }
             .sync { display: none; }
@@ -101,13 +103,33 @@
         }
         .bubble[data-c]:not([data-c="0"]) .knob::before { background: var(--hue); box-shadow: 0 0 0 1.5px var(--hue); }
         .bubble[data-c]:not([data-c="0"]).sel { box-shadow: 0 0 0 4px color-mix(in srgb, var(--hue) 35%, transparent), 0 4px 16px rgba(0,0,0,.12); border-color: var(--hue); }
+        /* Two colours: the left half in the first tint, the right half in the
+           second, the same mix as above. The border stays the first colour. */
+        .bubble[data-c2="1"] { --hue2: var(--c1); } .bubble[data-c2="2"] { --hue2: var(--c2); }
+        .bubble[data-c2="3"] { --hue2: var(--c3); } .bubble[data-c2="4"] { --hue2: var(--c4); }
+        .bubble[data-c2="5"] { --hue2: var(--c5); } .bubble[data-c2="6"] { --hue2: var(--c6); }
+        .bubble[data-c2="7"] { --hue2: var(--c7); }
+        .bubble[data-c]:not([data-c="0"])[data-c2]:not([data-c2="0"]) {
+            background: linear-gradient(90deg, color-mix(in srgb, var(--hue) 30%, var(--surface)) 50%, color-mix(in srgb, var(--hue2) 30%, var(--surface)) 50%);
+        }
         #wires .wire[data-c="1"] { stroke: var(--c1); } #wires .wire[data-c="2"] { stroke: var(--c2); }
         #wires .wire[data-c="3"] { stroke: var(--c3); } #wires .wire[data-c="4"] { stroke: var(--c4); }
         #wires .wire[data-c="5"] { stroke: var(--c5); } #wires .wire[data-c="6"] { stroke: var(--c6); }
         #wires .wire[data-c="7"] { stroke: var(--c7); }
         #wires .wire { stroke-width: 2.5; }
+        #wires .wire.sel { stroke: var(--danger); }
+        /* Arrowheads: a small polygon at a wire's end, in the wire's colour. */
+        #wires .arrow { fill: var(--accent); stroke: none; opacity: .85; }
+        #wires .arrow[data-c="1"] { fill: var(--c1); } #wires .arrow[data-c="2"] { fill: var(--c2); }
+        #wires .arrow[data-c="3"] { fill: var(--c3); } #wires .arrow[data-c="4"] { fill: var(--c4); }
+        #wires .arrow[data-c="5"] { fill: var(--c5); } #wires .arrow[data-c="6"] { fill: var(--c6); }
+        #wires .arrow[data-c="7"] { fill: var(--c7); }
+        #wires .arrow.dim { opacity: .12; }
+        #wires .arrow.sel { fill: var(--danger); }
         .bubble .label { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .bubble.long .label { white-space: normal; }
+        /* A big bubble: a heading that many things hang from. */
+        .bubble.big { max-width: 480px; padding: 14px 22px; font-weight: 700; font-size: 1.1em; }
         .bubble:hover { border-color: var(--accent); }
         .bubble.sel { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft), 0 4px 16px rgba(0,0,0,.12); }
         .bubble.drag { cursor: grabbing; box-shadow: 0 8px 24px rgba(0,0,0,.18); z-index: 5; }
@@ -155,9 +177,25 @@
         #marquee[hidden] { display: none; }
         .bubble.picked { box-shadow: 0 0 0 3px var(--accent), 0 4px 16px rgba(0,0,0,.12); }
         #stage.marquee-mode { cursor: crosshair; }
-        #btn-marquee.on { background: var(--accent); color: #fff; border-color: transparent; }
-        #edge-del { position: fixed; z-index: 30; transform: translate(-50%, -50%); background: var(--surface); box-shadow: 0 6px 20px rgba(0,0,0,.18); }
-        #edge-del[hidden] { display: none; }
+        #btn-marquee.on, #btn-big.on { background: var(--accent); color: #fff; border-color: transparent; }
+        /* Two buttons at the middle of a tapped line: the arrow's direction and the bin. */
+        #edge-bar {
+            position: fixed; z-index: 30; transform: translate(-50%, -50%); display: flex; gap: 6px; padding: 5px;
+            background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-pill); box-shadow: 0 6px 20px rgba(0,0,0,.18);
+        }
+        #edge-bar[hidden] { display: none; }
+        #edge-dir { min-width: 40px; justify-content: center; }
+        /* The selection bar: what to do with the picked bubbles. Bottom centre,
+           above the + and the zoom cluster; on a desk it slides clear of the
+           open side panel. */
+        #pickbar {
+            position: fixed; inset-inline: 0; bottom: 90px; z-index: 36; margin: 0 auto; width: max-content; max-width: calc(100vw - 24px);
+            display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; padding: 6px 8px;
+            background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 6px 20px rgba(0,0,0,.18);
+        }
+        #pickbar[hidden] { display: none; }
+        #pick-count { font-size: var(--fs-sm); font-weight: 700; color: var(--text-2); padding: 0 6px; white-space: nowrap; }
+        @media (min-width: 900px) { #sheet.open ~ #pickbar { inset-inline-end: 380px; } }
         .cluster.dim { opacity: .3; }
         @media (max-width: 640px) {
             #q { display: none; width: 100%; }
@@ -286,7 +324,7 @@
         #sheet textarea { min-height: 120px; resize: vertical; flex: 1; line-height: 1.55; }
         #sheet .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         #sheet .meta { font-size: var(--fs-xs); color: var(--text-3); }
-        #f-colors { display: flex; gap: 8px; flex-wrap: wrap; }
+        #f-colors, #f-colors2 { display: flex; gap: 8px; flex-wrap: wrap; }
         .swatch {
             width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: var(--surface-2);
             box-shadow: inset 0 0 0 1.5px var(--border-strong); cursor: pointer; transition: transform var(--t-fast);
@@ -298,6 +336,10 @@
         .swatch:not([data-c="0"]) { box-shadow: none; }
         .swatch.on { border-color: var(--text); transform: scale(1.15); }
         .swatch:hover { transform: scale(1.1); }
+        /* The "no second colour" swatch: an empty dashed ring with a dash in it. */
+        .swatch.none { background: transparent; box-shadow: none; border-style: dashed; border-color: var(--border-strong); display: grid; place-items: center; color: var(--text-3); font-size: 14px; line-height: 1; }
+        .swatch.none::before { content: '–'; }
+        .swatch.none.on { border-color: var(--text); color: var(--text); }
         #btn-rec.live { background: var(--danger); color: #fff; border-color: transparent; }
         .btn.small { min-height: 28px; padding: 0 10px; font-size: var(--fs-xs); }
         #f-recs { display: flex; flex-direction: column; gap: 10px; }
@@ -316,6 +358,16 @@
         #lightbox { position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,.88); display: grid; place-items: center; padding: 16px; cursor: zoom-out; }
         #lightbox[hidden] { display: none; }
         #lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+
+        /* The in-page question: a native <dialog>, dressed like the sheet. */
+        #confirm {
+            width: min(360px, calc(100vw - 32px)); max-width: 360px; margin: auto; padding: 18px 16px; direction: rtl; text-align: start;
+            background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 18px;
+            box-shadow: 0 12px 40px rgba(0,0,0,.18);
+        }
+        #confirm::backdrop { background: rgba(0,0,0,.45); }
+        #confirm p { font-size: var(--fs-md); line-height: 1.5; margin-bottom: 14px; white-space: pre-wrap; }
+        #confirm .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .bubble.has-img::after {
             content: ''; position: absolute; inset-inline-end: 14px; bottom: 6px; width: 6px; height: 6px;
             border-radius: 50%; background: var(--c5); opacity: .9;
@@ -332,6 +384,7 @@
             opacity: 0; transition: opacity var(--t-med); pointer-events: none;
         }
         .toast.show { opacity: 1; }
+        #pickbar:not([hidden]) ~ .toast { bottom: 150px; }
     </style>
 </head>
 <body>
@@ -347,6 +400,8 @@
             <div id="results" hidden></div>
         </div>
         <span class="sync" id="sync">מקומי</span>
+        <button type="button" class="btn quiet" id="btn-undo" onclick="undo()" title="בטל (Ctrl+Z)" aria-label="בטל" disabled>↶</button>
+        <button type="button" class="btn quiet" id="btn-redo" onclick="redo()" title="בצע שוב (Ctrl+Shift+Z)" aria-label="בצע שוב" disabled>↷</button>
         <button class="btn quiet" id="btn-trash" onclick="toggleTrash()" title="סל מחזור" aria-label="סל מחזור">🗑</button>
         <button class="btn quiet" id="btn-theme" onclick="toggleTheme()" title="יום / לילה" aria-label="יום או לילה">🌙</button>
     </div>
@@ -411,15 +466,16 @@
     <!-- The selection box (Shift-drag on a computer, the 🔲 mode on a phone). -->
     <div id="marquee" hidden></div>
 
-    <!-- One button for a tapped line, at its middle. -->
-    <button type="button" id="edge-del" class="btn danger small" onclick="deleteSelectedEdge()" hidden>מחק קו</button>
+    <!-- Two buttons for a tapped line, at its middle: the arrow's direction and the bin. -->
+    <div id="edge-bar" hidden><button type="button" class="btn small" id="edge-dir" onclick="cycleEdgeDir()" title="כיוון החץ">—</button><button type="button" class="btn danger small" onclick="deleteSelectedEdge()">מחק קו</button></div>
 
-    <div id="hint" hidden>לחיצה כפולה על הרקע פותחת תובנה חדשה · גרירה מהנקודה הכחולה מחברת קו</div>
+    <div id="hint" hidden>לחיצה כפולה על הרקע פותחת תובנה חדשה · גרירה מהנקודה הכחולה מחברת קו · Ctrl+Z מבטל</div>
     <div id="zoom">
         <button class="btn" onclick="zoomBy(1.2)" title="הגדל">+</button>
         <button class="btn" onclick="zoomBy(1/1.2)" title="הקטן">−</button>
         <button class="btn" id="btn-marquee" onclick="toggleMarquee()" title="בחירת כמה תובנות (או Shift+גרירה)" aria-label="מצב בחירה">🔲</button>
         <button class="btn" onclick="fitAll()" title="הצג הכל">⤢</button>
+        <button class="btn" id="btn-paste" onclick="pasteClipboard()" title="הדבק (Ctrl+V)" aria-label="הדבק" disabled>📋</button>
     </div>
     <button id="fab" onclick="addNodeAtCenter()" title="תובנה חדשה" aria-label="תובנה חדשה">+</button>
 
@@ -434,6 +490,10 @@
             <span class="meta" id="f-color-name"></span>
         </div>
         <div class="row">
+            <span class="meta">צבע שני</span>
+            <div id="f-colors2" role="group" aria-label="צבע שני"></div>
+        </div>
+        <div class="row">
             <label class="meta" for="f-page">לשונית</label>
             <select id="f-page" onchange="onPageSelect()" style="flex:1;border:1px solid var(--border-strong);border-radius:var(--r-md);background:var(--bg);padding:8px 10px"></select>
         </div>
@@ -441,6 +501,7 @@
             <button type="button" class="btn" id="btn-rec" onclick="toggleRecord()">🎙 הקלט</button>
             <button type="button" class="btn" onclick="pickImage()" title="הוסף תמונה לתובנה">📷 תמונה</button>
             <button type="button" class="btn quiet" onclick="pickTree()" title="בחר את כל מה שמחובר לתובנה הזו — ואז גרור">בחר את העץ</button>
+            <button type="button" class="btn" id="btn-big" onclick="toggleBig()" title="בועה גדולה — לכותרת שמובילה להרבה דברים">גדול</button>
             <input type="file" id="f-img-input" aria-label="בחירת תמונה" accept="image/*" onchange="onImagePicked(this)" hidden>
             <span class="meta">הקלטה קולית נשמרת לתובנה ומתומללת</span>
         </div>
@@ -448,6 +509,7 @@
         <div id="f-recs"></div>
         <div class="row">
             <button class="btn primary" onclick="closeSheet()">סגור</button>
+            <button class="btn" onclick="copySelected()" title="העתק (Ctrl+C)">העתק</button>
             <button class="btn" id="btn-link" onclick="startLinkFromSheet()">חבר ל…</button>
             <span class="spacer" style="flex:1"></span>
             <button class="btn danger" onclick="deleteSelected()">מחק</button>
@@ -455,8 +517,21 @@
         <div class="meta" id="f-meta"></div>
     </div>
 
+    <!-- The selection bar: what to do with the picked bubbles. -->
+    <div id="pickbar" hidden>
+        <span id="pick-count"></span>
+        <button type="button" class="btn" onclick="copyPicked()" title="העתק">העתק</button>
+        <button type="button" class="btn" onclick="cutPicked()" title="גזור">גזור</button>
+        <button type="button" class="btn" onclick="duplicatePicked()" title="שכפל">שכפל</button>
+        <button type="button" class="btn danger" onclick="deletePicked()" title="מחק">מחק</button>
+        <button type="button" class="btn quiet" onclick="clearPicked()" title="נקה בחירה" aria-label="נקה בחירה">✕</button>
+    </div>
+
+    <!-- A question with two answers, in the page rather than the browser's box. -->
+    <dialog id="confirm"><p id="confirm-text"></p><div class="row"><button type="button" class="btn danger" id="confirm-ok">כן</button><button type="button" class="btn" id="confirm-cancel">ביטול</button></div></dialog>
+
     <div class="toast" id="toast"></div>
 
-    <script src="thing.js?v=504"></script>
+    <script src="thing.js?v=505"></script>
 </body>
 </html>
