@@ -250,7 +250,9 @@ DROP_CAT = (
     ("phone/TV/computer accessories", frozenset((
         "אביזרי סלולר", "מסכי טלוויזיה ומחשב", "כבלי HDMI",
     )), None),
-    ("household heaters", frozenset(("חימום", "תנורים", "מפזרי חום")), None),
+    # Hard-wired bathroom/wall heaters (IP65, לקיר, לאמבטיה) are installed by an
+    # electrician and quoted — they stay; the portable ones go (Stav, 4.9.2026).
+    ("household heaters", frozenset(("חימום", "תנורים", "מפזרי חום")), re.compile(r"לקיר|לאמבטיה|IP-?65")),
     ("consumer fans, coolers, car fridges", frozenset((
         "מאווררי קיר, עמוד, רצפה, מצננים, מקררים לרכב",
         "מאווררי עמוד, רצפה וקיר", "מאווררים לבית ולמשרד", "מאווררי מגדל",
@@ -300,7 +302,7 @@ DROP_NAME = (
      re.compile(r"iphone|לפלאפון|אוזניות|מטען נייד|לסמסונג|מעמד טלפון",
                 re.IGNORECASE)),
     ("household heaters by name",
-     re.compile(r"תנור חימום|תנור אינפרא|תנור פטריה|מפזר חום|רגל לתנור")),
+     re.compile(r"^(?!.*(?:לקיר|לאמבטיה|IP-?65)).*?(?:תנור חימום|תנור אינפרא|תנור פטריה|מפזר חום|רגל לתנור)")),
     ("consumer batteries and junk by name",
      re.compile(r"גודל (?:VEGA )?LR|סוללת כפתור|CR2032|למכשירי שמיעה|"
                 r"נוזל ניקוי|פחית ריח|למנגל|נייר לבן|למדפסות")),
