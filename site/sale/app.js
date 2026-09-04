@@ -323,16 +323,16 @@ async function adminToggleUser(btn) {
 // AI model selection + usage meter
 // ==========================================================================
 // Selected AI as a "provider|model" value (matches the dropdown). Default: Gemini.
-let selectedGeminiModel = 'gemini|gemini-2.5-flash';
+let selectedGeminiModel = 'gemini|gemini-3.6-flash';
 const MODEL_LABELS = {
     'gemini|gemini-2.0-flash': 'Gemini 2.0 Flash',
-    'gemini|gemini-2.5-flash': 'Gemini 2.5 Flash',
+    'gemini|gemini-3.6-flash': 'Gemini 3.6 Flash',
     'grok|grok-2-latest': 'Grok 2'
 };
 // Each provider's default "provider|model" value — used when an automatic
 // server-side fallback switches us to a different provider.
 const PROVIDER_DEFAULT_VALUE = {
-    gemini: 'gemini|gemini-2.5-flash',
+    gemini: 'gemini|gemini-3.6-flash',
     grok: 'grok|grok-2-latest'
 };
 const WEIGHTED_DAILY_BUDGET_DEFAULT = 400;
@@ -3539,7 +3539,7 @@ function loadProject(id, navigate = true) {
     localStorage.setItem(getStorageKey('sj_active_project_id'), id);
     pendingChatPhotos = []; renderChatAttachments(); // don't carry photos between projects
 
-    selectedGeminiModel = 'gemini|gemini-2.5-flash';   // admin routing default
+    selectedGeminiModel = 'gemini|gemini-3.6-flash';   // admin routing default
 
     updateActiveProjectBanner(proj);
     filterProjectsList();
@@ -9471,7 +9471,8 @@ function getProfessionSystemInstruction() {
   "laborHoursEstimate": 5,                                 // שעות עבודה מוערכות (מספר): למנוע התמחור
   "blindSpots": ["נקודת עיוורון ראשונה", "נקודת עיוורון שנייה"],
   "materials": [
-    { "name": "שם החומר/האביזר", "price": 25, "details": "כמות והערה (למשל: 15 מטר)", "checked": true }
+    { "name": "שם החומר/האביזר", "qty": 15, "unit": "מטר", "price": 25, "details": "הערה חופשית (למשל: תוואי חיצוני)", "checked": true }
+    // qty = כמות (מספר), unit = יחידת המידה ("מטר" | "יח'" | "גליל" | "קומפלט" | "סט"), price = מחיר ליחידה אחת בלבד. סה"כ השורה = qty × price, המערכת מכפילה בעצמה.
   ],
   "fees": [                                                  // תשלומים שאינם עבודה ואינם חומר: בודק, אגרות חח"י, היתרים, פינוי פסולת.
     { "name": "חשמלאי בודק", "price": 600, "note": "שורה נפרדת — לא כלול בהתקנה" }

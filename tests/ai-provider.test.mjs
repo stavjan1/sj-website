@@ -8,7 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 import { toGemini, supportsThinkingOff, PROVIDERS, modelScore, generate } from '../functions/api/_ai.js';
 import { MODEL_CLASS } from '../functions/api/_tiers.js';
@@ -254,5 +254,70 @@ test('a spent daily quota answers in Hebrew instead of taking the endpoint down'
     assert.match(body.error.message, /[֐-׿]/, 'the customer gets an English error from Google');
   } finally {
     globalThis.fetch = realFetch;
+  }
+});
+
+test('Gemini contents alternate user / model, whatever the history looked like', () => {
+  // Gemini refuses two consecutive entries with the same role — 400 "multiturn
+  // requests alternate between user and model" — and the app produces that
+  // shape whenever a user sends twice before a reply lands, or a scripted
+  // handoff is stacked on the user's own text. toGemini used to push one entry
+  // per message and let Google reject it.
+  const body = toGemini([
+    { role: 'user', content: 'א' },
+    { role: 'user', content: 'ב' },
+    { role: 'assistant', content: 'ג' },
+    { role: 'assistant', content: 'ד' },
+    { role: 'user', content: 'ה' },
+  ]);
+  assert.deepEqual(body.contents.map((c) => c.role), ['user', 'model', 'user']);
+  // Nothing was dropped: the merged turn carries both texts, blank-line joined.
+  assert.equal(body.contents[0].parts[0].text, 'א\n\nב');
+  assert.equal(body.contents[1].parts[0].text, 'ג\n\nד');
+  assert.equal(body.contents[2].parts[0].text, 'ה');
+});
+
+test('a history that opens with the assistant still starts with a user turn', () => {
+  // The app's scripted greeting is the model's first message. Gemini wants the
+  // first entry to be the user's, so the greeting rides in the system
+  // instruction — kept, not dropped, and no user line is invented for it.
+  const body = toGemini([
+    { role: 'system', content: 'S' },
+    { role: 'assistant', content: 'שלום! תאר לי את העבודה' },
+    { role: 'user', content: 'עמדת טעינה' },
+  ]);
+  assert.equal(body.contents[0].role, 'user');
+  assert.equal(body.contents.length, 1);
+  assert.match(body.systemInstruction.parts[0].text, /תאר לי את העבודה/);
+  // Images on a merged turn are kept, after the text.
+  const png = 'data:image/png;base64,AAAA';
+  const merged = toGemini([
+    { role: 'user', content: 'x', images: [png] },
+    { role: 'user', content: 'y', images: [png] },
+  ]);
+  assert.equal(merged.contents.length, 1);
+  assert.equal(merged.contents[0].parts.filter((p) => p.inline_data).length, 2);
+});
+
+test('the browser never asks for a Gemini model Google has retired', () => {
+  // Server-side, MODEL_CLASS.basic is what customers get. But the admin path
+  // sends the browser's own selectedGeminiModel as `model`, and that default
+  // sat at gemini-2.5-flash — retired 2026-08-21 — so every admin call 404ed
+  // and was healed on the way. The default must follow the served class, and
+  // no code line under site/sale may name the dead model as a value.
+  const basic = MODEL_CLASS.basic.model;
+  const app = readFileSync(new URL('../site/sale/app.js', import.meta.url), 'utf8');
+  const assigns = [...app.matchAll(/selectedGeminiModel = '([^']+)'/g)].map((m) => m[1]);
+  assert.ok(assigns.length >= 2, 'the default assignments moved');
+  for (const v of assigns) assert.equal(v, 'gemini|' + basic, `browser default ${v} is not the served class`);
+  assert.equal(/gemini: '([^']+)'/.exec(app)[1], 'gemini|' + basic, 'PROVIDER_DEFAULT_VALUE.gemini is stale');
+
+  const dir = new URL('../site/sale/', import.meta.url);
+  for (const f of readdirSync(dir).filter((n) => n.endsWith('.js'))) {
+    const src = readFileSync(new URL(f, dir), 'utf8');
+    const code = src.split('\n').filter((line) => !/^\s*\/\//.test(line)).join('\n');
+    // The August retirement only: MODEL_LABELS still carries a 2.0 entry as a
+    // display label, which nobody can select and which is not a default.
+    assert.ok(!/'gemini\|gemini-2\.5-flash'/.test(code), `${f} still defaults to a retired model`);
   }
 });

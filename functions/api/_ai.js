@@ -385,20 +385,47 @@ export function supportsThinkingOff(model) {
 // OpenAI-style messages -> Gemini request body. A message may carry an
 // `images` array of data: URLs (site photos) — they become inline_data parts
 // so the multimodal model can "see" the job.
+//
+// Gemini's `contents` must alternate user / model. Two entries in a row with
+// the same role are refused outright — 400 "Please ensure that multiturn
+// requests alternate between user and model" — and the app produces exactly
+// that whenever a user sends twice before the reply lands, or the pricing
+// flow stacks a scripted handoff on top of the user's own text. So same-role
+// neighbours are merged into ONE entry: their text parts joined with a blank
+// line, their images kept in order. Nothing is dropped; the model just reads
+// it as one turn, which is what it was.
+//
+// The first entry must also be a user turn. A history that opens with the
+// assistant (the app's scripted greeting) is folded into the system
+// instruction instead of being dropped or answered with a made-up user line:
+// the model still knows what it said, and no turn is invented.
 export function toGemini(messages, opts = {}) {
   const contents = [];
   let system = '';
   for (const m of messages || []) {
     if (!m || typeof m.content !== 'string') continue;
     if (m.role === 'system') { system += (system ? '\n' : '') + m.content; continue; }
-    const parts = [{ text: m.content }];
+    const role = m.role === 'assistant' ? 'model' : 'user';
+    const images = [];
     if (Array.isArray(m.images)) {
       for (const img of m.images.slice(0, 4)) {
         const part = dataUrlToInlinePart(img);
-        if (part) parts.push(part);
+        if (part) images.push(part);
       }
     }
-    contents.push({ role: m.role === 'assistant' ? 'model' : 'user', parts });
+    if (contents.length === 0 && role === 'model') {
+      system += (system ? '\n\n' : '') + 'Your earlier message that opened this conversation:\n' + m.content;
+      continue;
+    }
+    const last = contents[contents.length - 1];
+    if (last && last.role === role) {
+      const text = last.parts.find((p) => typeof p.text === 'string');
+      if (text) text.text += (text.text && m.content ? '\n\n' : '') + m.content;
+      else last.parts.unshift({ text: m.content });
+      last.parts.push(...images);
+      continue;
+    }
+    contents.push({ role, parts: [{ text: m.content }, ...images] });
   }
   const body = { contents };
   if (system) body.systemInstruction = { parts: [{ text: system }] };
