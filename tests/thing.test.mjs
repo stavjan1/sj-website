@@ -77,7 +77,7 @@ test('the page is private, needs no Google, revalidates, and /mind/ is gone', ()
     const headers = readFileSync(new URL('../_headers', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
     assert.match(html, /name="robots" content="noindex/);
     assert.ok(!/gsi\/client|google\.accounts/.test(html + js), 'the tree must not depend on a Google login');
-    assert.ok(/\/thing\/\n\s+Cache-Control: no-cache/.test(headers));
+    assert.ok(/\/thing\/\n(?:\s+!\s*Cache-Control\n)?\s+Cache-Control: no-cache/.test(headers), '/thing/ must revalidate (the ! line detaches the immutable value of a broader rule)');
     // The microphone is off everywhere (the /* block) and on only under /thing/.
     assert.match(headers, /\/\*\n[^\n]*\n(?:[^\n]*\n)*?\s+Permissions-Policy: geolocation=\(\), microphone=\(\), camera=\(\)/, 'site-wide microphone must stay off');
     assert.match(headers, /\/thing\/\*\n\s+! Permissions-Policy\n\s+Permissions-Policy: [^\n]*microphone=\(self\)/, '/thing/ must be allowed to record');
@@ -374,6 +374,6 @@ test('a line wears the colour of the bubble it was drawn from, and can carry an 
     for (const id of ['btn-undo', 'btn-redo', 'pickbar', 'btn-paste', 'f-colors2', 'btn-big', 'edge-bar', 'edge-dir', 'confirm']) assert.ok(html.includes('id="' + id + '"'), id + ' missing from the page');
 });
 test('an empty note goes away when it is closed', () => {
-    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
     assert.ok(js.includes('function closeIfEmpty') && js.includes("closeIfEmpty();\n    $('sheet').classList.remove"), 'closeSheet must discard an empty note first');
 });

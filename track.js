@@ -46,7 +46,7 @@
     // the office site either; everything else is the office site.
     // /thing/ is Stav's private tree — not traffic, so it is not counted.
     if (p.indexOf('/thing') === 0) return null;
-    if (p.indexOf('/sale') === 0 || p.indexOf('/ask') === 0 || p.indexOf('/checkups') === 0) return 'app';
+    if (p.indexOf('/sale') === 0 || p.indexOf('/ask') === 0) return 'app';
     if (p.indexOf('/zerem') === 0) return 'zerem';
     if (p.indexOf('/q/') === 0 || p === '/q') return 'quote';
     return 'site';

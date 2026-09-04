@@ -16,7 +16,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 
-const PAGES = ['sale/index.html', 'index.html', 'zerem/index.html', 'ask/index.html', 'checkups/index.html', 'q/index.html'];
+const PAGES = ['sale/index.html', 'index.html', 'zerem/index.html', 'ask/index.html', 'q/index.html'];
 
 test('no element id appears twice on any page', () => {
     const problems = [];

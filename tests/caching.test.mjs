@@ -5,7 +5,8 @@
 // an immutable file referenced without a version is a file a returning visitor
 // keeps for a year after it changed; a page that stops being no-cache is a
 // deploy that never arrives. These tests read _headers the way Cloudflare
-// does (every matching rule applies, the last one wins) and check both.
+// does (every matching rule applies and its values are APPENDED — an exception
+// must detach the header with `! Cache-Control` before setting no-cache) and check both.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
@@ -166,4 +167,14 @@ test('the marketing pages agree on one trimmed font link', () => {
     const url = [...links][0];
     assert.ok(!url.includes('Heebo'), 'Heebo is back on the marketing pages');
     assert.ok(url.includes('display=swap'), 'display=swap is gone');
+});
+
+// Cloudflare joins the values of every matching rule; it never replaces one.
+// A no-cache exception under an immutable glob therefore has to detach the
+// header first, or /sale/sw.js leaves as "immutable, no-cache".
+test('every no-cache exception detaches Cache-Control before setting it', () => {
+    const lines = readFileSync(new URL('../_headers', import.meta.url), 'utf8').split(/\r?\n/);
+    const bad = [];
+    lines.forEach((l, i) => { if (/^\s+Cache-Control:\s*no-cache/.test(l) && !/^\s+!\s*Cache-Control/.test(lines[i - 1] || '')) bad.push(i + 1); });
+    assert.deepEqual(bad, [], 'no-cache without a preceding "! Cache-Control" at lines ' + bad.join(', '));
 });

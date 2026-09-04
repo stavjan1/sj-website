@@ -90,54 +90,68 @@
 # wildcards above also match some of them, and the last rule wins. ----
 # Pages and page routes: a deploy must show on the next refresh in EVERY
 # browser (this is what killed the Edge/Safari stale-cache problem).
+# Every no-cache rule below detaches Cache-Control first: Cloudflare appends
+# the values of all matching rules (it does not replace), so without the
+# `!` line /sale/sw.js would leave with "immutable, no-cache" from the
+# /sale/*.js rule above.
 /
+  ! Cache-Control
   Cache-Control: no-cache
 /*.html
+  ! Cache-Control
   Cache-Control: no-cache
 /sale/
+  ! Cache-Control
   Cache-Control: no-cache
 /sale/index.html
+  ! Cache-Control
   Cache-Control: no-cache
 /thing/
+  ! Cache-Control
   Cache-Control: no-cache
 /thing/index.html
-  Cache-Control: no-cache
-/checkups/
-  Cache-Control: no-cache
-/checkups/index.html
-  Cache-Control: no-cache
-/checkups/app.js
+  ! Cache-Control
   Cache-Control: no-cache
 /ask/
+  ! Cache-Control
   Cache-Control: no-cache
 /ask/index.html
+  ! Cache-Control
   Cache-Control: no-cache
 /q/
+  ! Cache-Control
   Cache-Control: no-cache
 /zerem/
+  ! Cache-Control
   Cache-Control: no-cache
 
 # The service workers: the browser checks them on every navigation, and a
 # worker held for a year is an app frozen on that version.
 /sale/sw.js
+  ! Cache-Control
   Cache-Control: no-cache
 /thing/sw.js
+  ! Cache-Control
   Cache-Control: no-cache
 # /thing/manifest.webmanifest is a Function (it carries the key), not a file.
 /sale/manifest.webmanifest
+  ! Cache-Control
   Cache-Control: no-cache
 
 # Data files are fetched by bare name (sj-prices.core.json with cache:'no-cache',
 # sj-prices.json and stern-pricing.json without any ?v=), so a new price list
 # has to be able to arrive without a deploy of the app around it.
 /sale/data/*
+  ! Cache-Control
   Cache-Control: no-cache
 /sale/stern-pricing.json
+  ! Cache-Control
   Cache-Control: no-cache
 
 # Team portraits change while everything else in /assets/ is versioned by
 # filename. Revalidate each visit; unchanged is a 304, changed is the new face.
 /assets/team/*
+  ! Cache-Control
   Cache-Control: no-cache
 
 # The insight tree records voice notes. Site-wide the microphone is off (above);
