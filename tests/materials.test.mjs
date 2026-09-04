@@ -89,7 +89,9 @@ test('SKUs are unique', () => {
 // searches it had no business winning ("מפסק מוגן מים IP65" → two heaters).
 // The build cuts it; these canaries make sure a re-harvest cannot let it back.
 const MUST_NOT_SHIP = /SHARK|NINJA|Iphone|מייבש ידיים|מאוורר רצפה|מאוורר ריצפה|תנור אינפרא|רב מודד|Makita|סרט תואם דיימו|מולטימטר|קומקום חשמלי|מטען נייד/i;
-const MUST_SHIP = [/N2XY/, /מא"ז/, /^ממסר פחת/, /מאוורר תקרה/, /^שנאי/, /^גלאי עשן/, /^פעמון/];
+const MUST_SHIP = [/N2XY/, /מא"ז/, /^ממסר פחת/, /מאוורר תקרה/, /^שנאי/, /^גלאי עשן/, /^פעמון/,
+  // ...and the Gewiss/VEGA smart switches ERCO files under a weekend-sale promo bucket.
+  /^מפסק חכם/, /^מפסק לדוד .*WIFI/];
 
 test('consumer goods and tools are not in the catalog', () => {
   const leaked = db.items.filter((it) => MUST_NOT_SHIP.test(it.name));

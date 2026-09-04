@@ -149,7 +149,7 @@ export async function onRequestPost(context) {
   let by = null;
   if (body.named && typeof body.named === 'string') by = body.named.trim().slice(0, 40) || null;
 
-  const key = bucketKey(prof, job);
+  const key = bucketKey(job);
   let arr = [];
   try { arr = JSON.parse((await env.SJ_DATA.get(key)) || '[]'); } catch { arr = []; }
   arr.push({ p: Math.round(labor), t: Date.now(), by });

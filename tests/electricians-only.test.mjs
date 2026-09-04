@@ -44,6 +44,8 @@ function stripComments(src) {
 }
 
 const SALE_HTML = stripComments(read('sale/index.html'));
+const HOME_HTML = stripComments(read('index.html'));
+const SERVICES_HTML = stripComments(read('services.html'));
 const ZEREM_HTML = stripComments(read('zerem/index.html'));
 const LLMS = read('llms.txt');
 const APP = stripComments(readApp());
@@ -106,17 +108,27 @@ test('the stats pipeline has one bucket, whatever the client sends', () => {
     assert.ok(!/prof=/.test(APP), 'the client sends ?prof= again');
     assert.ok(!/\|\| 'general'/.test(APP), "the client falls back to a 'general' bucket again");
     assert.ok(!/<th>מקצוע<\/th>/.test(APP), 'the admin stats table shows a trade column again');
+    assert.match(STATS, /const key = bucketKey\(job\);/,
+        'the sample is not filed under the job the client sent');
+    assert.ok(!/bucketKey\(prof/.test(STATS),
+        'bucketKey is called with the old (prof, job) shape — the trade lands as the job and every sample goes to other');
 });
 
 test('the words a new user reads say electricians', () => {
     const banned = /לבעלי מקצוע|לאנשי מקצוע|קבלני שיפוצים|אינסטלט/;
-    for (const [name, text] of [['sale/index.html', SALE_HTML], ['zerem/index.html', ZEREM_HTML], ['llms.txt', LLMS]]) {
+    const pages = [
+        ['sale/index.html', SALE_HTML], ['zerem/index.html', ZEREM_HTML], ['llms.txt', LLMS],
+        ['index.html', HOME_HTML], ['services.html', SERVICES_HTML],
+    ];
+    for (const [name, text] of pages) {
         const hit = text.match(banned);
         assert.ok(!hit, `${name} still addresses another trade: "${hit && hit[0]}"`);
     }
     assert.match(SALE_HTML, /תמחור והצעות מחיר לחשמלאים/, 'the lock card no longer says who the product is for');
     assert.match(SALE_HTML, /הצעות המחיר החכמה לחשמלאים/, 'the About card no longer says who the product is for');
     assert.match(LLMS, /for electricians/, 'llms.txt no longer says who the product is for in English');
+    assert.match(HOME_HTML, /הצעות המחיר שלנו לחשמלאים/, 'the homepage promo no longer says who the product is for');
+    assert.match(SERVICES_HTML, /לחשמלאים: מערכת הצעות המחיר החכמה/, 'the services card no longer says who the product is for');
     assert.ok(!/ובהמשך גם/.test(LLMS), 'llms.txt promises other trades again');
     assert.ok(!/תחום עיסוק/.test(read('functions/api/assistant.js')),
         'the system helper directs users to a trade control that does not exist');

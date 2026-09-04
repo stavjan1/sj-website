@@ -241,9 +241,12 @@ DROP_CAT = (
         "פלטות שבת", "מכונות קרח ביתיות", "מגהצים", "מכונות תספורת",
         "מייבשי ידיים", "קטלני יתושים", "קטלנים", "קטלנים ומלכודות חרקים",
         "מקררים משרדיים", "מקררים ומקפיאים", "מנגלים ואביזרים",
-        "מוצרים לבית ולגינה", "מבצעי סופ''ש - מוצרים לבית ולגינה",
         "שואבי אבק SHARK", "NINJA",
     )), None),
+    # Not "מוצרים לבית ולגינה" or its weekend-sale twin: those are promo
+    # buckets, and the Gewiss/VEGA smart switches and the WiFi boiler switch
+    # were filed there next to the vacuum and the ream of paper. The junk in
+    # that bucket is caught by its own department or by name.
     ("phone/TV/computer accessories", frozenset((
         "אביזרי סלולר", "מסכי טלוויזיה ומחשב", "כבלי HDMI",
     )), None),
@@ -300,7 +303,7 @@ DROP_NAME = (
      re.compile(r"תנור חימום|תנור אינפרא|תנור פטריה|מפזר חום|רגל לתנור")),
     ("consumer batteries and junk by name",
      re.compile(r"גודל (?:VEGA )?LR|סוללת כפתור|CR2032|למכשירי שמיעה|"
-                r"נוזל ניקוי|פחית ריח|למנגל")),
+                r"נוזל ניקוי|פחית ריח|למנגל|נייר לבן|למדפסות")),
     ("power-tool brands by name",
      re.compile(r"makita|מקיטה|devon|milwaukee|מילווקי|dewalt|דיוולט|"
                 r"\bבוש\b", re.IGNORECASE)),
