@@ -57,6 +57,44 @@ export const MODEL_TRAPS = [
     mustNotSay: [],
     why: 'בלי מספר מודולים, פאזות ומספר מעגלים אין תמחור: יש ניחוש. תשובה טובה שואלת קודם.',
   },
+  // Round 3 (Stav, 4.9.2026): the chat must be terse and speak the trade's
+  // words. These four measure that — `maxChars` is a hard ceiling on the reply.
+  {
+    id: 'breaker-flip',
+    title: 'הרמתי מא"ז והלכתי',
+    prompt: 'הגעתי ללקוחה בלי חשמל, בתכלס רק הרמתי מא"ז בלוח והלכתי. כמה לקחת?',
+    mustSay: [/\b100\b|מאה/],
+    mustNotSay: [/\b3[05]0\b/],
+    maxChars: 260,
+    why: 'הכלל של סתיו: "נהוג לקחת 100." ושורה אחת למה. לא 350 של ביקור, ולא חינם.',
+  },
+  {
+    id: 'visit-term',
+    title: 'ביקור — המונח של החשמלאים',
+    prompt: 'לקוח קרא לי כי אין חשמל בחדר. לקח לי 40 דקות למצוא חוט שרוף בקופסה ולתקן. כמה?',
+    mustSay: [/ביקור|הגעה/, /\d{3}/],
+    mustNotSay: [],
+    maxChars: 320,
+    why: 'קריאה אמיתית = ביקור (מחיר הביקור של המשתמש) + הזמן. תשובה קצרה, במונח של הענף.',
+  },
+  {
+    id: 'chase-concrete',
+    title: 'חציבה בבטון — לא מחיר של מכרז',
+    prompt: 'חציבה בבטון 3 מטר לקו חדש, בלי הכבל. כמה?',
+    mustSay: [/\d{3,4}/],
+    mustNotSay: [/\b50\b ?₪|\b50 שקל|\b150\b ?₪/],
+    maxChars: 320,
+    why: 'מטר חציבה בבטון הוא כשעה של עבודה קשה: מאות שקלים למטר, לא ה-50 של מחירון מכרזים.',
+  },
+  {
+    id: 'terse-socket',
+    title: 'נקודת שקע — מספר קודם',
+    prompt: 'כמה לנקודת שקע חדשה בקיר בלוקים, כולל חציבה ותיקון?',
+    mustSay: [/\d{3}/],
+    mustNotSay: [/^\s*(בשמחה|כמובן|שלום)/],
+    maxChars: 260,
+    why: 'המספר קודם, שורה אחת הסבר לכל היותר, בלי פתיחים.',
+  },
 ];
 
 // Screen one answer against one trap. Returns { pass, failed: [reasons] }.
@@ -69,5 +107,6 @@ export function scoreTrap(trap, answer) {
   for (const re of trap.mustNotSay || []) {
     if (re.test(text)) failed.push('קפץ ישר למחיר בלי לתקן');
   }
+  if (trap.maxChars && text.length > trap.maxChars) failed.push(`ארוך מדי (${text.length} תווים, מותר ${trap.maxChars})`);
   return { pass: failed.length === 0, failed };
 }

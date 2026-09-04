@@ -958,6 +958,16 @@ function modelsPanelHtml(d) {
         </div>`;
 }
 
+// What the app itself puts in front of every pricing question, so the eval
+// judges the model the way a customer meets it. Each block is optional here
+// because the admin screen can outlive a renamed helper.
+function evalSystemBlocks() {
+    const parts = [];
+    for (const fn of ['getProfessionSystemInstruction', 'getSjPriceBlock', 'getConciseRuleBlock', 'getSternLaborPromptBlock']) {
+        try { if (typeof window[fn] === 'function') parts.push(String(window[fn]() || '')); } catch (e) { /* a block that throws is a block we do not send */ }
+    }
+    return parts.join(String.fromCharCode(10) + String.fromCharCode(10)).slice(0, 24000);
+}
 async function runModelTraps(which) {
     const sel = document.getElementById('mdl-' + which);
     const box = document.getElementById('mdl-results');
@@ -968,7 +978,7 @@ async function runModelTraps(which) {
         const res = await adminRes('/api/model-eval', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model })
+            body: JSON.stringify({ system: evalSystemBlocks(), model })
         });
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
@@ -984,7 +994,7 @@ async function runModelTraps(which) {
                 <details><summary>מה הוא ענה</summary><pre>${escapeHtml(r.excerpt)}</pre></details>
             </div>`).join('');
         box.innerHTML = `<div class="mdl-score ${d.passed === d.total ? 'ok' : 'bad'}">
-                ${escapeHtml(d.model)} · עבר ${d.passed} מתוך ${d.total} · ${d.avgMs} ms בממוצע
+                ${escapeHtml(d.model)} · עבר ${d.passed} מתוך ${d.total} · ${d.avgMs} ms · ${d.avgChars || 0} תווים בממוצע
             </div>${rows}
             <p class="input-help">המלכודות מסננות כשלים שכבר ראינו, הן לא תעודת איכות. עבר = שווה מבט אנושי, לא "מאושר".</p>`;
     } catch (e) {

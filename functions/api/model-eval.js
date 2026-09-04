@@ -87,6 +87,10 @@ export async function onRequestPost(context) {
   try { body = await request.json(); } catch { return jsonResponse({ error: { message: 'בקשה לא תקינה.' } }, 400); }
   const model = String(body.model || '').trim();
   if (!model) return jsonResponse({ error: { message: 'לא נבחר מודל.' } }, 400);
+  // The admin screen sends the very system blocks the app builds client-side
+  // (persona, SJ price book, the concise rule), so the eval measures the model
+  // under the prompt customers get — not the bare pricing map. Admin-only, capped.
+  const clientSystem = String(body.system || '').slice(0, 24000);
   if (!PROVIDERS.gemini.models.includes(model)) {
     return jsonResponse({ error: { message: 'מודל לא מוכר לשרת: ' + model } }, 400);
   }
@@ -112,6 +116,7 @@ export async function onRequestPost(context) {
         provider: 'gemini',
         model,
         messages: [
+          ...(clientSystem ? [{ role: 'system', content: clientSystem }] : []),
           { role: 'system', content: await getPricingMap(env) },
           { role: 'system', content: renderQuoteChecklist() },
           { role: 'user', content: trap.prompt },
@@ -131,6 +136,7 @@ export async function onRequestPost(context) {
       id: trap.id, title: trap.title, why: trap.why,
       pass: score.pass, failed: score.failed, error,
       ms: Date.now() - started,
+      chars: answer.length,
       excerpt: answer.slice(0, 400),
     });
   }
@@ -139,6 +145,7 @@ export async function onRequestPost(context) {
   return jsonResponse({
     ok: true, model, passed, total: results.length,
     avgMs: Math.round(results.reduce((s, r) => s + r.ms, 0) / (results.length || 1)),
+    avgChars: Math.round(results.reduce((s, r) => s + (r.chars || 0), 0) / (results.length || 1)),
     results,
   });
 }
