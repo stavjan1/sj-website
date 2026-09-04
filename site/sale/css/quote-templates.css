@@ -2023,3 +2023,27 @@
     border: 1px solid #c3cbd6; background: #f7f9fb; padding: 9px 12px; margin-block-start: 10px;
 }
 .quote-sheet.tpl-engineer .pdf-terms-box { border: 1px solid #d5dce5; padding: 8px 10px; }
+
+/* ── The VAT lines around the total, per template ─────────────────────────────
+   The default sheet centres them under the price row; the three themes set
+   their own price row flush (space-between), so the small lines follow the
+   same edge or they read as a different column. */
+.quote-sheet.tpl-classic .pdf-price-line {
+    justify-content: space-between; min-width: 54%; font-size: 0.82em; color: var(--tpl-ink-3);
+}
+.quote-sheet.tpl-classic .pdf-price-line.is-strong { color: var(--tpl-ink); }
+.quote-sheet.tpl-classic .pdf-price-num { font-family: var(--tpl-num); font-variant-numeric: tabular-nums; }
+
+.quote-sheet.tpl-minimal .pdf-price-line {
+    justify-content: space-between; font-size: 0.78em; font-weight: 400; letter-spacing: 0.02em; color: var(--q-mute);
+}
+.quote-sheet.tpl-minimal .pdf-price-line.is-strong { font-weight: 500; color: inherit; }
+.quote-sheet.tpl-minimal .pdf-price-num { font-family: inherit; font-variant-numeric: tabular-nums; }
+
+.quote-sheet.tpl-engineer .pdf-price-line {
+    justify-content: space-between; padding: 2px 10px; font-size: 0.86em; font-weight: 600; color: var(--eng-ink-2);
+    border-inline: 1px solid var(--eng-grid);
+}
+.quote-sheet.tpl-engineer .pdf-price-line.is-strong { color: var(--eng-ink); }
+.quote-sheet.tpl-engineer .pdf-price-num { font-family: var(--eng-figures); font-variant-numeric: tabular-nums lining-nums; }
+.quote-sheet.tpl-engineer .pdf-price-lines { margin-bottom: 0; gap: 0; }

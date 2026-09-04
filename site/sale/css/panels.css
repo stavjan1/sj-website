@@ -6286,3 +6286,54 @@ th.pv-price { text-align: end; }
     .pt-cols-extra, .pt-row-extra { grid-template-columns: 44px minmax(0, 1fr) 96px 128px 84px; }
     .pt-cols-labor, .pt-row-labor { grid-template-columns: minmax(0, 1fr) 110px 84px 44px; }
 }
+
+/* ============================================================================
+   The quote screen, 4.9.2026: the consumables switch in the materials header,
+   the private/business chips in the editor, and the two quiet panels at the
+   end of the pricing tab (notes, tools and materials).
+   ============================================================================ */
+.pt-cons {
+    display: inline-flex; align-items: center; gap: var(--sp-1);
+    padding: 0 var(--sp-2) 0 0; border: 1px solid var(--border); border-radius: var(--r-pill);
+    font: 600 var(--fs-xs) var(--font-ui); color: var(--text-3); cursor: pointer; user-select: none;
+}
+.pt-cons.on { color: var(--accent); border-color: var(--accent-soft); background: var(--accent-soft); }
+.pt-cons .pt-cons-pct {
+    width: 3.2em; padding: 2px 4px; text-align: center;
+    border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--text);
+    font: 600 var(--fs-xs) var(--font-ui);
+}
+.pt-cons .pt-cons-pct:disabled { opacity: .5; }
+.ptf-cons { color: var(--text-3); }
+
+.cust-type { display: inline-flex; gap: 2px; margin-block-start: var(--sp-2); background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-pill); padding: 2px; }
+
+.pt-quiet { display: inline-flex; gap: var(--sp-1); margin-inline-start: auto; }
+.pt-quiet-btn {
+    background: none; border: 1px solid transparent; border-radius: var(--r-sm); cursor: pointer;
+    padding: var(--sp-1) var(--sp-2); font: 500 var(--fs-xs) var(--font-ui); color: var(--text-3);
+    display: inline-flex; align-items: center; gap: var(--sp-1);
+}
+.pt-quiet-btn:hover, .pt-quiet-btn[aria-expanded="true"] { color: var(--text); border-color: var(--border); background: var(--surface-2); }
+
+/* The side panels reuse .stern-drawer for the slide; only the inside is theirs. */
+.pt-side .drawer-body { display: flex; flex-direction: column; gap: var(--sp-3); }
+.pt-side-help { margin: 0; }
+.pt-side-h { margin: var(--sp-2) 0 0; font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
+.pt-side-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--sp-1); }
+.pt-side-list li { padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); font-size: var(--fs-sm); color: var(--text-2); }
+.pt-side-list li small { color: var(--text-3); }
+.pt-side-check { display: flex; align-items: flex-start; gap: var(--sp-2); cursor: pointer; }
+.pt-side-check input { margin: 3px 0 0; flex: none; }
+.pt-side-empty { color: var(--text-3); font-size: var(--fs-sm); }
+.pt-side-label { font-size: var(--fs-xs); font-weight: 600; color: var(--text-2); }
+.pt-side textarea { width: 100%; resize: vertical; }
+
+@media (pointer: coarse) {
+    .pt-quiet-btn, .pt-side-close { min-height: 44px; min-width: 44px; }
+    .pt-cons { min-height: 44px; }
+    .pt-cons .pt-cons-pct { min-height: 36px; }
+    .cust-type .pt-mode { min-height: 44px; }
+    .pt-side-check { min-height: 44px; align-items: center; }
+    .pt-side-check input { width: 22px; height: 22px; margin: 0; }
+}

@@ -364,7 +364,8 @@ function initNewQuote() {
         vatType: 'exclude',
         finalPrice: 0,
         summary: appState.settings.businessDetails.terms,
-        showItemizedPrices: false
+        showItemizedPrices: false,
+        customerType: 'private'
     };
     
     fillFormFromState();
@@ -552,31 +553,97 @@ function calculateItemizedTotal() {
 const VAT_RATE = 0.18;
 const VAT_PCT = Math.round(VAT_RATE * 100);
 
+// The three numbers behind every total: net, VAT, gross. 'exclude' adds VAT
+// to the base, 'include' peels it out of the base, 'exempt' has none.
+function quoteVatSplit(basePrice, vatType) {
+    const base = Number(basePrice) || 0;
+    if (vatType === 'exclude') return { net: base, vat: base * VAT_RATE, gross: base * (1 + VAT_RATE) };
+    if (vatType === 'include') { const net = base / (1 + VAT_RATE); return { net, vat: base - net, gross: base }; }
+    return { net: base, vat: 0, gross: base };
+}
+
+// Who is paying. A household reads one number — what it hands over, VAT in;
+// a business books the net and adds VAT itself. Default private, because
+// most callers are households. Stored on the quote next to the client name.
+function customerTypeOf(q) {
+    return q && q.customerType === 'business' ? 'business' : 'private';
+}
+
+// What the document shows for the money: which number is the big one, and
+// the small lines around it. Pure — the DOM writer below reads it, and so
+// do the tests.
+function quoteTotalsLayout(basePrice, vatType, customerType) {
+    const s = quoteVatSplit(basePrice, vatType);
+    const nis = (n) => formatPriceString(Number(Number(n).toFixed(2))) + ' ש"ח';
+    const vatLine = { label: `מע"מ ${VAT_PCT}%`, value: nis(s.vat) };
+    if (vatType !== 'exclude' && vatType !== 'include') {
+        return { big: s.gross, bigLabel: 'סה"כ לתשלום:', above: [], below: [],
+                 vatLabel: 'פטור ממע"מ (עוסק פטור)', showVatLabel: true };
+    }
+    if (customerType === 'business') {
+        return {
+            big: s.net, bigLabel: 'סה"כ לפני מע"מ:',
+            above: [],
+            below: [vatLine, { label: 'סה"כ כולל מע"מ', value: nis(s.gross), strong: true }],
+            // Read by the share link and the WhatsApp text next to finalPrice
+            // (the gross), so it must describe the gross — the sheet itself
+            // hides it, the lines above already say it.
+            vatLabel: `כולל מע"מ ${VAT_PCT}% (לפני מע"מ: ${nis(s.net)})`,
+            showVatLabel: false,
+        };
+    }
+    return {
+        big: s.gross, bigLabel: 'סה"כ לתשלום כולל מע"מ:',
+        above: [{ label: 'לפני מע"מ', value: nis(s.net) }, vatLine],
+        below: [],
+        vatLabel: `כולל מע"מ ${VAT_PCT}%`,
+        showVatLabel: true,
+    };
+}
+
+function renderQuoteTotals(layout) {
+    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    const lines = (id, rows) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.innerHTML = rows.map((r) =>
+            `<div class="pdf-price-line${r.strong ? ' is-strong' : ''}"><span>${escapeHtml(r.label)}</span><span class="pdf-price-num">${escapeHtml(r.value)}</span></div>`).join('');
+        el.hidden = !rows.length;
+    };
+    setTxt('pdf-total-label', layout.bigLabel);
+    setTxt('pdf-total-price', formatPriceString(Number(Number(layout.big).toFixed(2))) + ' ש"ח');
+    lines('pdf-price-above', layout.above);
+    lines('pdf-price-below', layout.below);
+    const vl = document.getElementById('pdf-vat-label');
+    if (vl) { vl.textContent = layout.vatLabel; vl.hidden = !layout.showVatLabel; }
+    const chips = document.querySelectorAll('#form-customer-type [data-type]');
+    chips.forEach((b) => b.classList.toggle('on', b.dataset.type === customerTypeOf(appState.currentQuote)));
+}
+
+function setCustomerType(type) {
+    appState.currentQuote.customerType = type === 'business' ? 'business' : 'private';
+    calculateTotal();
+}
+
 function calculateTotal() {
     const basePriceInput = document.getElementById('form-base-price').value;
     const basePrice = parseFloat(basePriceInput) || 0;
     const vatType = document.getElementById('form-vat-type').value;
 
-    let finalPrice = basePrice;
-    let vatLabel = 'פטור ממע"מ (עוסק פטור)';
+    // finalPrice keeps its meaning: what the customer pays (VAT in when
+    // there is VAT). The share link, the WhatsApp text and the invoice all
+    // read it, and the customer type only changes which number is printed big.
+    const split = quoteVatSplit(basePrice, vatType);
+    const roundedPrice = Number(split.gross.toFixed(2));
 
-    if (vatType === 'exclude') {
-        finalPrice = basePrice * (1 + VAT_RATE);
-        vatLabel = `לא כולל מע"מ (נוסף ${VAT_PCT}% מע"מ)`;
-    } else if (vatType === 'include') {
-        vatLabel = `כולל מע"מ (בשיעור ${VAT_PCT}%)`;
-    }
-    
-    const roundedPrice = Number(finalPrice.toFixed(2));
-    
     document.getElementById('form-final-price').value = formatPriceString(roundedPrice) + ' ש"ח';
-    document.getElementById('pdf-total-price').textContent = formatPriceString(roundedPrice) + ' ש"ח';
-    document.getElementById('pdf-vat-label').textContent = vatLabel;
-    
+    renderQuoteTotals(quoteTotalsLayout(basePrice, vatType, customerTypeOf(appState.currentQuote)));
+
     appState.currentQuote.basePrice = basePriceInput;
     appState.currentQuote.vatType = vatType;
     appState.currentQuote.finalPrice = roundedPrice;
-    
+    appState.currentQuote.customerType = customerTypeOf(appState.currentQuote);
+
     syncCurrentQuoteToProject();
 }
 
