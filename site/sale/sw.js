@@ -2,7 +2,7 @@
 // Purpose: make the app installable (PWA) and let the shell open instantly,
 // including offline at a job site (the user's data lives in localStorage
 // anyway). AI calls and cloud sync (/api/*) are ALWAYS network-only.
-const CACHE = 'zerem-shell-v382';
+const CACHE = 'zerem-shell-v383';
 
 // The typeface and the icons come from other people's servers, and at a job
 // site there is no reception to fetch them with. Without them the app is a wall
@@ -16,6 +16,13 @@ const CACHE = 'zerem-shell-v382';
 // v2: wiped once in V3.0.1 — a stale/poisoned cached font response could leave
 // the icon font permanently broken on a device, and this cache never expires.
 const CDN_CACHE = 'zerem-cdn-v2';
+// The pages reference every script and stylesheet as name?v=NNN and the edge
+// caches each URL for a year. The BARE name is therefore a year-old copy at
+// the edge, so the precache must ask for the versioned URL — cache:'reload'
+// only skips the browser's cache, not Cloudflare's. Bumped with every deploy
+// together with the pages (tests/site.test.mjs checks they agree).
+const ASSET_QUERY = '?v=512';
+const versioned = (u) => (/\.(js|css|json|webmanifest)$/.test(u) ? u + ASSET_QUERY : u);
 const CDN_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com'];
 const SHELL = [
   '/sale/',
@@ -56,7 +63,7 @@ self.addEventListener('install', (e) => {
   // cache: 'reload' — the shell is fetched past the browser's HTTP cache. The
   // versioned URLs the page uses are immutable for a year, and these bare
   // names would otherwise be answered from that cache with a stale body.
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(versioned(u), { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {

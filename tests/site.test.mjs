@@ -560,3 +560,19 @@ test('/checkups/ redirects into the app, and nothing links to it any more', () =
     const linking = files.filter((f) => link.test(readFileSync(join(ROOT, f), 'utf8')));
     assert.deepEqual(linking, [], 'these still link to the retired page');
 });
+
+// The service workers precache name?v=NNN (the bare name is a year-old edge
+// copy). They must carry the same version as every page, or a bump ships a
+// worker that precaches yesterday's script.
+test('the service workers precache the same asset version as the pages', () => {
+    const html = readFileSync(new URL('../site/index.html', import.meta.url), 'utf8');
+    const v = (html.match(/\?v=(\d+)/) || [])[1];
+    assert.ok(v, 'no ?v= on the home page');
+    for (const sw of ['../site/sale/sw.js', '../site/thing/sw.js']) {
+        const src = readFileSync(new URL(sw, import.meta.url), 'utf8');
+        const m = src.match(/const ASSET_QUERY = '\?v=(\d+)'/);
+        assert.ok(m, sw + ' has no ASSET_QUERY');
+        assert.equal(m[1], v, sw + ' precaches ?v=' + m[1] + ' while the pages are at ?v=' + v);
+        assert.ok(/versioned\(u\)/.test(src), sw + ' must precache the versioned URL');
+    }
+});
