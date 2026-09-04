@@ -95,7 +95,7 @@
     maxUserMessages: 40,
     // No user-facing model picker — the server picks the engine and auto-falls-back
     // (Gemini → DeepSeek → Grok → Cloudflare) when one runs out.
-    defaultModel: 'gemini|gemini-2.5-flash',
+    defaultModel: 'gemini|gemini-3.6-flash',
     providerLabels: { gemini: 'Gemini', deepseek: 'DeepSeek', grok: 'Grok', cloudflare: 'Cloudflare' },
   };
 

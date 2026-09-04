@@ -321,3 +321,13 @@ test('the browser never asks for a Gemini model Google has retired', () => {
     assert.ok(!/'gemini\|gemini-2\.5-flash'/.test(code), `${f} still defaults to a retired model`);
   }
 });
+
+// Google retired gemini-2.5-flash in Aug 2026; a URL or default that still names
+// it is a 404 waiting for a user (the tree's auto-title and the bring-your-own-key path had one).
+test('no live call names the retired model', () => {
+    const files = ['site/sale/app.js', 'functions/api/thing.js', 'site/assistant.js', 'functions/api/_tiers.js'];
+    for (const f of files) {
+        const src = readFileSync(new URL('../' + f, import.meta.url), 'utf8').split(/\r?\n/).filter((l) => !l.trim().startsWith('//')).join(' ');
+        assert.ok(!src.includes('gemini-2.5-flash'), f + ' still names gemini-2.5-flash');
+    }
+});
