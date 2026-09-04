@@ -1,6 +1,6 @@
 # CSP verification
 
-The `Content-Security-Policy` in `/_headers` is enforcing. If it is wrong, real
+The `Content-Security-Policy` in `site/_headers` is enforcing. If it is wrong, real
 features break in production silently — a blocked call just fails. These two
 scripts prove the policy is correct **before** it ships.
 

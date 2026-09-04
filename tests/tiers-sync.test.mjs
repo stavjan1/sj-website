@@ -53,7 +53,7 @@ test('the landing page sells the plans the app actually gives', () => {
     // for months. A landing page that oversells by one number is not marketing,
     // it is the first broken promise a new user meets: he opens the fourth job
     // and hits a wall nobody warned him about.
-    const raw = readFileSync(new URL('../zerem/index.html', import.meta.url), 'utf8');
+    const raw = readFileSync(new URL('../site/zerem/index.html', import.meta.url), 'utf8');
     // Scan the PAGE, not the notes about it. A comment explaining which claim
     // was removed contains that claim, and a test that reads it fails on the
     // very fix it is guarding.

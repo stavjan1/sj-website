@@ -16,7 +16,7 @@ import { createContext, runInContext } from 'node:vm';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const APP = readApp();
-const COVERAGE_SRC = readFileSync(join(ROOT, 'sale', 'coverage.js'), 'utf8');
+const COVERAGE_SRC = readFileSync(join(ROOT, 'site', 'sale', 'coverage.js'), 'utf8');
 // Cut the checklists object specifically: the file also declares the standard
 // defaults after it, so "from the first = to the last ;" now spans both.
 const cut = (name) => {

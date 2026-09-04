@@ -18,7 +18,7 @@ import { createContext, runInContext } from 'node:vm';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const APP = readApp();
-const HTML = readFileSync(join(ROOT, 'sale', 'index.html'), 'utf8');
+const HTML = readFileSync(join(ROOT, 'site', 'sale', 'index.html'), 'utf8');
 
 // One function's source, ending at its own closing brace rather than at an
 // arbitrary character count — a fixed window runs into the NEXT function and
@@ -187,7 +187,7 @@ test('nothing re-exports a global function as a wrapper around itself', () => {
   //
   // Found by running the deployed page. Reading the source had not caught it in
   // however long the line had been there.
-  for (const src of [APP, readFileSync(join(ROOT, 'sale', 'finance.js'), 'utf8')]) {
+  for (const src of [APP, readFileSync(join(ROOT, 'site', 'sale', 'finance.js'), 'utf8')]) {
     // Code only: the comment above quotes the broken line deliberately, and a
     // test that fails on its own explanation is a test nobody keeps.
     const code = src.split(/\r?\n/).filter((l) => !l.trimStart().startsWith('//')).join('\n');
@@ -200,7 +200,7 @@ test('exactly one button offers to reconnect', () => {
   // The funnel card built its own. Two buttons doing the same job is confusing
   // on its own, and the funnel's would have refreshed the funnel alone —
   // leaving the other six cards as empty as they were before the click.
-  const FIN = readFileSync(join(ROOT, 'sale', 'finance.js'), 'utf8');
+  const FIN = readFileSync(join(ROOT, 'site', 'sale', 'finance.js'), 'utf8');
   assert.ok(!/adminAuthHtml\(/.test(FIN), 'the funnel still renders its own sign-in panel');
   assert.ok(/window\.adminErrorHtml/.test(FIN), 'the funnel does not use the shared failure');
 

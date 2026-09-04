@@ -16,7 +16,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 
-const PAGES = ['sale/index.html', 'index.html', 'zerem/index.html', 'ask/index.html', 'q/index.html'];
+const PAGES = ['site/sale/index.html', 'site/index.html', 'site/zerem/index.html', 'site/ask/index.html', 'site/q/index.html'];
 
 test('no element id appears twice on any page', () => {
     const problems = [];
@@ -35,13 +35,13 @@ test('no element id appears twice on any page', () => {
 test('every control that fires the quote-writer is locked together', () => {
     // Two buttons call exportChatToQuote. Whatever their ids, the handler must
     // disable ALL of them, or the twin stays live while a request is in flight.
-    const html = readFileSync(new URL('../sale/index.html', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../site/sale/index.html', import.meta.url), 'utf8');
     const triggers = (html.match(/exportChatToQuote/g) || []).length;
     const marked = (html.match(/js-export-to-quote/g) || []).length;
     assert.equal(marked, triggers,
         'a control fires the quote-writer without the class the handler uses to lock them all');
 
-    const chat = readFileSync(new URL('../sale/chat.js', import.meta.url), 'utf8');
+    const chat = readFileSync(new URL('../site/sale/chat.js', import.meta.url), 'utf8');
     const i = chat.indexOf('async function exportChatToQuote');
     // A generous window: the function is long, and matching its closing brace
     // by scanning for the first one lands inside a nested block.

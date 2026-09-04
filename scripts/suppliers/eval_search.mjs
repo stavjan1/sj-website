@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path';
 import { hydrate, searchMaterials } from '../../functions/api/_materials.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const db = hydrate(JSON.parse(readFileSync(join(ROOT, 'data/materials/index.json'), 'utf8')));
+const db = hydrate(JSON.parse(readFileSync(join(ROOT, 'site/data/materials/index.json'), 'utf8')));
 
 const QUERIES = process.argv.slice(2).length ? process.argv.slice(2) : [
   'כבל N2XY 5x6 לעמדת טעינה',

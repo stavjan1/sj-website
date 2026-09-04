@@ -14,7 +14,7 @@ import { dirname, join } from 'node:path';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (f) => readFileSync(join(ROOT, f), 'utf8');
 const API = read('functions/api/admin-convos.js');
-const ADMIN = read('sale/admin.js');
+const ADMIN = read('site/sale/admin.js');
 
 test('the gate is the first thing that happens, and nothing writes', () => {
     // Order matters literally: any read of SJ_DATA that could be reached before
@@ -55,7 +55,7 @@ test('what the app hides from the user is not shown to the operator', () => {
     const body = fn.slice(0, fn.indexOf('\n}'));
     assert.match(body, /indexOf\('```'\)/, 'turnText stopped cutting the hidden block');
     // The same cut the client makes, so the two cannot drift.
-    const chat = read('sale/chat.js');
+    const chat = read('site/sale/chat.js');
     assert.match(chat, /function visibleChatText[\s\S]{0,220}indexOf\('```'\)/,
         'the client-side cut moved — the server copy of this rule needs to move with it');
 });
@@ -110,7 +110,7 @@ test('the terms tell users this screen exists', () => {
     // document that governs ZEREM is zerem/terms.html — privacy.html points at
     // it — and its section 5 used to license processing "for providing the
     // service ONLY", which this is not.
-    const terms = read('zerem/terms.html');
+    const terms = read('site/zerem/terms.html');
     assert.match(terms, /עיון בשיחות עם הסוכן/,
         'the terms no longer disclose that the operator can read stored conversations');
     assert.match(terms, /ועיון של המפעיל בשיחות עם הסוכן/,

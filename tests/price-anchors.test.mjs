@@ -15,7 +15,7 @@ import { readApp } from './_app-source.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MAP = readFileSync(join(ROOT, 'functions', 'api', '_pricing_map.js'), 'utf8');
-const BOOK = JSON.parse(readFileSync(join(ROOT, 'sale', 'stern-pricing.json'), 'utf8'));
+const BOOK = JSON.parse(readFileSync(join(ROOT, 'site', 'sale', 'stern-pricing.json'), 'utf8'));
 const APP = readApp();
 
 test('the map and the labour book agree on what a point costs', () => {

@@ -19,8 +19,8 @@ import {
 } from '../functions/api/_materials.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const INDEX_PATH = join(ROOT, 'data', 'materials', 'index.json');
-const FULL_PATH = join(ROOT, 'data', 'materials', 'erco.json');
+const INDEX_PATH = join(ROOT, 'site', 'data', 'materials', 'index.json');
+const FULL_PATH = join(ROOT, 'site', 'data', 'materials', 'erco.json');
 
 const raw = JSON.parse(readFileSync(INDEX_PATH, 'utf8'));
 const db = hydrate(raw);

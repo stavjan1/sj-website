@@ -15,13 +15,13 @@ import { extract } from '../scripts/build_coverage_data.mjs';
 import { detectJobType, renderCoverageBlock } from '../functions/api/_coverage.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const shipped = JSON.parse(readFileSync(join(ROOT, 'data', 'coverage', 'checklists.json'), 'utf8'));
+const shipped = JSON.parse(readFileSync(join(ROOT, 'site', 'data', 'coverage', 'checklists.json'), 'utf8'));
 
 test('the shipped mirror matches the authored source', () => {
   // Regenerate from sale/coverage.js and compare. This is the whole point of
   // the file existing: it is derived data, and derived data that can drift is
   // a second source of truth nobody declared.
-  const fresh = extract(readFileSync(join(ROOT, 'sale', 'coverage.js'), 'utf8'));
+  const fresh = extract(readFileSync(join(ROOT, 'site', 'sale', 'coverage.js'), 'utf8'));
   // Compared as serialized text rather than deepEqual: the two objects come
   // from different realms (one from JSON.parse, one built inside a vm context),
   // and deepStrictEqual treats their prototypes as different even when every

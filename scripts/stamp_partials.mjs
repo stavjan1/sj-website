@@ -1,5 +1,5 @@
 // Stamps the shared header / footer / theme-bootstrap fragments into every
-// marketing page at the repo root.
+// marketing page under site/ (the web root).
 //
 // The site is static HTML with no build step, so the header was pasted into
 // eleven pages by hand and the eleven copies drifted (a link added on one page
@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join, basename } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const SITE = join(ROOT, 'site');
 export const PARTIALS = ['theme', 'header', 'footer'];
 const CTA_DEFAULT = 'contact.html';
 
@@ -74,19 +75,19 @@ export function stamp(html, page) {
 }
 
 export function pages() {
-    return readdirSync(ROOT).filter((f) => f.endsWith('.html'));
+    return readdirSync(SITE).filter((f) => f.endsWith('.html'));
 }
 
 function main() {
     let changed = 0;
     for (const page of pages()) {
-        const raw = readFileSync(join(ROOT, page), 'utf8');
+        const raw = readFileSync(join(SITE, page), 'utf8');
         const before = nl(raw);
         if (!before.includes('<!-- partial:')) continue;
         const after = stamp(before, basename(page));
         if (after === before) continue;
         // Keep whatever line ending the checkout uses (git autocrlf on Windows).
-        writeFileSync(join(ROOT, page), raw.includes('\r\n') ? after.replace(/\n/g, '\r\n') : after);
+        writeFileSync(join(SITE, page), raw.includes('\r\n') ? after.replace(/\n/g, '\r\n') : after);
         changed++;
         console.log('stamped', page);
     }

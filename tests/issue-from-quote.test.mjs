@@ -72,7 +72,7 @@ test('a locked user is sold the plan and nothing moves', () => {
 });
 
 test('every control that issues a document is on the quote screen and gated', () => {
-    const html = readFileSync(new URL('../sale/index.html', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../site/sale/index.html', import.meta.url), 'utf8');
     const calls = (html.match(/issueDocFromQuote\(/g) || []).length;
     assert.ok(calls >= 2, 'the issue buttons are gone from the quote screen');
     // PROJECT_RAIL_DOCS was declared for this and referenced from nowhere for

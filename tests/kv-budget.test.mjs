@@ -63,7 +63,7 @@ test('a failed cloud save reaches the user instead of escaping as a 502', () => 
         'the cloud write is unguarded again — an exhausted budget throws out of the Function');
     assert.match(data, /503/, 'the cloud save no longer answers with a status the client can act on');
 
-    const app = readFileSync(new URL('../sale/app.js', import.meta.url), 'utf8');
+    const app = readFileSync(new URL('../site/sale/app.js', import.meta.url), 'utf8');
     const j = app.indexOf('async function cloudSaveNow');
     const fn = app.slice(j, j + 2600);
     assert.match(fn, /res\.status === 503/,

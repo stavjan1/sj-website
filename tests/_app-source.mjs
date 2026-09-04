@@ -11,12 +11,12 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // In load order, which is also the order the browser sees them.
 export const APP_FILES = [
-    'sale/app.js',
-    'sale/chat.js',
-    'sale/checkups.js',
-    'sale/market.js',
-    'sale/reports.js',
-    'sale/admin.js', 'sale/helper.js',
+    'site/sale/app.js',
+    'site/sale/chat.js',
+    'site/sale/checkups.js',
+    'site/sale/market.js',
+    'site/sale/reports.js',
+    'site/sale/admin.js', 'site/sale/helper.js',
 ];
 
 export function readApp() {

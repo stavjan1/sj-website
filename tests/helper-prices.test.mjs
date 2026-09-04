@@ -58,8 +58,8 @@ test('the seed list prices work, never materials, and every row has a unit', () 
 });
 
 test('the screen exists in the shell, the offline cache and the rail', () => {
-    const html = readFileSync(new URL('../sale/index.html', import.meta.url), 'utf8');
-    const sw = readFileSync(new URL('../sale/sw.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../site/sale/index.html', import.meta.url), 'utf8');
+    const sw = readFileSync(new URL('../site/sale/sw.js', import.meta.url), 'utf8');
     assert.ok(html.includes('id="panel-helper"'), 'no helper panel in the markup');
     assert.ok(html.includes('id="tab-helper"') && /id="tab-helper"[^>]*hidden/.test(html), 'the rail button must start hidden — the server decides who sees it');
     assert.ok(/helper\.js\?v=\d+/.test(html), 'helper.js is not loaded');
@@ -80,18 +80,18 @@ test('the helper list is the basics first, the catalogue behind search, and no m
     const ids = new Set([...basics, ...cat].map((it) => it.id)); assert.equal(ids.size, basics.length + cat.length, 'ids collide');
 });
 test('a friend has a door, a reason on the lock card, and a way in when he is not a helper yet', () => {
-    const redirects = readFileSync(new URL('../_redirects', import.meta.url), 'utf8');
+    const redirects = readFileSync(new URL('../site/_redirects', import.meta.url), 'utf8');
     assert.match(redirects, /^\/help\s+\/sale\/\?panel=helper\s+302/m, '/help must open the helper screen');
-    const html = readFileSync(new URL('../sale/index.html', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../site/sale/index.html', import.meta.url), 'utf8');
     assert.ok(html.includes('id="tab-helper"') && !html.includes('tab-helper-rail'), 'the rail button id must match #tab-<panel> so it lights up');
     assert.ok(html.includes('id="lock-helper-note"'), 'the lock card must say why the friend is here');
     assert.ok(html.includes('id="helper-privacy"'), 'who sees what must be written on the screen');
-    const js = readFileSync(new URL('../sale/helper.js', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../site/sale/helper.js', import.meta.url), 'utf8');
     assert.ok(js.includes('function helperRequestCard') && js.includes('res.status === 403'), 'a 403 must render the request card, not nothing');
     assert.ok(js.includes('onblur="helperBlur(') && js.includes('helperFocusNext'), 'blur saves, Enter moves on');
     assert.ok(js.includes("mine && it.sj ?"), 'our price shows only after the friend wrote his own');
-    const css = readFileSync(new URL('../sale/css/panels.css', import.meta.url), 'utf8');
+    const css = readFileSync(new URL('../site/sale/css/panels.css', import.meta.url), 'utf8');
     assert.ok(css.includes('.helper-row.has-price .helper-row-name::before'), 'a saved row must look saved');
-    const app = readFileSync(new URL('../sale/app.js', import.meta.url), 'utf8');
+    const app = readFileSync(new URL('../site/sale/app.js', import.meta.url), 'utf8');
     assert.ok(app.includes("switchTab(wantedPanel() === 'helper' ? 'helper' : 'home')"), 'sign-in must land on the helper screen when asked');
 });

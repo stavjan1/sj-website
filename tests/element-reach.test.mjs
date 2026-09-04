@@ -1,6 +1,6 @@
 // Code that reaches for an element WITHOUT a guard, and the element it reaches for.
 //
-// `sale/app.js` contains this line, on the Google sign-in path:
+// `site/sale/app.js` contains this line, on the Google sign-in path:
 //     let clientId = document.getElementById('lock-google-client-id').value.trim();
 // No `?.`, no `if`, no fallback. The element is a hidden input in the markup —
 // `<input type="hidden" id="lock-google-client-id">` — and there is a SECOND
@@ -21,7 +21,7 @@ import { dirname, join } from 'node:path';
 import { APP_FILES } from './_app-source.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const HTML = readFileSync(join(ROOT, 'sale', 'index.html'), 'utf8');
+const HTML = readFileSync(join(ROOT, 'site', 'sale', 'index.html'), 'utf8');
 
 // Ids the app creates at runtime rather than shipping in the markup — the
 // dialogs it builds, and anything a renderer writes into a container.

@@ -12,7 +12,7 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const PAGE = readFileSync(join(ROOT, 'calculator.html'), 'utf8').replace(/\r\n/g, '\n');
+const PAGE = readFileSync(join(ROOT, 'site', 'calculator.html'), 'utf8').replace(/\r\n/g, '\n');
 
 function load() {
     const start = PAGE.indexOf('// sj:voltage-drop-begin');

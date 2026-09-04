@@ -18,8 +18,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const SHEETS = ['assets/tokens.css', 'assets/ui.css', 'sale/css/panels.css', 'sale/css/shell.css',
-                'sale/css/pdf.css', 'sale/controlroom.css', 'sale/nextstep.css', 'sale/periodic.css']
+const SHEETS = ['site/assets/tokens.css', 'site/assets/ui.css', 'site/sale/css/panels.css', 'site/sale/css/shell.css',
+                'site/sale/css/pdf.css', 'site/sale/controlroom.css', 'site/sale/nextstep.css', 'site/sale/periodic.css']
     .filter((f) => existsSync(join(ROOT, f)));
 const CSS = SHEETS.map((f) => readFileSync(join(ROOT, f), 'utf8')).join('\n');
 
@@ -27,7 +27,7 @@ test('every design token that is used is also defined', () => {
     const defined = new Set();
     for (const m of CSS.matchAll(/(--[\w-]+)\s*:/g)) defined.add(m[1]);
     // Tokens JS sets at runtime on the root element, which no stylesheet declares.
-    for (const f of ['sale/app.js', 'sale/chat.js']) {
+    for (const f of ['site/sale/app.js', 'site/sale/chat.js']) {
         if (!existsSync(join(ROOT, f))) continue;
         const src = readFileSync(join(ROOT, f), 'utf8');
         for (const m of src.matchAll(/setProperty\(\s*['"](--[\w-]+)['"]/g)) defined.add(m[1]);

@@ -20,7 +20,7 @@ import { dirname, join } from 'node:path';
 import { readApp } from './_app-source.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const HTML = readFileSync(join(ROOT, 'sale', 'index.html'), 'utf8');
+const HTML = readFileSync(join(ROOT, 'site', 'sale', 'index.html'), 'utf8');
 const APP = readApp();
 
 // Comments are prose, not shipped identity — and these files now carry comments
@@ -59,7 +59,7 @@ const PRIVATE = ['207382920', '053-530-2887', 'דרך בן גוריון 138'];
 test('no personal identifier of the owner ships in the app', () => {
     const hits = [];
     for (const needle of PRIVATE) {
-        for (const [label, src] of [['sale/index.html', HTML_CODE], ['app scripts', APP_CODE]]) {
+        for (const [label, src] of [['site/sale/index.html', HTML_CODE], ['app scripts', APP_CODE]]) {
             src.split('\n').forEach((line, n) => {
                 if (line.includes(needle)) hits.push(`${label}:${n + 1} — ${needle}`);
             });

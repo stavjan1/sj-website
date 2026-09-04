@@ -26,7 +26,7 @@ import { APP_FILES, readApp } from './_app-source.mjs';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (f) => (existsSync(join(ROOT, f)) ? readFileSync(join(ROOT, f), 'utf8') : '');
 const APP = readApp();
-const HTML = read('sale/index.html');
+const HTML = read('site/sale/index.html');
 
 test('nothing in the app talks to Drive any more', () => {
     // Named functions, so a partial revert is caught rather than a stray word.
@@ -77,7 +77,7 @@ test('the two keys that only sound like Drive are untouched', () => {
     assert.match(APP, /getStorageKey\('sj_drive_token_exp'\)/,
         'the identity token expiry key is gone — stale sessions stop being detected');
     // The two files a Drive cleanup would never think to open.
-    assert.match(read('sale/finance.js') + read('ask/index.html'), /sj_drive_access_token/,
+    assert.match(read('site/sale/finance.js') + read('site/ask/index.html'), /sj_drive_access_token/,
         'the readers outside /sale/app.js no longer find the token they authenticate with');
     // And the comment that explains why, so the next sweep reads it first.
     assert.match(APP, /and are not about Drive/,

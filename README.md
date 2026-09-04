@@ -6,9 +6,14 @@ app with AI pricing/phrasing agents and a public AI assistant.
 Static HTML/CSS/JS hosted on **Cloudflare Pages**, with a few **Pages Functions**
 (`/functions/api/*`) for the server-side AI proxy and lead email. No build step.
 
+The public site lives in `site/`, which is the Pages build output directory:
+nothing outside `site/` is ever served. `functions/` stays at the repository
+root, where Pages resolves it. See `docs/LAYOUT.md`.
+
 ## Structure
 
 ```
+site/                   The web root — everything below is served as-is
 index.html              Home (services, guides carousel, testimonials, FAQ, contact)
 about.html              About / story / values / process
 contact.html            Contact info + form (web3forms)
@@ -20,11 +25,13 @@ calculator.html         Voltage-drop calculator
 login.html              Staff login → /sale (sets localStorage, then redirects)
 styles.css  app.js      Main-site styles + interactions
 assistant.js            Public AI chat widget (self-injects on every public page)
-llms.txt  sitemap.xml  robots.txt  _redirects
+llms.txt  sitemap.xml  robots.txt  _headers  _redirects
+data/materials/  data/coverage/   Runtime data the Functions fetch from the site
 
 sale/                   Quote-generation app (projects, AI pricing chat, quote
                         editor, PDF export, Google Drive sync) — see sale/
 
+(repository root, never served)
 functions/api/
   _ai.js                Shared multi-provider AI core (not a route; leading "_")
   chat.js               POST /api/chat      — pricing/phrasing agents

@@ -20,15 +20,15 @@ import { dirname, join } from 'node:path';
 import { readApp } from './_app-source.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const HTML = readFileSync(join(ROOT, 'sale', 'index.html'), 'utf8');
+const HTML = readFileSync(join(ROOT, 'site', 'sale', 'index.html'), 'utf8');
 const APP = readApp();
 const MARKUP = HTML + '\n' + APP;
 
 // Only the sheets /sale/ actually loads. The legacy V2 sheet that used to sit
 // beside them, sale/styles.css, was 222KB that no page linked; it is deleted.
-const SHEETS = ['sale/css/panels.css', 'sale/css/shell.css', 'sale/css/pdf.css',
-                'sale/controlroom.css', 'sale/nextstep.css', 'sale/periodic.css',
-                'assets/ui.css'];
+const SHEETS = ['site/sale/css/panels.css', 'site/sale/css/shell.css', 'site/sale/css/pdf.css',
+                'site/sale/controlroom.css', 'site/sale/nextstep.css', 'site/sale/periodic.css',
+                'site/assets/ui.css'];
 const CSS = SHEETS.map((f) => {
     try { return readFileSync(join(ROOT, f), 'utf8'); } catch { return ''; }
 }).join('\n');
@@ -149,7 +149,7 @@ test('the customer chooser is ours on every surface', () => {
     assert.match(HTML, /class="banner-client"[\s\S]{0,200}openClientPicker/,
         'the banner opens the product picker');
     // And detaching stayed possible when the dropdown went away.
-    const market = readFileSync(join(ROOT, 'sale', 'market.js'), 'utf8');
+    const market = readFileSync(join(ROOT, 'site', 'sale', 'market.js'), 'utf8');
     const i = market.indexOf('function openClientPicker(');
     const body = market.slice(i, market.indexOf('\n}', i));
     assert.match(body, /ללא לקוח/, 'the picker still offers "no customer"');
@@ -206,7 +206,7 @@ test('settings is reachable from the one menu a phone has', () => {
     // It lived behind the account chip at the very bottom of the drawer, under
     // Safari's own bar, in a panel that did not scroll to it. Stav: "בטלפון רק
     // אין גישה להגיע להגדרות בלשונית שלוש קווים."
-    const chat = readFileSync(join(ROOT, 'sale', 'chat.js'), 'utf8');
+    const chat = readFileSync(join(ROOT, 'site', 'sale', 'chat.js'), 'utf8');
     const i = chat.indexOf('function renderDrawerDestinations(');
     const body = chat.slice(i, chat.indexOf('\n}', i));
     // THE ASSERTION IS "REACHABLE ON A PHONE", not "is a rail button". It used to
@@ -258,7 +258,7 @@ test('there is one step rail, and it is the sidebar', () => {
     // content at 1017px — the width Stav's own laptop reports.
     assert.ok(!/project-rail/.test(HTML), 'the floating step rail is back in the markup');
     assert.ok(!/renderProjectRail/.test(APP), 'its renderer is back');
-    assert.ok(!/168px/.test(readFileSync(join(ROOT, 'sale', 'css', 'shell.css'), 'utf8')),
+    assert.ok(!/168px/.test(readFileSync(join(ROOT, 'site', 'sale', 'css', 'shell.css'), 'utf8')),
         'the 168px reservation for it is back');
     // The flag it used to own outlives it, and three rules depend on that —
     // the project banner's visibility among them. Reading the element first

@@ -71,7 +71,7 @@ test('every property track.js can report is one the server counts and the dashbo
     // properties. When track.js grew a 'quote' bucket for shared quotes, the
     // server still answered its hits 200 skipped:'bad-site' and dropped them —
     // a silent failure in every direction, so the three lists are held equal.
-    const track = read('track.js');
+    const track = read('site/track.js');
     const fn = track.slice(track.indexOf('function site()'), track.indexOf('function send()'));
     assert.ok(fn.length > 0, 'track.js site() moved — this guard is looking at the wrong code');
     const reported = [...fn.matchAll(/return '([a-z]+)'/g)].map((m) => m[1]);
@@ -79,7 +79,7 @@ test('every property track.js can report is one the server counts and the dashbo
     const unknown = reported.filter((s) => !SITES.includes(s));
     assert.deepEqual(unknown, [], `track.js reports properties the server drops as bad-site: ${unknown.join(', ')}`);
 
-    const admin = read('sale/admin.js');
+    const admin = read('site/sale/admin.js');
     const list = admin.slice(admin.indexOf('const TRAFFIC_SITES = ['), admin.indexOf('];', admin.indexOf('const TRAFFIC_SITES = [')));
     const shown = [...list.matchAll(/key: '([a-z]+)'/g)].map((m) => m[1]);
     assert.deepEqual(shown, SITES, 'the admin dashboard does not show the same properties the server counts');
@@ -90,8 +90,8 @@ test('every class the traffic card renders is styled by the stylesheet the app l
     // for one to live only in the unloaded legacy sheet, which is a rule that
     // never ran; that sheet is gone, and this keeps the classes where they work.
     const app = readApp();
-    const panels = read('sale/css/panels.css');
-    const index = read('sale/index.html');
+    const panels = read('site/sale/css/panels.css');
+    const index = read('site/sale/index.html');
     assert.ok(index.includes('css/panels.css'), 'sale/index.html no longer loads panels.css');
     assert.ok(!/href="[^"]*\/?styles\.css/.test(index), 'sale/index.html now loads the legacy styles.css — update this guard');
 

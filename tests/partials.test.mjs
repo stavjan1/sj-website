@@ -15,7 +15,7 @@ const read = (rel) => readFileSync(join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n
 
 // Pages with the site header are the marketing pages; 404 / login / thanks
 // stand on their own and are not stamped.
-const STAMPED = pages().filter((p) => read(p).includes('<header class="site-header">'));
+const STAMPED = pages().filter((p) => read('site/' + p).includes('<header class="site-header">'));
 
 test('every partial exists and carries no per-page state', () => {
     for (const name of PARTIALS) {
@@ -30,7 +30,7 @@ test('every marketing page is stamped, and its regions match the partials', () =
     assert.ok(STAMPED.length >= 10, `only ${STAMPED.length} marketing pages found`);
     const stale = [];
     for (const page of STAMPED) {
-        const html = read(page);
+        const html = read('site/' + page);
         for (const name of PARTIALS) {
             assert.ok(html.includes(`<!-- partial:${name}`) && html.includes(`<!-- /partial:${name} -->`),
                 `${page} has no partial:${name} region — its copy of the ${name} is loose again`);
@@ -46,7 +46,7 @@ test('a page linked from the header or footer is marked current exactly once', (
     // other page is named in one of the two and must be marked there only.
     const linked = (page) => (read('partials/header.html') + read('partials/footer.html')).includes(`<a href="${page}">`);
     for (const page of STAMPED) {
-        const html = read(page);
+        const html = read('site/' + page);
         const n = (html.match(/aria-current="page"/g) || []).length;
         assert.equal(n, linked(page) ? 1 : 0, `${page}: ${n} links claim to be the current page`);
     }

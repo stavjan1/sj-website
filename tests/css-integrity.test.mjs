@@ -11,15 +11,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const SHEETS = [
-  'assets/tokens.css',
-  'assets/ui.css',
-  'styles.css',
-  'sale/css/shell.css',
-  'sale/css/panels.css',
-  'sale/css/pdf.css',
-  'sale/controlroom.css',
-  'sale/periodic.css',
-  'sale/nextstep.css',
+  'site/assets/tokens.css',
+  'site/assets/ui.css',
+  'site/styles.css',
+  'site/sale/css/shell.css',
+  'site/sale/css/panels.css',
+  'site/sale/css/pdf.css',
+  'site/sale/controlroom.css',
+  'site/sale/periodic.css',
+  'site/sale/nextstep.css',
 ];
 
 // Braces inside comments and strings are text, not structure.
@@ -79,7 +79,7 @@ for (const file of SHEETS) {
 // correct, nothing throws, and the only symptom is a paid feature being free.
 test('the classes JS builds for overlays are actually styled', () => {
   const all = SHEETS.map((f) => readFileSync(new URL('../' + f, import.meta.url), 'utf8')).join('\n');
-  const app = readFileSync(new URL('../sale/app.js', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../site/sale/app.js', import.meta.url), 'utf8');
 
   // Every className string assigned in app.js whose name looks like a cover.
   const built = new Set();

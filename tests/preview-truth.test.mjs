@@ -19,8 +19,8 @@ import { dirname, join } from 'node:path';
 import { readApp } from './_app-source.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const PDFCSS = readFileSync(join(ROOT, 'sale', 'css', 'pdf.css'), 'utf8');
-const HTML = readFileSync(join(ROOT, 'sale', 'index.html'), 'utf8');
+const PDFCSS = readFileSync(join(ROOT, 'site', 'sale', 'css', 'pdf.css'), 'utf8');
+const HTML = readFileSync(join(ROOT, 'site', 'sale', 'index.html'), 'utf8');
 const APP = readApp();
 
 test('nothing styles the quote sheet by its id', () => {
@@ -53,7 +53,7 @@ test('the document fits the screen it is being looked at on', () => {
     // the ONLY way to see the document there, and it had a hardcoded
     // `transform: scale(0.62)` in CSS. 0.62 × 794 = 492px, which fits no phone.
     const APP2 = readApp();
-    const CSS = readFileSync(join(ROOT, 'sale', 'css', 'pdf.css'), 'utf8');
+    const CSS = readFileSync(join(ROOT, 'site', 'sale', 'css', 'pdf.css'), 'utf8');
 
     assert.ok(!/\.pdf-fs-content \.a4-sheet\s*\{[^}]*scale\(/.test(CSS),
         'the fullscreen preview is back on a fixed scale, which cannot fit an unknown screen');
