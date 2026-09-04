@@ -8,10 +8,10 @@
 
 | קובץ | מה זה | גודל |
 |---|---|---|
-| `data/materials/index.json` | האינדקס שהשרת קורא בזמן ריצה (עמודות, דחוס) | ~0.8MB |
-| `data/materials/erco.json` | כל השדות, קריא לבני אדם ולבדיקות | ~4.6MB |
-| `data/materials/taxonomy.json` | עץ הקטגוריות + סטטיסטיקת מחירים לכל ענף | ~0.2MB |
-| `data/materials/raw/` | הקציר הגולמי מהספק (JSONL) — מקור האמת, לא נוגעים ידנית | ~40MB |
+| `site/data/materials/index.json` | האינדקס שהשרת קורא בזמן ריצה (עמודות, דחוס) | ~0.8MB |
+| `site/data/materials/erco.json` | כל השדות, קריא לבני אדם ולבדיקות | ~4.6MB |
+| `site/data/materials/taxonomy.json` | עץ הקטגוריות + סטטיסטיקת מחירים לכל ענף | ~0.2MB |
+| `site/data/materials/raw/` | הקציר הגולמי מהספק (JSONL) — מקור האמת, לא נוגעים ידנית | ~40MB |
 
 כל שורה במאגר היא **פריט שאפשר לקנות**: לא "כבל N2XY בגדלים שונים" אלא
 "כבל 5X6 FR N2XY — 17.54 ₪ למטר, מק"ט 5951160".
@@ -27,7 +27,7 @@
 הקציר עובר שלושה שלבים:
 
 ```bash
-python scripts/suppliers/erco_harvest.py      # קטלוג → data/materials/raw/
+python scripts/suppliers/erco_harvest.py      # קטלוג → site/data/materials/raw/
 python scripts/suppliers/erco_units.py        # יחידות מדויקות מדפי המוצר
 python scripts/suppliers/build_materials_db.py  # raw → המאגר המנורמל
 node --test tests/materials.test.mjs          # שומרי הסף

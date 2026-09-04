@@ -17,7 +17,7 @@ import { readFileSync } from 'node:fs';
 
 const ROOT = new URL('../../', import.meta.url);
 const read = (f) => readFileSync(new URL(f, ROOT), 'utf8');
-const APP = read('sale/app.js');
+const APP = read('site/sale/app.js');
 
 function literalBlock(fn) {
   const at = APP.indexOf(`function ${fn}(`);
@@ -27,7 +27,7 @@ function literalBlock(fn) {
 }
 
 const sternBlock = (() => {
-  const rows = JSON.parse(read('sale/stern-pricing.json').replace(/^﻿/, ''));
+  const rows = JSON.parse(read('site/sale/stern-pricing.json').replace(/^﻿/, ''));
   const items = Array.isArray(rows) ? rows : rows.items;
   return items.filter((i) => i && i.description && Number(i.price) > 0)
     .map((i) => `• ${i.description} — ${i.price} ₪`).join('\n');

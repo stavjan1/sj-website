@@ -12,7 +12,7 @@ rude, so this runs ONLY over the families where metre-vs-unit changes the quote
 (cables, conduit, trunking, ladders, strips) and leaves everything else to the
 category-based inference in build_materials_db.py.
 
-Output: data/materials/raw/erco_units.json — {sku: unit}. Resumable; re-running
+Output: site/data/materials/raw/erco_units.json — {sku: unit}. Resumable; re-running
 only fetches pages it has not already read.
 """
 
@@ -28,7 +28,7 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
-RAW_DIR = os.path.join(REPO, "data", "materials", "raw")
+RAW_DIR = os.path.join(REPO, "site", "data", "materials", "raw")
 PRODUCTS_PATH = os.path.join(RAW_DIR, "erco_products.jsonl")
 UNITS_PATH = os.path.join(RAW_DIR, "erco_units.json")
 DONE_PATH = os.path.join(RAW_DIR, "erco_units_done.json")

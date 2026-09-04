@@ -26,7 +26,7 @@ function loadChecklists() {
     // defaults), so "everything between the first { and the last }" is no
     // longer the checklists — it is both, with a stray `};\nconst … = {` in
     // the middle. Cut the one that is being asked for.
-    const src = read('sale/coverage.js');
+    const src = read('site/sale/coverage.js');
     const start = src.indexOf('{', src.indexOf('const COVERAGE_CHECKLISTS'));
     const end = src.indexOf('\n};', start);
     return JSON.parse(src.slice(start, end + 2));
@@ -194,7 +194,7 @@ test('the page-break guide agrees with the exporter, and never prints', () => {
     // actually prints a customer's quote went unchecked: delete the rule from
     // the real file and this stayed green while red dashed guides started
     // appearing on quotes people send to customers.
-    const css = read('sale/css/pdf.css');
+    const css = read('site/sale/css/pdf.css');
     assert.ok(/@media print[\s\S]{0,400}\.page-guide/.test(css),
         'the print path does not hide the page guides');
 });

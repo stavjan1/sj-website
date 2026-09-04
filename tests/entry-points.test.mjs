@@ -25,7 +25,7 @@ import { readApp } from './_app-source.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const APP = readApp();
-const HTML = readFileSync(join(ROOT, 'sale', 'index.html'), 'utf8');
+const HTML = readFileSync(join(ROOT, 'site', 'sale', 'index.html'), 'utf8');
 
 const bodyOf = (name) => {
     const i = APP.indexOf(`function ${name}(`);

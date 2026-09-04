@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path';
 import { readApp } from './_app-source.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const PAGES = readdirSync(ROOT).filter((f) => f.endsWith('.html'));
+const PAGES = readdirSync(join(ROOT, 'site')).filter((f) => f.endsWith('.html')).map((f) => 'site/' + f);
 // Normalised: git checks out CRLF on Windows and LF on CI, and several of
 // these tests slice on a newline-plus-brace boundary.
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
@@ -19,7 +19,7 @@ const read = (rel) => readFileSync(join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n
 test('every JSON-LD block parses', () => {
     // A single unescaped quote inside מע"מ silently invalidated a whole FAQPage
     // once. Structured data fails quietly — nothing on the page looks wrong.
-    for (const page of [...PAGES, 'ask/index.html', 'zerem/index.html']) {
+    for (const page of [...PAGES, 'site/ask/index.html', 'site/zerem/index.html']) {
         const text = read(page);
         for (const m of text.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) {
             assert.doesNotThrow(() => JSON.parse(m[1]), `${page}: JSON-LD does not parse`);
@@ -39,14 +39,14 @@ test('declared URLs point at what the server serves', () => {
     }
     assert.deepEqual(offenders, [], 'declared URLs still name the .html form');
 
-    const sitemap = read('sitemap.xml');
+    const sitemap = read('site/sitemap.xml');
     const stale = [...sitemap.matchAll(/<loc>([^<]*\.html)<\/loc>/g)].map((m) => m[1]);
     assert.deepEqual(stale, [], 'sitemap still lists .html URLs');
 });
 
 test('every indexable page declares a canonical', () => {
     for (const page of PAGES) {
-        if (['404.html', 'login.html', 'thanks.html'].includes(page)) continue;
+        if (['site/404.html', 'site/login.html', 'site/thanks.html'].includes(page)) continue;
         assert.match(read(page), /rel="canonical"/, `${page}: no canonical`);
     }
 });
@@ -55,7 +55,7 @@ test('all pages agree on one asset version', () => {
     // A cherry-pick once left pages on v=1, v=43 and v=44 while the CSS and JS
     // behind them had moved on — returning visitors got a stale app.
     const versions = new Set();
-    for (const page of [...PAGES, 'ask/index.html', 'zerem/index.html', 'sale/index.html', 'q/index.html']) {
+    for (const page of [...PAGES, 'site/ask/index.html', 'site/zerem/index.html', 'site/sale/index.html', 'site/q/index.html']) {
         if (!existsSync(join(ROOT, page))) continue;
         for (const m of read(page).matchAll(/\?v=(\d+)/g)) versions.add(m[1]);
     }
@@ -65,8 +65,8 @@ test('all pages agree on one asset version', () => {
 test('the offline shell contains every script the app loads', () => {
     // coverage.js became load-bearing after the shell list was written;
     // offline, the app opened without its checklists.
-    const sw = read('sale/sw.js');
-    const html = read('sale/index.html');
+    const sw = read('site/sale/sw.js');
+    const html = read('site/sale/index.html');
     const scripts = [...html.matchAll(/<script src="([^"]+)"/g)]
         .map((m) => m[1].split('?')[0])
         .filter((src) => !src.startsWith('http'));
@@ -84,13 +84,13 @@ test('the offline shell contains every script the app loads', () => {
 });
 
 test('the service worker never caches API calls', () => {
-    const sw = read('sale/sw.js');
+    const sw = read('site/sale/sw.js');
     assert.match(sw, /pathname\.startsWith\('\/api\/'\)/, 'no /api/ bypass — AI replies could be served from cache');
     assert.match(sw, /request\.method !== 'GET'/, 'writes are not excluded from the cache');
 });
 
 test('robots.txt invites the AI crawlers and keeps the app out', () => {
-    const robots = read('robots.txt');
+    const robots = read('site/robots.txt');
     for (const bot of ['GPTBot', 'ClaudeBot', 'PerplexityBot', 'Google-Extended']) {
         assert.ok(robots.includes(bot), `robots.txt does not mention ${bot}`);
     }
@@ -108,7 +108,7 @@ test('the fonts and icons survive a deploy and a dead network', () => {
     // At a job site there is no reception to fetch a typeface with. Without
     // these cached the app is blank squares, and a quote drafted on site
     // prints in a different font than one drafted at home.
-    const sw = read('sale/sw.js');
+    const sw = read('site/sale/sw.js');
 
     for (const host of ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com']) {
         assert.ok(sw.includes(host), `${host} is no longer cached — offline loses its assets`);
@@ -137,7 +137,7 @@ test('the fonts and icons survive a deploy and a dead network', () => {
 
 test('the local snapshots have a door, and restoring is all-or-nothing', () => {
     const app = readApp();
-    const html = read('sale/index.html');
+    const html = read('site/sale/index.html');
 
     // The snapshots were correct and complete and reachable only by typing
     // sjDataRecovery.restore(0) into a browser console — no use to an
@@ -172,7 +172,7 @@ test('the customer-facing quote page cannot be broken out of', () => {
     //
     // Grepping for the regex would not have caught that; the mistake reads
     // fine. So run the real functions out of the page against the real attack.
-    const html = read('q/index.html');
+    const html = read('site/q/index.html');
     const escSrc = html.match(/const esc = [^\n]+/);
     const imgSrc = html.match(/const safeImg = [^\n]+/);
     assert.ok(escSrc && imgSrc, 'esc/safeImg are gone from the quote page');
@@ -218,7 +218,7 @@ test('a deploy actually reaches an installed service worker', () => {
     // server at ?v=66, worker cache at ?v=65, page rendered ?v=65 — a whole
     // deploy behind. The HTML carries the ?v= for every other file, so one
     // stale page means the entire app is stale.
-    const sw = read('sale/sw.js');
+    const sw = read('site/sale/sw.js');
     assert.ok(/cache: 'reload'/.test(sw),
         'the shell fetch can be served from the HTTP cache, so a deploy may not arrive');
     assert.ok(/mode === 'navigate'/.test(sw),
@@ -256,7 +256,7 @@ test('rotating the web3forms key cannot half-happen', () => {
     // the Functions keep working while the three contact forms keep posting a
     // dead key — no error, no bounce, just leads quietly falling on the floor.
     // This fails loudly if a rotation only lands in some of them.
-    const files = ['contact.html', 'index.html', 'zerem/index.html',
+    const files = ['site/contact.html', 'site/index.html', 'site/zerem/index.html',
                    'functions/api/lead.js', 'functions/api/share-catalog.js'];
     const found = new Map();
     for (const f of files) {
@@ -320,7 +320,7 @@ test('a stale Google token cannot block its own replacement', () => {
 });
 
 test('the maintenance reminder is asked once and answered "never" without re-asking', () => {
-    const html = read('sale/index.html');
+    const html = read('site/sale/index.html');
     const app = readApp();
 
     // Stav specified this sentence word for word. It is the only place the app
@@ -366,7 +366,7 @@ test('the calendar entry is the action, at the date you take it', () => {
 
 test('recurrence is a property of a project, and it ends', () => {
     const app = readApp();
-    const html = read('sale/index.html');
+    const html = read('site/sale/index.html');
 
     // The job/maintenance switch at creation is gone. Stav's counter-example:
     // panel maintenance is a one-off JOB whose OPPORTUNITY returns next year —
@@ -398,7 +398,7 @@ test('a rendered screen is actually reachable', () => {
     // projects that come back, not about clients). The guard follows the routes
     // they are actually reached by: the old tab names still resolve, and the
     // view that opens runs its renderer.
-    const html = read('sale/index.html');
+    const html = read('site/sale/index.html');
     const app = readApp();
     const panels = [...html.matchAll(/id="panel-([a-z]+)"/g)].map((m) => m[1]);
     assert.ok(panels.includes('clients'), 'the clients panel is gone');
@@ -476,7 +476,7 @@ test('every guide milestone the app fires actually exists in the guide', () => {
     // not. This shipped: sale/app.js called coachMilestone(), sale/coach.js
     // defined coachHint(), and creating a project threw at the last line.
     const app = readApp();
-    const coach = read('sale/coach.js');
+    const coach = read('site/sale/coach.js');
 
     // Whatever name the app uses for the guide, the guide must expose it.
     const called = [...app.matchAll(/window\.(coach\w+)\s*\(/g)].map((m) => m[1]);
@@ -496,7 +496,7 @@ test('every guide milestone the app fires actually exists in the guide', () => {
     // instead of a once-ever flag, and so can still help someone on his fifth
     // project. What must never happen is BOTH mechanisms losing them, which
     // would leave those moments with nothing on screen saying what to do next.
-    const cards = read('sale/nextstep.js');
+    const cards = read('site/sale/nextstep.js');
     assert.ok(ids.length >= 3 || /NEXT_STEP_CARDS\s*=/.test(cards),
         'nothing answers "what now" any more — not the guide and not the cards');
     for (const id of ids) {
@@ -507,39 +507,33 @@ test('every guide milestone the app fires actually exists in the guide', () => {
     assert.match(app, /function coachSay\(id, delay\) \{\s*try \{/);
 });
 
-test('every internal doc in the deploy root is blocked, not just the remembered ones', () => {
-  // There is no .cfignore, so everything committed is served. The block list is
-  // maintained by hand and had drifted: ANALYTICS/BACKLOG/PRODUCT_OVERVIEW were
-  // listed, COORDINATION/ROADMAP/ELECTRICAL_KIT/README and the whole security
-  // review under scripts/ were not.
-  const red = readFileSync(new URL('../_redirects', import.meta.url), 'utf8');
-  const rooted = execSync('git ls-files "*.md"', { cwd: new URL('..', import.meta.url) })
-    .toString().split('\n').map((s) => s.trim()).filter(Boolean)
-    .filter((f) => f !== 'llms.txt');
+// site/ is the Cloudflare Pages build output directory: only what sits inside
+// it is ever served, so nothing needs hiding with stubs or 404 rules any more.
+// The other half of the repo — docs, tests, scripts, build-only data, the
+// partials — stays outside, and a file that lands on the wrong side fails
+// here instead of going public on the next deploy.
+test('only the public site is under site/, and the private folders stay outside it', () => {
+    const tracked = execSync('git ls-files', { cwd: ROOT }).toString().split('\n')
+        .map((s) => s.trim()).filter(Boolean);
+    const served = tracked.filter((f) => f.startsWith('site/'));
+    assert.ok(served.length > 50, 'site/ is suspiciously empty — is the web root still there?');
 
-  const unblocked = rooted.filter((f) => {
-    const dir = f.includes('/') ? f.slice(0, f.indexOf('/')) : null;
-    if (dir && (red.includes('/' + dir + '/*') || red.includes('/' + dir + '/'))) return false;
-    return !red.includes('/' + f);
-  });
-  assert.deepEqual(unblocked, [],
-    'these internal documents are publicly served — add them to _redirects');
-});
+    const leaked = served.filter((f) =>
+        /\.(md|mjs|py|yml|csv|jsonl)$/.test(f)
+        || /\.test\.js$/.test(f)
+        || /^site\/data\/(clarity|field-research|dekel|iec_)/.test(f));
+    assert.deepEqual(leaked, [], 'these would be served from the web root');
 
-// `_redirects` cannot return 404 on Cloudflare Pages (verified 4.9.2026: /scripts/*
-// answered 200 with a 404 rule in place). The 404 lines in that file are the map of
-// what must stay private; the block itself is a Function stub. This keeps the two
-// in step, so a new 404 line without a stub fails here instead of on the web.
-test('every 404 path in _redirects has a Function stub that actually denies it', () => {
-    const rules = readFileSync(new URL('../_redirects', import.meta.url), 'utf8').split(/\r?\n/)
-        .map((l) => l.trim()).filter((l) => l && !l.startsWith('#') && /\s404\s*$/.test(l))
-        .map((l) => l.split(/\s+/)[0]);
-    assert.ok(rules.length >= 5, 'the map of private paths shrank');
-    const missing = rules.filter((p) => {
-        const rel = p.replace(/^\//, '').replace(/\/\*$/, '/[[path]]');
-        return !existsSync(new URL('../functions/' + rel + '.js', import.meta.url));
-    });
-    assert.deepEqual(missing, [], 'these 404 rules have no Function stub, so they are public: ' + missing.join(', '));
+    for (const dir of ['functions', 'tests', 'scripts', 'docs', 'partials', 'data/clarity', 'data/field-research', '.github']) {
+        assert.ok(tracked.some((f) => f.startsWith(dir + '/')), dir + '/ is no longer at the repo root');
+        assert.ok(!tracked.some((f) => f.startsWith('site/' + dir + '/')), dir + '/ is under site/ — it would be served');
+    }
+    assert.ok(tracked.some((f) => /^data\/iec_/.test(f)), 'the IEC build inputs left the repo root');
+    assert.ok(!tracked.some((f) => /^[^/]+\.(html|css|txt|xml)$/.test(f) || f === '_headers' || f === '_redirects'),
+        'a page or a Pages control file sits at the repo root — it would not be deployed');
+    for (const f of ['site/_headers', 'site/_redirects', 'site/index.html', 'site/data/materials/index.json', 'site/data/coverage/checklists.json']) {
+        assert.ok(tracked.includes(f), f + ' is missing from the web root');
+    }
 });
 
 // The standalone /checkups/ page was retired on 4.9.2026: the periodic-service
@@ -547,18 +541,18 @@ test('every 404 path in _redirects has a Function stub that actually denies it',
 // WhatsApp, so it must keep landing somewhere — and nothing on the site may
 // point at it again, or the redirect quietly becomes the page.
 test('/checkups/ redirects into the app, and nothing links to it any more', () => {
-    const rules = readFileSync(join(ROOT, '_redirects'), 'utf8').split(/\r?\n/)
+    const rules = readFileSync(join(ROOT, 'site', '_redirects'), 'utf8').split(/\r?\n/)
         .map((l) => l.trim()).filter((l) => l && !l.startsWith('#')).map((l) => l.split(/\s+/));
     for (const from of ['/checkups', '/checkups/*']) {
         const rule = rules.find((r) => r[0] === from);
         assert.ok(rule, from + ' has no rule — old bookmarks and the WhatsApp links land on a 404');
         assert.deepEqual(rule.slice(1), ['/sale/', '301'], from);
     }
-    assert.ok(!existsSync(join(ROOT, 'checkups', 'index.html')), 'the page itself is back');
+    assert.ok(!existsSync(join(ROOT, 'site', 'checkups', 'index.html')), 'the page itself is back');
 
     const files = execSync('git ls-files', { cwd: ROOT }).toString().split('\n')
         .map((f) => f.trim()).filter(Boolean)
-        .filter((f) => f !== '_redirects' && !/\.(png|jpe?g|webp|gif|ico|woff2?|ttf|pdf|zip)$/i.test(f));
+        .filter((f) => f !== 'site/_redirects' && !/\.(png|jpe?g|webp|gif|ico|woff2?|ttf|pdf|zip)$/i.test(f));
     // A link is an href/src, a sitemap <loc>, a markdown link, a full URL, a
     // location assignment or a robots rule. Prose that names the old page
     // (comments, the changelog) is history, not a link.

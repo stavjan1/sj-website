@@ -17,7 +17,7 @@ import { APP_FILES } from './_app-source.mjs';
 
 // The load order from _app-source.mjs, plus the four scripts the page loads
 // after it (each an IIFE, but any top-level function they add is in scope too).
-const SCRIPTS = [...APP_FILES, 'sale/finance.js', 'sale/coach.js', 'sale/nextstep.js', 'sale/coverage.js'];
+const SCRIPTS = [...APP_FILES, 'site/sale/finance.js', 'site/sale/coach.js', 'site/sale/nextstep.js', 'site/sale/coverage.js'];
 
 // Reached some other way than by name in these files. Keep this tiny, and say
 // how each one is reached.
@@ -32,7 +32,7 @@ const read = (rel) => readFileSync(new URL('../' + rel, import.meta.url), 'utf8'
 
 test('every top-level function in the sale scripts is referenced somewhere', () => {
     const sources = SCRIPTS.map((rel) => ({ rel, src: read(rel) }));
-    const html = read('sale/index.html');
+    const html = read('site/sale/index.html');
     const everything = sources.map((s) => s.src).join('\n') + '\n' + html;
 
     const declared = [];

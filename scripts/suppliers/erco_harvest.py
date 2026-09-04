@@ -35,7 +35,7 @@ ROOT_CATEGORY_ID = 526  # "קטלוג ראשי" — the b2c store root
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
-RAW_DIR = os.path.join(REPO, "data", "materials", "raw")
+RAW_DIR = os.path.join(REPO, "site", "data", "materials", "raw")
 
 PRODUCTS_PATH = os.path.join(RAW_DIR, "erco_products.jsonl")
 CATEGORIES_PATH = os.path.join(RAW_DIR, "erco_categories.json")

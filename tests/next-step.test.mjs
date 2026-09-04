@@ -20,9 +20,9 @@ import { createContext, runInContext } from 'node:vm';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
-const SRC = read('sale', 'nextstep.js');
+const SRC = read('site', 'sale', 'nextstep.js');
 const APP = readApp();
-const HTML = read('sale', 'index.html');
+const HTML = read('site', 'sale', 'index.html');
 
 // The file in a jar, with the app's five predicates stubbed. Everything the
 // cards are allowed to read is passed in here — if a card ever reaches for
@@ -115,7 +115,7 @@ test('no second door to the quote stacks over the composer', () => {
     const body = APP.slice(i, APP.indexOf('\n}', i));
     assert.ok(!body.includes('pricingTotals'), 'the bar no longer decides anything');
     assert.ok(!body.includes('סה'), 'and never went back to reading the conversation');
-    const HTML = readFileSync(join(ROOT, 'sale', 'index.html'), 'utf8');
+    const HTML = readFileSync(join(ROOT, 'site', 'sale', 'index.html'), 'utf8');
     assert.match(HTML, /id="side-asks"/, 'the side column exists');
     assert.match(HTML, /openSpecFromChat\(\)/, 'דיוק העבודה is still reachable');
     assert.match(HTML, /askListInChat\('materials'\)/, 'רשימת חומרים is still reachable');
@@ -184,11 +184,11 @@ test('the slots exist once each, start hidden, and the assets are loaded', () =>
     assert.match(HTML, /nextstep\.js\?v=\d+/);
     // [hidden] loses to display:block without this, and the card would sit
     // there empty forever.
-    assert.match(read('sale', 'nextstep.css'), /\.next-step\[hidden\][^}]*display:\s*none\s*!important/);
+    assert.match(read('site', 'sale', 'nextstep.css'), /\.next-step\[hidden\][^}]*display:\s*none\s*!important/);
 });
 
 test('the guide and the cards do not both own the same moment', () => {
-    const coach = read('sale', 'coach.js');
+    const coach = read('site', 'sale', 'coach.js');
     for (const gone of ['first-project', 'first-priced', 'first-quote-saved']) {
         assert.ok(!coach.includes("'" + gone + "'"), `${gone} still has a spotlight as well as a card`);
         assert.ok(!APP.includes("coachSay('" + gone + "'"), `${gone} is still fired from the app`);
@@ -202,5 +202,5 @@ test('the funnel can tell whether any of this worked', () => {
     assert.match(funnel, /!m\.handoff && !m\.hidden/, 'a button press is not a conversation');
     assert.match(funnel, /reachedPricing:/);
     assert.match(funnel, /reachedDraft:/);
-    assert.match(read('sale', 'finance.js'), /הגיעו לתמחור/, 'and the admin screen shows them');
+    assert.match(read('site', 'sale', 'finance.js'), /הגיעו לתמחור/, 'and the admin screen shows them');
 });

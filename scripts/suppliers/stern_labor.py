@@ -40,7 +40,7 @@ URL = ("https://a-electrician.co.il/"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
-OUT = os.path.join(REPO, "sale", "stern-pricing.json")
+OUT = os.path.join(REPO, "site", "sale", "stern-pricing.json")
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")

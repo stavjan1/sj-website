@@ -6,9 +6,14 @@ app with AI pricing/phrasing agents and a public AI assistant.
 Static HTML/CSS/JS hosted on **Cloudflare Pages**, with a few **Pages Functions**
 (`/functions/api/*`) for the server-side AI proxy and lead email. No build step.
 
+The public site lives in `site/`, which is the Pages build output directory:
+nothing outside `site/` is ever served. `functions/` stays at the repository
+root, where Pages resolves it. See `docs/LAYOUT.md`.
+
 ## Structure
 
 ```
+site/                   The web root — everything below is served as-is
 index.html              Home (services, guides carousel, testimonials, FAQ, contact)
 about.html              About / story / values / process
 contact.html            Contact info + form (web3forms)
@@ -20,11 +25,13 @@ calculator.html         Voltage-drop calculator
 login.html              Staff login → /sale (sets localStorage, then redirects)
 styles.css  app.js      Main-site styles + interactions
 assistant.js            Public AI chat widget (self-injects on every public page)
-llms.txt  sitemap.xml  robots.txt  _redirects
+llms.txt  sitemap.xml  robots.txt  _headers  _redirects
+data/materials/  data/coverage/   Runtime data the Functions fetch from the site
 
 sale/                   Quote-generation app (projects, AI pricing chat, quote
                         editor, PDF export, Google Drive sync) — see sale/
 
+(repository root, never served)
 functions/api/
   _ai.js                Shared multi-provider AI core (not a route; leading "_")
   chat.js               POST /api/chat      — pricing/phrasing agents
@@ -84,11 +91,15 @@ message (and the assistant degrades to a contact card).
 
 ## Local development
 
-No build step. Serve the folder statically, e.g.:
+No build step. The public site is the `site/` folder (the Pages build output
+directory), so serve that — not the repo root — or every root-absolute
+reference (`/assets/…`, `/sale/…`, `/data/…`) 404s:
 
 ```
-python3 -m http.server 8099   # then open http://localhost:8099
+python3 -m http.server 8099 -d site   # then open http://localhost:8099
 ```
+
+For the Functions too: `wrangler pages dev site`.
 
 Note: `/api/*` are Cloudflare Pages Functions and only run on a Pages deploy (or
 `wrangler pages dev`). Locally without them, the AI features degrade gracefully

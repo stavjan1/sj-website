@@ -15,8 +15,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const ROOT = new URL('../', import.meta.url);
-const SRC = new URL('sale/data/sj-prices.json', ROOT);
-const OUT = new URL('sale/data/sj-prices.core.json', ROOT);
+const SRC = new URL('site/sale/data/sj-prices.json', ROOT);
+const OUT = new URL('site/sale/data/sj-prices.core.json', ROOT);
 
 export function coreOf(book) {
     return {

@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const ASK = readFileSync(join(ROOT, 'ask', 'index.html'), 'utf8');
+const ASK = readFileSync(join(ROOT, 'site', 'ask', 'index.html'), 'utf8');
 // Comments quote the copy they removed, so the rules below read code only.
 const CODE = ASK.split('\n').filter((l) => !l.trimStart().startsWith('//')).join('\n');
 

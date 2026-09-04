@@ -106,7 +106,7 @@ test('nothing identifying is stored, and the policy says the id exists', () => {
     assert.ok(!src.includes(forbidden), `the visitor record reaches for ${forbidden}`);
   }
   // Stav agreed to this on the understanding it is declared, not hidden.
-  const privacy = readFileSync(join(ROOT, 'privacy.html'), 'utf8');
+  const privacy = readFileSync(join(ROOT, 'site', 'privacy.html'), 'utf8');
   assert.match(privacy, /מזהה אורח אקראי/, 'the id is stored but never disclosed');
   assert.match(privacy, /אינו מכיל שם, אימייל, כתובת IP/, 'the policy does not say what it excludes');
 });
@@ -114,7 +114,7 @@ test('nothing identifying is stored, and the policy says the id exists', () => {
 test('a signed-in visitor is never counted as an anonymous one', () => {
   // Two identities for one person would double-count him and put a stranger's
   // number on a man who has a name.
-  const ask = readFileSync(join(ROOT, 'ask', 'index.html'), 'utf8');
+  const ask = readFileSync(join(ROOT, 'site', 'ask', 'index.html'), 'utf8');
   assert.match(ask, /if \(authToken\) headers\['Authorization'\][\s\S]{0,260}else \{ const a = anonId\(\)/,
     'the guest id is sent alongside a real account');
   const chat = readFileSync(join(ROOT, 'functions', 'api', 'chat.js'), 'utf8');

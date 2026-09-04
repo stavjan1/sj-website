@@ -73,7 +73,7 @@ test('an entry with no id is never duplicated in', () => {
 });
 
 test('the open app keeps talking to the cloud, and a lapsed hour does not silence it', () => {
-    const src = readFileSync(new URL('../sale/app.js', import.meta.url), 'utf8');
+    const src = readFileSync(new URL('../site/sale/app.js', import.meta.url), 'utf8');
     const fn = (name) => { const i = src.indexOf('async function ' + name); return src.slice(i, src.indexOf('\n}\n', i)); };
     assert.ok(/ensureGoogleToken\(\)/.test(fn('cloudSaveNow')), 'cloudSaveNow must mint a token silently, not trust the one in memory');
     assert.ok(/ensureGoogleToken\(\)/.test(fn('cloudLoadAndMerge')), 'cloudLoadAndMerge must mint a token silently');

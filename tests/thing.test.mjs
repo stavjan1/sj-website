@@ -71,17 +71,17 @@ test('merging a tree with itself changes nothing', () => {
 });
 
 test('the page is private, needs no Google, revalidates, and /mind/ is gone', () => {
-    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
-    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../site/thing/index.html', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../site/thing/thing.js', import.meta.url), 'utf8');
     // CRLF normalised: a Windows checkout (autocrlf) puts \r before every \n and the block matches below silently fail.
-    const headers = readFileSync(new URL('../_headers', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+    const headers = readFileSync(new URL('../site/_headers', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
     assert.match(html, /name="robots" content="noindex/);
     assert.ok(!/gsi\/client|google\.accounts/.test(html + js), 'the tree must not depend on a Google login');
     assert.ok(/\/thing\/\n(?:\s+!\s*Cache-Control\n)?\s+Cache-Control: no-cache/.test(headers), '/thing/ must revalidate (the ! line detaches the immutable value of a broader rule)');
     // The microphone is off everywhere (the /* block) and on only under /thing/.
     assert.match(headers, /\/\*\n[^\n]*\n(?:[^\n]*\n)*?\s+Permissions-Policy: geolocation=\(\), microphone=\(\), camera=\(\)/, 'site-wide microphone must stay off');
     assert.match(headers, /\/thing\/\*\n\s+! Permissions-Policy\n\s+Permissions-Policy: [^\n]*microphone=\(self\)/, '/thing/ must be allowed to record');
-    assert.ok(!existsSync(new URL('../mind/index.html', import.meta.url)), 'the old /mind/ page was left behind');
+    assert.ok(!existsSync(new URL('../site/mind/index.html', import.meta.url)), 'the old /mind/ page was left behind');
     assert.ok(!existsSync(new URL('../functions/api/mind.js', import.meta.url)), 'the old /api/mind was left behind');
 });
 
@@ -92,17 +92,17 @@ test('with no engine at hand, the first words become the title, never a blank', 
 });
 
 test('the tree opens without a signal: a worker caches its shell, never the API, and the CSP lets a local note play', () => {
-    const sw = readFileSync(new URL('../thing/sw.js', import.meta.url), 'utf8');
-    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
-    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    const sw = readFileSync(new URL('../site/thing/sw.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../site/thing/index.html', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../site/thing/thing.js', import.meta.url), 'utf8');
     // CRLF normalised: a Windows checkout (autocrlf) puts \r before every \n and the block matches below silently fail.
-    const headers = readFileSync(new URL('../_headers', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+    const headers = readFileSync(new URL('../site/_headers', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
     for (const f of ['/thing/', '/thing/index.html', '/thing/thing.js', '/assets/tokens.css']) assert.ok(sw.includes(`'${f}'`), `${f} missing from the offline shell`);
     assert.ok(/pathname\.startsWith\('\/api\/'\)\) return/.test(sw), 'the API must never be served from cache');
     assert.ok(/cache: 'reload'/.test(sw), 'a deploy must reach the phone on the next open');
     assert.ok(js.includes("serviceWorker.register('/thing/sw.js')"), 'the worker is never registered');
     assert.ok(html.includes('rel="manifest"') && existsSync(new URL('../functions/thing/manifest.webmanifest.js', import.meta.url)), 'no manifest — no icon on the phone');
-    assert.ok(!existsSync(new URL('../thing/manifest.webmanifest', import.meta.url)), 'the static manifest would shadow the keyed one');
+    assert.ok(!existsSync(new URL('../site/thing/manifest.webmanifest', import.meta.url)), 'the static manifest would shadow the keyed one');
     assert.ok(/endsWith\('\.webmanifest'\)\) return/.test(sw), 'the worker must never serve a cached keyless manifest');
     assert.match(headers, /media-src 'self' blob:/, 'a note that only exists on the phone cannot play');
 });
@@ -129,8 +129,8 @@ test('tabs: a bubble keeps its page, a line keeps its kind, and a deleted page f
 });
 
 test('search: the page has a field and the script searches titles, bodies and transcripts across pages', () => {
-    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
-    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../site/thing/index.html', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../site/thing/thing.js', import.meta.url), 'utf8');
     assert.ok(html.includes('id="q"') && html.includes('id="results"'), 'no search field or results list');
     assert.ok(/function bubbleHaystack[\s\S]*?n\.t[\s\S]*?n\.b[\s\S]*?r\.tx/.test(js), 'search must cover title, body and transcripts');
     assert.ok(/tree\.nodes\.filter\(matches\)/.test(js), 'search must run over every page, not only the open tab');
@@ -138,8 +138,8 @@ test('search: the page has a field and the script searches titles, bodies and tr
 });
 
 test('a device without the address can join, keeps a backup, and every device polls the cloud', () => {
-    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
-    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../site/thing/index.html', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../site/thing/thing.js', import.meta.url), 'utf8');
     assert.ok(html.includes('id="nokey"') && html.includes('id="nokey-input"'), 'no way to enter the address on a device that lacks it');
     assert.ok(/sj_thing_backup_/.test(js), 'joining must leave a local backup behind');
     assert.ok(/setInterval\([\s\S]*?cloudLoad\(\)[\s\S]*?POLL_MS\)/.test(js), 'devices must poll the cloud');
@@ -156,7 +156,7 @@ test('the home-screen icon carries the address: the manifest answers with the ke
     assert.equal(bare.start_url, '/thing/', 'no key, no key');
     const bad = await (await onRequestGet({ request: new Request('https://www.sj-eng.co.il/thing/manifest.webmanifest?k=../x') })).json();
     assert.equal(bad.start_url, '/thing/', 'a malformed key is dropped, not echoed');
-    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../site/thing/thing.js', import.meta.url), 'utf8');
     assert.ok(/manifest\.webmanifest\?k=/.test(js), 'the page must point its manifest at the keyed one');
 });
 
@@ -193,15 +193,15 @@ test('the bin: a deleted bubble waits 30 days with its lines, a restore beats th
     assert.ok(m2.nodes.some((n) => n.id === 'a'), 'the restore wins over the tombstone');
     assert.equal(m2.trash.length, 0, 'and it leaves the bin');
 
-    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
-    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../site/thing/thing.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../site/thing/index.html', import.meta.url), 'utf8');
     assert.ok(/function restoreFromTrash/.test(js) && /function purgeFromTrash/.test(js) && /function emptyTrash/.test(js));
     assert.ok(html.includes('id="trash"') && html.includes('id="btn-trash"'), 'the bin has no door');
 });
 
 test('three small things: an untitled bubble shows its first words, a tapped line has a delete button, and the map zooms far out', () => {
-    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
-    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../site/thing/thing.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../site/thing/index.html', import.meta.url), 'utf8');
     assert.ok(/firstWords\(n\) \|\| 'ללא כותרת'/.test(js), 'the label must fall back to the body before "ללא כותרת"');
     assert.ok(html.includes('id="edge-bar"') && /function deleteSelectedEdge/.test(js), 'no delete button for a line');
     assert.ok(!/confirm\(`למחוק את הקו/.test(js), 'the line dialog should be gone');
@@ -211,8 +211,8 @@ test('three small things: an untitled bubble shows its first words, a tapped lin
 });
 
 test('choosing many: a selection box, a whole tree by Ctrl or from the sheet, and they move together', () => {
-    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
-    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../site/thing/thing.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../site/thing/index.html', import.meta.url), 'utf8');
     assert.ok(html.includes('id="marquee"') && html.includes('id="btn-marquee"'), 'no selection box or its phone button');
     assert.ok(/type: 'marquee'/.test(js) && /ev\.shiftKey \|\| marqueeMode/.test(js), 'Shift-drag or the mode must start a box');
     assert.ok(/function connectedTo/.test(js) && /function pickTree/.test(js), 'no way to grab a whole tree');
@@ -221,8 +221,8 @@ test('choosing many: a selection box, a whole tree by Ctrl or from the sheet, an
 });
 
 test('pictures on a bubble: shrunk in the page, stored like the voice notes, gone with the bubble', () => {
-    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
-    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../site/thing/thing.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../site/thing/index.html', import.meta.url), 'utf8');
     const api = readFileSync(new URL('../functions/api/thing.js', import.meta.url), 'utf8');
     assert.ok(html.includes('id="f-img-input"') && html.includes('accept="image/*"'), 'no way to pick a picture');
     assert.ok(/toBlob\(res, 'image\/jpeg', 0\.82\)/.test(js) && /MAX = 1280/.test(js), 'a photo must be shrunk before it is sent');
@@ -235,8 +235,8 @@ test('the legend is his to rename: names ride with the tree, the newest rename w
     assert.deepEqual(t.legend.map((l) => [l.c, l.name]), [[4, 'סיפור ישן'], [7, 'x']], 'names are trimmed and colours clamped; an empty name is no entry');
     const m = mergeTrees({ legend: [{ c: 4, name: 'ישן', u: 1 }] }, { legend: [{ c: 4, name: 'חדש', u: 2 }, { c: 7, name: 'לעשות', u: 1 }] });
     assert.deepEqual(m.legend.map((l) => l.name).sort(), ['חדש', 'לעשות']);
-    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
-    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../site/thing/thing.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../site/thing/index.html', import.meta.url), 'utf8');
     assert.ok(/function legendName/.test(js) && /function renameLegend/.test(js), 'no way to rename');
     assert.ok(html.includes('id="btn-legend-edit"'), 'no pencil on the legend');
     assert.ok(!/LEGEND_BY_C\[c\]\.name\)/.test(js.slice(js.indexOf('function legendPick'), js.indexOf('function toggleLegendEdit'))), 'the picker must show the renamed name');
@@ -247,8 +247,8 @@ test('a page can stay out of הכל, and one button paints every bubble by the l
     assert.deepEqual(t.pages.map((p) => p.x), [true, false], 'the flag rides with the page');
     const m = mergeTrees({ pages: [{ id: 'p1', name: 'פרטי', u: 1, x: false }] }, { pages: [{ id: 'p1', name: 'פרטי', u: 2, x: true }] });
     assert.equal(m.pages[0].x, true, 'the newer flag wins');
-    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
-    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../site/thing/thing.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../site/thing/index.html', import.meta.url), 'utf8');
     assert.ok(/function hiddenPages/.test(js) && /function togglePageHidden/.test(js), 'no way to keep a page out of the general view');
     assert.ok(/const groups = generalPages\(\);/.test(js), 'a hidden page must not get a slot in הכל');
     assert.ok(html.includes('id="btn-paint"') && /async function paintAll/.test(js) && /function undoPaint/.test(js), 'no paint-all button, or no way back');
@@ -268,7 +268,7 @@ test('a blob can only leave as the exact type that was allowed in', () => {
     assert.ok(!api.includes("'Content-Type': mime,"), 'a stored mime must not be echoed without re-validation');
     const mw = readFileSync(new URL('../functions/_middleware.js', import.meta.url), 'utf8');
     assert.ok(mw.includes('X-Content-Type-Options'), 'every /api/* response gets nosniff from the middleware');
-    const admin = readFileSync(new URL('../sale/admin.js', import.meta.url), 'utf8');
+    const admin = readFileSync(new URL('../site/sale/admin.js', import.meta.url), 'utf8');
     assert.ok(!admin.includes("escapeHtml(m.text).replace(/\\n/g, '<br>')"), 'the admin reader must not re-insert markup after escaping');
 });
 
@@ -344,19 +344,19 @@ test('merging a tree that uses every new field with itself changes nothing', () 
 // 4.9.2026 — Stav's second round on the tree: undo, clipboard, arrows, two
 // colours, big bubbles, and four bugs. These pin the shapes that fixed them.
 test('one bubble per double tap: the pointer path decides, there is no dblclick listener', () => {
-    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../site/thing/thing.js', import.meta.url), 'utf8');
     assert.ok(!js.includes("addEventListener('dblclick'"), 'a dblclick listener next to the tap detector makes two bubbles per double-click');
     assert.ok(js.includes('lastTapX') && js.includes('< 30'), 'a double tap must be two taps in the same place');
 });
 test('a reply from the cloud is merged in, never dropped over what happened meanwhile', () => {
-    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../site/thing/thing.js', import.meta.url), 'utf8');
     assert.ok(js.includes('tree = mergeLocal(tree, merged)'), 'adopt must merge, not replace');
     assert.ok(js.includes('const seq = localSeq;') && js.includes('localSeq === seq'), 'a save that started before a change may not clear dirty');
     assert.ok(js.includes('keepalive: true'), 'a save started while the page closes must still land');
     assert.ok(js.includes("'trash:' + x.id"), 'a purge must leave a tombstone or the bin refills from the other device');
 });
 test('undo covers every edit, the media never', () => {
-    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../site/thing/thing.js', import.meta.url), 'utf8');
     for (const fn of ['function addNodeAt', 'function connect(a, b)', 'function deleteSelected', 'function deletePicked', 'function setColor', 'function setColor2', 'function toggleBig', 'function cycleEdgeDir', 'function deleteSelectedEdge', 'function pasteClipboard', 'function cutPicked', 'function nudgePicked', 'function assignPage']) {
         const i = js.indexOf(fn); assert.ok(i > -1, fn + ' missing');
         const body = js.slice(i, js.indexOf('\n}', i));
@@ -367,13 +367,13 @@ test('undo covers every edit, the media never', () => {
     assert.ok(js.includes("mod && k === 'z'") && js.includes("k === 'v'"), 'Ctrl+Z / Ctrl+V are wired');
 });
 test('a line wears the colour of the bubble it was drawn from, and can carry an arrow', () => {
-    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8');
+    const js = readFileSync(new URL('../site/thing/thing.js', import.meta.url), 'utf8');
     assert.ok(js.includes('const c = a.c || 0;'), 'a white source gives a plain line, never the target colour');
     assert.ok(js.includes("e.d === 'ab' || e.d === 'both'") && js.includes("e.d === 'ba' || e.d === 'both'"), 'both arrow ends are drawn');
-    const html = readFileSync(new URL('../thing/index.html', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../site/thing/index.html', import.meta.url), 'utf8');
     for (const id of ['btn-undo', 'btn-redo', 'pickbar', 'btn-paste', 'f-colors2', 'btn-big', 'edge-bar', 'edge-dir', 'confirm']) assert.ok(html.includes('id="' + id + '"'), id + ' missing from the page');
 });
 test('an empty note goes away when it is closed', () => {
-    const js = readFileSync(new URL('../thing/thing.js', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+    const js = readFileSync(new URL('../site/thing/thing.js', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
     assert.ok(js.includes('function closeIfEmpty') && js.includes("closeIfEmpty();\n    $('sheet').classList.remove"), 'closeSheet must discard an empty note first');
 });

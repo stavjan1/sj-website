@@ -17,9 +17,9 @@ import { dirname, join } from 'node:path';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const PUBLIC_TEXT = [
-    ...readdirSync(ROOT).filter((f) => f.endsWith('.html') || f === 'llms.txt'),
-    'ask/index.html', 'zerem/index.html', 'sale/index.html',
-    'functions/api/assistant.js', 'sale/coverage.js', 'functions/api/_pricing_map.js',
+    ...readdirSync(join(ROOT, 'site')).filter((f) => f.endsWith('.html') || f === 'llms.txt').map((f) => 'site/' + f),
+    'site/ask/index.html', 'site/zerem/index.html', 'site/sale/index.html',
+    'functions/api/assistant.js', 'site/sale/coverage.js', 'functions/api/_pricing_map.js',
 ].map((rel) => ({ rel, text: readFileSync(join(ROOT, rel), 'utf8') }));
 
 // Phrases that assert SJ *is* something. Each is a self-claim in any context.

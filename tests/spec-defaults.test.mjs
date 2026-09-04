@@ -16,7 +16,7 @@ import { readApp } from './_app-source.mjs';
 import { createContext, runInContext } from 'node:vm';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const COVERAGE = readFileSync(join(ROOT, 'sale', 'coverage.js'), 'utf8').replace(/\r\n/g, '\n');
+const COVERAGE = readFileSync(join(ROOT, 'site', 'sale', 'coverage.js'), 'utf8').replace(/\r\n/g, '\n');
 const APP = readApp().replace(/\r\n/g, '\n');
 
 const cut = (name) => {

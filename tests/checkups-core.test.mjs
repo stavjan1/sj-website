@@ -18,7 +18,7 @@ import { createContext, runInContext } from 'node:vm';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const load = () => {
     const ctx = createContext({ Date, String, Number, Math, Array, Object });
-    runInContext(readFileSync(join(ROOT, 'assets', 'checkups-core.js'), 'utf8'), ctx);
+    runInContext(readFileSync(join(ROOT, 'site', 'assets', 'checkups-core.js'), 'utf8'), ctx);
     return runInContext('SJ_CK', ctx);
 };
 
@@ -109,6 +109,6 @@ test('the app delegates — no second copy of the arithmetic', () => {
     }
     assert.doesNotMatch(sale, /Checkups\/\/HE/, 'a second copy of the checkup .ics is back');
     // And the page must actually load the core, or the delegation is a crash.
-    assert.match(readFileSync(join(ROOT, 'sale', 'index.html'), 'utf8'), /assets\/checkups-core\.js/,
+    assert.match(readFileSync(join(ROOT, 'site', 'sale', 'index.html'), 'utf8'), /assets\/checkups-core\.js/,
         'sale/index.html no longer loads assets/checkups-core.js');
 });

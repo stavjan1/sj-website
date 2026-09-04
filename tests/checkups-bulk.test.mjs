@@ -20,7 +20,7 @@ import { createContext, runInContext } from 'node:vm';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
 const APP = readApp();
-const HTML = read('sale', 'index.html');
+const HTML = read('site', 'sale', 'index.html');
 
 // The body of one function, by brace counting from its declaration.
 function fn(src, name) {
@@ -104,7 +104,7 @@ test('there is exactly one thing in the codebase that builds a calendar file', (
 
 test('many appointments come out as ONE calendar file', () => {
     const ctx = createContext({ Date, String, Number, Math, Array, Object });
-    runInContext(read('assets', 'checkups-core.js'), ctx);
+    runInContext(read('site', 'assets', 'checkups-core.js'), ctx);
     const CK = runInContext('SJ_CK', ctx);
     const a = { id: 'a', name: 'דירה', months: 12, last: '2026-01-10' };
     const b = { id: 'b', name: 'משרד', months: 6, last: '2026-02-10' };

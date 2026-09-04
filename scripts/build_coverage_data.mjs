@@ -22,8 +22,8 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 
 const ROOT = new URL('../', import.meta.url);
-const SRC = new URL('sale/coverage.js', ROOT);
-const OUT_DIR = new URL('data/coverage/', ROOT);
+const SRC = new URL('site/sale/coverage.js', ROOT);
+const OUT_DIR = new URL('site/data/coverage/', ROOT);
 const OUT = new URL('checklists.json', OUT_DIR);
 
 export function extract(source) {

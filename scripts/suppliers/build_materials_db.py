@@ -7,7 +7,7 @@ Raw -> normalized is a separate step on purpose: the schema below will change as
 we learn what the bot actually needs, and a schema change must never mean
 hitting the supplier again.
 
-What comes out (data/materials/):
+What comes out (site/data/materials/):
   erco.json        full normalized rows — the human/tooling-readable source
   index.json       compact runtime payload the API + client search over
   taxonomy.json    the category tree with price statistics per node
@@ -33,8 +33,8 @@ from collections import defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
-RAW_DIR = os.path.join(REPO, "data", "materials", "raw")
-OUT_DIR = os.path.join(REPO, "data", "materials")
+RAW_DIR = os.path.join(REPO, "site", "data", "materials", "raw")
+OUT_DIR = os.path.join(REPO, "site", "data", "materials")
 
 VAT_RATE = 0.18  # Israel, since 1.1.2025. Site prices are shown INCLUDING VAT.
 

@@ -10,8 +10,8 @@ import { hydrate, searchMaterials, searchMaterialsMulti, extractItemQueries,
          categoryStats, renderMaterialsBlock, consumableQueries } from '../../functions/api/_materials.js';
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => readFileSync(new URL(p, ROOT), 'utf8');
-const db = hydrate(JSON.parse(read('data/materials/index.json')));
-const APP = read('sale/app.js');
+const db = hydrate(JSON.parse(read('site/data/materials/index.json')));
+const APP = read('site/sale/app.js');
 // The WHOLE function, not a fixed window. A 12,000-char window cut
 // getProfessionSystemInstruction — 13,970 chars — right before the JSON output
 // contract at offset 13,066, so every run tested a prompt that never asked for
@@ -22,7 +22,7 @@ function literalBlock(fn) {
   const next = APP.indexOf('\nfunction ', at + 10);
   return ((next === -1 ? APP.slice(at) : APP.slice(at, next)).match(/`[^`]*`/g) || []).join('\n');
 }
-function sternBlock(){const r=JSON.parse(read('sale/stern-pricing.json').replace(/^\uFEFF/,''));const items=Array.isArray(r)?r:r.items;
+function sternBlock(){const r=JSON.parse(read('site/sale/stern-pricing.json').replace(/^\uFEFF/,''));const items=Array.isArray(r)?r:r.items;
   return items.filter(i=>i&&i.description&&Number(i.price)>0).map(i=>`• ${i.description} — ${i.price} ₪`).join('\n');}
 const CLIENT=[literalBlock('getProfessionSystemInstruction'),sternBlock(),
   literalBlock('getMarketAnchorsPromptBlock'),literalBlock('getPricingInstinctPromptBlock')].join('\n\n');

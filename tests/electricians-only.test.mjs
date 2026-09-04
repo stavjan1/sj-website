@@ -43,11 +43,11 @@ function stripComments(src) {
         .join('\n');
 }
 
-const SALE_HTML = stripComments(read('sale/index.html'));
-const HOME_HTML = stripComments(read('index.html'));
-const SERVICES_HTML = stripComments(read('services.html'));
-const ZEREM_HTML = stripComments(read('zerem/index.html'));
-const LLMS = read('llms.txt');
+const SALE_HTML = stripComments(read('site/sale/index.html'));
+const HOME_HTML = stripComments(read('site/index.html'));
+const SERVICES_HTML = stripComments(read('site/services.html'));
+const ZEREM_HTML = stripComments(read('site/zerem/index.html'));
+const LLMS = read('site/llms.txt');
 const APP = stripComments(readApp());
 const STATS = stripComments(read('functions/api/stats.js'));
 
@@ -117,7 +117,7 @@ test('the stats pipeline has one bucket, whatever the client sends', () => {
 test('the words a new user reads say electricians', () => {
     const banned = /לבעלי מקצוע|לאנשי מקצוע|קבלני שיפוצים|אינסטלט/;
     const pages = [
-        ['sale/index.html', SALE_HTML], ['zerem/index.html', ZEREM_HTML], ['llms.txt', LLMS],
+        ['site/sale/index.html', SALE_HTML], ['site/zerem/index.html', ZEREM_HTML], ['llms.txt', LLMS],
         ['index.html', HOME_HTML], ['services.html', SERVICES_HTML],
     ];
     for (const [name, text] of pages) {

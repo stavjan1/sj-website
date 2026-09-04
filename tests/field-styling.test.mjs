@@ -22,8 +22,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const CSS = readFileSync(join(ROOT, 'sale', 'css', 'panels.css'), 'utf8');
-const HTML = readFileSync(join(ROOT, 'sale', 'index.html'), 'utf8');
+const CSS = readFileSync(join(ROOT, 'site', 'sale', 'css', 'panels.css'), 'utf8');
+const HTML = readFileSync(join(ROOT, 'site', 'sale', 'index.html'), 'utf8');
 
 // The containers the base rule actually covers, read out of the CSS rather than
 // listed here — so this test cannot drift from the thing it guards.

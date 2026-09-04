@@ -15,7 +15,7 @@ import { readApp } from './_app-source.mjs';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (f) => readFileSync(join(ROOT, f), 'utf8');
 const APP = readApp();
-const HTML = read('sale/index.html');
+const HTML = read('site/sale/index.html');
 const DATA = read('functions/api/data.js');
 const ADMIN_USERS = read('functions/api/admin-users.js');
 
@@ -93,6 +93,6 @@ test('both promises have a button', () => {
     assert.match(HTML, /onclick="exportMyData\(\)"/, 'there is no way to get a copy of your data');
     assert.match(HTML, /onclick="eraseMyData\(\)"/, 'there is no way to delete your data');
     // And the terms must keep saying it, or the buttons are the only record.
-    assert.match(read('zerem/terms.html'), /לבקשת עיון או מחיקה/,
+    assert.match(read('site/zerem/terms.html'), /לבקשת עיון או מחיקה/,
         'the terms no longer mention the access and erasure rights these buttons implement');
 });

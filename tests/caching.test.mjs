@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, posix } from 'node:path';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', 'site');
 // CRLF normalised: a Windows checkout (autocrlf) puts \r before every \n.
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
 
@@ -173,7 +173,7 @@ test('the marketing pages agree on one trimmed font link', () => {
 // A no-cache exception under an immutable glob therefore has to detach the
 // header first, or /sale/sw.js leaves as "immutable, no-cache".
 test('every no-cache exception detaches Cache-Control before setting it', () => {
-    const lines = readFileSync(new URL('../_headers', import.meta.url), 'utf8').split(/\r?\n/);
+    const lines = readFileSync(new URL('../site/_headers', import.meta.url), 'utf8').split(/\r?\n/);
     const bad = [];
     lines.forEach((l, i) => { if (/^\s+Cache-Control:\s*no-cache/.test(l) && !/^\s+!\s*Cache-Control/.test(lines[i - 1] || '')) bad.push(i + 1); });
     assert.deepEqual(bad, [], 'no-cache without a preceding "! Cache-Control" at lines ' + bad.join(', '));

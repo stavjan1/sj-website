@@ -29,8 +29,8 @@ import { renderPanelSizerBlock } from '../../functions/api/_panel_sizer.js';
 const ROOT = new URL('../../', import.meta.url);
 const read = (p) => readFileSync(new URL(p, ROOT), 'utf8');
 
-const db = hydrate(JSON.parse(read('data/materials/index.json')));
-const COVERAGE = JSON.parse(read('data/coverage/checklists.json'));
+const db = hydrate(JSON.parse(read('site/data/materials/index.json')));
+const COVERAGE = JSON.parse(read('site/data/coverage/checklists.json'));
 const PANEL_JOB = /לוח חשמל|לוח דירתי|החלפת לוח|ארון חשמל|מודול|מקומות בלוח|מא"ז|מאז|ממסר פחת|מגען|שעון שבת|תלת פאזי|תלת-פאזי/;
 
 // --------------------------------------------------------------------------
@@ -41,7 +41,7 @@ const PANEL_JOB = /לוח חשמל|לוח דירתי|החלפת לוח|ארון 
 // book, which is data. That is the whole of what a pricing turn carries today:
 // the system catalog is empty in production (verified against /api/catalog), so
 // getPriceCatalogPromptBlock renders to nothing.
-const APP = read('sale/app.js');
+const APP = read('site/sale/app.js');
 
 function literalBlock(fnName) {
   const at = APP.indexOf(`function ${fnName}(`);
@@ -59,7 +59,7 @@ function literalBlock(fnName) {
 }
 
 function sternBlock() {
-  const rows = JSON.parse(read('sale/stern-pricing.json').replace(/^﻿/, ''));
+  const rows = JSON.parse(read('site/sale/stern-pricing.json').replace(/^﻿/, ''));
   const items = Array.isArray(rows) ? rows : rows.items;
   return items
     .filter((it) => it && it.description && Number(it.price) > 0)

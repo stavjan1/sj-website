@@ -10,7 +10,7 @@ const path = require('path');
 const { chromium } = require('playwright');
 
 // Resolved from this file, not hardcoded — see csp-page-check.js.
-const ROOT = require('path').resolve(__dirname, '..', '..');
+const ROOT = require('path').resolve(__dirname, '..', '..', 'site');
 const PORT = 8932;
 const headersFile = fs.readFileSync(path.join(ROOT, '_headers'), 'utf8');
 const cspLine = headersFile.split('\n').find((l) => /^\s*Content-Security-Policy(-Report-Only)?:/.test(l));

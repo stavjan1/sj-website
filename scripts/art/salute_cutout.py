@@ -10,10 +10,11 @@ What this does instead: flood-fill inward from the four corners with a colour
 tolerance, so only background CONNECTED to the border is removed. A light patch
 inside a figure is never reached, because the figure's outline stops the fill.
 
-    python3 scripts/art/salute_cutout.py assets/salute-source.png
+    python3 scripts/art/salute_cutout.py site/assets/salute-source.png
 
-Writes assets/salute-a.png (right figure, RTL: the first one you read) and
-assets/salute-b.png, each trimmed to the figure and 512px tall.
+Writes site/assets/salute-a.png (right figure, RTL: the first one you read) and
+site/assets/salute-b.png, each trimmed to the figure and 512px tall. Paths are
+resolved from the script's location, so it runs from any directory.
 """
 import sys
 import pathlib
@@ -23,6 +24,11 @@ import numpy as np
 SENTINEL = (255, 0, 255)      # a colour the artwork cannot contain
 TOLERANCE = 42                # per-channel distance that still counts as paper
 TARGET_H = 512            # a ceiling, never an upscale
+
+# The public site lives in site/ (the Pages build output directory); the
+# artwork sits in its assets folder.
+REPO = pathlib.Path(__file__).resolve().parents[2]
+ASSETS = REPO / 'site' / 'assets'
 
 
 def already_cut(img: Image.Image) -> bool:
@@ -83,7 +89,7 @@ def trim(img: Image.Image) -> Image.Image:
 
 
 def main():
-    src = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else 'assets/salute-source.png')
+    src = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else ASSETS / 'salute-source.png'
     if not src.exists():
         sys.exit(f'not found: {src}\nPut the artwork there (png/jpg) and run again.')
     img = Image.open(src)
@@ -101,7 +107,7 @@ def main():
         if fig.height != target:
             scale = target / fig.height
             fig = fig.resize((max(1, round(fig.width * scale)), target), Image.LANCZOS)
-        out = pathlib.Path('assets') / f'salute-{name}.png'
+        out = ASSETS / f'salute-{name}.png'
         fig.save(out, optimize=True)
         print(f'{out}  {fig.width}x{fig.height}  {out.stat().st_size // 1024} KB')
 

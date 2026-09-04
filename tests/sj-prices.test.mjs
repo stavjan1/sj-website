@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { SJ_ITEMS, SJ_GROUPS } from '../functions/api/_sj_catalog.js';
 
-const book = JSON.parse(readFileSync(new URL('../sale/data/sj-prices.json', import.meta.url), 'utf8'));
-const core = JSON.parse(readFileSync(new URL('../sale/data/sj-prices.core.json', import.meta.url), 'utf8'));
+const book = JSON.parse(readFileSync(new URL('../site/sale/data/sj-prices.json', import.meta.url), 'utf8'));
+const core = JSON.parse(readFileSync(new URL('../site/sale/data/sj-prices.core.json', import.meta.url), 'utf8'));
 
 test('the public price file is ours: decided prices, two modes, no Dekel numbers', () => {
     assert.ok(book.rows.length > 2000, 'the everyday catalogue is thousands of rows');
@@ -47,10 +47,10 @@ test('the helper list is work items only, each with our price, unique ids', () =
 
 test('the three seams are wired', () => {
     const api = readFileSync(new URL('../functions/api/helper-prices.js', import.meta.url), 'utf8');
-    const app = readFileSync(new URL('../sale/app.js', import.meta.url), 'utf8');
-    const chat = readFileSync(new URL('../sale/chat.js', import.meta.url), 'utf8');
-    const html = readFileSync(new URL('../sale/index.html', import.meta.url), 'utf8');
-    const market = readFileSync(new URL('../sale/market.js', import.meta.url), 'utf8');
+    const app = readFileSync(new URL('../site/sale/app.js', import.meta.url), 'utf8');
+    const chat = readFileSync(new URL('../site/sale/chat.js', import.meta.url), 'utf8');
+    const html = readFileSync(new URL('../site/sale/index.html', import.meta.url), 'utf8');
+    const market = readFileSync(new URL('../site/sale/market.js', import.meta.url), 'utf8');
     assert.ok(api.includes('basicItems().concat(helperCatalog(), custom)'), 'the helper list must be the basics, then the catalogue, then the helpers' + String.fromCharCode(39) + ' own items');
     assert.ok(/groups: SJ_GROUPS/.test(api), 'the helper response must carry the groups');
     assert.ok(/function getSjPriceBlock/.test(app) && /loadSjPrices\(\)/.test(app), 'the agent block is missing');
@@ -60,9 +60,9 @@ test('the three seams are wired', () => {
 });
 
 test('boot loads the core slice and waits for it before a money prompt; the view loads the full book apart', () => {
-    const app = readFileSync(new URL('../sale/app.js', import.meta.url), 'utf8');
-    const chat = readFileSync(new URL('../sale/chat.js', import.meta.url), 'utf8');
-    const market = readFileSync(new URL('../sale/market.js', import.meta.url), 'utf8');
+    const app = readFileSync(new URL('../site/sale/app.js', import.meta.url), 'utf8');
+    const chat = readFileSync(new URL('../site/sale/chat.js', import.meta.url), 'utf8');
+    const market = readFileSync(new URL('../site/sale/market.js', import.meta.url), 'utf8');
     assert.ok(/fetch\('data\/sj-prices\.core\.json'/.test(app), 'boot must fetch the core file, not the 685 KB book');
     assert.ok(!/fetch\('data\/sj-prices\.json'/.test(app), 'app.js must not fetch the full book');
     assert.ok(/function sjPricesSettled/.test(app), 'the settle helper is gone');

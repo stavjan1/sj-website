@@ -15,8 +15,8 @@ import { readApp } from './_app-source.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const APP = readApp();
-const CHECKLISTS = JSON.parse(readFileSync(join(ROOT, 'data', 'coverage', 'checklists.json'), 'utf8'));
-const COVERAGE = readFileSync(join(ROOT, 'sale', 'coverage.js'), 'utf8');
+const CHECKLISTS = JSON.parse(readFileSync(join(ROOT, 'site', 'data', 'coverage', 'checklists.json'), 'utf8'));
+const COVERAGE = readFileSync(join(ROOT, 'site', 'sale', 'coverage.js'), 'utf8');
 
 test('an "I don\'t know" answer still prints its assumption', () => {
   // 21 chips across the checklists let you say you do not know. Storing a

@@ -1,0 +1,24 @@
+# Only non-obvious redirects live here.
+# CF Pages serves .html files and index.html in subdirs automatically.
+# Nothing outside site/ is deployed (site/ is the Pages build output
+# directory), so there is nothing to hide with 404 rules — and Pages ignores
+# 404 rules in this file anyway (verified live, 4.9.2026).
+
+/app    /sale/    301
+# The helper screen has a door of its own — the link Stav sends a friend.
+/help   /sale/?panel=helper   302
+/Help   /sale/?panel=helper   302
+/HELP   /sale/?panel=helper   302
+/עזרה   /sale/?panel=helper   302
+
+# The standalone periodic-checkups page was retired (4.9.2026): the screen
+# lives inside the app. The URL was already sent to customers on WhatsApp and
+# sits in bookmarks, so it keeps landing somewhere.
+/checkups    /sale/    301
+/checkups/*  /sale/    301
+
+# Case tolerance for the shared /ask/ link (people type it by hand from WhatsApp)
+/ASK    /ask/    301
+/ASK/*  /ask/    301
+/Ask    /ask/    301
+/Ask/*  /ask/    301
