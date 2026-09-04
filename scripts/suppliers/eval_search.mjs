@@ -26,8 +26,11 @@ const QUERIES = process.argv.slice(2).length ? process.argv.slice(2) : [
   'תעלת רשת 100 מ"מ',
   'מהדק שורה 4 ממ"ר',
   'נעל כבל 16 ממ"ר',
-  'מולטימטר',
+  'קונטקטור 25A',
   'פס צבירה לוח חשמל',
+  // The two probes that used to come back with space heaters and phone chargers.
+  'מפסק מוגן מים IP65',
+  'מטען',
 ];
 
 console.log(`db: ${db.items.length} items, ${db.cats.length} categories\n`);

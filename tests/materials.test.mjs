@@ -80,6 +80,31 @@ test('SKUs are unique', () => {
   assert.equal(dupes.length, 0, `duplicate SKUs: ${dupes.slice(0, 5).join(', ')}`);
 });
 
+// --------------------------------------------------------------------------
+// What must NOT be in the catalog
+// --------------------------------------------------------------------------
+
+// ERCO also sells kitchen appliances, phone chargers, space heaters and a
+// whole tool department. None of it is a quotable material, and all of it won
+// searches it had no business winning ("מפסק מוגן מים IP65" → two heaters).
+// The build cuts it; these canaries make sure a re-harvest cannot let it back.
+const MUST_NOT_SHIP = /SHARK|NINJA|Iphone|מייבש ידיים|מאוורר רצפה|מאוורר ריצפה|תנור אינפרא|רב מודד|Makita|סרט תואם דיימו|מולטימטר|קומקום חשמלי|מטען נייד/i;
+const MUST_SHIP = [/N2XY/, /מא"ז/, /^ממסר פחת/, /מאוורר תקרה/, /^שנאי/, /^גלאי עשן/, /^פעמון/];
+
+test('consumer goods and tools are not in the catalog', () => {
+  const leaked = db.items.filter((it) => MUST_NOT_SHIP.test(it.name));
+  assert.equal(leaked.length, 0,
+    `not materials, still shipped: ${leaked.slice(0, 5).map((i) => i.name).join(' | ')}`);
+});
+
+test('the cut did not take the electrical goods filed next to the junk', () => {
+  // Transformers, detectors and bells share ERCO's "home electricity" anchor
+  // with the kettles; ceiling fans share a bucket with the box fans; the UV
+  // N2XY ranges are filed under power-tool accessories.
+  const missing = MUST_SHIP.filter((rx) => !db.items.some((it) => rx.test(it.name)));
+  assert.equal(missing.length, 0, `cut too deep, lost: ${missing.join(' ')}`);
+});
+
 test('the runtime index stays small enough to parse per cold start', () => {
   // The Worker parses this whole file on a cold isolate. Past ~3MB that starts
   // showing up as first-request latency on every chat turn.
@@ -141,7 +166,7 @@ const TRADE_QUERIES = [
   'קופסת חיבורים',
   'שרוול',
   'נעל כבל',
-  'מולטימטר',
+  'מגען',
   'מהדק',
   'פס צבירה',
 ];
@@ -180,12 +205,13 @@ test('one huge product family cannot swallow the whole result budget', () => {
 // a future scoring tweak has to keep passing them.
 
 test('trade slang reaches the catalog word for the same thing', () => {
-  // ERCO files multimeters as "רב מודד" / "מודד". Before the synonym map, the
-  // word every electrician actually says returned two hits out of a whole
-  // measurement department.
-  const hits = searchMaterials(db, 'מולטימטר', 6);
-  assert.ok(hits.length >= 3, `only ${hits.length} hits for מולטימטר`);
-  assert.ok(/מולטימטר|מודד/.test(hits[0].name), `top hit is unrelated: ${hits[0].name}`);
+  // ERCO files contactors as "מגען"; half the trade says "קונטקטור". Before
+  // the synonym map the loan-word returned nothing. (This used to be checked
+  // on מולטימטר / "רב מודד" — meters are tools, and tools no longer ship in the
+  // catalog, so the check moved to a part that does.)
+  const hits = searchMaterials(db, 'קונטקטור', 6);
+  assert.ok(hits.length >= 3, `only ${hits.length} hits for קונטקטור`);
+  assert.ok(/מגען/.test(hits[0].name), `top hit is unrelated: ${hits[0].name}`);
 
   // 'מא"ז' is filed as "חצי אוטומט" and 'מאמ"ת'.
   const mz = searchMaterials(db, 'מא"ז 3x25', 6);
@@ -369,7 +395,7 @@ test('the word that names the product beats the words that describe it', () => {
 test('a misspelling still finds the product', () => {
   // Hebrew typos are mostly homophone swaps (ח/כ, ט/ת, א/ע/ה) plus dropped
   // letters. Both classes are repaired against the catalog's own vocabulary.
-  for (const [typo, rx] of [['מולטמטר', /מולטימטר/], ['אלקטרודה', /אלקטרודה/]]) {
+  for (const [typo, rx] of [['מגאן', /מגען/], ['אלקטרודה', /אלקטרודה/]]) {
     const hits = searchMaterials(db, typo, 3);
     assert.ok(hits.length > 0, `no hits for ${typo}`);
     assert.ok(hits.some((h) => rx.test(h.name)), `${typo} → ${hits.map((h) => h.name).join(' | ')}`);
