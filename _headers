@@ -58,10 +58,6 @@
   Cache-Control: public, max-age=31536000, immutable
 /assets/*.css
   Cache-Control: public, max-age=31536000, immutable
-/assets/tokens.css
-  Cache-Control: public, max-age=31536000, immutable
-/assets/ui.css
-  Cache-Control: public, max-age=31536000, immutable
 /sale/*.js
   Cache-Control: public, max-age=31536000, immutable
 /sale/*.css

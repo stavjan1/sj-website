@@ -6170,6 +6170,13 @@ th.pv-price { text-align: end; }
    in a <style> block inside index.html, above #panel-helper. */
 .helper-group { margin: 14px 0 6px; font-size: var(--fs-sm); color: var(--text-2); }
 .helper-sj { font-size: var(--fs-xs); color: var(--accent); margin-inline-start: 6px; white-space: nowrap; }
+.helper-row.has-price .helper-row-name::before { content: '✓'; color: var(--success, #2e9e5b); font-weight: 800; margin-inline-end: 6px; }
+.helper-row.has-price { background: color-mix(in srgb, var(--success, #2e9e5b) 6%, transparent); border-radius: var(--r-sm, 8px); padding-inline: 6px; }
+.helper-basics { margin: 4px 0 10px; font-size: var(--fs-sm); color: var(--text-2); }
+.helper-more { margin: 14px 0 0; font-size: var(--fs-sm); color: var(--text-2); }
+.helper-request { padding: 14px; border: 1px solid var(--border); border-radius: var(--r-md, 12px); line-height: 1.7; }
+.helper-request code { user-select: all; font-size: 1em; }
+.lock-helper-note { margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 12%, transparent); font-size: .9rem; }
 .sj-group summary { cursor: pointer; padding: 8px 0; font-weight: 700; }
 .sj-group .market-row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); font-size: var(--fs-sm); }
 .sj-group .market-nums { white-space: nowrap; }

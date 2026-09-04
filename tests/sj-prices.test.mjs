@@ -51,7 +51,7 @@ test('the three seams are wired', () => {
     const chat = readFileSync(new URL('../sale/chat.js', import.meta.url), 'utf8');
     const html = readFileSync(new URL('../sale/index.html', import.meta.url), 'utf8');
     const market = readFileSync(new URL('../sale/market.js', import.meta.url), 'utf8');
-    assert.ok(/SJ_ITEMS\.concat\(custom\)/.test(api), 'the helper list must be the catalogue plus the helpers\' own items');
+    assert.ok(api.includes('basicItems().concat(helperCatalog(), custom)'), 'the helper list must be the basics, then the catalogue, then the helpers' + String.fromCharCode(39) + ' own items');
     assert.ok(/groups: SJ_GROUPS/.test(api), 'the helper response must carry the groups');
     assert.ok(/function getSjPriceBlock/.test(app) && /loadSjPrices\(\)/.test(app), 'the agent block is missing');
     assert.equal((chat.match(/getSjPriceBlock\(\)/g) || []).length, 2, 'the agent block must reach both prompt builders');

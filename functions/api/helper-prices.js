@@ -116,15 +116,25 @@ async function helperGate(request, env) {
 // with our price as the reference — Stav, 4.9.2026: "תכניס הכל לאתר"), and
 // after it whatever the helpers added themselves (KV). Ids never collide:
 // catalogue ids are Dekel-style codes, added items are Hebrew slugs.
+// What a helper is asked for, in this order: the sixteen everyday jobs in the
+// trade's own words (SEED_ITEMS — a friend can price them in five minutes),
+// then the catalogue behind search, then whatever the helpers added. The
+// catalogue rows that are materials or monthly fees are left out: the screen's
+// first rule is "לא מאגר חומרים", and a house electrician cannot price a metre
+// of telephone cable or an EV-fleet management fee (review, 4.9.2026).
+export function helperCatalog() {
+  return SJ_ITEMS.filter((it) => it.group !== 'cables' && !/חודש/.test(it.name)).map(({ starter, ...it }) => it);
+}
+export function basicItems() { return SEED_ITEMS.map((it) => ({ ...it, basic: true })); }
 async function loadItems(env) {
   const custom = await loadCustomItems(env);
-  return SJ_ITEMS.concat(custom);
+  return basicItems().concat(helperCatalog(), custom);
 }
 async function loadCustomItems(env) {
   if (!env.SJ_DATA) return [];
   const raw = await env.SJ_DATA.get(ITEMS_KEY);
   const list = raw ? safeParse(raw, null) : null;
-  return Array.isArray(list) ? list.filter((it) => it && it.id && !SJ_ITEMS.some((s) => s.id === it.id)) : [];
+  return Array.isArray(list) ? list.filter((it) => it && it.id && !SJ_ITEMS.some((s) => s.id === it.id) && !SEED_ITEMS.some((s) => s.id === it.id)) : [];
 }
 
 async function loadAllPrices(env) {

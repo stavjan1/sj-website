@@ -1606,6 +1606,9 @@ function updateGuestUpgradeUI() {
     if (box) box.style.display = isGuestUser() ? 'block' : 'none';
 }
 
+// /help sends a friend to /sale/?panel=helper: the lock card says why he is
+// here, and after sign-in the helper screen opens instead of the home tab.
+function wantedPanel() { try { return new URLSearchParams(location.search).get('panel') || ''; } catch (e) { return ''; } }
 function initUserSession() {
     // Defense in depth: a guest session must never display a leftover Google
     // identity, no matter which path led here (fresh entry, restored session).
@@ -1629,7 +1632,7 @@ function initUserSession() {
     // get the correction to 'home' afterwards, so a phone that entered as a
     // guest landed on the project list and had to find the chat itself
     // (Stav, 25/08: "זה נפתח בדיפולט על הפרויקטים ולא עם הצ'אט").
-    switchTab('home');
+    switchTab(wantedPanel() === 'helper' ? 'helper' : 'home');
     try { syncConversationsLayout(); } catch (e) {}   // the wide-screen thread column
     updateUserProfileUI();
     try { syncChatGreeting(); } catch (e) {}   // greet whoever is actually here

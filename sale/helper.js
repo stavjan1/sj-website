@@ -4,7 +4,12 @@
 // only once yours is on it (the server decides that, not this file). Kept
 // deliberately small: Stav, 2.9.2026 — "תעשה את המינימום ונזרום".
 
-let helperState = { items: [], groups: [], mine: {}, others: {}, loaded: false };
+let helperState = { items: [], groups: [], mine: {}, others: {}, loaded: false, denied: false };
+// True when the address that opened the app asked for this screen (/help →
+// /sale/?panel=helper): the panel opens by itself after sign-in, and a friend
+// who is not a helper yet gets a card that says how to become one instead of
+// nothing at all.
+function helperRequested() { try { return new URLSearchParams(location.search).get('panel') === 'helper'; } catch (e) { return false; } }
 
 function helperEsc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -22,7 +27,7 @@ function helperFmt(n) { return Number(n).toLocaleString('he-IL'); }
 // the answer is retried a few times instead of being remembered as a refusal.
 let helperAccessRetries = 0;
 async function refreshHelperAccess() {
-    const btn = document.getElementById('tab-helper-rail');
+    const btn = document.getElementById('tab-helper');
     if (!btn) return;
     const guest = typeof isGuestUser === 'function' ? isGuestUser() : true;
     if (guest || typeof adminRes !== 'function') { btn.hidden = true; return; }
@@ -30,11 +35,13 @@ async function refreshHelperAccess() {
     try {
         const res = await adminRes('/api/helper-prices');
         btn.hidden = !res.ok;
+        helperState.denied = res.status === 403;
         if (res.ok) {
             const data = await res.json();
-            helperState = { items: data.items || [], groups: data.groups || [], mine: data.mine || {}, others: data.others || {}, loaded: true };
+            helperState = { items: data.items || [], groups: data.groups || [], mine: data.mine || {}, others: data.others || {}, loaded: true, denied: false };
         }
         helperAccessRetries = 0;
+        if (helperRequested() && typeof switchTab === 'function' && !document.getElementById('panel-helper').classList.contains('active')) switchTab('helper');
     } catch (e) {
         if (e && e.code === 'NO_TOKEN' && helperAccessRetries < 4) {
             helperAccessRetries++;
@@ -51,8 +58,9 @@ async function renderHelperPanel(force) {
         try {
             const res = await adminRes('/api/helper-prices');
             const data = await res.json();
+            if (res.status === 403) { root.innerHTML = helperRequestCard(); return; }
             if (!res.ok) { root.innerHTML = '<p class="input-help">' + helperEsc((data.error && data.error.message) || 'אין גישה.') + '</p>'; return; }
-            helperState = { items: data.items || [], groups: data.groups || [], mine: data.mine || {}, others: data.others || {}, loaded: true };
+            helperState = { items: data.items || [], groups: data.groups || [], mine: data.mine || {}, others: data.others || {}, loaded: true, denied: false };
         } catch (e) {
             // A helper who is not the admin never sees the admin strip, so this
             // is his one way back in. Same reconnect as the strip's button —
@@ -65,25 +73,56 @@ async function renderHelperPanel(force) {
         }
     }
     const q = (document.getElementById('helper-q') || {}).value || '';
-    const needle = q.trim();
-    const rows = helperState.items.filter((it) => !needle || it.name.includes(needle) || (it.sub || '').includes(needle));
-    const done = Object.keys(helperState.mine).length;
-    const counter = document.getElementById('helper-progress');
-    if (counter) counter.textContent = done + ' מתוך ' + helperState.items.length + ' סעיפים עם המחיר שלך';
-    if (!rows.length) { root.innerHTML = '<p class="input-help">לא נמצא סעיף כזה — תוסיף אותו למטה.</p>'; return; }
-    // The list reads like the catalogue: the everyday strip first, then the
-    // groups in the order an electrician opens them, the helpers' own items last.
-    const groups = helperState.groups || [];
+    const needle = helperNorm(q);
+    const hit = (it) => !needle || helperNorm(it.name).includes(needle) || helperNorm(it.sub || '').includes(needle) || helperSyn(needle).some((w) => helperNorm(it.name).includes(w));
+    helperCounter();
+    const items = helperState.items;
+    const basics = items.filter((it) => it.basic);
+    const custom = items.filter((it) => !it.basic && !it.group);
+    const catalogue = items.filter((it) => it.group);
     const sections = [];
-    const starter = rows.filter((it) => it.starter);
-    if (starter.length && !needle) sections.push({ name: 'הכי בשימוש', rows: starter });
-    for (const g of groups) {
-        const inG = rows.filter((it) => it.group === g.id && !(it.starter && !needle));
-        if (inG.length) sections.push({ name: g.name, rows: inG });
+    if (!needle) {
+        // Without a search: the basics, the helpers' own rows, and one line that
+        // says the rest of the catalogue is a search away — not 660 rows.
+        sections.push({ name: 'הבסיס — 16 עבודות', rows: basics, note: 'מספר אחד לשורה, לפני מע"מ. אין חובה למלא הכל.' });
+        if (custom.length) sections.push({ name: 'סעיפים שהוספתם', rows: custom });
+    } else {
+        const rows = items.filter(hit);
+        if (!rows.length) { root.innerHTML = '<p class="input-help">לא נמצא סעיף כזה — תוסיף אותו למטה (השם כבר שם).</p>'; helperPrefillAdd(q); return; }
+        const inBasics = rows.filter((it) => it.basic), inCustom = rows.filter((it) => !it.basic && !it.group);
+        if (inBasics.length) sections.push({ name: 'הבסיס', rows: inBasics });
+        for (const g of helperState.groups || []) { const inG = rows.filter((it) => it.group === g.id); if (inG.length) sections.push({ name: g.name, rows: inG }); }
+        if (inCustom.length) sections.push({ name: 'סעיפים שהוספתם', rows: inCustom });
     }
-    const custom = rows.filter((it) => !it.group);
-    if (custom.length) sections.push({ name: 'סעיפים שהוספתם', rows: custom });
-    root.innerHTML = sections.map((sec) => `<h4 class="helper-group">${helperEsc(sec.name)} <span class="input-help">· ${sec.rows.length}</span></h4>` + sec.rows.map(helperRow).join('')).join('');
+    root.innerHTML = sections.map((sec) => `<h4 class="helper-group">${helperEsc(sec.name)} <span class="input-help">· ${sec.rows.length}</span></h4>${sec.note ? `<p class="helper-basics">${helperEsc(sec.note)}</p>` : ''}` + sec.rows.map(helperRow).join('')).join('')
+        + (!needle && catalogue.length ? `<p class="helper-more">יש עוד ${catalogue.length} סעיפים מהמחירון המלא — חפש למעלה (למשל "שקע", "מזגן", "לוח").</p>` : '');
+}
+
+// The counter is a goal, not a verdict: the basics are the unit.
+function helperCounter() {
+    const counter = document.getElementById('helper-progress'); if (!counter) return;
+    const basics = helperState.items.filter((it) => it.basic);
+    const doneBasics = basics.filter((it) => helperState.mine[it.id]).length;
+    const extra = Object.keys(helperState.mine).length - doneBasics;
+    counter.textContent = basics.length ? `${doneBasics} מתוך ${basics.length} הבסיסיים${extra > 0 ? ` · ועוד ${extra}` : ''}` : `${Object.keys(helperState.mine).length} מחירים`;
+}
+
+// Search in the trade's words: a few synonyms so "שקע" finds "בית תקע".
+const HELPER_SYN = { 'שקע': ['בית תקע', 'בתי תקע'], 'שקעים': ['בית תקע'], 'מזגן': ['מיזוג'], 'לוח': ['לוח חשמל', 'לוחות'], 'מאז': ['מא"ז'], 'פחת': ['ממסר פחת'], 'נורה': ['גוף תאורה', 'מנורה'], 'ספוט': ['שקוע'], 'דוד': ['מים חמים'], 'חציבה': ['חריצה'], 'הארקה': ['הארקת'], 'תעלה': ['תעלות'], 'צנרת': ['צינור', 'צינורות'], 'כבל': ['כבלי'] };
+function helperNorm(s) { return String(s || '').replace(/["'״׳]/g, '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+function helperSyn(needle) { return Object.entries(HELPER_SYN).filter(([k]) => needle.includes(k)).flatMap(([, v]) => v.map(helperNorm)); }
+let helperSearchTimer = null;
+function helperSearchChanged() { clearTimeout(helperSearchTimer); helperSearchTimer = setTimeout(() => renderHelperPanel(), 160); }
+function helperPrefillAdd(q) { const el = document.getElementById('helper-new-name'); if (el && !el.value) el.value = q.trim(); }
+
+// Signed in, not (yet) a helper: the one screen a friend must never hit is
+// an empty one. This says what to send Stav, with the address ready to copy.
+function helperRequestCard() {
+    let email = ''; try { email = (typeof getActiveUser === 'function' && getActiveUser()) || ''; } catch (e) { /* not signed in */ }
+    return `<div class="helper-request">
+        <p><b>המסך הזה נפתח לחברים שסתיו הזמין.</b> נכנסת עם ${email ? `<code>${helperEsc(email)}</code>` : 'חשבון Google'} — שלח לו את הכתובת הזאת בוואטסאפ והוא פותח לך תוך דקה.</p>
+        ${email ? `<button type="button" class="btn btn-small btn-accent" onclick="navigator.clipboard&&navigator.clipboard.writeText('${helperEsc(email)}').then(()=>showToast('הכתובת הועתקה — שלח לסתיו','success'))">העתק את הכתובת</button>` : ''}
+    </div>`;
 }
 
 function helperRow(it) {
@@ -91,12 +130,13 @@ function helperRow(it) {
     const others = helperState.others[it.id];
     return `
     <div class="helper-row${mine ? ' has-price' : ''}" id="helper-row-${helperEsc(it.id)}">
-        <div class="helper-row-name">${helperEsc(it.name)} <span class="helper-unit">${helperEsc(it.unit)}</span>${it.sj ? ` <span class="helper-sj" title="המחיר של SJ, לפי ${helperEsc(it.sub || '')}">SJ: ${helperFmt(it.sj)} ₪</span>` : ''}</div>
+        <div class="helper-row-name">${helperEsc(it.name)} <span class="helper-unit">${helperEsc(it.unit)}</span>${mine && it.sj ? ` <span class="helper-sj">המחיר שלנו: ${helperFmt(it.sj)} ₪ — לא חייב להסכים</span>` : ''}</div>
         <div class="helper-row-input">
             <input type="number" inputmode="numeric" min="1" step="1" class="model-select-input" style="width:110px"
                    value="${mine ? helperEsc(mine.price) : ''}" placeholder="₪"
-                   id="helper-price-${helperEsc(it.id)}"
-                   onkeydown="if(event.key==='Enter'){event.preventDefault();saveHelperPrice('${helperEsc(it.id)}')}">
+                   id="helper-price-${helperEsc(it.id)}" data-saved="${mine ? helperEsc(mine.price) : ''}"
+                   onblur="helperBlur('${helperEsc(it.id)}')"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();saveHelperPrice('${helperEsc(it.id)}', true)}">
             <button type="button" class="btn btn-small ${mine ? 'btn-secondary' : 'btn-accent'}" onclick="saveHelperPrice('${helperEsc(it.id)}')">${mine ? 'עדכן' : 'שמור'}</button>
         </div>
         <div class="helper-row-others" id="helper-others-${helperEsc(it.id)}">${helperOthersText(mine, others)}</div>
@@ -111,10 +151,24 @@ function helperOthersText(mine, others) {
     return `<span class="input-help">עוד ${others.n} עוזרים: <b>${helperFmt(others.low)}–${helperFmt(others.high)} ₪</b>, באמצע ${helperFmt(others.median)} ₪.</span>`;
 }
 
-async function saveHelperPrice(itemId) {
+// Leaving a field with a new number in it saves it — a friend on a phone
+// should not need a third tap per row.
+function helperBlur(itemId) {
+    const input = document.getElementById('helper-price-' + itemId); if (!input) return;
+    if (input.value && String(input.value) !== String(input.dataset.saved || '')) saveHelperPrice(itemId);
+}
+function helperFocusNext(itemId) {
+    const inputs = [...document.querySelectorAll('#helper-list input[id^="helper-price-"]')];
+    const i = inputs.findIndex((x) => x.id === 'helper-price-' + itemId);
+    const next = inputs.slice(i + 1).find((x) => !x.value);
+    if (next) { next.focus(); next.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+}
+async function saveHelperPrice(itemId, andNext) {
     const input = document.getElementById('helper-price-' + itemId);
     const price = Math.round(Number(input && input.value));
     if (!price || price <= 0) { showToast('תרשום מחיר.', 'error'); return; }
+    if (input && input.dataset.saving === '1') return;
+    if (input) input.dataset.saving = '1';
     try {
         const res = await adminRes('/api/helper-prices', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -122,16 +176,20 @@ async function saveHelperPrice(itemId) {
         });
         const data = await res.json();
         if (!res.ok) { showToast((data.error && data.error.message) || 'לא נשמר.', 'error'); return; }
+        const wasNew = !helperState.mine[itemId];
         helperState.mine[itemId] = data.mine;
         if (data.others) helperState.others[itemId] = data.others; else delete helperState.others[itemId];
         const row = document.getElementById('helper-row-' + itemId);
         if (row) row.outerHTML = helperRow(helperState.items.find((x) => x.id === itemId));
-        const counter = document.getElementById('helper-progress');
-        if (counter) counter.textContent = Object.keys(helperState.mine).length + ' מתוך ' + helperState.items.length + ' סעיפים עם המחיר שלך';
-        showToast('נשמר.', 'success');
+        helperCounter();
+        const n = Object.keys(helperState.mine).length;
+        if (wasNew && n === 10) showToast('10 מחירים — תודה! זה כבר משפר את המחירון של כולם.', 'success');
+        else if (wasNew && n === helperState.items.filter((it) => it.basic).length) showToast('כל הבסיס מלא. תודה ענקית — סתיו רואה את זה.', 'success');
+        else showToast('נשמר ✓', 'success');
+        if (andNext) helperFocusNext(itemId);
     } catch (e) {
         showToast('לא נשמר — התחבר שוב לגוגל.', 'error');
-    }
+    } finally { const inp = document.getElementById('helper-price-' + itemId); if (inp) delete inp.dataset.saving; }
 }
 
 async function addHelperItem() {
@@ -221,6 +279,8 @@ async function setHelper(email, on) {
 }
 
 window.refreshHelperAccess = refreshHelperAccess;
+window.helperSearchChanged = helperSearchChanged;
+window.helperBlur = helperBlur;
 window.renderHelperPanel = renderHelperPanel;
 window.saveHelperPrice = saveHelperPrice;
 window.addHelperItem = addHelperItem;

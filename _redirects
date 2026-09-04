@@ -37,6 +37,11 @@
 /scripts/*            /404.html   404
 
 /app    /sale/    301
+# The helper screen has a door of its own — the link Stav sends a friend.
+/help   /sale/?panel=helper   302
+/Help   /sale/?panel=helper   302
+/HELP   /sale/?panel=helper   302
+/עזרה   /sale/?panel=helper   302
 
 # The standalone periodic-checkups page was retired (4.9.2026): the screen
 # lives inside the app. The URL was already sent to customers on WhatsApp and
