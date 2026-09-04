@@ -1,7 +1,20 @@
-# Cloudflare Pages headers — kill the Edge/Safari stale-cache problem.
-# HTML must always revalidate (so a deploy shows up on the next refresh in
-# EVERY browser); the service worker file too. Hashed/versioned assets can
-# cache hard.
+# Cloudflare Pages headers.
+#
+# CACHING CONTRACT (Stav, 4.9.2026)
+# Every script and stylesheet is referenced with ?v=NNN — tests/site.test.mjs
+# keeps the whole site on one number — and the service workers key their caches
+# by that same number. A URL with ?v= therefore never changes: to ship a change
+# you bump the version, you never overwrite what a browser already holds. Those
+# files cache for a year, immutable (tests/caching.test.mjs checks that every
+# immutable path is referenced WITH a version wherever it appears).
+# Everything fetched without a version keeps revalidating on every visit: the
+# HTML pages (they carry the ?v= for everything else, so a stale page is a stale
+# app), the service workers, the manifest, the data files, and the images,
+# which are addressed by bare filename (the team portraits by ?p=<mtime>).
+#
+# Cloudflare _headers semantics: every matching rule applies, and for the same
+# header name the LAST matching rule wins. So the broad immutable rules come
+# first and the specific no-cache exceptions come after them. Keep that order.
 
 # Security headers on every response.
 #
@@ -30,79 +43,96 @@
   Permissions-Policy: geolocation=(), microphone=(), camera=()
   Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://accounts.google.com https://apis.google.com https://www.clarity.ms https://scripts.clarity.ms https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://api.web3forms.com https://generativelanguage.googleapis.com https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://www.clarity.ms https://*.clarity.ms https://www.googletagmanager.com https://*.google-analytics.com; frame-src https://accounts.google.com https://content.googleapis.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'
 
+# ---- Versioned assets: a year, immutable (contract above) ----
+/app.js
+  Cache-Control: public, max-age=31536000, immutable
+/assistant.js
+  Cache-Control: public, max-age=31536000, immutable
+/track.js
+  Cache-Control: public, max-age=31536000, immutable
+/reserve.js
+  Cache-Control: public, max-age=31536000, immutable
+/styles.css
+  Cache-Control: public, max-age=31536000, immutable
+/assets/*.js
+  Cache-Control: public, max-age=31536000, immutable
+/assets/*.css
+  Cache-Control: public, max-age=31536000, immutable
+/assets/tokens.css
+  Cache-Control: public, max-age=31536000, immutable
+/assets/ui.css
+  Cache-Control: public, max-age=31536000, immutable
+/sale/*.js
+  Cache-Control: public, max-age=31536000, immutable
+/sale/*.css
+  Cache-Control: public, max-age=31536000, immutable
+/sale/css/*
+  Cache-Control: public, max-age=31536000, immutable
+/thing/thing.js
+  Cache-Control: public, max-age=31536000, immutable
+
+# ---- Images: addressed by bare filename, so never immutable. A day, then a
+# revalidation; a replaced logo shows up by tomorrow, not next year. ----
+/assets/*.png
+  Cache-Control: public, max-age=86400
+/assets/*.jpg
+  Cache-Control: public, max-age=86400
+/assets/*.jpeg
+  Cache-Control: public, max-age=86400
+/assets/*.webp
+  Cache-Control: public, max-age=86400
+/assets/*.svg
+  Cache-Control: public, max-age=86400
+/sale/icons/*
+  Cache-Control: public, max-age=86400
+
+# ---- Unversioned: revalidate every visit. These come LAST on purpose — the
+# wildcards above also match some of them, and the last rule wins. ----
+# Pages and page routes: a deploy must show on the next refresh in EVERY
+# browser (this is what killed the Edge/Safari stale-cache problem).
 /
   Cache-Control: no-cache
-
 /*.html
   Cache-Control: no-cache
-
 /sale/
   Cache-Control: no-cache
-
 /sale/index.html
   Cache-Control: no-cache
-
-/sale/sw.js
+/thing/
   Cache-Control: no-cache
-
+/thing/index.html
+  Cache-Control: no-cache
+/checkups/
+  Cache-Control: no-cache
+/checkups/index.html
+  Cache-Control: no-cache
+/checkups/app.js
+  Cache-Control: no-cache
+/ask/
+  Cache-Control: no-cache
+/ask/index.html
+  Cache-Control: no-cache
+/q/
+  Cache-Control: no-cache
 /zerem/
   Cache-Control: no-cache
 
-/q/
+# The service workers: the browser checks them on every navigation, and a
+# worker held for a year is an app frozen on that version.
+/sale/sw.js
   Cache-Control: no-cache
-
-/sale/app.js
-  Cache-Control: no-cache
-
-/styles.css
-  Cache-Control: no-cache
-
-/app.js
-  Cache-Control: no-cache
-
-/assistant.js
-  Cache-Control: no-cache
-
-/thing/
-  Cache-Control: no-cache
-
-/thing/thing.js
-  Cache-Control: no-cache
-
 /thing/sw.js
   Cache-Control: no-cache
-
-
-/thing/index.html
+# /thing/manifest.webmanifest is a Function (it carries the key), not a file.
+/sale/manifest.webmanifest
   Cache-Control: no-cache
 
-/checkups/
+# Data files are fetched by bare name (sj-prices.core.json with cache:'no-cache',
+# sj-prices.json and stern-pricing.json without any ?v=), so a new price list
+# has to be able to arrive without a deploy of the app around it.
+/sale/data/*
   Cache-Control: no-cache
-
-/checkups/index.html
-  Cache-Control: no-cache
-
-/checkups/app.js
-  Cache-Control: no-cache
-
-/ask/
-  Cache-Control: no-cache
-
-/ask/index.html
-  Cache-Control: no-cache
-
-/assets/listcards.js
-  Cache-Control: no-cache
-
-# V3 app layers — same no-cache treatment as the legacy core files, so a CSS
-# fix never has to wait out an edge cache (the ?v= bump is belt, this is braces).
-/assets/*
-  Cache-Control: no-cache
-/sale/css/*
-  Cache-Control: no-cache
-/sale/finance.js
-  Cache-Control: no-cache
-/sale/sw.js
+/sale/stern-pricing.json
   Cache-Control: no-cache
 
 # Team portraits change while everything else in /assets/ is versioned by

@@ -503,7 +503,7 @@ function buildReportSheet(r) {
     set('rpt-sign-role', biz.name || '');
 }
 
-function downloadReportPDF() {
+async function downloadReportPDF() {
     const r = collectReport();
     if (!r.client) { showToast('הזן לכבוד מי הדוח (שם הלקוח)', 'error'); return; }
     if (r.findings.length === 0 && r.blocks.length === 0 && !r.summary) { showToast('הוסף תוכן לדוח, טקסט, טבלה, ממצא או סיכום', 'error'); return; }
@@ -512,6 +512,9 @@ function downloadReportPDF() {
     const el = document.getElementById('report-pdf-sheet');
     const filename = `${r.title}_${r.number}_${(r.client || '').replace(/\s+/g, '_')}.pdf`;
     showToast('מכין את הדוח להורדה...');
+    // The report borrows the quote sheet's header and footer, which may wear a
+    // paper face; html2canvas paints what is on screen, so wait for it first.
+    await ensurePdfFonts();
     // The sheet lives scaled inside the live-preview box, capture it unscaled.
     const restoreSheet = _unscaleSheetForCapture(el);
     return html2pdf().set({
