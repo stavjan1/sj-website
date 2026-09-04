@@ -40,6 +40,9 @@ const MAX_PRICE = 500000;
 // The first list a helper sees. Spoken names, not catalogue names, and units
 // the trade actually quotes in. Helpers add to it; the admin prunes it.
 export const SEED_ITEMS = [
+  // First on purpose: "ביקור" is the one number every electrician prices
+  // differently (Stav, 4.9.2026), and it is the base of every fault call.
+  { id: 'visit',            name: 'ביקור (הגעה ללקוח)',                      unit: 'ביקור' },
   { id: 'point-light',      name: 'נקודת מאור חדשה',                       unit: "נק'" },
   { id: 'point-socket',     name: 'נקודת בית תקע חדשה',                    unit: "נק'" },
   { id: 'point-move',       name: "העתקת נקודה עד 2 מ' כולל חציבה ותיקון",  unit: "נק'" },
