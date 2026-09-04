@@ -33,7 +33,6 @@ export async function onRequestPost(context) {
   const name = String(body.name || '').trim().slice(0, 80) || 'משתמש';
   const email = String(body.email || '').trim().slice(0, 120);
   const phone = String(body.phone || '').trim().slice(0, 40);
-  const profession = String(body.profession || '').trim().slice(0, 60);
 
   const catalog = Array.isArray(body.catalog) ? body.catalog : [];
   const items = catalog
@@ -61,8 +60,7 @@ export async function onRequestPost(context) {
     `שם: ${name}`,
     email ? `אימייל: ${email}` : 'אימייל: (אורח · לא מחובר)',
     phone ? `טלפון: ${phone}` : 'טלפון: לא סופק',
-    profession ? `תחום: ${profession}` : null,
-  ].filter(Boolean).join('\n');
+  ].join('\n');
 
   const notify = {
     endpoint: WEB3FORMS_ENDPOINT,

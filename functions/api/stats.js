@@ -3,15 +3,15 @@
 // Captures LABOR-ONLY prices at PDF-export time and aggregates them per job
 // type, so users can see what similar work is typically priced at. Privacy by
 // design: NO client names/addresses/phones ever touch this — only
-// { profession, jobType, labor, contributor-label?, month }. Aggregate only,
+// { jobType, labor, contributor-label?, month }. Aggregate only,
 // shown with a minimum sample size, median + range (not a lying single mean).
 //
 // Display is OFF until the admin flips config:statsLive — the pipe collects
 // silently from day one so there's real data by the time it goes live.
 //
-//   POST /api/stats            { profession, jobType, labor, quoteId, named?, items? } → record (rate-limited)
-//   GET  /api/stats?market=1&prof= → per-ITEM market prices (median per line item)
-//   GET  /api/stats?job=&prof= → public benchmark for one bucket (only when live)
+//   POST /api/stats            { jobType, labor, quoteId, named?, items? } → record (rate-limited)
+//   GET  /api/stats?market=1   → per-ITEM market prices (median per line item)
+//   GET  /api/stats?job=       → public benchmark for one bucket (only when live)
 //   GET  /api/stats?admin=1    → admin: full aggregate dashboard + live flag
 //   POST /api/stats            { setLive: true|false }  (admin) → toggle display
 
@@ -41,24 +41,23 @@ const ITEMS_PER_QUOTE = 10;
 // KV list() returns at most 1000 keys per page, so a limit of 4000 could never
 // be reached and this ceiling never fired — the guard existed and did nothing.
 // 900 sits under the page size, so the count is real. It is also plenty: this
-// is distinct ITEM NAMES per profession, and an electrician's vocabulary of
-// billable components is in the low hundreds.
-const ITEM_BUCKETS_CAP = 900;   // safety ceiling on distinct item names per profession
+// is distinct ITEM NAMES, and an electrician's vocabulary of billable
+// components is in the low hundreds.
+const ITEM_BUCKETS_CAP = 900;   // safety ceiling on distinct item names
 
 const JOB_TYPES = ['panel', 'points', 'charger', 'solar', 'inspection', 'fault', 'infra', 'other'];
-// Closed list, mirroring PROFESSIONS in sale/app.js. This write path is PUBLIC,
-// and the bucket key is built from it — accepting free text meant an attacker
-// could mint an unbounded number of KV buckets, and the admin dashboard does one
-// KV read per bucket, so a few thousand junk professions would blow the Worker
-// subrequest limit and break the dashboard for good. Anything unknown → general.
-const PROFESSIONS = [
-  'electrician', 'plumber', 'hvac', 'contractor', 'renovator', 'general',
-  'solar_installer', 'charger_installer',
-];
+// One trade. The product is for electricians only (Stav, 04/09/2026), so every
+// sample lands in the same bucket whatever the client sends — the write path is
+// PUBLIC and the bucket key is built from this, so it must never be free text.
+// The literal segment keeps the KV key format from the multi-trade days
+// ('stats:samples:electrician:<job>', 'stats:items:electrician:<name>'), so the
+// data collected so far under 'electrician' needs no migration. Buckets written
+// under the old 'general' fallback (guest posts, before the client and the AI
+// agreed on a trade) stay in KV and are only visible in the admin table.
+const PROF = 'electrician';
 
-function normProfession(v) {
-  const p = String(v || 'general').toLowerCase().slice(0, 30);
-  return PROFESSIONS.includes(p) ? p : 'general';
+function normProfession() {
+  return PROF;
 }
 
 // One item name → one bucket. Normalised so "נקודת מאור" and "נקודת  מאור "
@@ -71,13 +70,13 @@ function normItemName(v) {
     .trim()
     .slice(0, ITEM_NAME_MAX);
 }
-function itemKey(prof, name) {
-  return `stats:items:${normProfession(prof)}:${normItemName(name)}`;
+function itemKey(name) {
+  return `stats:items:${normProfession()}:${normItemName(name)}`;
 }
 
-function bucketKey(prof, job) {
+function bucketKey(job) {
   const p = JOB_TYPES.includes(job) ? job : 'other';
-  return `stats:samples:${normProfession(prof)}:${p}`;
+  return `stats:samples:${normProfession()}:${p}`;
 }
 
 // Who sent this, as far as an endpoint with no accounts can tell: the same
@@ -125,7 +124,7 @@ export async function onRequestPost(context) {
   if (!Number.isFinite(labor) || labor < LABOR_MIN || labor > LABOR_MAX) {
     return jsonResponse({ ok: false, skipped: 'out-of-bounds' }, 200); // silent — never breaks the export
   }
-  const prof = normProfession(body.profession);
+  const prof = normProfession(); // whatever body.profession says
   const job = JOB_TYPES.includes(body.jobType) ? body.jobType : 'other';
 
   // Dedup: count a quote once (re-exports/edits don't re-inflate the stats).
@@ -169,11 +168,11 @@ export async function onRequestPost(context) {
         if (name.length < 2 || seen.has(name)) continue;
         if (!Number.isFinite(price) || price < ITEM_PRICE_MIN || price > ITEM_PRICE_MAX) continue;
         seen.add(name);
-        const k = itemKey(prof, name);
+        const k = itemKey(name);
         let list = [];
         try { list = JSON.parse((await env.SJ_DATA.get(k)) || '[]'); } catch { list = []; }
         if (!list.length) {
-          // A brand-new bucket: only allow it while the profession is under its ceiling.
+          // A brand-new bucket: only allow it while the store is under its ceiling.
           const existing = await env.SJ_DATA.list({ prefix: `stats:items:${prof}:`, limit: ITEM_BUCKETS_CAP });
           if (existing.keys.length >= ITEM_BUCKETS_CAP) continue;
         }
@@ -222,8 +221,8 @@ export async function onRequestGet(context) {
     });
   }
 
-  // The market list: every item name this profession has priced, with its
-  // median and sample count. Admin sees it always; everyone else only once the
+  // The market list: every item name the trade has priced, with its median and
+  // sample count. Admin sees it always; everyone else only once the
   // display flag is live (same rule as the labor benchmark).
   if (url.searchParams.get('market')) {
     const liveFlag = (await env.SJ_DATA.get('config:statsLive')) === '1';
@@ -233,7 +232,7 @@ export async function onRequestGet(context) {
       isAdmin = gate.ok;
       if (!isAdmin) return jsonResponse({ live: false, items: [] });
     }
-    const prof = normProfession(url.searchParams.get('prof'));
+    const prof = normProfession();
     const list = await env.SJ_DATA.list({ prefix: `stats:items:${prof}:`, limit: 1000 });
     const names = list.keys.map(k => k.name);
     const items = [];
@@ -262,10 +261,9 @@ export async function onRequestGet(context) {
   // Public benchmark for one bucket — only when the admin has gone live.
   const live = (await env.SJ_DATA.get('config:statsLive')) === '1';
   if (!live) return jsonResponse({ live: false });
-  const prof = url.searchParams.get('prof') || 'general';
   const job = url.searchParams.get('job') || 'other';
   let arr = [];
-  try { arr = JSON.parse((await env.SJ_DATA.get(bucketKey(prof, job))) || '[]'); } catch { arr = []; }
+  try { arr = JSON.parse((await env.SJ_DATA.get(bucketKey(job))) || '[]'); } catch { arr = []; }
   const s = summarize(arr);
   if (s.count < MIN_SAMPLES) return jsonResponse({ live: true, enough: false });
   return jsonResponse({ live: true, enough: true, count: s.count, median: s.median, low: s.low, high: s.high });
