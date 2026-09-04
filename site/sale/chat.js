@@ -2034,13 +2034,130 @@ async function runPricingAgent(activeProject, promptChars) {
     }
 }
 
+// The quantity hiding in a free-text details field.
+//
+// Until 4.9.2026 the pricing prompt asked for materials as {name, price,
+// details:"15 מטר"} — no qty field at all. Rows landed with qty missing,
+// matQty() read that as 1, and the catalogue pass then swapped the price for
+// the supplier's UNIT price: a 15-metre cable run became 1 × 17.54 ₪. The
+// prompt now asks for qty/unit explicitly; this reads the old shape (and a
+// model that ignores the new one) so the multiplier is never silently 1.
+//
+// Reads the first number that sits next to a unit word: "15 מטר", "15 מ'",
+// "x3", "3 יח'", "כ-20 מטר", "100 מ" → 15 / 15 / 3 / 3 / 20 / 100.
+// A bare number with no unit is NOT a quantity ("5x6" is a cable size, "40A"
+// a rating, "2.5 ממ"ר" a cross-section) — the default is 1.
+//
+// \b does not know Hebrew letters, so word ends are (?![א-ת]) lookaheads.
+const QTY_UNIT_RX = new RegExp(
+    "(?:^|[^\\d.,])(?:כ-?\\s?)?(\\d+(?:[.,]\\d+)?)\\s*"
+    + "(מטרים|מטר|מ\"ר|מ\"ק|ק\"ג|מ'|מ\"|מ|יחידות|יחידה|יח'|יח\"|יח|גלילים|גליל|קומפלט|סטים|סט|זוגות|זוג"
+    + "|חבילות|חבילה|נקודות|נקודה|נק'|נק|שעות|שעה|ימים|יום|m|pcs|pc|units|unit)"
+    + "(?![א-תA-Za-z0-9\"'])", 'i');
+// "x3" / "× 3" / "3x" — the multiplier notation, but never the x inside a
+// cable size ("5x6" has a digit before the x; "3x " has nothing after it).
+const QTY_TIMES_RX = /(?:^|[\s(])[x×*]\s*(\d+(?:[.,]\d+)?)(?![\d.,]*[א-תA-Za-z])|(?:^|[\s(])(\d+(?:[.,]\d+)?)\s*[x×*](?=\s|$|\))/i;
+const UNIT_WORD_TO_TABLE = [
+    [/^(?:מטרים|מטר|מ'|מ"|מ|m)$/i, 'מטר'],
+    [/^(?:גליל|גלילים)$/, 'גליל'],
+    [/^(?:יחידות|יחידה|יח'|יח"|יח|pcs|pc|units|unit)$/i, "יח'"],
+    [/^קומפלט$/, 'קומפלט'],
+    [/^(?:סט|סטים)$/, 'סט'],
+    [/^(?:זוג|זוגות)$/, 'זוג'],
+    [/^(?:חבילה|חבילות)$/, 'חבילה'],
+    [/^(?:נקודה|נקודות|נק'|נק)$/, "נק'"],
+    [/^מ"ר$/, 'מ"ר'], [/^מ"ק$/, 'מ"ק'], [/^ק"ג$/, 'ק"ג'],
+    [/^(?:שעה|שעות)$/, 'שעה'], [/^(?:יום|ימים)$/, 'יום'],
+];
+function _qtyNumber(raw) {
+    const t = String(raw || '');
+    // "1,000" is a thousand; "1,5" is one and a half.
+    const n = Number(/^\d+,\d{3}$/.test(t) ? t.replace(',', '') : t.replace(',', '.'));
+    return n > 0 ? n : 0;
+}
+function _qtyFromText(details) {
+    const text = String(details == null ? '' : details).trim();
+    if (!text) return { qty: 0, unitWord: '' };
+    const u = QTY_UNIT_RX.exec(text);
+    if (u) return { qty: _qtyNumber(u[1]), unitWord: u[2] };
+    const x = QTY_TIMES_RX.exec(text);
+    if (x) return { qty: _qtyNumber(x[1] || x[2]), unitWord: '' };
+    return { qty: 0, unitWord: '' };
+}
+function parseQtyFromDetails(details) {
+    return _qtyFromText(details).qty || 1;
+}
+// The unit word that went with the number, in the table's own vocabulary
+// (MATERIAL_UNITS). Empty when there was none — matUnit() then shows יח'.
+function parseUnitFromDetails(details) {
+    const w = _qtyFromText(details).unitWord;
+    if (!w) return '';
+    for (const [rx, unit] of UNIT_WORD_TO_TABLE) if (rx.test(w)) return unit;
+    return '';
+}
+
+// One material row from the model's JSON, in the table's shape:
+//   { name, qty (number), unit (string), price = UNIT price, details, checked }
+// The line total is always qty × price (matLineTotal) — the model never writes
+// a total, the table does.
+//
+// Which price did the model write? The rule, in one place:
+//   · the row carries "qty"  → it answered the prompt that asks for a unit
+//     price, so price is per unit and qty multiplies it.
+//   · the row has no "qty"   → the pre-4.9 shape, where the prompt said "a
+//     price per item, then sum them" — so price is the LINE total for whatever
+//     quantity the details mention. The quantity is read from the details and
+//     the unit price is total ÷ qty, which leaves the line total exactly as the
+//     model wrote it while letting a later catalogue override replace the unit
+//     price and still multiply by the right count.
+function materialRowFromModel(newMat, matched) {
+    const details = String(newMat.details == null ? '' : newMat.details).slice(0, 400);
+    const carriedQty = newMat.qty != null && newMat.qty !== '' && Number.isFinite(Number(newMat.qty));
+    const qty = (carriedQty && Number(newMat.qty) > 0) ? Number(newMat.qty) : parseQtyFromDetails(details);
+    const rawPrice = Number(newMat.price) || 0;
+    const price = carriedQty ? rawPrice : (qty > 1 ? rawPrice / qty : rawPrice);
+    const unit = String(newMat.unit == null ? '' : newMat.unit).trim().slice(0, 20) || parseUnitFromDetails(details);
+    return {
+        name: String(newMat.name == null ? '' : newMat.name).slice(0, 200),
+        qty,
+        unit,
+        price,
+        details,
+        checked: matched ? matched.checked : true
+    };
+}
+
+// Take the machine block OUT of a reply before a human reads it. The mirror
+// of extractJsonBlock: the fence if there is one, otherwise the outermost
+// {…} — but only when that outermost span really is JSON, so a stray brace in
+// prose cannot swallow the paragraph after it. Used to be a non-greedy
+// /({[\s\S]*?})/ here too, which on a fenceless reply left everything after
+// the first material sitting in the bubble as raw JSON.
+function stripJsonBlock(text) {
+    const t = String(text || '');
+    const fenced = /```(?:json)?\s*[\s\S]*?\s*```/i.exec(t);
+    if (fenced) return t.replace(fenced[0], '').trim();
+    const first = t.indexOf('{');
+    const last = t.lastIndexOf('}');
+    if (first === -1 || last <= first) return t.trim();
+    const span = t.slice(first, last + 1);
+    let isJson = false;
+    try { JSON.parse(span); isJson = true; } catch (e) { /* not one object */ }
+    if (isJson) return (t.slice(0, first) + t.slice(last + 1)).trim();
+    return t.replace(/({[\s\S]*?})/, '').trim();
+}
+
 // Parse the trailing JSON block of a pricing reply and sync the labor price,
 // materials checklist and blind-spots box.
 function applyMaterialsFromResponse(activeProject, responseText) {
-    const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) || responseText.match(/({[\s\S]*?})/);
-    if (!jsonMatch) return;
+    // extractJsonBlock: fenced block first, else first '{' to last '}'. The
+    // non-greedy /({[\s\S]*?})/ it replaced stopped at the FIRST closing brace,
+    // so a fenceless reply with materials:[{…},{…}] was cut mid-array and the
+    // parse error below swallowed the whole bill of quantities.
+    const block = extractJsonBlock(responseText);
+    if (!block || block[0] !== '{') return;
     try {
-        const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+        const parsed = JSON.parse(block);
         if (!parsed) return;
 
         // Staged flow: each reply's JSON carries only the fields relevant to its
@@ -2056,17 +2173,13 @@ function applyMaterialsFromResponse(activeProject, responseText) {
         if (Array.isArray(parsed.materials) && parsed.materials.length > 0) {
             const existingMaterials = activeProject.materials || [];
             activeProject.materials = parsed.materials.map(newMat => {
+                if (!newMat || typeof newMat !== 'object') newMat = {};
                 const matched = existingMaterials.find(m => m.name === newMat.name);
                 // Clamp types at the trust boundary: this comes from the model,
                 // which can be steered by a hostile catalog/supplier-page name
                 // (prompt injection), and it gets PERSISTED into the project and
                 // the cloud blob. Keep it plain data — never markup, never NaN.
-                return {
-                    name: String(newMat.name == null ? '' : newMat.name).slice(0, 200),
-                    price: Number(newMat.price) || 0,
-                    details: String(newMat.details == null ? '' : newMat.details).slice(0, 400),
-                    checked: matched ? matched.checked : true
-                };
+                return materialRowFromModel(newMat, matched);
             });
             renderMaterialsChecklist(activeProject.materials);
             // Second pass: the model named the products, the catalogue prices
@@ -2149,7 +2262,13 @@ async function catalogPriceMaterials(proj) {
         priced.forEach((row, i) => {
             const m = proj.materials[i];
             if (!m || !row || !row.matched) return;
+            // UNIT price only. qty and unit stay the row's own — the total is
+            // matLineTotal = qty × price, so a per-metre price against qty 15
+            // is exactly right, and the same swap against a row whose qty had
+            // been dropped (the 4.9 bug) turned 15 metres into 1.
             m.price = Number(row.price) || m.price;
+            if (!(Number(m.qty) > 0)) m.qty = parseQtyFromDetails(m.details);
+            if (!m.unit && row.unit) m.unit = String(row.unit).slice(0, 20);
             m.sku = row.sku || '';
             m.fromCatalog = true;
             // The catalogue's own name for it, kept beside his: they differ
@@ -2467,8 +2586,7 @@ function renderChatHistory(projOrHistory) {
             try { listsData = JSON.parse(lm[1]); } catch (e) { /* malformed → just strip */ }
             text = text.replace(lm[0], '').trim();
         }
-        text = text.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
-        text = text.replace(/({[\s\S]*?})/, '').trim();
+        text = stripJsonBlock(text);
         // /ask/-protocol machine blocks (questions/calculator) have no renderer
         // here — strip them so they never show as raw JSON in the app chat.
         text = text.replace(/\[\[(?:שאלות|מחשבון)\]\][\s\S]*?\[\[\/(?:שאלות|מחשבון)\]\]/g, '').trim();
@@ -4072,12 +4190,20 @@ function renderMaterialsChecklist(materials) {
         const suggested = mat.suggested !== undefined ? Number(mat.suggested) : Number(mat.price) || 0;
         const mine = Number(mat.price) || 0;
         const changed = suggested > 0 && Math.round(mine) !== Math.round(suggested);
+        // The price is per unit, so the count has to be on screen beside it —
+        // "17.54 ₪" under "כבל 5x6" means nothing until it says × 15 מטר.
+        // Skipped when the details already spell the quantity out (the old
+        // rows, where "15 מטר" was the only place it lived).
+        const qty = matQty(mat);
+        const qtyText = (qty > 1 && !String(mat.details || '').includes(String(qty)))
+            ? `× ${heNum(qty)} ${matUnit(mat)}` : '';
+        const detailsText = [qtyText, mat.details || ''].filter(Boolean).join(' · ');
         return `
         <div class="material-check-row">
             <input type="checkbox" id="mat-chk-${idx}" ${mat.checked ? 'checked' : ''} onchange="toggleMaterialChecked(${idx}, this.checked)">
             <div class="material-check-text">
                 <span class="material-item-name">${escapeHtml(mat.name)}</span>
-                <span class="material-item-details">${mat.details ? escapeHtml(mat.details) : ''}</span>
+                <span class="material-item-details">${detailsText ? escapeHtml(detailsText) : ''}</span>
             </div>
             <span class="mat-sugg${changed ? ' is-old' : ''}">מוצע ${heNum(suggested)} ₪</span>
             <label class="mat-mine">
@@ -4142,6 +4268,23 @@ function renderEstimateTotal() {
 // buttons trigger this, so locking one by id was never enough — and a re-entry
 // guard matters more here than anywhere else in the app: this call ships the
 // entire conversation to the model, so a second press is not a small waste.
+// The quote's base price is the sum of its lines — arithmetic, not a field the
+// model fills in. The writer prompt asks for basePrice "equal to the sum of
+// the items", and a model can add wrong: the lines said 4,200 and the total
+// said 3,500, and the total is the number that went on the quote. So the
+// lines win. The model's figure is kept only when there are no lines to add,
+// and a mismatch above 1% is logged so a bad reply can be traced.
+function quoteBasePrice(result) {
+    const items = Array.isArray(result && result.items) ? result.items : [];
+    const sum = items.reduce((acc, i) => acc + (Number(i && i.price) || 0), 0);
+    const written = Number(result && result.basePrice) || 0;
+    if (!(sum > 0)) return written;
+    if (written > 0 && Math.abs(written - sum) > sum * 0.01) {
+        console.warn('quote writer: basePrice ' + written + ' disagrees with the sum of its items ' + sum + ' — using the sum');
+    }
+    return sum;
+}
+
 let _exportingQuote = false;
 async function exportChatToQuote(el) {
     if (_exportingQuote) return;
@@ -4170,8 +4313,7 @@ async function exportChatToQuote(el) {
     // Format conversation history
     const conversationText = proj.chatHistory.map(msg => {
         const senderName = msg.role === 'user' ? 'סתיו' : 'מומחה תמחור';
-        let text = msg.parts[0].text.replace(/```json\s*[\s\S]*?\s*```/, '').trim();
-        text = text.replace(/({[\s\S]*?})/, '').trim();
+        const text = stripJsonBlock(msg.parts[0].text);
         return `${senderName}: ${text}`;
     }).join('\n\n');
     
@@ -4274,7 +4416,7 @@ ${extrasText ? `תוספות שסתיו סימן (כל אחת סעיף נפרד 
         // Sync quote editor
         proj.quoteData.subject = result.subject || proj.quoteData.subject;
         proj.quoteData.items = result.items || [];
-        proj.quoteData.basePrice = result.basePrice || (result.items || []).reduce((sum, i) => sum + (i.price || 0), 0);
+        proj.quoteData.basePrice = quoteBasePrice(result);
         // Remember the block verbatim so it can be refreshed later without
         // guessing which lines were ours.
         proj.specTermsWritten = specTermsBlock(proj);
