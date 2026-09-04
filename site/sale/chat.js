@@ -2101,21 +2101,21 @@ function parseUnitFromDetails(details) {
 // The line total is always qty × price (matLineTotal) — the model never writes
 // a total, the table does.
 //
-// Which price did the model write? The rule, in one place:
-//   · the row carries "qty"  → it answered the prompt that asks for a unit
-//     price, so price is per unit and qty multiplies it.
-//   · the row has no "qty"   → the pre-4.9 shape, where the prompt said "a
-//     price per item, then sum them" — so price is the LINE total for whatever
-//     quantity the details mention. The quantity is read from the details and
-//     the unit price is total ÷ qty, which leaves the line total exactly as the
-//     model wrote it while letting a later catalogue override replace the unit
-//     price and still multiply by the right count.
+// Which price did the model write? Always the UNIT price. The prompt in force
+// says so in the schema line ("price = מחיר ליחידה אחת בלבד"), the catalogue
+// block it is told to price from lists unit prices ("17.54 ₪ / מטר"), and even
+// the pre-4.9 example ({"price": 25, "details": "15 מטר"}) read as ₪/m — no
+// prompt ever asked for a line total. So a row that drops "qty" is a model
+// that skipped a field, not one that switched semantics: the count is read
+// from the details and the price is left as written. (An earlier version
+// divided the price by that count, on the theory that a qty-less row carried
+// the line total; a unit price of 17.54 for 15 metres then became 1.17 ₪/m
+// and the line 15× too low unless the catalogue happened to match it.)
 function materialRowFromModel(newMat, matched) {
     const details = String(newMat.details == null ? '' : newMat.details).slice(0, 400);
     const carriedQty = newMat.qty != null && newMat.qty !== '' && Number.isFinite(Number(newMat.qty));
     const qty = (carriedQty && Number(newMat.qty) > 0) ? Number(newMat.qty) : parseQtyFromDetails(details);
-    const rawPrice = Number(newMat.price) || 0;
-    const price = carriedQty ? rawPrice : (qty > 1 ? rawPrice / qty : rawPrice);
+    const price = Number(newMat.price) || 0;
     const unit = String(newMat.unit == null ? '' : newMat.unit).trim().slice(0, 20) || parseUnitFromDetails(details);
     return {
         name: String(newMat.name == null ? '' : newMat.name).slice(0, 200),
@@ -2154,7 +2154,16 @@ function applyMaterialsFromResponse(activeProject, responseText) {
     // non-greedy /({[\s\S]*?})/ it replaced stopped at the FIRST closing brace,
     // so a fenceless reply with materials:[{…},{…}] was cut mid-array and the
     // parse error below swallowed the whole bill of quantities.
-    const block = extractJsonBlock(responseText);
+    //
+    // The /ask/-protocol blocks ([[רשימות]] for the list cards, [[שאלות]],
+    // [[מחשבון]], [[פתוח]]) are JSON too, and since the outermost-brace rule
+    // they parse whole: a "tools" list of plain strings became nameless tool
+    // rows, and a price-less "materials" list would replace the priced bill.
+    // They have their own renderer (renderChatHistory) — cut them out before
+    // looking for the pricing block.
+    const withoutProtocolBlocks = String(responseText || '')
+        .replace(/\[\[(רשימות|שאלות|מחשבון|פתוח)\]\][\s\S]*?\[\[\/\1\]\]/g, '');
+    const block = extractJsonBlock(withoutProtocolBlocks);
     if (!block || block[0] !== '{') return;
     try {
         const parsed = JSON.parse(block);
@@ -2218,9 +2227,11 @@ function applyMaterialsFromResponse(activeProject, responseText) {
         if (Array.isArray(parsed.tools) && parsed.tools.length > 0) {
             const existingTools = activeProject.tools || [];
             activeProject.tools = parsed.tools.map(t => {
-                const matched = existingTools.find(x => x.name === t.name);
-                return { name: t.name, checked: matched ? matched.checked : false };
-            });
+                // A tool may arrive as a bare string; the row needs a name either way.
+                const name = String(typeof t === 'string' ? t : (t && t.name != null ? t.name : '')).slice(0, 200);
+                const matched = existingTools.find(x => x.name === name);
+                return { name, checked: matched ? matched.checked : false };
+            }).filter(t => t.name);
             renderWizardTools(activeProject.tools);
         }
 

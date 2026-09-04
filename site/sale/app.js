@@ -597,6 +597,17 @@ function applyReportsLock() {
 // people filled the form, pressed, and met a paywall — the tag is the warning
 // that was missing. Quota gates (projects, PDFs per month) are not tagged: they
 // depend on how much was used, not on the plan.
+//
+// The tooltip names the LOWEST plan that opens the feature, read from the
+// tier table — invoicing is Diamond-only, and a Gold user must not be told
+// the feature is "available on Gold and up" while standing on Gold.
+const PRO_TAG_TITLES = { pro: 'זמין במסלול גולד ומעלה', business: 'זמין במסלול דיימונד' };
+function proTagTitle(feature) {
+    for (const tier of ['pro', 'business']) {
+        if (TIER_FALLBACK[tier] && TIER_FALLBACK[tier][feature]) return PRO_TAG_TITLES[tier];
+    }
+    return PRO_TAG_TITLES.pro;
+}
 function applyProTags() {
     document.querySelectorAll('[data-pro]').forEach((el) => {
         const feature = el.getAttribute('data-pro');
@@ -606,7 +617,7 @@ function applyProTags() {
             tag = document.createElement('span');
             tag.className = 'pro-tag';
             tag.textContent = 'PRO';
-            tag.title = 'זמין במסלול גולד ומעלה';
+            tag.title = proTagTitle(feature);
             el.appendChild(tag);
         } else if (!locked && tag) {
             tag.remove();
@@ -7889,6 +7900,29 @@ function importCatalogFromFile(input) {
 // Shareable quote link, the client opens a permanent web link instead of a
 // file. Seed of the per-client archive (every share gets a lasting token).
 // ==========================================================================
+
+// The parts of a quote the customer would notice changing between the link
+// he opens and the message that carried it: the total, the lines, the subject.
+function quoteShareFingerprint(q) {
+    q = q || {};
+    return JSON.stringify({
+        finalPrice: Number(q.finalPrice) || 0,
+        subject: String(q.subject || ''),
+        clientName: String(q.clientName || ''),
+        items: (Array.isArray(q.items) ? q.items : []).map((i) => [String((i && i.title) || ''), String((i && i.description) || ''), Number(i && i.price) || 0]),
+    });
+}
+
+// The stored /q/ link, but only while it still shows what the form shows.
+// The link serves the snapshot posted when it was made; edit the quote after
+// that and the WhatsApp text would quote today's total next to a link that
+// opens yesterday's. Links made before the fingerprint existed are trusted.
+function currentShareLink(proj) {
+    if (!proj || !proj.shareLink) return '';
+    if (!proj.shareFingerprint) return proj.shareLink;
+    return proj.shareFingerprint === quoteShareFingerprint(proj.quoteData) ? proj.shareLink : '';
+}
+
 async function shareQuoteLink() {
     if (!activeProjectId) { showToast('בחר פרויקט תחילה', 'error'); return; }
     if (isGuestUser() || !googleAccessToken) {
@@ -7935,6 +7969,9 @@ async function shareQuoteLink() {
         const link = `${location.origin}/q/?t=${data.token}`;
         proj.shareLink = link; // kept on the project, the archive seed
         proj.shareToken = data.token;   // so the app can ask later whether it was approved
+        // What the link serves is a snapshot; the WhatsApp text quotes the LIVE
+        // form. The fingerprint is how the text knows the two still agree.
+        proj.shareFingerprint = quoteShareFingerprint(q);
         markQuoteOut();
         saveProjects();
         try {
@@ -8369,32 +8406,28 @@ function markQuoteOut() {
     } catch (e) {}
 }
 
-async function downloadPDF() {
-    // Export gate: guests must sign in (free); free tier has a monthly cap.
-    const gate = await checkPdfExportAllowed();
-    if (gate && gate.allow === false) {
-        showUpgradeModal(gate.reason === 'quota' ? 'pdfQuota' : 'guestPdf');
-        return;
-    }
-
-    // A quote is a number. Reviewers exported a finished-looking A4 whose total
-    // read "0 ₪" and nothing anywhere objected -- not the button, not a hint,
-    // not a toast. The mistake is easy to make (prices left in the pricing table
-    // and never applied to the document) and it is the kind that reaches the
-    // customer before anyone notices, so it asks once rather than blocking.
-    //
-    // The total comes from #form-base-price, NOT from summing the rows. In
-    // itemized mode calculateItemizedTotal() writes the sum into that field and
-    // locks it; in the DEFAULT mode the per-item price input is never rendered
-    // at all (see addWorkItemRow's `isItemized ?` branch), so summing the rows
-    // returns 0 for every quote and this guard would fire on every ordinary
-    // export. That is exactly what it did between 5b0826f and here — one field
-    // reads correctly in both modes, and this is it.
+// A quote is a number. Reviewers exported a finished-looking A4 whose total
+// read "0 ₪" and nothing anywhere objected -- not the button, not a hint,
+// not a toast. The mistake is easy to make (prices left in the pricing table
+// and never applied to the document) and it is the kind that reaches the
+// customer before anyone notices, so it asks once rather than blocking.
+//
+// The total comes from #form-base-price, NOT from summing the rows. In
+// itemized mode calculateItemizedTotal() writes the sum into that field and
+// locks it; in the DEFAULT mode the per-item price input is never rendered
+// at all (see addWorkItemRow's `isItemized ?` branch), so summing the rows
+// returns 0 for every quote and this guard would fire on every ordinary
+// export. That is exactly what it did between 5b0826f and here — one field
+// reads correctly in both modes, and this is it.
+//
+// One guard for every road a PDF takes to the customer: the download button
+// and the share sheet alike. Resolves false when the export must not go on.
+async function confirmQuoteHasSubstance() {
     const _items = getWorkItemsFromForm();
     const _sum = parseFloat(document.getElementById('form-base-price')?.value) || 0;
     if (!_items.length) {
         showToast('אין שורות עבודה בהצעה — הוסף לפחות שורה אחת לפני הייצוא', 'error');
-        return;
+        return false;
     }
     if (_sum <= 0) {
         const go = await askConfirm({
@@ -8404,8 +8437,20 @@ async function downloadPDF() {
             cancelLabel: 'חזור ותקן',
             danger: true,
         });
-        if (!go) return;
+        if (!go) return false;
     }
+    return true;
+}
+
+async function downloadPDF() {
+    // Export gate: guests must sign in (free); free tier has a monthly cap.
+    const gate = await checkPdfExportAllowed();
+    if (gate && gate.allow === false) {
+        showUpgradeModal(gate.reason === 'quota' ? 'pdfQuota' : 'guestPdf');
+        return;
+    }
+
+    if (!(await confirmQuoteHasSubstance())) return;
 
     ensureQuoteNumber();
     const clientName = document.getElementById('form-client-name').value.trim() || 'לקוח';
@@ -8632,13 +8677,20 @@ async function shareWhatsApp() {
         return;
     }
     const proj = (projectsList || []).find((p) => p.id === activeProjectId);
-    const shareLink = (proj && proj.shareLink) || '';
+    // The form is the truth: sync it into the project first, so the link test
+    // below compares the stored snapshot against what the message will quote.
+    updatePreviewFromForm();
+    const shareLink = proj && proj.shareLink ? currentShareLink(proj) : '';
 
     // 1. A real attachment, where the device can do it. The PDF goes through
     //    the same export gate as the download button: a share IS an export.
     if (canShareQuoteFile()) {
         const gate = await checkPdfExportAllowed();
         if (!(gate && gate.allow === false)) {
+            // Same substance check as the download button: a document with no
+            // rows, or one that sums to 0 ₪, must not leave through the share
+            // sheet either — that road goes straight to the customer.
+            if (!(await confirmQuoteHasSubstance())) return;
             ensureQuoteNumber();
             updatePreviewFromForm();
             const quoteNumber = document.getElementById('form-quote-number').value.trim() || '000';

@@ -71,6 +71,36 @@ test('the pricing parser reads a fenceless reply with several materials', () => 
     assert.equal(plain.materials.length, 1);
 });
 
+test('a [[רשימות]] list reply never reaches the priced bill, and string tools get names', () => {
+    // requestToolsList asks for the list inside the pricing chat; the reply's
+    // [[רשימות]] block is JSON too and, whole-object, it parsed: "tools" of
+    // plain strings became nameless rows and a price-less "materials" list
+    // would have replaced the bill. The block has its own renderer — the
+    // pricing parser must look past it.
+    const calls = [];
+    let toolsRendered = null;
+    const ctx = vm.createContext({
+        Number, String, Object, Math, Array, JSON, RegExp, console: { error: (m) => calls.push(m), warn: () => {} },
+        document: { getElementById: () => null },
+        saveProjects: () => {}, renderPricingEngine: () => {}, renderMaterialsChecklist: () => {},
+        catalogPriceMaterials: () => {}, renderWizardScope: () => {}, renderWizardTools: (t) => { toolsRendered = t; },
+        escapeHtml: (s) => s,
+    });
+    vm.runInContext(
+        slice('function extractJsonBlock(text)', '// ====')
+        + '\n' + slice('const QTY_UNIT_RX =', '// Ask the catalogue what these actually cost.')
+        + ';globalThis.apply = applyMaterialsFromResponse;', ctx);
+    const proj = { materials: [{ name: 'כבל 5x6', qty: 15, unit: 'מטר', price: 17.54, details: '', checked: true }], tools: [] };
+    ctx.apply(proj, 'הנה הרשימה:\n[[רשימות]]{"materials":[{"item":"כבל 5x6","qty":"15 מ\'"}],"tools":["מברגה","סרט מדידה"]}[[/רשימות]]');
+    assert.equal(calls.length, 0, 'parse error: ' + calls[0]);
+    assert.equal(proj.materials[0].price, 17.54, 'the list reply replaced the priced bill');
+    assert.equal(proj.tools.length, 0, 'the list block was read as the pricing JSON');
+    assert.equal(toolsRendered, null);
+    // Tools that do arrive in the pricing JSON as bare strings still get a name.
+    ctx.apply(proj, '```json\n{"tools": ["פטישון", {"name": "דיסק יהלום"}, {}]}\n```');
+    assert.deepEqual(proj.tools.map((t) => t.name), ['פטישון', 'דיסק יהלום']);
+});
+
 test('no parse site in chat.js still uses the first-closing-brace fallback', () => {
     // The one place the non-greedy regex may still live is the last resort
     // inside stripJsonBlock, after the outermost span failed to parse.

@@ -15,6 +15,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { readApp, APP_FILES } from './_app-source.mjs';
@@ -208,4 +209,42 @@ test('the theme toggle sits in the top bar and reuses toggleSystemTheme', () => 
     const place = fnBody(APP, 'placeBackButton');
     assert.ok(place.includes("getElementById('ctx-theme')") && place.includes('h2.appendChild(theme)'),
         'placeBackButton no longer carries the theme button into the title line');
+});
+
+// ── Review fixes (wave A) ───────────────────────────────────────────────────
+test('the PRO tag names the lowest plan that opens the feature', () => {
+    // invoicing is Diamond-only: a Gold user must not read "available on Gold".
+    const ctx = vm.createContext({ String });
+    vm.runInContext(
+        section(APP, 'const TIER_FALLBACK = {', '};') + '};\n'
+        + section(APP, 'const PRO_TAG_TITLES =', 'function applyProTags()')
+        + ';globalThis.t = proTagTitle;', ctx);
+    assert.equal(ctx.t('invoicing'), 'זמין במסלול דיימונד');
+    assert.equal(ctx.t('shareLink'), 'זמין במסלול גולד ומעלה');
+    assert.equal(ctx.t('reports'), 'זמין במסלול גולד ומעלה');
+    assert.match(fnBody(APP, 'applyProTags'), /tag\.title = proTagTitle\(feature\)/, 'the tag title is fixed text again');
+});
+
+test('the share sheet refuses an empty or 0 ₪ quote exactly like the download button', () => {
+    const guard = fnBody(APP, 'confirmQuoteHasSubstance');
+    assert.ok(guard.includes('אין שורות עבודה בהצעה') && guard.includes('ההצעה יוצאת על 0 ₪'), 'the guard lost a case');
+    assert.match(fnBody(APP, 'downloadPDF'), /await confirmQuoteHasSubstance\(\)/);
+    const share = section(APP, 'async function shareWhatsApp(', '\n}\n');
+    const guardAt = share.indexOf('await confirmQuoteHasSubstance()');
+    const fileAt = share.indexOf('_quotePdfFileForShare(');
+    assert.ok(guardAt > 0 && guardAt < fileAt, 'the share sheet builds the PDF before the substance check');
+});
+
+test('the /q/ link rides the WhatsApp text only while it still matches the form', () => {
+    const ctx = vm.createContext({ String, Number, Array, JSON });
+    vm.runInContext(section(APP, 'function quoteShareFingerprint(q)', 'async function shareQuoteLink()') + ';globalThis.c = currentShareLink;', ctx);
+    const snap = { finalPrice: 4200, subject: 'לוח', clientName: 'דני', items: [{ title: 'לוח', description: '', price: 4200 }] };
+    const proj = { shareLink: 'https://x/q/?t=abc', shareFingerprint: JSON.stringify({ finalPrice: 4200, subject: 'לוח', clientName: 'דני', items: [['לוח', '', 4200]] }), quoteData: snap };
+    assert.equal(ctx.c(proj), 'https://x/q/?t=abc');
+    proj.quoteData = { ...snap, finalPrice: 5100 };
+    assert.equal(ctx.c(proj), '', 'an edited total still carried the old snapshot link');
+    // Links made before the fingerprint existed are kept.
+    assert.equal(ctx.c({ shareLink: 'https://x/q/?t=old', quoteData: snap }), 'https://x/q/?t=old');
+    assert.match(fnBody(APP, 'shareQuoteLink'), /proj\.shareFingerprint = quoteShareFingerprint\(q\)/);
+    assert.match(section(APP, 'async function shareWhatsApp(', '\n}\n'), /currentShareLink\(proj\)/);
 });

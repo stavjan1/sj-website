@@ -82,15 +82,17 @@ test('a row that carries qty is a unit price times a count', () => {
     assert.equal(materialRowFromModel({ name: 'x', qty: 1, price: 5 }, { checked: false }).checked, false);
 });
 
-test('the old shape (no qty) keeps its line total and learns its count from the details', () => {
-    // Pre-4.9 the prompt said "a price per item, then sum them", so the price
-    // was the line. The line must not double: 15 metres at "420" stays 420.
+test('a row without qty keeps its UNIT price and learns its count from the details', () => {
+    // Every prompt — the catalogue block, the schema line, even the old
+    // example — hands the model unit prices, so a row that skipped "qty" still
+    // carries a unit price: 17.54 ₪/m at "15 מטר" is a 263 ₪ line, and the
+    // price must not be divided by the count it forgot to write.
     const { materialRowFromModel, matLineTotal, matQty, matUnit } = load();
-    const row = materialRowFromModel({ name: 'כבל 5x6', price: 420, details: '15 מטר' });
+    const row = materialRowFromModel({ name: 'כבל 5x6', price: 17.54, details: '15 מטר' });
     assert.equal(matQty(row), 15);
     assert.equal(matUnit(row), 'מטר');
-    assert.equal(matLineTotal(row), 420, 'the model\'s line total was doubled');
-    assert.equal(row.price, 28, 'the unit price is total ÷ qty');
+    assert.equal(row.price, 17.54, 'the unit price was divided by the quantity');
+    assert.equal(Math.round(matLineTotal(row) * 100) / 100, 263.1, 'the line must be 15 × the unit price');
     // No quantity anywhere → one unit at the written price.
     const one = materialRowFromModel({ name: 'ממסר פחת', price: 87, details: '40A' });
     assert.equal(matQty(one), 1);
