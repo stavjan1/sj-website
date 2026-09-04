@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>מחולל הצעות מחיר | SJ הנדסת חשמל</title>
+    <title>זרם · תמחור והצעות מחיר לחשמלאים</title>
 
     <!-- App area: kept out of search results (it has its own built-in login) -->
     <meta name="robots" content="noindex">
@@ -59,8 +59,9 @@
                 <path d="M40 82 L62 46 L46 46 L58 14 L33 52 L50 52 Z"/>
             </svg>
         </div>
-        <div class="splash-brand">SJ הנדסת חשמל</div>
+        <div class="splash-brand">זרם</div>
         <div class="splash-sub">טוען את סביבת העבודה…</div>
+        <div class="splash-credit">פותח ע"י SJ הנדסת חשמל</div>
         <div class="splash-spinner"></div>
     </div>
 
@@ -250,6 +251,25 @@
                 <button type="button" class="ctx-back" id="ctx-back" onclick="goBackTab()" title="חזרה למסך הקודם" aria-label="חזרה למסך הקודם" hidden>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                     <span>חזרה</span>
+                </button>
+                <!-- Inside a project the generic "back" is replaced by a named
+                     anchor: the one place every project screen returns to.
+                     switchTab('projects') is also what closes the open project.
+                     A breadcrumb beside it says where you are, in one line:
+                     עבודות / לקוח — עבודה / שלב N: שם. Both are filled and shown
+                     by renderCtxCrumb() (app.js). -->
+                <button type="button" class="ctx-works" id="ctx-works" onclick="switchTab('projects')" title="חזרה לרשימת כל העבודות" hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    <span>כל העבודות</span>
+                </button>
+                <span class="ctx-crumb" id="ctx-crumb" aria-label="מיקום" hidden></span>
+                <!-- Daylight on a roof: the light theme is one tap from every
+                     screen. It was only inside the account menu, which is two
+                     taps and a menu nobody opens with a glove on. Same cycle as
+                     the menu item (auto → light → dark). -->
+                <button type="button" class="ctx-theme" id="ctx-theme" onclick="toggleSystemTheme()"
+                        aria-label="מצב תאורה: אוטומטי, בהיר, כהה" title="מצב תאורה">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></svg>
                 </button>
                 <button type="button" class="ctx-bell" id="reminder-bell" onclick="toggleReminderPopover(event)"
                         aria-expanded="false" aria-label="תזכורות לקוחות" title="תזכורות">
@@ -793,7 +813,7 @@
                                 <!-- Site photos are a Pro capability. The control stays
                                      visible and greyed for everyone else: a button you
                                      cannot see is a feature nobody knows exists. -->
-                                <label class="btn btn-secondary chat-attach-btn" id="btn-attach-photo" title="צרף תמונה מהשטח · ה-AI יראה את העבודה" onclick="return chatPhotoGate(event)">
+                                <label class="btn btn-secondary chat-attach-btn" id="btn-attach-photo" data-pro="chatPhotos" title="צרף תמונה מהשטח · ה-AI יראה את העבודה" onclick="return chatPhotoGate(event)">
                                     <i class="fa-solid fa-camera"></i>
                                     <span class="attach-lock" aria-hidden="true"><i class="fa-solid fa-lock"></i></span>
                                     <input type="file" accept="image/*" multiple style="display:none" onchange="onChatPhotoPicked(this)">
@@ -1092,7 +1112,7 @@
                                     <i class="fa-solid fa-signature"></i>
                                     <span>החתמת לקוח</span>
                                 </button>
-                                <button class="btn btn-secondary" id="btn-share-link" onclick="shareQuoteLink()" title="קישור קבוע שהלקוח פותח בדפדפן, בלי קובץ">
+                                <button class="btn btn-secondary" id="btn-share-link" data-pro="shareLink" onclick="shareQuoteLink()" title="קישור קבוע שהלקוח פותח בדפדפן, בלי קובץ">
                                     <i class="fa-solid fa-link"></i>
                                     <span>קישור ללקוח</span>
                                 </button>
@@ -1111,12 +1131,12 @@
                                      job ENDS — you have just made the quote, and the next
                                      honest question is what you send when he says yes.
                                      Visible to everyone; the click explains diamond. -->
-                                <button class="btn btn-secondary btn-issue" onclick="issueDocFromQuote('DealInvoice')"
+                                <button class="btn btn-secondary btn-issue" data-pro="invoicing" onclick="issueDocFromQuote('DealInvoice')"
                                         title="חשבון עסקה · לפני התשלום, מסמך שאינו חשבונית מס">
                                     <i class="fa-solid fa-file-signature"></i>
                                     <span>הנפקת חשבון עסקה</span>
                                 </button>
-                                <button class="btn btn-secondary btn-issue" onclick="issueDocFromQuote('Invoice')"
+                                <button class="btn btn-secondary btn-issue" data-pro="invoicing" onclick="issueDocFromQuote('Invoice')"
                                         title="חשבונית מס">
                                     <i class="fa-solid fa-file-invoice"></i>
                                     <span>הנפקת חשבונית</span>
@@ -1124,7 +1144,7 @@
                                 <!-- The inspection report left the project rail (three steps is
                                      three steps); it is reached from here, where someone
                                      actually thinks of it. -->
-                                <button class="btn btn-secondary" onclick="switchTab('reports')">
+                                <button class="btn btn-secondary" data-pro="reports" onclick="switchTab('reports')">
                                     <i class="fa-solid fa-clipboard-check"></i>
                                     <span>דוח בדיקה</span>
                                 </button>
@@ -1691,6 +1711,7 @@
                                 </button>
                             </div>
                             <p class="input-help" style="margin:14px 0 0;opacity:.8;">הקובץ שיורד הוא גם גיבוי מלא: אפשר לטעון אותו חזרה דרך ייבוא. מחיקה היא סופית ואין ממנה דרך חזרה.</p>
+                            <p class="trust-line">הנתונים והלקוחות שלך שמורים בחשבון שלך; שיחות עם הסוכן עשויות להיסקר לשיפור המערכת, כמפורט ב<a href="/zerem/terms.html" target="_blank" rel="noopener">תנאי השימוש</a>.</p>
                         </div>
                     </div>
 
@@ -2636,12 +2657,17 @@
                 <div style="width:56px;height:56px;background:linear-gradient(135deg,#2b74db,#f0c040);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
                     <i class="fa-solid fa-bolt" style="font-size:1.6rem;color:#fff;"></i>
                 </div>
-                <h2 style="font-size:1.3rem;font-weight:700;margin-bottom:4px;">SJ הנדסת חשמל</h2>
+                <!-- The product leads; the studio that built it is a credit line.
+                     Until the UX review (4.9.2026) this card opened with the
+                     engineer's firm name, so the first thing a new user read was
+                     somebody else's business. -->
+                <h2 style="font-size:1.5rem;font-weight:800;margin-bottom:4px;">זרם ⚡</h2>
                 <!-- "כניסת עובדים" told every self-employed electrician, in the first
                      sentence he reads, that he is somebody's employee. All four
                      first-time reviewers hit it independently and two thought they
                      had opened an internal system by mistake. -->
-                <p style="color:var(--text-muted);font-size:0.88rem;">זרם ⚡ · תמחור והצעות מחיר לחשמלאים</p>
+                <p style="color:var(--text-muted);font-size:0.88rem;">תמחור והצעות מחיר לחשמלאים</p>
+                <p class="brand-credit">פותח ע"י SJ הנדסת חשמל</p>
                 <p id="lock-helper-note" class="lock-helper-note" hidden>סתיו ביקש את המחירים שלך. כניסה עם Google — והמסך נפתח לבד.</p>
             </div>
 
@@ -2664,6 +2690,10 @@
             <p style="margin-top:12px;font-size:0.85rem;color:var(--text-secondary);text-align:center;line-height:1.6;background:rgba(255,170,0,0.09);border:1px solid rgba(255,170,0,0.25);border-radius:10px;padding:10px 14px;">
                 שים ❤️, במצב אורח <strong>ההיסטוריה שלך נמחקת ברגע ההתנתקות</strong>.<br>התחברות עם Google שומרת את הכל בענן.
             </p>
+            <!-- What the code can promise, and only that: data lives under the
+                 account; conversations may be reviewed (admin-convos.js), and
+                 the terms say so. -->
+            <p class="trust-line">הנתונים והלקוחות שלך שמורים בחשבון שלך; שיחות עם הסוכן עשויות להיסקר לשיפור המערכת, כמפורט ב<a href="/zerem/terms.html" target="_blank" rel="noopener">תנאי השימוש</a>.</p>
 
             <!-- The compact face of the platform — no sign-up needed -->
             <p style="margin-top:14px;font-size:0.84rem;text-align:center;">
@@ -2770,7 +2800,7 @@
     </div>
 
     <!-- Notification Toast -->
-    <div id="toast-container" class="toast-container"></div>
+    <div id="toast-container" class="toast-container" role="status" aria-live="polite"></div>
 
     <!-- Full-screen PDF preview modal -->
     <div id="pdf-fullscreen-modal" class="pdf-fs-modal" style="display:none;" onclick="if(event.target===this)closeFullPdfPreview()">
