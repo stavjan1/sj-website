@@ -1,7 +1,8 @@
 // One definition of "when is the next checkup due".
 //
-// The tracker at /checkups/ and the "שירות תקופתי" view inside /sale/ each had
-// their own copy of the same nine functions. The 08/08 pre-deploy review caught
+// The standalone tracker at /checkups/ (retired 4.9.2026; the URL redirects
+// into the app) and the "שירות תקופתי" view inside /sale/ each had their own
+// copy of the same nine functions. The 08/08 pre-deploy review caught
 // a fix that had to be applied twice, by hand, identically — which is the
 // warning, not the bug. Two copies that can disagree about a due date is a
 // missed visit, and about ICS escaping is a file Apple Calendar refuses to open.
@@ -90,9 +91,11 @@ test('the calendar event says where it came from, in the caller\'s words', () =>
     assert.equal(ev.reminders.overrides.length, 3);
 });
 
-test('both screens delegate — no second copy of the arithmetic', () => {
+test('the app delegates — no second copy of the arithmetic', () => {
+    // The standalone page is gone, so the app is the only consumer left. The
+    // guard stays: the day someone re-inlines addMonths "just for this screen"
+    // is the day two definitions of "due" come back.
     const sale = readApp();
-    const checkups = readFileSync(join(ROOT, 'checkups', 'app.js'), 'utf8');
     // Scoped to the periodic-service functions: the app has other calendar
     // exports (the maintenance series, a follow-up reminder) that are different
     // features and legitimately build their own files.
@@ -102,16 +105,10 @@ test('both screens delegate — no second copy of the arithmetic', () => {
         return src.slice(at, src.indexOf('\n}', at));
     };
     for (const name of ['ckRrule', 'ckEventBody', 'ckIcsText', 'ckAddMonths', 'ckNextDue', 'ckStatusOf']) {
-        assert.match(fn(sale, name), /SJ_CK\./, 'sale/app.js ' + name + ' has its own copy again');
+        assert.match(fn(sale, name), /SJ_CK\./, 'sale/checkups.js ' + name + ' has its own copy again');
     }
-    for (const name of ['eventBody', 'icsText', 'addMonths', 'nextDue', 'statusOf']) {
-        assert.match(fn(checkups, name), /SJ_CK\./, 'checkups/app.js ' + name + ' has its own copy again');
-    }
-    for (const src of [sale, checkups]) {
-        assert.doesNotMatch(src, /Checkups\/\/HE/, 'a second copy of the checkup .ics is back');
-    }
-    // And both pages must actually load it, or the delegation is a crash.
-    for (const page of ['sale/index.html', 'checkups/index.html']) {
-        assert.match(readFileSync(join(ROOT, page), 'utf8'), /assets\/checkups-core\.js/, page);
-    }
+    assert.doesNotMatch(sale, /Checkups\/\/HE/, 'a second copy of the checkup .ics is back');
+    // And the page must actually load the core, or the delegation is a crash.
+    assert.match(readFileSync(join(ROOT, 'sale', 'index.html'), 'utf8'), /assets\/checkups-core\.js/,
+        'sale/index.html no longer loads assets/checkups-core.js');
 });
