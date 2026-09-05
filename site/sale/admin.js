@@ -513,10 +513,17 @@ function crPaintAttention() {
     if ((ai.events || []).some((e) => dayOf(e) === today && e.label === 'all')) {
         items.push({ tone: 'bad', tab: 'ai', text: 'כשל AI מלא היום — הבוט לא מקבל תשובות מאף ספק' });
     }
-    const failed = (ai.events || []).filter((e) => dayOf(e) === today && e.outcome === 'fail');
+    // A model that failed today. Every field here is one recordAiUse writes
+    // (functions/api/_ai.js): label, outcome, model, status, at — and `date`,
+    // which analytics.js stamps from the day key. The 'all' row is the ledger's
+    // marker for a full outage, already named above, so it is not counted
+    // again as a model failure. Newest event first is the server's order.
+    const failed = (ai.events || []).filter((e) => dayOf(e) === today && e.outcome === 'fail' && e.label !== 'all');
     if (failed.length) {
         const last = failed[0];
-        items.push({ tone: 'warn', tab: 'ai', text: `${failed.length === 1 ? 'כשל מודל אחד' : failed.length + ' כשלי מודל'} היום · ${AI_POOL_LABELS[last.label] || last.label}${last.status ? ' · ' + last.status : ''}` });
+        const where = [last.model, AI_POOL_LABELS[last.label] || last.label, last.status ? String(last.status) : '']
+            .filter(Boolean).join(' · ');
+        items.push({ tone: 'warn', tab: 'ai', text: `מודל נכשל היום${failed.length > 1 ? ` (${failed.length} פעמים)` : ''} · ${where}` });
     }
 
     // Prices: a verdict that came in since yesterday, and helpers who wrote.
@@ -925,6 +932,11 @@ function modelsPanelHtml(d) {
         </div>`;
     };
 
+    // The comparison's second seat: the newest stable model Google lists, when
+    // there is one — that is the question the row exists to answer — else the
+    // advanced model, so the two seats never start out equal.
+    const cmpB = (d.newer || [])[0] || d.configured.advanced.model;
+
     return `<div class="mdl-live">${liveRow('basic', 'בסיסי')}${liveRow('advanced', 'מתקדם')}</div>
         ${newer}
         <div class="mdl-row">
@@ -938,6 +950,13 @@ function modelsPanelHtml(d) {
             <button class="btn btn-secondary btn-small" onclick="runModelTraps('advanced')"><i class="fa-solid fa-vial"></i> הרץ מלכודות</button>
         </div>
         <div id="mdl-results"></div>
+        <div class="mdl-row mdl-compare">
+            <label>השווה שני מודלים</label>
+            <select id="mdl-cmp-a" aria-label="מודל ראשון">${opts(d.configured.basic.model)}</select>
+            <select id="mdl-cmp-b" aria-label="מודל שני">${opts(cmpB)}</select>
+            <button class="btn btn-secondary btn-small" id="mdl-cmp-run" onclick="compareModels()"><i class="fa-solid fa-scale-balanced"></i> השווה</button>
+        </div>
+        <div id="mdl-compare-results"></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn btn-accent btn-small" onclick="saveModelChoice()"><i class="fa-solid fa-floppy-disk"></i> החלף למודלים שנבחרו</button>
             <button class="btn btn-secondary btn-small" onclick="resetModelChoice()">חזור לברירת המחדל (${escapeHtml(d.shipped.basic.model)})</button>
@@ -986,6 +1005,75 @@ async function runModelTraps(which) {
     } catch (e) {
         if (box) box.innerHTML = adminErrorHtml(e);
     }
+}
+
+// Two models, the same traps, one table. The runs go one after the other,
+// not in parallel: a burst of two eval runs is ten model calls at once on the
+// same keys customers are using, and the second run would measure a key
+// under the first run's load. Same body shape as runModelTraps, system
+// blocks included, so both columns are the model as a customer meets it.
+let _cmpBusy = false;
+async function compareModels() {
+    const a = (document.getElementById('mdl-cmp-a') || {}).value;
+    const b = (document.getElementById('mdl-cmp-b') || {}).value;
+    const box = document.getElementById('mdl-compare-results');
+    const btn = document.getElementById('mdl-cmp-run');
+    if (!a || !b || !box) return;
+    if (a === b) { box.innerHTML = '<p class="input-help">בחר שני מודלים שונים.</p>'; return; }
+    if (_cmpBusy) return;
+    _cmpBusy = true;
+    if (btn) btn.disabled = true;
+    const n = _modelsData ? _modelsData.trapCount : 5;
+    const system = evalSystemBlocks();
+    try {
+        const runs = [];
+        for (const model of [a, b]) {
+            box.innerHTML = `<p class="input-help">מריץ ${n} מלכודות על ${escapeHtml(model)} (${runs.length + 1} מתוך 2)… זה לוקח כמה שניות.</p>`;
+            const res = await adminRes('/api/model-eval', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ system, model })
+            });
+            const d = await res.json();
+            if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+            runs.push(d);
+        }
+        box.innerHTML = compareTableHtml(runs[0], runs[1], Date.now());
+    } catch (e) {
+        box.innerHTML = adminErrorHtml(e);
+    } finally {
+        _cmpBusy = false;
+        if (btn) btn.disabled = false;
+    }
+}
+
+// Rows are the traps, columns the two models, a cell is pass/fail and how
+// long the answer was. The totals row and the one-line verdict are arithmetic
+// over the two payloads — which model answered shorter, which passed more —
+// and nothing else: the numbers are the recommendation, the reader makes it.
+function compareTableHtml(a, b, at) {
+    const byId = (run) => { const m = {}; (run.results || []).forEach((r) => { m[r.id] = r; }); return m; };
+    const ra = byId(a), rb = byId(b);
+    const ids = [];
+    (a.results || []).concat(b.results || []).forEach((r) => { if (!ids.includes(r.id)) ids.push(r.id); });
+    const title = (id) => ((ra[id] || rb[id] || {}).title) || id;
+    const cell = (r) => {
+        if (!r) return '<td class="mdl-cmp-cell">—</td>';
+        const mark = r.pass ? '<span class="mdl-cmp-ok">✓</span>' : '<span class="mdl-cmp-bad">✗</span>';
+        const chars = r.error ? 'שגיאה' : `${crNum(r.chars || 0)} תווים`;
+        return `<td class="mdl-cmp-cell${r.pass ? ' ok' : ' bad'}" title="${escapeHtml(r.error || (r.failed || []).join(' · ') || '')}">${mark} <small>${chars}</small></td>`;
+    };
+    const tot = (run) => `<td class="mdl-cmp-cell"><b>${run.passed}/${run.total}</b> <small>עבר · ${crNum(run.avgChars || 0)} תווים · ${crNum(run.avgMs || 0)} ms בממוצע</small></td>`;
+    const shorter = (a.avgChars || 0) === (b.avgChars || 0) ? null : ((a.avgChars || 0) < (b.avgChars || 0) ? a.model : b.model);
+    const passes = (a.passed || 0) === (b.passed || 0) ? null : ((a.passed || 0) > (b.passed || 0) ? a.model : b.model);
+    const verdict = `קצר יותר: ${shorter ? escapeHtml(shorter) : 'שווים'} · עובר יותר: ${passes ? escapeHtml(passes) : 'שווים'}`;
+    const when = at ? new Date(at).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) : '';
+    return `<div class="table-scroll"><table class="au-table mdl-cmp-table">
+        <thead><tr><th>מלכודת</th><th dir="ltr">${escapeHtml(a.model)}</th><th dir="ltr">${escapeHtml(b.model)}</th></tr></thead>
+        <tbody>${ids.map((id) => `<tr><td>${escapeHtml(title(id))}</td>${cell(ra[id])}${cell(rb[id])}</tr>`).join('')}</tbody>
+        <tfoot><tr><td>סה"כ</td>${tot(a)}${tot(b)}</tr></tfoot>
+    </table></div>
+    <p class="mdl-cmp-verdict">${verdict}${when ? ` <small class="mdl-note">· הורץ ${when}</small>` : ''}</p>`;
 }
 
 async function saveModelChoice() {
@@ -1271,6 +1359,7 @@ async function adminLoadConvos() {
         _adminConvos.forEach((t) => { const e = fb[t.id]; if (e) { t.verdict = e.verdict; t.note = e.note || ''; } });
         _adminConvosMeta = d;
         _adminConvosLoaded = true;
+        adminFillConvoUsers();
         return true;
     } finally {
         _convosLoading = false;
@@ -1283,8 +1372,8 @@ async function renderAdminConvos() {
     if (_convosLoading) return;
     box.innerHTML = '<p class="input-help">טוען…</p>';
     try {
-        await adminLoadConvos();
-        renderAdminConvoList(_adminConvosMeta);
+        // false = a load was already in flight and will paint when it lands.
+        if (await adminLoadConvos()) renderAdminConvoList(_adminConvosMeta);
     } catch (e) {
         box.innerHTML = `<p class="input-help" style="color:var(--danger);">הטעינה נכשלה: ${escapeHtml(String(e.message || e))}</p>`;
     }
@@ -1293,35 +1382,78 @@ async function renderAdminConvos() {
     try { renderAdminUsersTable(); } catch (e) { /* not rendered yet */ }
 }
 
+// The feed, narrowed. Pure over the payload the screen already holds: no
+// filter here costs a request. `days` is 'today' (since local midnight — what
+// "היום" means to the person reading), or a count of days back from now.
+// Newest first is asserted here rather than trusted from the wire, so the
+// order the list promises is the order it draws.
+function adminFilterConvos(threads, opts) {
+    opts = opts || {};
+    const q = String(opts.q || '').trim().toLowerCase();
+    const user = String(opts.user || '').toLowerCase();
+    const mode = opts.mode || '';
+    const now = opts.now || Date.now();
+    let since = 0;
+    if (opts.days === 'today') { const d = new Date(now); d.setHours(0, 0, 0, 0); since = d.getTime(); }
+    else if (Number(opts.days) > 0) since = now - Number(opts.days) * 86400000;
+    return (Array.isArray(threads) ? threads : [])
+        .filter((t) => !user || String(t.email).toLowerCase() === user)
+        .filter((t) => !since || (Number(t.when) || 0) >= since)
+        .filter((t) => mode === 'priced' ? !!t.verdict
+            : mode === 'unpriced' ? !t.verdict
+            : mode === 'way_off' ? t.verdict === 'way_off'
+            : true)
+        .filter((t) => !q
+            || String(t.title).toLowerCase().includes(q)
+            || String(t.asked).toLowerCase().includes(q)
+            || String(t.answered).toLowerCase().includes(q)
+            || String(t.email).toLowerCase().includes(q))
+        .sort((a, b) => (Number(b.when) || 0) - (Number(a.when) || 0));
+}
+
+// The user select, from the feed: only people who actually wrote, with how
+// many threads each — a list of 150 registered emails would be the wrong
+// list. The current choice survives a refresh when that person is still there.
+function adminFillConvoUsers() {
+    const sel = document.getElementById('admin-convo-user');
+    if (!sel) return;
+    const was = sel.value;
+    const counts = {};
+    _adminConvos.forEach((t) => { counts[t.email] = (counts[t.email] || 0) + 1; });
+    const emails = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+    sel.innerHTML = '<option value="">כל המשתמשים</option>' + emails.map((em) =>
+        `<option value="${escapeHtml(em)}">${escapeHtml(em)} (${counts[em]})</option>`).join('');
+    sel.value = counts[was] ? was : '';
+}
+
 function renderAdminConvoList(meta) {
     const box = document.getElementById('admin-convos-body');
     if (!box) return;
     if (!_adminConvosLoaded) return;
 
-    const q = (document.getElementById('admin-convo-q')?.value || '').trim().toLowerCase();
+    const val = (id) => (document.getElementById(id) || {}).value || '';
+    const q = val('admin-convo-q').trim();
+    const user = val('admin-convo-user');
+    const days = val('admin-convo-days');
     // Priced or not: the verdict joined from /api/feedback is the one filter
     // that turns a pile of conversations into a queue of the ones that went wrong.
-    const mode = (document.getElementById('admin-convo-verdict') || {}).value || '';
-    const rows = _adminConvos.filter((t) => !q
-        || String(t.title).toLowerCase().includes(q)
-        || String(t.asked).toLowerCase().includes(q)
-        || String(t.answered).toLowerCase().includes(q)
-        || String(t.email).toLowerCase().includes(q))
-        .filter((t) => mode === 'priced' ? !!t.verdict
-            : mode === 'unpriced' ? !t.verdict
-            : mode === 'way_off' ? t.verdict === 'way_off'
-            : true);
+    const mode = val('admin-convo-verdict');
+    const narrowed = !!(q || user || days || mode);
+    const rows = adminFilterConvos(_adminConvos, { q, user, days, mode });
 
     if (!rows.length) {
-        box.innerHTML = `<p class="input-help">${(q || mode) ? 'לא נמצאה שיחה שמתאימה.' : 'עוד אין שיחות במערכת.'}</p>`;
+        box.innerHTML = `<p class="input-help">${narrowed ? 'לא נמצאה שיחה שמתאימה.' : 'עוד אין שיחות במערכת.'}</p>`;
         return;
     }
 
-    const head = meta
-        ? `<p class="input-help" style="margin:0 0 8px;">${meta.total} שיחות אצל ${meta.users} משתמשים${meta.usersTruncated
+    // What the server scanned, and — when a filter is on — how much of it is
+    // showing, so "3 שיחות" is never mistaken for "3 שיחות בסך הכל".
+    const scanned = meta
+        ? `${meta.total} שיחות אצל ${meta.users} משתמשים${meta.usersTruncated
             ? ` · נסרקו ${meta.users} משתמשים בלבד`
-            : (meta.truncated ? ' · מוצגות האחרונות בלבד' : '')}${meta.failed ? ` · ${meta.failed} לא נקראו` : ''}</p>`
-        : `<p class="input-help" style="margin:0 0 8px;">${rows.length} מתוך ${_adminConvos.length}</p>`;
+            : (meta.truncated ? ' · מוצגות האחרונות בלבד' : '')}${meta.failed ? ` · ${meta.failed} לא נקראו` : ''}`
+        : `${_adminConvos.length} שיחות`;
+    const head = `<p class="input-help" style="margin:0 0 8px;">${narrowed ? `מוצגות ${rows.length} מתוך ${_adminConvos.length} · ` : ''}${scanned}</p>`;
 
     box.innerHTML = head + `<div class="convo-feed">` + rows.map((t, i) => `
         <button type="button" class="cf-row" onclick="openAdminConvo(${i})">

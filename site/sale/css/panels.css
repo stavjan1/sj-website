@@ -2110,6 +2110,15 @@ i[class^="fa-"], i[class*=" fa-"] {
 .mdl-newer { border-color: var(--accent); }
 .mdl-trap { font-size: var(--fs-xs); color: var(--text-2); }
 .mdl-trap-fail { color: var(--danger); }
+/* Two models side by side: the mark carries the verdict, the length sits small
+   beside it, and the totals row is the only bold line. */
+.mdl-compare select { flex: 1 1 160px; min-width: 0; }
+.mdl-cmp-table td, .mdl-cmp-table th { font-variant-numeric: tabular-nums; }
+.mdl-cmp-table tfoot td { border-block-start: 1px solid var(--border); }
+.mdl-cmp-cell small { color: var(--text-3); }
+.mdl-cmp-ok { color: var(--ok-text); font-weight: 700; }
+.mdl-cmp-bad { color: var(--danger); font-weight: 700; }
+.mdl-cmp-verdict { margin: var(--sp-2) 0 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* Users — the table on the screen and the person's page in the drawer.
    The row list with a body that unfolded under each user is gone (5/9);

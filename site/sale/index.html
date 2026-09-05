@@ -2450,6 +2450,17 @@
                                     <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
                                     <input type="text" id="admin-convo-q" placeholder="חיפוש בשיחות…" oninput="renderAdminConvoList()">
                                 </div>
+                                <!-- Filled from the feed itself after it loads (adminFillConvoUsers):
+                                     the people who actually wrote, each with his count. -->
+                                <select id="admin-convo-user" class="model-select-input" onchange="renderAdminConvoList()" aria-label="סינון לפי משתמש">
+                                    <option value="">כל המשתמשים</option>
+                                </select>
+                                <select id="admin-convo-days" class="model-select-input" onchange="renderAdminConvoList()" aria-label="סינון לפי תאריך">
+                                    <option value="">כל התאריכים</option>
+                                    <option value="today">היום</option>
+                                    <option value="7">7 ימים אחרונים</option>
+                                    <option value="30">30 ימים אחרונים</option>
+                                </select>
                                 <select id="admin-convo-verdict" class="model-select-input" onchange="renderAdminConvoList()" aria-label="סינון לפי משוב">
                                     <option value="">הכל</option>
                                     <option value="priced">עם משוב מחיר</option>
