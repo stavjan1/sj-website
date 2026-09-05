@@ -11,7 +11,7 @@ const SHELL = ['/thing/', '/thing/index.html', '/thing/thing.js', '/assets/token
 // Bare /thing/thing.js is a year-old copy at the edge (the page asks for
 // thing.js?v=NNN and the edge caches per URL), so the precache fetches the
 // versioned URL and stores it under the bare key the runtime path uses.
-const ASSET_QUERY = '?v=515';
+const ASSET_QUERY = '?v=516';
 const versioned = (u) => (/\.(js|css)$/.test(u) ? u + ASSET_QUERY : u);
 
 self.addEventListener('install', (e) => {

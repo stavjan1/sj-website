@@ -2,7 +2,7 @@
 // Purpose: make the app installable (PWA) and let the shell open instantly,
 // including offline at a job site (the user's data lives in localStorage
 // anyway). AI calls and cloud sync (/api/*) are ALWAYS network-only.
-const CACHE = 'zerem-shell-v386';
+const CACHE = 'zerem-shell-v387';
 
 // The typeface and the icons come from other people's servers, and at a job
 // site there is no reception to fetch them with. Without them the app is a wall
@@ -21,7 +21,7 @@ const CDN_CACHE = 'zerem-cdn-v2';
 // the edge, so the precache must ask for the versioned URL — cache:'reload'
 // only skips the browser's cache, not Cloudflare's. Bumped with every deploy
 // together with the pages (tests/site.test.mjs checks they agree).
-const ASSET_QUERY = '?v=515';
+const ASSET_QUERY = '?v=516';
 const versioned = (u) => (/\.(js|css|json|webmanifest)$/.test(u) ? u + ASSET_QUERY : u);
 const CDN_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com'];
 const SHELL = [
