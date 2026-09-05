@@ -2026,6 +2026,8 @@ async function runPricingAgent(activeProject, promptChars) {
         renderChatHistory(activeProject);
 
         applyMaterialsFromResponse(activeProject, responseText);
+        // The guide: step 1 is done, and if he is only reading, walk him on.
+        try { guideOnPriced(activeProject); } catch (e) {}
     } catch (err) {
         console.error(err);
         showTypingIndicator(false);
