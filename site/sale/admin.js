@@ -513,10 +513,17 @@ function crPaintAttention() {
     if ((ai.events || []).some((e) => dayOf(e) === today && e.label === 'all')) {
         items.push({ tone: 'bad', tab: 'ai', text: 'כשל AI מלא היום — הבוט לא מקבל תשובות מאף ספק' });
     }
-    const failed = (ai.events || []).filter((e) => dayOf(e) === today && e.outcome === 'fail');
+    // A model that failed today. Every field here is one recordAiUse writes
+    // (functions/api/_ai.js): label, outcome, model, status, at — and `date`,
+    // which analytics.js stamps from the day key. The 'all' row is the ledger's
+    // marker for a full outage, already named above, so it is not counted
+    // again as a model failure. Newest event first is the server's order.
+    const failed = (ai.events || []).filter((e) => dayOf(e) === today && e.outcome === 'fail' && e.label !== 'all');
     if (failed.length) {
         const last = failed[0];
-        items.push({ tone: 'warn', tab: 'ai', text: `${failed.length === 1 ? 'כשל מודל אחד' : failed.length + ' כשלי מודל'} היום · ${AI_POOL_LABELS[last.label] || last.label}${last.status ? ' · ' + last.status : ''}` });
+        const where = [last.model, AI_POOL_LABELS[last.label] || last.label, last.status ? String(last.status) : '']
+            .filter(Boolean).join(' · ');
+        items.push({ tone: 'warn', tab: 'ai', text: `מודל נכשל היום${failed.length > 1 ? ` (${failed.length} פעמים)` : ''} · ${where}` });
     }
 
     // Prices: a verdict that came in since yesterday, and helpers who wrote.
@@ -925,6 +932,11 @@ function modelsPanelHtml(d) {
         </div>`;
     };
 
+    // The comparison's second seat: the newest stable model Google lists, when
+    // there is one — that is the question the row exists to answer — else the
+    // advanced model, so the two seats never start out equal.
+    const cmpB = (d.newer || [])[0] || d.configured.advanced.model;
+
     return `<div class="mdl-live">${liveRow('basic', 'בסיסי')}${liveRow('advanced', 'מתקדם')}</div>
         ${newer}
         <div class="mdl-row">
@@ -938,6 +950,13 @@ function modelsPanelHtml(d) {
             <button class="btn btn-secondary btn-small" onclick="runModelTraps('advanced')"><i class="fa-solid fa-vial"></i> הרץ מלכודות</button>
         </div>
         <div id="mdl-results"></div>
+        <div class="mdl-row mdl-compare">
+            <label>השווה שני מודלים</label>
+            <select id="mdl-cmp-a" aria-label="מודל ראשון">${opts(d.configured.basic.model)}</select>
+            <select id="mdl-cmp-b" aria-label="מודל שני">${opts(cmpB)}</select>
+            <button class="btn btn-secondary btn-small" id="mdl-cmp-run" onclick="compareModels()"><i class="fa-solid fa-scale-balanced"></i> השווה</button>
+        </div>
+        <div id="mdl-compare-results"></div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn btn-accent btn-small" onclick="saveModelChoice()"><i class="fa-solid fa-floppy-disk"></i> החלף למודלים שנבחרו</button>
             <button class="btn btn-secondary btn-small" onclick="resetModelChoice()">חזור לברירת המחדל (${escapeHtml(d.shipped.basic.model)})</button>
@@ -986,6 +1005,76 @@ async function runModelTraps(which) {
     } catch (e) {
         if (box) box.innerHTML = adminErrorHtml(e);
     }
+}
+
+// Two models, the same traps, one table. The runs go one after the other,
+// not in parallel: a burst of two eval runs is ten model calls at once on the
+// same keys customers are using, and the second run would measure a key
+// under the first run's load. Same body shape as runModelTraps, system
+// blocks included, so both columns are the model as a customer meets it.
+let _cmpBusy = false;
+async function compareModels() {
+    const a = (document.getElementById('mdl-cmp-a') || {}).value;
+    const b = (document.getElementById('mdl-cmp-b') || {}).value;
+    const box = document.getElementById('mdl-compare-results');
+    const btn = document.getElementById('mdl-cmp-run');
+    if (!a || !b || !box) return;
+    if (a === b) { box.innerHTML = '<p class="input-help">בחר שני מודלים שונים.</p>'; return; }
+    if (_cmpBusy) return;
+    _cmpBusy = true;
+    if (btn) btn.disabled = true;
+    const n = _modelsData ? _modelsData.trapCount : 5;
+    const system = evalSystemBlocks();
+    try {
+        const runs = [];
+        for (const model of [a, b]) {
+            box.innerHTML = `<p class="input-help">מריץ ${n} מלכודות על ${escapeHtml(model)} (${runs.length + 1} מתוך 2)… זה לוקח כמה שניות.</p>`;
+            const res = await adminRes('/api/model-eval', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ system, model })
+            });
+            const d = await res.json();
+            if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+            runs.push(d);
+        }
+        box.innerHTML = compareTableHtml(runs[0], runs[1], Date.now());
+    } catch (e) {
+        box.innerHTML = adminErrorHtml(e);
+    } finally {
+        _cmpBusy = false;
+        if (btn) btn.disabled = false;
+    }
+}
+
+// Rows are the traps, columns the two models, a cell is pass/fail, how long
+// the answer was and how long it took. The totals row and the one-line
+// verdict are arithmetic over the two payloads — which model answered
+// shorter, which passed more — and nothing else: the numbers are the
+// recommendation, the reader makes it.
+function compareTableHtml(a, b, at) {
+    const byId = (run) => { const m = {}; (run.results || []).forEach((r) => { m[r.id] = r; }); return m; };
+    const ra = byId(a), rb = byId(b);
+    const ids = [];
+    (a.results || []).concat(b.results || []).forEach((r) => { if (!ids.includes(r.id)) ids.push(r.id); });
+    const title = (id) => ((ra[id] || rb[id] || {}).title) || id;
+    const cell = (r) => {
+        if (!r) return '<td class="mdl-cmp-cell">—</td>';
+        const mark = r.pass ? '<span class="mdl-cmp-ok">✓</span>' : '<span class="mdl-cmp-bad">✗</span>';
+        const chars = r.error ? 'שגיאה' : `${crNum(r.chars || 0)} תווים · ${crNum(r.ms || 0)} ms`;
+        return `<td class="mdl-cmp-cell${r.pass ? ' ok' : ' bad'}" title="${escapeHtml(r.error || (r.failed || []).join(' · ') || '')}">${mark} <small>${chars}</small></td>`;
+    };
+    const tot = (run) => `<td class="mdl-cmp-cell"><b>${run.passed}/${run.total}</b> <small>עבר · ${crNum(run.avgChars || 0)} תווים · ${crNum(run.avgMs || 0)} ms בממוצע</small></td>`;
+    const shorter = (a.avgChars || 0) === (b.avgChars || 0) ? null : ((a.avgChars || 0) < (b.avgChars || 0) ? a.model : b.model);
+    const passes = (a.passed || 0) === (b.passed || 0) ? null : ((a.passed || 0) > (b.passed || 0) ? a.model : b.model);
+    const verdict = `קצר יותר: ${shorter ? escapeHtml(shorter) : 'שווים'} · עובר יותר: ${passes ? escapeHtml(passes) : 'שווים'}`;
+    const when = at ? new Date(at).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) : '';
+    return `<div class="table-scroll"><table class="au-table mdl-cmp-table">
+        <thead><tr><th>מלכודת</th><th dir="ltr">${escapeHtml(a.model)}</th><th dir="ltr">${escapeHtml(b.model)}</th></tr></thead>
+        <tbody>${ids.map((id) => `<tr><td>${escapeHtml(title(id))}</td>${cell(ra[id])}${cell(rb[id])}</tr>`).join('')}</tbody>
+        <tfoot><tr><td>סה"כ</td>${tot(a)}${tot(b)}</tr></tfoot>
+    </table></div>
+    <p class="mdl-cmp-verdict">${verdict}${when ? ` <small class="mdl-note">· הורץ ${when}</small>` : ''}</p>`;
 }
 
 async function saveModelChoice() {
@@ -1231,17 +1320,20 @@ const PF_VERDICT_HE = {
 
 let _adminConvos = [];
 let _adminConvosLoaded = false;
+let _adminConvosMeta = null;    // the counts and truncation flags that came with the feed
 // One refresh is one KV read per user, out of a daily budget shared with the
 // whole product — including the save path and the pricing agent's quota check.
 // A held-down Enter key on a focused refresh button is ~30 requests a second.
 let _convosLoading = false;
 
-async function renderAdminConvos() {
-    const box = document.getElementById('admin-convos-body');
-    if (!box) return;
-    if (_convosLoading) return;
+// The feed into memory. Shared by the שיחות screen and the משתמשים screen:
+// the second joins per-user conversation counts from this array instead of
+// asking the server per row, so the whole panel pays for the scan once.
+// Resolves true when a fresh feed landed, false when a load was already in
+// flight; throws when the server said no.
+async function adminLoadConvos() {
+    if (_convosLoading) return false;
     _convosLoading = true;
-    box.innerHTML = '<p class="input-help">טוען…</p>';
     try {
         // The feed and the verdicts, together. /api/feedback already returns the
         // recent entries and each carries quoteId — which IS the project id —
@@ -1260,18 +1352,79 @@ async function renderAdminConvos() {
         let fb = {};
         try {
             const fd = fbRes ? await fbRes.json() : null;
+            if (fd && fbRes.ok) _adminSide.feedback = { at: Date.now(), data: fd };   // the user page reads it too
             (fd && Array.isArray(fd.entries) ? fd.entries : []).forEach((e) => {
                 if (e && e.quoteId && !fb[e.quoteId]) fb[e.quoteId] = e;   // newest first already
             });
         } catch (e) { /* no verdicts is a feed without badges, not a failure */ }
         _adminConvos.forEach((t) => { const e = fb[t.id]; if (e) { t.verdict = e.verdict; t.note = e.note || ''; } });
+        _adminConvosMeta = d;
         _adminConvosLoaded = true;
-        renderAdminConvoList(d);
-    } catch (e) {
-        box.innerHTML = `<p class="input-help" style="color:var(--danger);">הטעינה נכשלה: ${escapeHtml(String(e.message || e))}</p>`;
+        adminFillConvoUsers();
+        return true;
     } finally {
         _convosLoading = false;
     }
+}
+
+async function renderAdminConvos() {
+    const box = document.getElementById('admin-convos-body');
+    if (!box) return;
+    if (_convosLoading) return;
+    box.innerHTML = '<p class="input-help">טוען…</p>';
+    try {
+        // false = a load was already in flight and will paint when it lands.
+        if (await adminLoadConvos()) renderAdminConvoList(_adminConvosMeta);
+    } catch (e) {
+        box.innerHTML = `<p class="input-help" style="color:var(--danger);">הטעינה נכשלה: ${escapeHtml(String(e.message || e))}</p>`;
+    }
+    // The users table counts conversations from this feed; a fresh feed is a
+    // fresh column there.
+    try { renderAdminUsersTable(); } catch (e) { /* not rendered yet */ }
+}
+
+// The feed, narrowed. Pure over the payload the screen already holds: no
+// filter here costs a request. `days` is 'today' (since local midnight — what
+// "היום" means to the person reading), or a count of days back from now.
+// Newest first is asserted here rather than trusted from the wire, so the
+// order the list promises is the order it draws.
+function adminFilterConvos(threads, opts) {
+    opts = opts || {};
+    const q = String(opts.q || '').trim().toLowerCase();
+    const user = String(opts.user || '').toLowerCase();
+    const mode = opts.mode || '';
+    const now = opts.now || Date.now();
+    let since = 0;
+    if (opts.days === 'today') { const d = new Date(now); d.setHours(0, 0, 0, 0); since = d.getTime(); }
+    else if (Number(opts.days) > 0) since = now - Number(opts.days) * 86400000;
+    return (Array.isArray(threads) ? threads : [])
+        .filter((t) => !user || String(t.email).toLowerCase() === user)
+        .filter((t) => !since || (Number(t.when) || 0) >= since)
+        .filter((t) => mode === 'priced' ? !!t.verdict
+            : mode === 'unpriced' ? !t.verdict
+            : mode === 'way_off' ? t.verdict === 'way_off'
+            : true)
+        .filter((t) => !q
+            || String(t.title).toLowerCase().includes(q)
+            || String(t.asked).toLowerCase().includes(q)
+            || String(t.answered).toLowerCase().includes(q)
+            || String(t.email).toLowerCase().includes(q))
+        .sort((a, b) => (Number(b.when) || 0) - (Number(a.when) || 0));
+}
+
+// The user select, from the feed: only people who actually wrote, with how
+// many threads each — a list of 150 registered emails would be the wrong
+// list. The current choice survives a refresh when that person is still there.
+function adminFillConvoUsers() {
+    const sel = document.getElementById('admin-convo-user');
+    if (!sel) return;
+    const was = sel.value;
+    const counts = {};
+    _adminConvos.forEach((t) => { counts[t.email] = (counts[t.email] || 0) + 1; });
+    const emails = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || a.localeCompare(b));
+    sel.innerHTML = '<option value="">כל המשתמשים</option>' + emails.map((em) =>
+        `<option value="${escapeHtml(em)}">${escapeHtml(em)} (${counts[em]})</option>`).join('');
+    sel.value = counts[was] ? was : '';
 }
 
 function renderAdminConvoList(meta) {
@@ -1279,30 +1432,31 @@ function renderAdminConvoList(meta) {
     if (!box) return;
     if (!_adminConvosLoaded) return;
 
-    const q = (document.getElementById('admin-convo-q')?.value || '').trim().toLowerCase();
+    const val = (id) => (document.getElementById(id) || {}).value || '';
+    const q = val('admin-convo-q').trim();
+    const user = val('admin-convo-user');
+    const days = val('admin-convo-days');
     // Priced or not: the verdict joined from /api/feedback is the one filter
     // that turns a pile of conversations into a queue of the ones that went wrong.
-    const mode = (document.getElementById('admin-convo-verdict') || {}).value || '';
-    const rows = _adminConvos.filter((t) => !q
-        || String(t.title).toLowerCase().includes(q)
-        || String(t.asked).toLowerCase().includes(q)
-        || String(t.answered).toLowerCase().includes(q)
-        || String(t.email).toLowerCase().includes(q))
-        .filter((t) => mode === 'priced' ? !!t.verdict
-            : mode === 'unpriced' ? !t.verdict
-            : mode === 'way_off' ? t.verdict === 'way_off'
-            : true);
+    const mode = val('admin-convo-verdict');
+    const narrowed = !!(q || user || days || mode);
+    const rows = adminFilterConvos(_adminConvos, { q, user, days, mode });
 
     if (!rows.length) {
-        box.innerHTML = `<p class="input-help">${(q || mode) ? 'לא נמצאה שיחה שמתאימה.' : 'עוד אין שיחות במערכת.'}</p>`;
+        box.innerHTML = `<p class="input-help">${narrowed ? 'לא נמצאה שיחה שמתאימה.' : 'עוד אין שיחות במערכת.'}</p>`;
         return;
     }
 
-    const head = meta
-        ? `<p class="input-help" style="margin:0 0 8px;">${meta.total} שיחות אצל ${meta.users} משתמשים${meta.usersTruncated
-            ? ` · נסרקו ${meta.users} משתמשים בלבד`
-            : (meta.truncated ? ' · מוצגות האחרונות בלבד' : '')}${meta.failed ? ` · ${meta.failed} לא נקראו` : ''}</p>`
-        : `<p class="input-help" style="margin:0 0 8px;">${rows.length} מתוך ${_adminConvos.length}</p>`;
+    // What the server scanned, and — when a filter is on — how much of it is
+    // showing, so "3 שיחות" is never mistaken for "3 שיחות בסך הכל". `users`
+    // is every record the scan read, writers or not — so it is "נסרקו", not
+    // "אצל".
+    const scanned = meta
+        ? `${meta.total} שיחות · נסרקו ${meta.users} משתמשים${meta.usersTruncated
+            ? ' בלבד'
+            : (meta.truncated ? ' · מוצגות האחרונות בלבד' : '')}${meta.failed ? ` · ${meta.failed} לא נקראו` : ''}`
+        : `${_adminConvos.length} שיחות`;
+    const head = `<p class="input-help" style="margin:0 0 8px;">${narrowed ? `מוצגות ${rows.length} מתוך ${_adminConvos.length} · ` : ''}${scanned}</p>`;
 
     box.innerHTML = head + `<div class="convo-feed">` + rows.map((t, i) => `
         <button type="button" class="cf-row" onclick="openAdminConvo(${i})">
@@ -1327,14 +1481,24 @@ function renderAdminConvoList(meta) {
 
 let _adminConvoView = [];
 
-async function openAdminConvo(i) {
-    const t = _adminConvoView[i];
+function openAdminConvo(i) {
+    return openAdminThread(_adminConvoView[i]);
+}
+
+// One thread, in the drawer. `back`, when given, is { label, onBack } — the
+// user page opens threads through here and needs a way back to itself,
+// inside the same drawer, without a second drawer or a modal.
+let _adminThreadBack = null;
+async function openAdminThread(t, back) {
     if (!t) return;
+    _adminThreadBack = back || null;
     // The thread opens in the admin drawer — one place, one X, Escape closes —
     // instead of a modal <dialog> of its own.
     const body = openAdminDrawer(t.title,
-        `<p class="input-help" style="margin:0 0 10px;">${escapeHtml(t.email)} · ${t.messages} הודעות · ${escapeHtml(crWhen(t.when))}${t.verdict ? ` · <span class="cf-vote v-${t.verdict}">${escapeHtml(PF_VERDICT_HE[t.verdict] || t.verdict)}</span>` : ''}</p>
+        (back ? `<button type="button" class="au-back" onclick="adminThreadBack()"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i> ${escapeHtml(back.label)}</button>` : '')
+        + `<p class="input-help" style="margin:0 0 10px;">${escapeHtml(t.email)} · ${t.messages} הודעות · ${escapeHtml(crWhen(t.when))}${t.verdict ? ` · <span class="cf-vote v-${t.verdict}">${escapeHtml(PF_VERDICT_HE[t.verdict] || t.verdict)}</span>` : ''}</p>
          <div class="adm-convo" id="admin-convo-read"><p class="input-help">טוען…</p></div>`);
+    if (!body) return;
     try {
         const res = await adminRes(`/api/admin-convos?user=${encodeURIComponent(t.email)}&id=${encodeURIComponent(t.id)}`);
         const d = await res.json().catch(() => ({}));
@@ -1351,6 +1515,399 @@ async function openAdminConvo(i) {
         if (read) read.innerHTML = `<p class="input-help" style="color:var(--danger);">${escapeHtml(String(e.message || e))}</p>`;
     }
 }
+function adminThreadBack() {
+    const b = _adminThreadBack;
+    _adminThreadBack = null;
+    if (b && typeof b.onBack === 'function') b.onBack();
+}
+
+// ============================================================================
+// USERS — who is here, and one page per person
+// ============================================================================
+// A table of everyone with a cloud record, and behind each row the whole
+// person: his plan, his quotes, his conversations, the prices he wrote as a
+// helper, the verdicts he gave, and the one destructive action. Every number
+// here comes from a payload some screen already holds — the users list (one
+// read per user), the conversations feed (the same, loaded once by its own
+// screen or by the button in the שיחות column), the helper prices and the
+// recent feedback (a few dozen reads, cached five minutes). Nothing is
+// fetched per row: with 150 users a per-row request would be 150 requests
+// for a scroll, out of a daily read budget the pricing agent also lives on.
+// ============================================================================
+let _adminUsers = [];
+let _adminUsersMeta = null;     // the rest of the payload: count, signup-mail state
+let _adminUsersLoaded = false;
+let _usersLoading = false;      // the same guard as the feed: one refresh is one read per user
+let _adminUsersSort = { key: 'lastUpdated', dir: -1 };
+
+// The side sources of the user page — helper prices and recent verdicts.
+// Cheap, and usually already in the overview's cache from the last paint, so
+// the page reads that copy and fetches only when the copy is five minutes old.
+const _adminSide = {};
+async function adminSideSource(key, url) {
+    const fresh = (at) => at && Date.now() - at < 5 * 60000;
+    if (_adminSide[key] && fresh(_adminSide[key].at)) return _adminSide[key].data;
+    if (_crCache[key] && fresh(_crAt)) return _crCache[key];
+    const res = await adminRes(url);
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+    _adminSide[key] = { at: Date.now(), data: d };
+    return d;
+}
+
+// The name on the row: what he typed into his business details, else the part
+// of the address before the @ — never a guess dressed up as a name.
+function adminUserName(u) {
+    return (u && u.name) || String((u && u.email) || '').split('@')[0] || '—';
+}
+
+// Conversations per address, counted from the feed already in memory. null
+// until the feed has loaded, and the table says so instead of showing zeros.
+function adminConvoCounts() {
+    if (!_adminConvosLoaded) return null;
+    const m = new Map();
+    _adminConvos.forEach((t) => m.set(t.email, (m.get(t.email) || 0) + 1));
+    return m;
+}
+// Who is a helper — the set helper.js keeps from /api/helper-prices?admin=1,
+// which the helpers card on this same screen fetches on panel open.
+function adminHelperSet() {
+    return (window._adminHelperSet instanceof Set) ? window._adminHelperSet : null;
+}
+
+async function adminRefreshUserList() {
+    const container = document.getElementById('admin-users-list');
+    if (!container) return;
+    if (!isAdmin()) {
+        container.innerHTML = '<p class="input-help">התחבר כמנהל כדי לראות משתמשים.</p>';
+        return;
+    }
+    if (_usersLoading) return;
+    _usersLoading = true;
+    container.innerHTML = '<p class="input-help">טוען…</p>';
+    try {
+        const res = await adminRes('/api/admin-users');
+        const d = await res.json();
+        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        _adminUsers = Array.isArray(d.users) ? d.users : [];
+        _adminUsersMeta = d;
+        _adminUsersLoaded = true;
+        renderAdminUsersTable();
+    } catch (e) {
+        container.innerHTML = adminErrorHtml(e);
+    } finally {
+        _usersLoading = false;
+    }
+}
+
+function adminSortUsers(key) {
+    if (_adminUsersSort.key === key) _adminUsersSort.dir = -_adminUsersSort.dir;
+    else _adminUsersSort = { key, dir: key === 'name' ? 1 : -1 };
+    renderAdminUsersTable();
+}
+
+// The feed, for the שיחות column, when the שיחות screen has not loaded it yet.
+// One scan, the same one that screen does — and its list fills in as well.
+async function adminLoadConvosForUsers(btn) {
+    if (btn) btn.disabled = true;
+    try {
+        await adminLoadConvos();
+        if (_adminConvosLoaded) renderAdminConvoList(_adminConvosMeta);
+    } catch (e) {
+        showToast('טעינת השיחות נכשלה: ' + (e.message || e), 'error');
+    }
+    renderAdminUsersTable();
+    if (_adminUserPage) paintAdminUserPage();
+}
+
+function renderAdminUsersTable() {
+    const container = document.getElementById('admin-users-list');
+    if (!container || !_adminUsersLoaded) return;
+    const d = _adminUsersMeta || {};
+    const users = _adminUsers;
+    if (!users.length) {
+        container.innerHTML = '<p class="input-help">אין משתמשים רשומים עדיין.</p>';
+        return;
+    }
+    // Signup summary strip: total + new registrations this calendar month.
+    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+    const newThisMonth = users.filter((u) => u.firstSeen && u.firstSeen >= monthStart.getTime()).length;
+    const summary = `<p class="input-help" style="margin:0 0 10px;">
+        סה"כ <b>${users.length}</b> נרשמים · <b>${newThisMonth}</b> חדשים החודש
+        <span>${signupMailNote(d)}</span>
+        <button type="button" class="btn btn-secondary btn-small" style="margin-inline-start:8px;" onclick="adminTestMail(this)">
+            <i class="fa-solid fa-paper-plane" aria-hidden="true"></i> שלח מייל בדיקה
+        </button></p>`;
+
+    const q = ((document.getElementById('admin-users-q') || {}).value || '').trim().toLowerCase();
+    const convos = adminConvoCounts();
+    const helpers = adminHelperSet();
+    const rows = users
+        .filter((u) => !q || String(u.email).toLowerCase().includes(q) || adminUserName(u).toLowerCase().includes(q))
+        .map((u) => ({ u, convos: convos ? (convos.get(u.email) || 0) : null, helper: helpers ? helpers.has(u.email) : null }));
+    const { key, dir } = _adminUsersSort;
+    const val = (r) => key === 'convos' ? (r.convos || 0)
+        : key === 'history' ? (r.u.history || 0)
+        : key === 'name' ? adminUserName(r.u)
+        : (r.u.lastUpdated || 0);
+    rows.sort((a, b) => {
+        const x = val(a), y = val(b);
+        return (typeof x === 'string' ? x.localeCompare(y, 'he') : x - y) * dir;
+    });
+
+    const th = (k, label) => `<th scope="col" aria-sort="${key === k ? (dir < 0 ? 'descending' : 'ascending') : 'none'}"><button type="button" class="au-sort${key === k ? ' is-on' : ''}" onclick="adminSortUsers('${k}')">${label}${key === k ? ` <i class="fa-solid ${dir < 0 ? 'fa-arrow-down' : 'fa-arrow-up'}" aria-hidden="true"></i>` : ''}</button></th>`;
+    // The column exists before the feed does: it says what it is missing and
+    // offers the one load, rather than a column of zeros that read as "nobody".
+    const convoHead = convos ? th('convos', 'שיחות')
+        : `<th scope="col">שיחות <button type="button" class="btn btn-secondary btn-small" onclick="adminLoadConvosForUsers(this)" title="טעינת פיד השיחות — קריאה אחת לכל משתמש">טען</button></th>`;
+    const chip = (t) => `<span class="au-plan plan-${escapeHtml(t || 'free')}">${escapeHtml(TIER_LABELS[t] || t || 'free')}</span>`;
+
+    const table = rows.length ? `<div class="table-scroll"><table class="au-table">
+        <thead><tr>
+            ${th('name', 'שם')}
+            <th scope="col">מייל</th>
+            <th scope="col">מסלול</th>
+            ${th('lastUpdated', 'שמירה אחרונה')}
+            ${th('history', 'הצעות')}
+            ${convoHead}
+            <th scope="col">עוזר</th>
+        </tr></thead>
+        <tbody>${rows.map((r) => `
+            <tr class="au-row" tabindex="0" data-email="${escapeHtml(r.u.email)}" onclick="openAdminUser(this.dataset.email)" onkeydown="if(event.key==='Enter'){openAdminUser(this.dataset.email)}">
+                <td class="au-name">${escapeHtml(adminUserName(r.u))}</td>
+                <td class="au-email" dir="ltr">${escapeHtml(r.u.email)}</td>
+                <td>${chip(r.u.tier)}</td>
+                <td>${escapeHtml(crWhen(r.u.lastUpdated))}</td>
+                <td>${heNum(r.u.history)}</td>
+                <td>${r.convos === null ? '—' : heNum(r.convos)}</td>
+                <td>${r.helper ? '<span class="au-helper-badge">עוזר</span>' : (r.helper === null ? '—' : '')}</td>
+            </tr>`).join('')}</tbody></table></div>`
+        : '<p class="input-help">לא נמצא משתמש שמתאים.</p>';
+
+    // What each column means, in one line: the field behind "שמירה אחרונה"
+    // is the last cloud save, and the conversation count is only as complete
+    // as the feed it comes from.
+    const cm = _adminConvosMeta || {};
+    const feedNote = !convos ? 'שיחות: יוצגו אחרי טעינת הפיד.'
+        : (cm.usersTruncated || cm.truncated) ? `שיחות: מתוך הפיד (${cm.users} משתמשים נסרקו, ${cm.total} שיחות; קטום, המספר עשוי להיות חלקי).`
+        : `שיחות: מתוך הפיד (${cm.total} שיחות · נסרקו ${cm.users} משתמשים).`;
+    const notes = `<p class="input-help au-notes">שמירה אחרונה = הפעם האחרונה שהמכשיר שלו שמר לענן, לא כניסה. הצעות = בארכיון ההצעות שלו, מאז ההתחלה. ${feedNote}${helpers ? '' : ' עוזר: יוצג אחרי שכרטיס העוזרים נטען.'}</p>`;
+
+    container.innerHTML = summary + table + notes;
+}
+
+// A tier landed on the server: the chip on his row and his page follow, from
+// the cache — a refetch of the list is one KV read per registered user.
+function adminNoteTier(email, tier) {
+    const u = _adminUsers.find((x) => x.email === email);
+    if (u) u.tier = tier;
+    renderAdminUsersTable();
+    if (_adminUserPage && _adminUserPage.email === email) {
+        _adminUserPage.row.tier = tier;
+        if (_adminUserPage.detail) _adminUserPage.detail.tier = tier;
+        paintAdminUserPage();
+    }
+}
+
+// ---- one user's page ------------------------------------------------------
+// Opens at once from the row already on screen, then three sources land on
+// their own: his projects (one read), the helper prices and the recent
+// verdicts (cached, see adminSideSource). Nothing waits for anything else.
+let _adminUserPage = null;
+
+async function openAdminUser(email) {
+    if (!email) return;
+    const row = _adminUsers.find((u) => u.email === email) || { email };
+    const page = { email, row, detail: null, detailErr: null, helpers: null, helpersErr: null, feedback: null, feedbackErr: null };
+    _adminUserPage = page;
+    if (!openAdminDrawer(adminUserName(row), '', page)) return;
+    paintAdminUserPage();
+
+    const land = (k, p) => p
+        .then((data) => { page[k] = data; }, (e) => { page[k + 'Err'] = e; })
+        .then(() => { if (_adminUserPage === page) paintAdminUserPage(); });
+    await Promise.all([
+        land('detail', adminRes('/api/admin-users?user=' + encodeURIComponent(email)).then(async (res) => {
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+            return d;
+        })),
+        land('helpers', adminSideSource('helpers', '/api/helper-prices?admin=1')),
+        land('feedback', adminSideSource('feedback', '/api/feedback')),
+    ]);
+}
+
+function paintAdminUserPage() {
+    const page = _adminUserPage;
+    const el = document.getElementById('admin-drawer');
+    const body = document.getElementById('admin-drawer-body');
+    const head = document.getElementById('admin-drawer-title');
+    // Only while the drawer is his: a source that lands after a thread, or
+    // another screen's detail, took the drawer must not paint over it.
+    if (!page || !el || !body || !el.classList.contains('open') || _adminDrawerOwner !== page) return;
+    const { email, row } = page;
+    if (head) head.textContent = adminUserName(row);
+    const e = escapeHtml(email);
+    const tier = (page.detail && page.detail.tier) || row.tier || 'free';
+    const nis = (n) => n ? '₪' + Math.round(n).toLocaleString('he-IL') : '—';
+    const err = (x) => `<p class="input-help" style="color:var(--danger);">${escapeHtml(String((x && x.message) || x || 'שגיאה'))}</p>`;
+    const sec = (id, title, html) => `<section class="au-sec" data-sec="${id}"><h4 class="tcol-title">${title}</h4>${html}</section>`;
+
+    // 1 · פרופיל ומסלול
+    const helperSet = adminHelperSet();
+    const isHelper = page.helpers ? (page.helpers.helpers || []).includes(email) : (helperSet ? helperSet.has(email) : null);
+    const profile = `
+        <div class="au-profile">
+            <div><span class="au-k">מייל</span> <span dir="ltr">${e}</span></div>
+            <div><span class="au-k">נרשם</span> ${row.firstSeen ? escapeHtml(new Date(row.firstSeen).toLocaleDateString('he-IL')) : '— (רשומה מלפני שנשמר תאריך הרשמה)'}</div>
+            <div><span class="au-k">שמירה אחרונה לענן</span> ${escapeHtml(crWhen(row.lastUpdated))}</div>
+        </div>
+        <div class="au-tier">מסלול: <span class="au-plan plan-${escapeHtml(tier)}">${escapeHtml(TIER_LABELS[tier] || tier)}</span>
+            ${tier === 'admin' ? '' : `<select class="model-select-input au-tier-sel" aria-label="שינוי מסלול" onchange="adminSetTierFor('${e}', this.value, this)">
+                ${['free', 'pro', 'business'].map((t) => `<option value="${t}" ${tier === t ? 'selected' : ''}>${escapeHtml(TIER_LABELS[t] || t)}</option>`).join('')}
+            </select>`}
+        </div>
+        <label class="au-helper">
+            <input type="checkbox" ${isHelper ? 'checked' : ''} ${isHelper === null ? 'disabled' : ''} onchange="adminUserSetHelper('${e}', this.checked, this)">
+            עוזר — רואה את מסך העוזר וכותב מחירים${isHelper === null ? ' <span class="input-help">(רשימת העוזרים עוד לא נטענה)</span>' : ''}
+        </label>`;
+
+    // 2 · הצעות — the counts from the list row, the project list once it lands.
+    const projects = page.detail ? (page.detail.projects || []) : null;
+    const quotes = `
+        <p class="input-help" style="margin:0 0 8px;">${heNum(row.history)} הצעות בארכיון · ${heNum(row.projects)} עבודות · מאז ההתחלה</p>
+        ${projects
+            ? (projects.length
+                ? projects.map((p) => `<div class="au-proj">
+                    <span class="au-proj-name">${escapeHtml(p.name)}</span>
+                    <span class="au-proj-meta"><span class="status-badge status-badge-${escapeHtml(p.status)}">${escapeHtml(p.status)}</span> ${nis(p.amount)}</span>
+                </div>`).join('')
+                : '<p class="input-help">אין עבודות ברשומה.</p>')
+            : page.detailErr ? `<p class="input-help">רשימת העבודות לא נטענה.</p>${err(page.detailErr)}`
+            : '<p class="input-help">רשימת העבודות נטענת…</p>'}`;
+
+    // 3 · שיחות — from the feed in memory; each opens in this drawer, with a way back.
+    let convos;
+    if (_adminConvosLoaded) {
+        page.threads = _adminConvos.filter((t) => t.email === email);
+        const cm = _adminConvosMeta || {};
+        convos = page.threads.length
+            ? `<div class="convo-feed">${page.threads.map((t, i) => `
+                <button type="button" class="cf-row" onclick="openAdminUserThread(${i})">
+                    <div class="cf-top">
+                        <span class="cf-title">${escapeHtml(t.title)}</span>
+                        ${t.verdict ? `<span class="cf-vote v-${t.verdict}">${escapeHtml(PF_VERDICT_HE[t.verdict] || t.verdict)}</span>` : ''}
+                        <span class="cf-kind ${t.kind === 'ask' ? 'is-ask' : ''}">${t.kind === 'ask' ? 'שאלה' : 'עבודה'}</span>
+                    </div>
+                    <div class="cf-said">${escapeHtml(t.asked || '—')}</div>
+                    <div class="cf-meta"><span>${t.messages} הודעות</span><span>${escapeHtml(crWhen(t.when))}</span></div>
+                </button>`).join('')}</div>`
+            : '<p class="input-help">אין שיחות שלו בפיד.</p>';
+        convos = `<p class="input-help" style="margin:0 0 8px;">${page.threads.length} שיחות · מתוך פיד השיחות${(cm.usersTruncated || cm.truncated) ? ' (קטום, ייתכן שחסרות)' : ''}</p>` + convos;
+    } else {
+        convos = `<p class="input-help">פיד השיחות עוד לא נטען. הטעינה היא קריאה אחת לכל משתמש רשום.</p>
+            <button type="button" class="btn btn-secondary btn-small" onclick="adminLoadConvosForUsers(this)">טען שיחות</button>`;
+    }
+
+    // 4 · מחירי עוזר — from /api/helper-prices?admin=1, this address only.
+    let helperPrices;
+    if (page.helpers) {
+        const items = page.helpers.items || [];
+        const byId = Object.fromEntries(items.map((it) => [it.id, it]));
+        const mine = Object.entries((page.helpers.prices || {})[email] || {})
+            .map(([id, p]) => ({ name: (byId[id] || {}).name || id, unit: (byId[id] || {}).unit || '', price: p.price, at: p.at }))
+            .sort((a, b) => a.name.localeCompare(b.name, 'he'));
+        helperPrices = `<p class="input-help" style="margin:0 0 8px;">${mine.length} מחירים · מאז ההתחלה${isHelper ? '' : ' · לא עוזר כרגע'}</p>` + (mine.length
+            ? `<div class="table-scroll"><table class="au-table"><thead><tr><th scope="col">סעיף</th><th scope="col">₪</th><th scope="col">מתי</th></tr></thead><tbody>${mine.map((r) => `<tr><td>${escapeHtml(r.name)} <span class="input-help">${escapeHtml(r.unit)}</span></td><td>${heNum(r.price)}</td><td>${escapeHtml(crWhen(r.at))}</td></tr>`).join('')}</tbody></table></div>`
+            : '');
+    } else helperPrices = page.helpersErr ? `<p class="input-help">מחירי העוזר לא נטענו.</p>${err(page.helpersErr)}` : '<p class="input-help">טוען…</p>';
+
+    // 5 · משוב — the verdicts he gave, out of the recent ones the server returns.
+    let feedback;
+    if (page.feedback) {
+        const all = page.feedback.entries || [];
+        const mine = all.filter((x) => x && x.by === email);
+        feedback = `<p class="input-help" style="margin:0 0 8px;">${mine.length} משובים שלו · מתוך ${all.length} המשובים האחרונים במערכת</p>` + (mine.length
+            ? mine.map((x) => `<div class="au-fb">
+                <span class="cf-vote v-${escapeHtml(x.verdict)}">${escapeHtml(PF_VERDICT_HE[x.verdict] || x.verdict)}</span>
+                <span>${escapeHtml(x.jobType || '')}${x.price ? ' · ' + nis(x.price) : ''}</span>
+                <span class="input-help">${escapeHtml(crWhen(x.at))}</span>
+                ${x.note ? `<div class="cf-note">“${escapeHtml(x.note)}”</div>` : ''}
+            </div>`).join('')
+            : '');
+    } else feedback = page.feedbackErr ? `<p class="input-help">המשובים לא נטענו.</p>${err(page.feedbackErr)}` : '<p class="input-help">טוען…</p>';
+
+    // 6 · פעולות — one, and it says exactly what it erases and what it does not.
+    const actions = tier === 'admin'
+        ? '<p class="input-help">את חשבון המנהל אי אפשר למחוק מכאן.</p>'
+        : `<p class="input-help" style="margin:0 0 8px;">מוחק את הרשומה שלו בענן (עבודות, הצעות, לקוחות, מחירון) ואת שיוך המסלול. לא נוגע במחירי העוזר, במשובים ובעותק שעל המכשיר שלו.</p>
+           <button type="button" class="btn btn-danger btn-small" onclick="adminDeleteUserData('${e}')"><i class="fa-solid fa-trash" aria-hidden="true"></i> מחק את הנתונים שלו</button>`;
+
+    body.innerHTML = sec('profile', 'פרופיל ומסלול', profile)
+        + sec('quotes', 'הצעות', quotes)
+        + sec('convos', 'שיחות', convos)
+        + sec('helper', 'מחירי עוזר', helperPrices)
+        + sec('feedback', 'משוב', feedback)
+        + sec('actions', 'פעולות', actions);
+}
+
+function openAdminUserThread(i) {
+    const page = _adminUserPage;
+    const t = page && page.threads && page.threads[i];
+    if (!t) return;
+    return openAdminThread(t, { label: 'חזרה לדף של ' + adminUserName(page.row), onBack: () => { _adminUserPage = page; _adminDrawerOwner = page; paintAdminUserPage(); } });
+}
+
+// The helper switch on his page: the same PUT the helpers card uses, then the
+// page redraws from what the server confirmed.
+async function adminUserSetHelper(email, on, el) {
+    if (el) el.disabled = true;
+    const ok = await setHelper(email, on);
+    const page = _adminUserPage;
+    if (ok && page && page.email === email && page.helpers) {
+        const list = (page.helpers.helpers || []).filter((x) => x !== email);
+        if (on) list.push(email);
+        page.helpers.helpers = list;
+        if (_adminSide.helpers) _adminSide.helpers.data = page.helpers;
+    }
+    if (page && page.email === email) paintAdminUserPage();
+    else if (el) el.disabled = false;
+}
+
+// Erase one user's cloud record, on his request — the same two gates the user
+// passes when he erases himself (a confirm, then the typed word), the same
+// DELETE the terms page promises. What it removes is his record and his tier;
+// helper prices, verdicts and his own device are untouched, and the page says so.
+async function adminDeleteUserData(email) {
+    if (!email) return;
+    if (!await askConfirm({
+        title: 'למחוק את הנתונים של ' + email + '?',
+        body: 'העבודות, ההצעות, הלקוחות והמחירון שלו יימחקו מהענן, וגם שיוך המסלול. מה ששמור על המכשיר שלו לא נמחק מכאן.',
+        note: 'אי אפשר לשחזר.',
+        confirmLabel: 'המשך למחיקה',
+        danger: true,
+    })) return;
+    openNamePrompt({
+        title: 'אישור אחרון',
+        label: 'הקלד "מחק" כדי לאשר',
+        placeholder: 'מחק',
+        saveLabel: 'מחק הכול',
+        onSave: async (typed) => {
+            if (String(typed).trim() !== 'מחק') { showToast('לא נמחק — המילה לא תאמה', 'error'); return; }
+            try {
+                const res = await adminRes('/api/admin-users?user=' + encodeURIComponent(email), { method: 'DELETE' });
+                const d = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+                showToast(d.existed ? 'הרשומה של ' + email + ' נמחקה.' : 'לא הייתה רשומה בענן ל-' + email + '.');
+                _adminUsers = _adminUsers.filter((u) => u.email !== email);
+                if (_adminUserPage && _adminUserPage.email === email) { _adminUserPage = null; closeAdminDrawer(); }
+                renderAdminUsersTable();
+            } catch (e) {
+                showToast('המחיקה נכשלה: ' + (e.message || e), 'error');
+            }
+        },
+    });
+}
 
 // ============================================================================
 // THE ADMIN DRAWER
@@ -1359,12 +1916,19 @@ async function openAdminConvo(i) {
 // side, with one X at the top and Escape to close. Before this each card grew
 // its own list underneath, and nothing could close them (Stav, 5/9). The
 // chrome is the app's .stern-drawer; this file only fills it.
+//
+// `owner` is whatever opened it — the user page hands itself in, so a source
+// of that page landing late paints only while the drawer is still that page;
+// once a thread or another screen's detail has taken the drawer (or it has
+// closed), the late paint is dropped.
 // ============================================================================
-function openAdminDrawer(title, html) {
+let _adminDrawerOwner = null;
+function openAdminDrawer(title, html, owner) {
     const el = document.getElementById('admin-drawer');
     const body = document.getElementById('admin-drawer-body');
     const head = document.getElementById('admin-drawer-title');
     if (!el || !body) return null;
+    _adminDrawerOwner = owner || null;
     if (head) head.textContent = title || '';
     body.innerHTML = html || '';
     body.scrollTop = 0;
@@ -1377,6 +1941,7 @@ function openAdminDrawer(title, html) {
 function closeAdminDrawer() {
     const el = document.getElementById('admin-drawer');
     document.removeEventListener('keydown', _adminDrawerEsc);
+    _adminDrawerOwner = null;
     if (!el || !el.classList.contains('open')) return;
     el.classList.remove('open');
     // Nothing keeps a stale thread or user in a drawer nobody can see.

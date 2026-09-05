@@ -252,7 +252,7 @@
 /* Every target a thumb meets in the admin is 44px; tables scroll inside
    their own frame instead of the page. */
 @media (pointer: coarse) {
-    #panel-admin .btn-small, #panel-admin .spec-chip, #panel-admin .admin-user-head,
+    #panel-admin .btn-small, #panel-admin .spec-chip, #panel-admin .au-row, #panel-admin .au-sort,
     #panel-admin .cf-row, #panel-admin select, #panel-admin .tg-x, #panel-admin .vswitch-btn,
     .admin-drawer .btn-close, .admin-drawer select { min-block-size: 44px; }
     #panel-admin .tg-x { min-inline-size: 44px; }
@@ -260,14 +260,18 @@
 }
 #panel-admin .table-scroll { overflow-x: auto; max-inline-size: 100%; }
 #panel-admin .table-scroll table { min-inline-size: 100%; }
-@media (max-width: 860px) {
-    .adm-head { padding-inline: 0; }
-    .adm-head-actions { margin-inline-start: 0; }
-    .adm-filters { flex-direction: column; }
-}
 .adm-filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .adm-filters .search-bar { flex: 1 1 220px; max-width: none; }
 .adm-filters select { flex: 0 1 200px; }
+@media (max-width: 860px) {
+    .adm-head { padding-inline: 0; }
+    .adm-head-actions { margin-inline-start: 0; }
+    /* Stacked: the row basis must not become a height — flex: 1 1 220px in a
+       column made the search box 220px tall on every phone. After the base
+       rules on purpose: same specificity, so order decides. */
+    .adm-filters { flex-direction: column; align-items: stretch; }
+    .adm-filters .search-bar, .adm-filters select { flex: 0 0 auto; width: 100%; }
+}
 
 /* ============================================================
    THE CARDS — the seven screens.
@@ -462,7 +466,6 @@
 #panel-admin .admin-stats-tbl tbody tr:last-child td { border-block-end: 0; }
 #panel-admin .tlist li { border-block-end-color: var(--cr-line-soft); }
 #panel-admin .au-proj { border-block-end-color: var(--cr-line-soft); }
-#panel-admin .admin-user-body { border-block-start: 1px solid var(--cr-line-soft); }
 
 /* The plan, on the row you already read. It was only ever visible by typing the
    address into a search box above the list — an address that was on screen. */
@@ -488,7 +491,47 @@
     border-color: rgb(107 168 245 / 0.35);
     background: rgb(107 168 245 / 0.10);
 }
-#panel-admin .au-tier-sel { max-inline-size: 170px; margin-inline-start: 6px; }
+#panel-admin .au-tier-sel, .admin-drawer .au-tier-sel { max-inline-size: 170px; margin-inline-start: 6px; }
+
+/* ---------- the users table, and the person behind a row ---------- */
+/* Horizontal rules only, like every other table in the room; the whole row
+   is the door, so it reads as one and answers to the keyboard. A header cell
+   that sorts is a button with no chrome — the arrow says which one is live. */
+#panel-admin .au-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+#panel-admin .au-table th, #panel-admin .au-table td,
+.admin-drawer .au-table th, .admin-drawer .au-table td {
+    text-align: start; padding: 8px 10px; border-block-end: 1px solid var(--cr-line-soft); white-space: nowrap;
+}
+#panel-admin .au-table thead th { background: rgb(255 255 255 / 0.05); color: var(--cr-ink-2); font-weight: 600; }
+#panel-admin .au-table tbody tr:last-child td { border-block-end: 0; }
+#panel-admin .au-row { cursor: pointer; }
+#panel-admin .au-row:hover, #panel-admin .au-row:focus-visible { background: rgb(255 255 255 / 0.05); outline: none; }
+#panel-admin .au-row:focus-visible td:first-child { box-shadow: inset 3px 0 0 var(--cr-green); }
+#panel-admin .au-name { font-weight: 600; color: var(--cr-ink); }
+#panel-admin .au-sort {
+    background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px;
+}
+#panel-admin .au-sort.is-on { color: var(--cr-ink); }
+#panel-admin .au-helper-badge {
+    padding: 2px 8px; border-radius: 99px; font-size: var(--fs-xs); font-weight: 700;
+    color: var(--cr-amber); border: 1px solid rgb(252 211 77 / 0.35); background: rgb(252 211 77 / 0.10);
+}
+#panel-admin .au-notes { margin: 8px 0 0; line-height: 1.6; }
+.admin-drawer .au-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.admin-drawer .au-table thead th { color: var(--cr-ink-2); font-weight: 600; }
+.admin-drawer .au-sec { padding-block-end: 12px; border-block-end: 1px solid var(--cr-line-soft); }
+.admin-drawer .au-sec:last-child { border-block-end: 0; }
+.admin-drawer .au-sec .tcol-title { margin-block-end: 8px; }
+.admin-drawer .au-profile { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--cr-ink); overflow-wrap: anywhere; }
+.admin-drawer .au-k { color: var(--cr-ink-3); font-size: var(--fs-xs); margin-inline-end: 4px; }
+.admin-drawer .au-helper { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); cursor: pointer; min-block-size: 44px; }
+.admin-drawer .au-back {
+    align-self: flex-start; background: none; border: 0; padding: 0 0 6px; color: var(--cr-blue); font: inherit; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px; min-block-size: 44px;
+}
+.admin-drawer .au-fb { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; border-block-end: 1px dashed var(--cr-line-soft); font-size: var(--fs-sm); }
+.admin-drawer .au-fb .cf-note { flex-basis: 100%; }
 /* Wide tables scroll inside their own frame, with the room's thin scrollbar
    instead of the platform's. */
 #panel-admin .table-scroll { scrollbar-width: thin; scrollbar-color: rgb(255 255 255 / 0.16) transparent; }

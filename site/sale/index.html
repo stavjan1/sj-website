@@ -2387,26 +2387,36 @@
                     </div>
                 </div>
 
-                <!-- ═══ 2 · משתמשים ═══ who is here, and one door per person. -->
+                <!-- ═══ 2 · משתמשים ═══ who is here, and one door per person.
+                     A table, one row per cloud record, joined in the browser
+                     from payloads the panel already holds (the conversations
+                     feed, the helper list) — never a request per row. The row
+                     opens the whole person in the drawer: plan, quotes,
+                     conversations, helper prices, verdicts, and the one
+                     erase action. -->
                 <div class="adm-screen" data-admin-tab="users" id="admin-tab-users" role="tabpanel">
                     <div class="adm-head">
                         <div>
                             <h3 class="adm-title">משתמשים</h3>
-                            <p class="adm-purpose">מי רשום, מתי היה פה לאחרונה ובאיזה מסלול. לחיצה על משתמש פותחת את הדף שלו בצד.</p>
+                            <p class="adm-purpose">מי רשום, מתי שמר לאחרונה ובאיזה מסלול. לחיצה על שורה פותחת את הדף של המשתמש בצד: מסלול, הצעות, שיחות, מחירי עוזר, משוב ופעולות.</p>
                         </div>
                     </div>
                     <div class="adm-cards adm-cols-2">
                         <div class="section-card" id="admin-users-card">
-                            <div class="card-header">
+                            <div class="card-header flex-header">
                                 <h3><i class="fa-solid fa-users" style="color:var(--warn-text);"></i> משתמשי המערכת</h3>
+                                <button class="btn btn-secondary btn-small" onclick="adminRefreshUserList()" title="קריאה אחת לכל משתמש רשום"><i class="fa-solid fa-rotate"></i> רענן</button>
                             </div>
-                            <div class="card-body">
-                                <div id="admin-users-list" style="display:flex;flex-direction:column;gap:8px;">
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+                                <div class="adm-filters">
+                                    <div class="search-bar">
+                                        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                                        <input type="text" id="admin-users-q" placeholder="חיפוש לפי שם או מייל…" oninput="renderAdminUsersTable()">
+                                    </div>
+                                </div>
+                                <div id="admin-users-list">
                                     <!-- populated by JS -->
                                 </div>
-                                <button class="btn btn-secondary" style="margin-top:14px;width:100%;" onclick="adminRefreshUserList()">
-                                    <i class="fa-solid fa-rotate"></i> רענן רשימת משתמשים
-                                </button>
                             </div>
                         </div>
                         <div class="section-card" id="admin-helpers-card">
@@ -2440,6 +2450,17 @@
                                     <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
                                     <input type="text" id="admin-convo-q" placeholder="חיפוש בשיחות…" oninput="renderAdminConvoList()">
                                 </div>
+                                <!-- Filled from the feed itself after it loads (adminFillConvoUsers):
+                                     the people who actually wrote, each with his count. -->
+                                <select id="admin-convo-user" class="model-select-input" onchange="renderAdminConvoList()" aria-label="סינון לפי משתמש">
+                                    <option value="">כל המשתמשים</option>
+                                </select>
+                                <select id="admin-convo-days" class="model-select-input" onchange="renderAdminConvoList()" aria-label="סינון לפי תאריך">
+                                    <option value="">כל התאריכים</option>
+                                    <option value="today">היום</option>
+                                    <option value="7">7 ימים אחרונים</option>
+                                    <option value="30">30 ימים אחרונים</option>
+                                </select>
                                 <select id="admin-convo-verdict" class="model-select-input" onchange="renderAdminConvoList()" aria-label="סינון לפי משוב">
                                     <option value="">הכל</option>
                                     <option value="priced">עם משוב מחיר</option>

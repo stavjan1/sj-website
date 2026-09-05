@@ -240,6 +240,9 @@ async function renderAdminHelpers() {
     const prices = data.prices || {};
     const items = data.items || [];
     const byId = Object.fromEntries(items.map((it) => [it.id, it]));
+    // The users table on the same screen marks who is a helper from this set —
+    // the same fetch, not a second one.
+    window._adminHelperSet = new Set(helpers);
     const list = helpers.length
         ? helpers.map((em) => `<li>${helperEsc(em)} <span class="input-help">· ${Object.keys(prices[em] || {}).length} מחירים · מאז ההתחלה</span>
             <button type="button" class="btn btn-small btn-secondary" onclick="setHelper('${helperEsc(em)}', false)">הסר</button></li>`).join('')
@@ -265,22 +268,28 @@ async function renderAdminHelpers() {
         </div>
         <ul style="margin:0;padding-inline-start:18px;line-height:2">${list}</ul>`;
     if (pricesBox) pricesBox.innerHTML = table;
+    try { window.renderAdminUsersTable && window.renderAdminUsersTable(); } catch (e) { /* the users table is not up yet */ }
 }
 
+// Resolves true when the server took the change, false otherwise — the user
+// page in the admin drawer flips its switch on the answer, not on the click.
 async function setHelper(email, on) {
     const em = email || ((document.getElementById('admin-helper-email') || {}).value || '').trim();
-    if (!em) { showToast('תכתוב מייל.', 'error'); return; }
+    if (!em) { showToast('תכתוב מייל.', 'error'); return false; }
     try {
         const res = await adminRes('/api/helper-prices', {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: em, on: !!on }),
         });
         const data = await res.json();
-        if (!res.ok) { showToast((data.error && data.error.message) || 'לא נשמר.', 'error'); return; }
+        if (!res.ok) { showToast((data.error && data.error.message) || 'לא נשמר.', 'error'); return false; }
         showToast(on ? 'נוסף. הוא יראה "עוזר" בסרגל אחרי התחברות.' : 'הוסר.', 'success');
+        if (window._adminHelperSet instanceof Set) { if (on) window._adminHelperSet.add(em); else window._adminHelperSet.delete(em); }
         renderAdminHelpers();
+        return true;
     } catch (e) {
         showToast('לא נשמר — התחבר שוב לגוגל.', 'error');
+        return false;
     }
 }
 
