@@ -1,70 +1,26 @@
 /* ============================================================
-   THE CONTROL ROOM — the admin panel's status board.
+   THE ADMIN PANEL — seven screens, one drawer.
    ------------------------------------------------------------
-   Thirteen cards down a long scroll is a filing cabinet, not a
-   dashboard: by the time you reach the AI keys you no longer
-   remember what traffic said, and nothing can be compared to
-   anything. This sheet builds the opposite — one screen that
-   never scrolls, every number that can change a decision in
-   view at once, and the deep cards one click away for when a
-   tile raises a question.
+   This sheet used to draw a control room: one screen that
+   promised never to scroll, a clock, seven tiles and a
+   five-minute refresh loop. On a laptop it scrolled anyway
+   with every number cut in half, and the deep cards behind it
+   were filed under the wrong tabs. The room is gone (5/9/2026);
+   what stays is the language it taught the panel — the dark
+   ground, the green accent, the tabular numbers, the bars and
+   the dots — now worn by seven ordinary screens.
    ------------------------------------------------------------
    Its own file on purpose: sale/css/** is the other session's
-   under COORDINATION.md, and a room this large has no business
-   landing in a file somebody else is mid-sweep on.
+   under COORDINATION.md.
    ------------------------------------------------------------
-   The room stays dark in both themes, deliberately. A control
-   room is dark; light chrome around numbers this dense reads
-   as a spreadsheet. The accent is still the app's green, so
-   the room belongs to the same product as the sign.
+   Dark in both themes, deliberately: this panel is one person
+   reading dense numbers, and light chrome around numbers this
+   dense reads as a spreadsheet.
    ============================================================ */
 
-.ctlroom {
-    --cr-ink: #EAF1FB;
-    --cr-ink-2: #A8BAD4;
-    --cr-ink-3: #7C93B2;
-    --cr-ground: #060E1A;
-    --cr-tile: rgb(255 255 255 / 0.035);
-    --cr-tile-2: rgb(255 255 255 / 0.015);
-    --cr-line: rgb(255 255 255 / 0.09);
-    --cr-line-soft: rgb(255 255 255 / 0.05);
-    --cr-green: #6ABF3C;
-    --cr-amber: #FCD34D;
-    --cr-red: #F87171;
-    --cr-blue: #6BA8F5;
-
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    min-block-size: 0;
-    padding: 12px;
-    border-radius: 18px;
-    color: var(--cr-ink);
-    font-family: var(--font-ui);
-    /* The ground: a deep navy wash, a soft glow where the eye lands first, and
-       tiles mounted on it like instruments on a panel. */
-    background:
-        radial-gradient(1200px 400px at 70% -10%, rgb(106 191 60 / 0.10), transparent 60%),
-        radial-gradient(900px 380px at 10% 110%, rgb(107 168 245 / 0.07), transparent 60%),
-        linear-gradient(180deg, #0A1526 0%, var(--cr-ground) 100%);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 18px 50px rgb(0 0 0 / 0.45);
-    border: 1px solid rgb(255 255 255 / 0.07);
-}
-
-/* ---------- the top bar: what the room itself is doing ---------- */
-.cr-bar {
-    display: flex; align-items: center; gap: 12px;
-    flex: none;
-    padding: 2px 4px 10px;
-    border-block-end: 1px solid var(--cr-line-soft);
-}
-.cr-brand { display: flex; align-items: center; gap: 9px; min-inline-size: 0; }
-.cr-brand b { font: 700 var(--fs-md)/1 var(--font-display); letter-spacing: -0.01em; }
-.cr-sub {
-    color: var(--cr-ink-3); font-size: var(--fs-xs);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
+/* ---------- the pieces every screen is built from ---------- */
 .cr-dot {
+    display: inline-block;
     inline-size: 9px; block-size: 9px; border-radius: 50%; flex: none;
     background: var(--cr-ink-3);
     box-shadow: 0 0 0 3px rgb(255 255 255 / 0.05);
@@ -75,141 +31,23 @@
 .cr-dot.live { animation: cr-pulse 2.4s ease-in-out infinite; }
 @keyframes cr-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 
-.cr-actions { display: flex; align-items: center; gap: 8px; margin-inline-start: auto; }
-.cr-clock {
-    font: 600 var(--fs-sm)/1 var(--font-display);
-    font-variant-numeric: tabular-nums;
-    color: var(--cr-ink-2); letter-spacing: 0.02em;
-}
-.cr-select, .cr-btn {
-    background: rgb(255 255 255 / 0.06);
-    border: 1px solid var(--cr-line);
-    color: var(--cr-ink); border-radius: var(--r-sm);
-    font: 500 var(--fs-xs)/1 var(--font-ui);
-    padding: 7px 10px; cursor: pointer;
-    transition: background var(--t-fast), border-color var(--t-fast);
-}
-.cr-select:hover, .cr-btn:hover { background: rgb(255 255 255 / 0.12); border-color: rgb(255 255 255 / 0.20); }
-.cr-btn:focus-visible, .cr-select:focus-visible { outline: 2px solid var(--cr-green); outline-offset: 2px; }
-.cr-select option { background: #0F1E35; color: #EAF1FB; }
-
-/* panels.css styles every <select> inside a content panel and wins on
-   specificity — including the ink colour, which in the LIGHT theme is
-   near-black, and a chevron drawn for a light background. On this dark ground
-   that select was dark-on-dark. Scoped one level deeper so the room's own
-   values hold in both themes, with a chevron of its own. */
-.ctlroom .cr-select,
-.ctlroom .cr-btn {
-    color: var(--cr-ink);
-    /* and the fill, for the same reason: --surface is white in the light theme,
-       which would leave the room's light ink on a white pill. */
-    background-color: rgb(255 255 255 / 0.06);
-    border-color: var(--cr-line);
-}
-.ctlroom .cr-select {
-    appearance: none; -webkit-appearance: none;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' fill='none' stroke='%23A8BAD4' stroke-width='1.6' stroke-linecap='round'/></svg>");
-    background-repeat: no-repeat;
-    background-position: left 9px center;
-    background-size: 10px 7px;
-    padding-inline-start: 26px;
-}
-
-/* ---------- the grid ---------- */
-.cr-grid {
-    flex: 1 1 auto; min-block-size: 0;
-    display: grid; gap: 10px;
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    grid-template-rows: auto minmax(0, 1.06fr) minmax(0, 1fr);
-}
-
-/* ---------- the four headline numbers ---------- */
-.cr-kpis {
-    grid-column: 1 / -1;
-    display: grid; gap: 10px;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-.cr-kpi {
-    position: relative; overflow: hidden;
-    display: flex; flex-direction: column; gap: 2px;
-    padding: 10px 13px;
-    border-radius: 14px;
-    border: 1px solid var(--cr-line);
-    background: linear-gradient(155deg, var(--cr-tile), var(--cr-tile-2));
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
-}
-/* A hairline of colour on the leading edge: the tile's state, readable from
-   across the room without reading a word of it. */
-.cr-kpi::before {
-    content: ""; position: absolute; inset-block: 0; inset-inline-start: 0;
-    inline-size: 3px; background: var(--cr-blue); opacity: 0.75;
-}
-.cr-kpi.ok::before   { background: var(--cr-green); }
-.cr-kpi.warn::before { background: var(--cr-amber); }
-.cr-kpi.bad::before  { background: var(--cr-red); }
-.cr-kpi-k { color: var(--cr-ink-3); font-size: var(--fs-xs); font-weight: 600; }
-.cr-kpi-v {
-    font: 800 clamp(1.4rem, 2.1vw, 2rem)/1.05 var(--font-display);
-    font-variant-numeric: tabular-nums; letter-spacing: -0.03em;
-    display: flex; align-items: baseline; gap: 7px;
-}
-.cr-kpi-v small { font-size: 0.5em; font-weight: 700; color: var(--cr-ink-3); letter-spacing: 0; }
-.cr-kpi-s { color: var(--cr-ink-3); font-size: var(--fs-xs); }
-.cr-delta { font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums; }
-.cr-delta.up { color: var(--cr-green); }
-.cr-delta.down { color: var(--cr-red); }
-.cr-delta.flat { color: var(--cr-ink-3); }
-.cr-kpi-spark { position: absolute; inset-block-end: 0; inset-inline: 0; block-size: 34px; opacity: 0.5; pointer-events: none; }
-
-/* ---------- a tile ---------- */
-.cr-tile {
-    display: flex; flex-direction: column; min-block-size: 0;
-    border-radius: 14px;
-    border: 1px solid var(--cr-line);
-    background: linear-gradient(155deg, var(--cr-tile), var(--cr-tile-2));
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
-    overflow: hidden;
-}
-.cr-head {
-    flex: none; display: flex; align-items: center; gap: 8px;
-    padding: 9px 13px 7px;
-    border-block-end: 1px solid var(--cr-line-soft);
-}
-.cr-title {
-    font: 700 var(--fs-sm)/1.2 var(--font-display);
-    letter-spacing: -0.01em; color: var(--cr-ink);
-    display: flex; align-items: center; gap: 7px;
-}
-.cr-title i { color: var(--cr-green); font-size: 0.85em; }
 .cr-meta {
     margin-inline-start: auto; color: var(--cr-ink-3);
     font-size: var(--fs-xs); font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
-.cr-body {
-    flex: 1 1 auto; min-block-size: 0;
-    padding: 11px 13px;
-    overflow: auto;
-    scrollbar-width: thin;
-    scrollbar-color: rgb(255 255 255 / 0.16) transparent;
-}
-.cr-body::-webkit-scrollbar { inline-size: 6px; block-size: 6px; }
-.cr-body::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.16); border-radius: 99px; }
+/* "+20%" stays "+20%" inside an RTL value. */
+.cr-delta { font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
+.cr-delta.up { color: var(--cr-green); }
+.cr-delta.down { color: var(--cr-red); }
+.cr-delta.flat { color: var(--cr-ink-3); }
 
-.cr-t-traffic  { grid-column: span 5; }
-.cr-t-funnel   { grid-column: span 3; }
-.cr-t-ai       { grid-column: span 4; }
-.cr-t-quality  { grid-column: span 3; }
-.cr-t-users    { grid-column: span 3; }
-.cr-t-feed     { grid-column: span 3; }
-.cr-t-health   { grid-column: span 3; }
-
-/* ---------- the pieces tiles are built from ---------- */
 .cr-chart { inline-size: 100%; block-size: clamp(88px, 13vh, 150px); display: block; }
 .cr-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-block-start: 8px; }
 .cr-leg { display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--cr-ink-2); }
 .cr-leg i { inline-size: 10px; block-size: 3px; border-radius: 99px; background: currentColor; }
 .cr-leg b { font-variant-numeric: tabular-nums; color: var(--cr-ink); }
+.cr-leg small { color: var(--cr-ink-3); }
 
 .cr-bars { display: flex; flex-direction: column; gap: 8px; }
 .cr-bar-row { display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; align-items: baseline; }
@@ -271,73 +109,170 @@
 
 .cr-empty, .cr-err { color: var(--cr-ink-3); font-size: var(--fs-xs); line-height: 1.6; margin: 0; }
 .cr-err { color: var(--cr-amber); }
-.cr-skel {
-    block-size: 10px; border-radius: 99px; margin-block-end: 9px;
-    background: linear-gradient(90deg, rgb(255 255 255 / 0.05), rgb(255 255 255 / 0.12), rgb(255 255 255 / 0.05));
-    background-size: 200% 100%;
-    animation: cr-shimmer 1.4s linear infinite;
-}
-@keyframes cr-shimmer { to { background-position: -200% 0; } }
-
-/* A jump to the deep card behind a tile: the room answers "is it fine",
-   the card behind it answers "why". */
-.cr-more {
-    background: none; border: 0; padding: 0; cursor: pointer;
-    color: var(--cr-ink-3); font: 600 var(--fs-xs)/1 var(--font-ui);
-    text-decoration: underline; text-underline-offset: 3px;
-}
-.cr-more:hover { color: var(--cr-green); }
 
 @media (prefers-reduced-motion: reduce) {
-    .cr-dot.live, .cr-skel { animation: none; }
+    .cr-dot.live { animation: none; }
     .cr-bar-fill { transition: none; }
 }
 
-/* ---------- the height lock ---------- */
-/* The whole point is that nothing scrolls. The shell scrolls by default, so
-   the room claims the remaining height of the panel and hands each tile its
-   own overflow instead. */
-body.cr-lock .main-content { overflow: hidden; }
-body.cr-lock #panel-admin.content-panel.active {
-    flex: 1 1 auto; min-block-size: 0;
-    display: flex; flex-direction: column;
+/* ---------- a screen ---------- */
+/* Seven wrappers, one shown at a time (setAdminTab). Each opens with its
+   title and the one line that says what question it answers. */
+#panel-admin #admin-tabs { margin: 4px 0 14px; }
+.adm-screen { display: flex; flex-direction: column; gap: 14px; }
+.adm-head { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; padding: 2px 4px 0; }
+.adm-head > div:first-child { min-inline-size: 0; flex: 1 1 260px; }
+.adm-title {
+    margin: 0;
+    font: 800 var(--fs-xl)/1.15 var(--font-display);
+    letter-spacing: -0.02em; color: var(--cr-ink);
 }
-body.cr-lock #panel-admin > .section-header { display: none; }
-body.cr-lock #admin-room { flex: 1 1 auto; min-block-size: 0; }
+.adm-purpose { margin: 4px 0 0; color: var(--cr-ink-3); font-size: var(--fs-sm); line-height: 1.55; }
+.adm-head-actions { display: flex; align-items: center; gap: 10px; margin-inline-start: auto; }
+.adm-stamp { color: var(--cr-ink-3); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-/* ---------- narrower screens ---------- */
-@media (max-width: 1400px) {
-    .cr-t-traffic { grid-column: span 6; }
-    .cr-t-funnel  { grid-column: span 6; }
-    .cr-t-ai      { grid-column: span 6; }
-    .cr-t-quality { grid-column: span 6; }
-    .cr-t-users   { grid-column: span 6; }
-    .cr-t-feed    { grid-column: span 6; }
-    .cr-t-health  { grid-column: span 6; }
-    /* Seven tiles two-up is four rows, not three. Declaring three left the
-       fourth to an implicit auto row, which is exactly how a screen that
-       promises never to scroll starts scrolling. */
-    .cr-grid { grid-template-rows: auto repeat(4, minmax(0, 1fr)); }
+/* Cards in a column; two-up where the screen says so and the width allows.
+   A card that needs the whole row says .adm-span. */
+.adm-cards { display: grid; grid-template-columns: 1fr; gap: 14px; align-items: start; }
+.adm-cards > .section-card { margin: 0; min-inline-size: 0; }
+@media (min-width: 1100px) {
+    .adm-cards.adm-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .adm-cards .adm-span { grid-column: 1 / -1; }
 }
-@media (max-width: 1100px) {
-    .cr-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* ---------- the overview: six numbers ---------- */
+.admin-overview {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px; margin: 0;
 }
-/* On a phone one screen is a fantasy, so the room becomes an ordinary column
-   and the page scrolls again — the tiles keep their look, not their lock. */
+/* Each tile is a button to its screen; it keeps the tile's look and gains a
+   hairline of state on the leading edge, readable across the room. */
+.aov-tile {
+    position: relative; overflow: hidden;
+    display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
+    padding: 12px 14px 12px 16px;
+    border-radius: 14px;
+    border: 1px solid var(--cr-line);
+    background: linear-gradient(155deg, var(--cr-tile), var(--cr-tile-2));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+    color: var(--cr-ink); text-align: start; cursor: pointer;
+    font: inherit; min-block-size: 44px;
+    transition: border-color var(--t-fast), background var(--t-fast);
+}
+.aov-tile:hover { border-color: rgb(255 255 255 / 0.2); background: rgb(255 255 255 / 0.06); }
+.aov-tile:focus-visible { outline: 2px solid var(--cr-green); outline-offset: 2px; }
+.aov-tile::before {
+    content: ""; position: absolute; inset-block: 0; inset-inline-start: 0;
+    inline-size: 3px; background: var(--cr-blue); opacity: 0.75;
+}
+.aov-tile.ok::before   { background: var(--cr-green); }
+.aov-tile.warn::before { background: var(--cr-amber); }
+.aov-tile.bad::before  { background: var(--cr-red); }
+.aov-tile .aov-k { font-size: var(--fs-xs); color: var(--cr-ink-3); font-weight: 600; }
+.aov-tile .aov-v {
+    font: 800 clamp(1.4rem, 2.1vw, 2rem)/1.05 var(--font-display);
+    font-variant-numeric: tabular-nums; letter-spacing: -0.03em;
+    color: var(--cr-ink); direction: rtl; unicode-bidi: isolate;
+    display: flex; align-items: baseline; gap: 7px;
+}
+.aov-tile .aov-v small { font-size: 0.5em; font-weight: 700; color: var(--cr-ink-3); letter-spacing: 0; }
+.aov-tile .aov-s { font-size: var(--fs-xs); color: var(--cr-ink-3); line-height: 1.5; }
 @media (max-width: 860px) {
-    body.cr-lock .main-content { overflow: auto; }
-    body.cr-lock #panel-admin > .section-header { display: block; }
-    .ctlroom { min-block-size: auto; }
-    .cr-grid { grid-template-columns: 1fr; grid-template-rows: none; }
-    .cr-kpis { grid-column: 1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .cr-tile { grid-column: 1; min-block-size: 220px; }
-    .cr-body { overflow: visible; }
+    .admin-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+@media (max-width: 400px) {
+    .admin-overview { grid-template-columns: 1fr; }
+}
+
+/* ---------- what needs a hand ---------- */
+.adm-attn { display: flex; flex-direction: column; }
+.adm-attn-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0; min-block-size: 44px;
+    border-block-end: 1px solid var(--cr-line-soft);
+    font-size: var(--fs-sm); line-height: 1.45;
+}
+.adm-attn-row:last-child { border-block-end: 0; }
+.adm-attn-text { color: var(--cr-ink-2); min-inline-size: 0; flex: 1 1 auto; }
+.adm-attn-go { flex: none; }
+
+/* ---------- the models: what runs vs. what the code says ---------- */
+.mdl-live { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
+.mdl-live-row {
+    display: flex; flex-direction: column; gap: 3px;
+    padding: 10px 12px; border-radius: 12px;
+    border: 1px solid var(--cr-line);
+    background: linear-gradient(155deg, var(--cr-tile), var(--cr-tile-2));
+}
+.mdl-live-row.is-changed { border-color: rgb(252 211 77 / 0.35); }
+.mdl-live-k { font-size: var(--fs-xs); color: var(--cr-ink-3); font-weight: 600; }
+.mdl-live-v {
+    font: 800 var(--fs-xl)/1.1 var(--font-display);
+    letter-spacing: -0.02em; color: var(--cr-ink); text-align: start;
+    overflow-wrap: anywhere;
+}
+.mdl-live-def { font-size: var(--fs-xs); color: var(--cr-ink-3); line-height: 1.5; }
+.mdl-live-row.is-changed .mdl-live-def { color: var(--cr-amber); }
+
+/* ---------- the chart above the traffic card ---------- */
+.adm-chart { display: flex; flex-direction: column; gap: 4px; }
+.adm-chart-head { display: flex; align-items: center; gap: 8px; font-size: var(--fs-xs); font-weight: 600; color: var(--cr-ink-2); }
+
+/* ---------- the drawer ---------- */
+/* .stern-drawer does the slide; this only widens it for tables and threads
+   and paints it with the panel's ground, since it opens over the panel. */
+.admin-drawer {
+    width: min(640px, 94vw);
+    --cr-ink: #EAF1FB; --cr-ink-2: #A8BAD4; --cr-ink-3: #7C93B2;
+    --cr-tile: rgb(255 255 255 / 0.035); --cr-tile-2: rgb(255 255 255 / 0.015);
+    --cr-line: rgb(255 255 255 / 0.09); --cr-line-soft: rgb(255 255 255 / 0.05);
+    --cr-green: #6ABF3C; --cr-amber: #FCD34D; --cr-red: #F87171; --cr-blue: #6BA8F5;
+    --bg: #060E1A;
+    --surface: #0A1526;
+    --surface-2: rgb(255 255 255 / 0.07);
+    --text: #EAF1FB; --text-2: #A8BAD4; --text-3: #7C93B2;
+    --border: rgb(255 255 255 / 0.09);
+    --accent: #6ABF3C; --accent-soft: rgb(106 191 60 / 0.12);
+    --text-secondary: #A8BAD4; --text-muted: #7C93B2; --border-color: rgb(255 255 255 / 0.09);
+    --color-accent: #6ABF3C; --color-success: #6ABF3C; --color-danger: #F87171;
+    --ok-text: #6ABF3C; --warn-text: #FCD34D; --danger: #F87171;
+    color-scheme: dark;
+}
+.admin-drawer .drawer-header h3 { min-inline-size: 0; overflow-wrap: anywhere; }
+.admin-drawer .drawer-body { display: flex; flex-direction: column; gap: 10px; }
+.admin-drawer .tgrid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.admin-drawer .table-scroll { overflow-x: auto; }
+.admin-drawer .cf-vote { display: inline-block; }
+/* A thread reads as a thread: his lines on one side, the agent's on the other. */
+.adm-convo { display: flex; flex-direction: column; gap: 10px; }
+.adm-convo .cr-msg { max-width: 92%; }
+.adm-convo .cr-who { display: block; font-size: var(--fs-xs); font-weight: 700; color: var(--text-3); margin-block-end: 2px; }
+
+/* ---------- phone ---------- */
+/* Every target a thumb meets in the admin is 44px; tables scroll inside
+   their own frame instead of the page. */
+@media (pointer: coarse) {
+    #panel-admin .btn-small, #panel-admin .spec-chip, #panel-admin .admin-user-head,
+    #panel-admin .cf-row, #panel-admin select, #panel-admin .tg-x, #panel-admin .vswitch-btn,
+    .admin-drawer .btn-close, .admin-drawer select { min-block-size: 44px; }
+    #panel-admin .tg-x { min-inline-size: 44px; }
+    .admin-drawer .btn-close { min-inline-size: 44px; }
+}
+#panel-admin .table-scroll { overflow-x: auto; max-inline-size: 100%; }
+#panel-admin .table-scroll table { min-inline-size: 100%; }
+@media (max-width: 860px) {
+    .adm-head { padding-inline: 0; }
+    .adm-head-actions { margin-inline-start: 0; }
+    .adm-filters { flex-direction: column; }
+}
+.adm-filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.adm-filters .search-bar { flex: 1 1 220px; max-width: none; }
+.adm-filters select { flex: 0 1 200px; }
 
 /* ============================================================
-   THE DEEP CARDS — the four tabs behind the room.
+   THE CARDS — the seven screens.
    ------------------------------------------------------------
-   One chip away from the control room the product used to
+   One chip away from the old control room the product used to
    change: white paper, navy accent, the leftover gold. Same
    panel, same numbers, two design languages a click apart.
 
@@ -360,9 +295,8 @@ body.cr-lock #admin-room { flex: 1 1 auto; min-block-size: 0; }
    ============================================================ */
 
 #panel-admin {
-    /* The room's palette, restated here so the cards and the tiles are lit by
-       one lamp. .ctlroom re-declares the same values on itself so that block
-       still reads alone; nothing fights, they are identical. */
+    /* The palette the pieces above read. Declared on the panel, and again
+       on .admin-drawer, which opens outside it. */
     --cr-ink: #EAF1FB;
     --cr-ink-2: #A8BAD4;
     --cr-ink-3: #7C93B2;
@@ -465,15 +399,6 @@ body.cr-lock #admin-room { flex: 1 1 auto; min-block-size: 0; }
     color: var(--cr-ink);
 }
 #panel-admin #admin-tabs .spec-chip.active i { color: var(--cr-green); }
-
-/* The two column wrappers inside .settings-grid carry no id, no class and no
-   data-admin-tab, so setAdminTab can never hide them: on "ידע ומאגרים" the
-   right column stayed an empty half while its two cards stacked in the left.
-   display:contents dissolves the wrappers, so the cards become grid items in
-   their own right and only the visible ones take a cell. The !important
-   outranks their inline display:flex — the alternative was two HTML edits to
-   fix a layout bug. */
-#panel-admin .settings-grid > div { display: contents !important; }
 
 /* ---------- numbers ---------- */
 /* Everything a refresh can change is set in the display face with tabular
@@ -636,30 +561,4 @@ body.cr-lock #admin-room { flex: 1 1 auto; min-block-size: 0; }
    the only thing in short supply. */
 @media (max-width: 860px) {
     #panel-admin { padding: 8px; border-radius: 14px; }
-}
-
-/* ---------- the lock needs HEIGHT, not just width ----------
-   "One screen, nothing scrolls" is a good rule on a monitor and a bad one on a
-   laptop: eight tiles inside 640px of content area get about 110px each, so
-   every tile grows its own scrollbar and every number in the room is cut in
-   half. Stav, 28/08, with a screenshot of exactly that: "במסך הראשי לא רואים
-   טוב את הכל."
-   Numbers you cannot read are worse than a scroll, so the lock releases below
-   1080px of viewport height — the same surrender the phone breakpoint already
-   makes, applied to the axis that actually decides whether it can work.
-   1080 rather than 900 because it was measured, not guessed: at 1000px one tile
-   was still clipping. The room needs roughly the KPI row plus four tile rows,
-   and below that the promise cannot be kept. If it ever clips above this line
-   too, the honest move is to drop the lock rather than raise the number
-   again — a screen that hides half its numbers is not one screen, it is a
-   smaller screen. */
-@media (max-height: 1080px) {
-    body.cr-lock .main-content { overflow: auto; }
-    body.cr-lock #panel-admin.content-panel.active { display: block; }
-    body.cr-lock #admin-room { flex: none; }
-    .ctlroom { min-block-size: auto; }
-    .cr-grid { grid-template-rows: none; }
-    /* Enough for a heading, a headline number and two lines under it. */
-    .cr-tile { min-block-size: 190px; }
-    .cr-body { overflow: visible; }
 }

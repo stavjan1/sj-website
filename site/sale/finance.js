@@ -747,6 +747,11 @@
     }
 
     // ── Admin usage funnel (renders into #admin-funnel-body) ───────────────
+    let _funnelUsersHtml = '';
+    window.openAdminFunnelUsers = function openAdminFunnelUsers() {
+        if (!_funnelUsersHtml || typeof window.openAdminDrawer !== 'function') return;
+        window.openAdminDrawer('פירוט לפי משתמש', _funnelUsersHtml);
+    };
     window.renderAdminFunnel = async function renderAdminFunnel() {
         const body = document.getElementById('admin-funnel-body');
         if (!body) return;
@@ -769,30 +774,38 @@
                 ['הפיקו הצעה', f.producedQuote],
             ];
             const maxV = Math.max(f.signedUp, 1);
+            // The per-user table opens in the admin drawer; it used to unfold
+            // under the card. Kept here, not in the DOM, until asked for.
+            _funnelUsersHtml = `<p class="fin-muted" style="margin:0 0 8px;">${data.users.length} משתמשים · מאז ההתחלה${f.capped ? ' · חלקי, נקראו 40 חשבונות' : ''}</p>
+                <div class="table-scroll"><table class="fin-table">
+                    <thead><tr><th>משתמש</th><th>פרויקטים</th><th>הודעות צ'אט</th><th>הצעות</th><th>מאגר</th><th>פעילות אחרונה</th></tr></thead>
+                    <tbody>${data.users.map(u => `
+                        <tr><td>${esc(u.email)}${u.anon ? ' <span class="fin-muted">(אורח)</span>' : ''}</td><td class="num">${u.projects}</td><td class="num">${u.chatMsgs}</td>
+                        <td class="num">${u.quotes}</td><td class="num">${u.catalogItems}</td>
+                        <td>${u.lastUpdated ? new Date(u.lastUpdated).toLocaleDateString('he-IL') : '—'}</td></tr>`).join('')}
+                    </tbody>
+                </table></div>`;
             body.innerHTML = `
-                <div class="fin-funnel">${steps.map(([label, v]) => `
+                <p class="fin-muted" style="margin:0 0 8px;">כל הנרשמים · מאז ההתחלה. הנשירה בין שלב לשלב היא המספר ששווה החלטת מוצר.</p>
+                <div class="fin-funnel">${steps.map(([label, v], i) => {
+                    // The drop between two steps is the whole point of a funnel.
+                    const prev = i ? steps[i - 1][1] : null;
+                    const drop = prev ? Math.round(100 * (1 - v / Math.max(1, prev))) : 0;
+                    return `
                     <div class="fin-funnel-row">
-                        <span class="ff-label">${label}</span>
+                        <span class="ff-label">${label}${prev ? ` <small class="fin-muted">נשרו ${drop}%</small>` : ''}</span>
                         <span class="ff-bar"><i style="inline-size:${Math.round(100 * v / maxV)}%"></i></span>
                         <b class="num">${v}</b>
-                    </div>`).join('')}
+                    </div>`; }).join('')}
                 </div>
                 <p class="fin-muted" style="margin-block-start:8px;">
-                    פעילים בשבוע האחרון: <b class="num">${f.activeLast7d}</b> ·
+                    פעילים · 7 ימים: <b class="num">${f.activeLast7d}</b> ·
                     נעצרו אחרי הודעה-שתיים: <b class="num">${f.oneMessageOnly}</b> ·
-                    ייצאו PDF החודש: <b class="num">${f.pdfThisMonth}</b>${f.capped ? ' · (חלקי · נקראו 40 חשבונות)' : ''}
+                    ייצאו PDF · החודש: <b class="num">${f.pdfThisMonth}</b>${f.capped ? ' · (חלקי · נקראו 40 חשבונות)' : ''}
                     ${f.anonVisitors ? `<br>אורחים שלא התחברו: <b class="num">${f.anonVisitors}</b> · <b class="num">${f.anonMsgs}</b> שאלות${f.anonCapped ? ' (חלקי)' : ''}` : ''}
                 </p>
-                <details class="fin-details"><summary>פירוט לפי משתמש (${data.users.length})</summary>
-                    <div class="table-scroll"><table class="fin-table">
-                        <thead><tr><th>משתמש</th><th>פרויקטים</th><th>הודעות צ'אט</th><th>הצעות</th><th>מאגר</th><th>פעילות אחרונה</th></tr></thead>
-                        <tbody>${data.users.map(u => `
-                            <tr><td>${esc(u.email)}${u.anon ? ' <span class="fin-muted">(אורח)</span>' : ''}</td><td class="num">${u.projects}</td><td class="num">${u.chatMsgs}</td>
-                            <td class="num">${u.quotes}</td><td class="num">${u.catalogItems}</td>
-                            <td>${u.lastUpdated ? new Date(u.lastUpdated).toLocaleDateString('he-IL') : '—'}</td></tr>`).join('')}
-                        </tbody>
-                    </table></div>
-                </details>`;
+                <p style="margin:8px 0 0;"><button type="button" class="btn btn-secondary btn-small" onclick="window.openAdminFunnelUsers && window.openAdminFunnelUsers()">
+                    <i class="fa-solid fa-table-list" aria-hidden="true"></i> פירוט לפי משתמש (${data.users.length})</button></p>`;
         } catch (e) {
             // The same failure, wearing the same face as every other card on
             // the panel. This one used to grow its own "התחבר מחדש", so one
