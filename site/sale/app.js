@@ -3777,6 +3777,241 @@ function renderHome() {
                 <span class="hr-meta">${escapeHtml(formatHebrewDate(p.created) || '')}</span>
             </button>`).join('')
         : '<p class="home-empty">עוד לא פתחת עבודה. תאר אחת ונתחיל.</p>';
+
+    try { renderResumeCard(); } catch (e) {}
+    try { renderPipelineMeter(); } catch (e) {}
+    try { refreshApprovals(); } catch (e) {}
+}
+
+// ==========================================================================
+// The home's three answers to "what now" (Stav, 4.9.2026: the electrician
+// should never wonder what to do next).
+//
+//   · the resume card — the one job he was in the middle of, and one button
+//     that opens it at the step he left it on;
+//   · the pipeline meter — how much money is out there waiting for a customer
+//     to say yes;
+//   · the approval refresh — a quote sent by link may have been approved while
+//     he was driving, and the badge should already be green when he looks.
+//
+// Nothing here promises what the app cannot do: no reminder, no notification,
+// only what is stored and what one public GET can tell.
+// ==========================================================================
+
+// A sample project is a demo he loaded to see the road, not work he has. It
+// renders like any project, but it must never be counted as money.
+function isSampleProject(p) { return !!(p && p.sample === true); }
+
+const RESUME_STATUS_LABEL = { 'טיוטה': 'בטיוטה', 'נשלח': 'ממתינה לאישור הלקוח' };
+
+// The job he was last working on: open (draft or sent), not closed, not a
+// draft that went stale a week ago — the same rule the list uses to decide
+// what is still "in the middle of".
+function resumeCandidate(list) {
+    return (list || [])
+        .filter((p) => isJob(p) && !p.closedAs && RESUME_STATUS_LABEL[p.status || 'טיוטה'] && !isStaleDraft(p))
+        .sort((a, b) => projectLastActivity(b) - projectLastActivity(a))[0] || null;
+}
+
+// Has a number been put on this job yet? The quote's own total wins; before
+// that, a priced material or a labour figure counts.
+function projectIsPriced(p) {
+    if (!p) return false;
+    const qd = p.quoteData || {};
+    if (Number(qd.finalPrice) > 0 || Number(qd.basePrice) > 0) return true;
+    if (Number(p.laborPrice) > 0) return true;
+    if ((p.laborItems || []).some((r) => r && (Number(r.price) > 0 || Number(r.qty) > 0))) return true;
+    return (p.materials || []).some((m) => m && Number(m.price) > 0);
+}
+
+// Where "continue" lands. The guide (when it is on) remembers the exact step;
+// without it the stage is read off the project: a sent quote is on the quote
+// screen, a quote that already has a total is on the quote screen too, priced
+// materials mean the pricing table, and anything earlier is the conversation.
+// The guide persists step as 1/2/3 (GUIDE_STEPS); the string aliases are kept
+// for older saves and for anything that names the stage instead.
+const RESUME_STEP_TABS = { 1: 'wizard', 2: 'pricing', 3: 'create', wizard: 'wizard', plan: 'wizard', price: 'pricing', pricing: 'pricing', draft: 'create', create: 'create' };
+function resumeTabFor(p) {
+    const step = p && p.guide && p.guide.step;
+    if (step && RESUME_STEP_TABS[step]) return RESUME_STEP_TABS[step];
+    if ((p.status || 'טיוטה') === 'נשלח') return 'create';
+    if (Number(p.quoteData && p.quoteData.finalPrice) > 0) return 'create';
+    return projectIsPriced(p) ? 'pricing' : 'wizard';
+}
+
+// "<לקוח — שם העבודה>", or just the work when nobody is attached yet.
+function resumeLabel(p) {
+    const title = (p.autoName && p.name === 'פרויקט חדש') ? draftPreview(p) : (p.name || '');
+    const client = ((p.quoteData && p.quoteData.clientName) || '').trim();
+    return client && client !== title ? `${client} — ${title}` : title;
+}
+
+function approvedBadgeHtml(p) {
+    if (!p || !p.approvedAt) return '';
+    return `<span class="approved-badge" title="${escapeHtml('אושרה בקישור' + (p.approvedBy ? ' על ידי ' + p.approvedBy : ''))}">הלקוח אישר 🎉</span>`;
+}
+
+function renderResumeCard() {
+    const box = document.getElementById('home-resume');
+    if (!box) return;
+    const p = resumeCandidate(projectsList);
+    if (!p) { box.hidden = true; box.innerHTML = ''; return; }
+    const state = p.approvedAt ? approvedBadgeHtml(p) : escapeHtml(RESUME_STATUS_LABEL[p.status || 'טיוטה']);
+    box.innerHTML = `
+        <div class="home-resume-card">
+            <span class="home-resume-text">👋 יש לך עבודה פתוחה: <b>${escapeHtml(resumeLabel(p))}</b> · ${state}</span>
+            <button type="button" class="home-resume-btn" onclick="resumeProject('${p.id}')">המשך מאיפה שעצרת ←</button>
+        </div>`;
+    box.hidden = false;
+}
+
+function resumeProject(id) {
+    const p = (projectsList || []).find((x) => x.id === id);
+    if (!p) return;
+    const tab = resumeTabFor(p);
+    loadProject(id, false);
+    switchTab(tab);
+}
+
+// ── Pipeline meter ──────────────────────────────────────────────────────────
+// Money that is out with customers: quotes sent and not yet answered. Approved
+// ones have moved on, paid ones are done, and a sample is not money.
+function isPipelineQuote(p) {
+    return isJob(p) && !isSampleProject(p) && !p.closedAs && (p.status || 'טיוטה') === 'נשלח' && !p.approvedAt;
+}
+function pipelineSum(list) {
+    return (list || []).filter(isPipelineQuote).reduce((s, p) => s + projectAmount(p), 0);
+}
+function renderPipelineMeter() {
+    const el = document.getElementById('home-pipeline');
+    if (!el) return;
+    const sum = pipelineSum(projectsList);
+    const nis = '₪' + Math.round(sum).toLocaleString('he-IL');
+    el.textContent = sum > 0
+        ? `צבר הצעות פעילות: ${nis} ממתינות לאישור`
+        : 'צבר הצעות פעילות: ₪0 — שלח הצעה ראשונה';
+}
+
+// ── Approval refresh ────────────────────────────────────────────────────────
+// Once every ten minutes per project, never for a project without a link,
+// never in a loop: the home and the list render often, and each render asks
+// once whether anyone is due. The stamp is written BEFORE the fetch, so a
+// request that fails does not come back on the very next render.
+const APPROVAL_REFRESH_MS = 10 * 60 * 1000;
+let _approvalRefreshBusy = false;
+function approvalCheckKey(id) { return getStorageKey('sj_apprchk_' + id); }
+function approvalLastChecked(id) {
+    try { return Number(localStorage.getItem(approvalCheckKey(id))) || 0; } catch (e) { return 0; }
+}
+function approvalRefreshDue(p, now) {
+    if (!p || !isJob(p) || isSampleProject(p) || p.closedAs) return false;
+    if (!p.shareToken || p.approvedAt) return false;
+    const st = p.status || 'טיוטה';
+    if (st !== 'נשלח' && st !== 'טיוטה') return false;
+    return (now - approvalLastChecked(p.id)) >= APPROVAL_REFRESH_MS;
+}
+function refreshApprovals() {
+    if (_approvalRefreshBusy || typeof fetchQuoteApproval !== 'function') return;
+    const now = Date.now();
+    const due = (projectsList || []).filter((p) => approvalRefreshDue(p, now));
+    if (!due.length) return;
+    _approvalRefreshBusy = true;
+    due.forEach((p) => { try { localStorage.setItem(approvalCheckKey(p.id), String(now)); } catch (e) {} });
+    Promise.all(due.map((p) => fetchQuoteApproval(p).then((a) => applyQuoteApproval(p, a)).catch(() => false)))
+        .then((results) => {
+            if (!results.some(Boolean)) return;
+            saveProjects();
+            filterProjectsList();
+        })
+        .finally(() => { _approvalRefreshBusy = false; });
+}
+
+// ── Completed → periodic checkup ────────────────────────────────────────────
+// Some jobs carry an inspection that comes back: a charger and a solar array
+// yearly, a new panel two years on, anything in a business or a public
+// building, a generator. When such a job is marked done the card offers, once,
+// to put the customer on the periodic-service list. A socket in a flat does
+// not come back, so it is not asked.
+const CHECKUP_MONTHS_BY_JOB = { charger: 12, solar: 12, inspection: 12, panel: 24 };
+function checkupIntervalFor(p) {
+    if (!p) return 0;
+    const type = (p.spec && p.spec.jobType) || '';
+    if (CHECKUP_MONTHS_BY_JOB[type]) return CHECKUP_MONTHS_BY_JOB[type];
+    const answers = (p.spec && p.spec.answers) || {};
+    const site = ['property_type', 'site_type'].map((k) => (answers[k] && answers[k].value) || '').join(' ');
+    const words = [site, p.name || '', (p.quoteData && p.quoteData.subject) || ''].join(' ');
+    if (/גנרטור/.test(words)) return 12;
+    if (type && type !== 'fault' && /עסק|מסחר|תעשי|ציבורי|משרד|מפעל/.test(site)) return 12;
+    return 0;
+}
+function checkupIntervalLabel(months) {
+    if (months === 12) return 'שנה';
+    if (months === 24) return 'שנתיים';
+    return `${months} חודשים`;
+}
+// The months to offer, or 0 when the card should stay quiet: not done yet,
+// already followed, already declined, or a job that does not come back.
+function checkupPromptFor(p) {
+    if (!p || (p.status || '') !== 'הושלם' || p.checkupDeclined) return 0;
+    if (p.maintenance && p.maintenance.next) return 0;
+    return checkupIntervalFor(p);
+}
+function checkupPromptHtml(p) {
+    const months = checkupPromptFor(p);
+    if (!months) return '';
+    const who = ((p.quoteData && p.quoteData.clientName) || '').trim() || 'הלקוח';
+    return `<div class="ck-offer" onclick="event.stopPropagation()">
+        <span>להוסיף את <b>${escapeHtml(who)}</b> למעקב בדיקה תקופתית בעוד ${checkupIntervalLabel(months)}?</span>
+        <button type="button" class="btn btn-secondary btn-small" onclick="acceptCheckupFollow('${p.id}', event)">כן</button>
+        <button type="button" class="btn btn-secondary btn-small" onclick="declineCheckupFollow('${p.id}', event)">לא עכשיו</button>
+    </div>`;
+}
+function acceptCheckupFollow(id, e) {
+    if (e) e.stopPropagation();
+    const p = (projectsList || []).find((x) => x.id === id);
+    const months = checkupIntervalFor(p);
+    if (!p || !months) return;
+    maintFollowProject(id, months);
+}
+function declineCheckupFollow(id, e) {
+    if (e) e.stopPropagation();
+    const p = (projectsList || []).find((x) => x.id === id);
+    if (!p) return;
+    p.checkupDeclined = true;
+    saveProjects();
+    filterProjectsList();
+    try { renderStatistics(); } catch (err) {}
+}
+
+// ── A sample project ────────────────────────────────────────────────────────
+// An empty list explains nothing. One realistic job — a charger in a parking
+// garage, specified and priced — lets him see the materials, walk to the
+// quote and delete it when he is done. It is flagged, so nothing counts it.
+async function loadSampleProject() {
+    let data;
+    try {
+        const res = await fetch('data/sample-project.json', { cache: 'no-cache' });
+        if (!res.ok) throw new Error(String(res.status));
+        data = await res.json();
+    } catch (e) {
+        showToast('הפרויקט לדוגמה לא נטען — נסה שוב', 'error');
+        return;
+    }
+    const today = getTodayDateString();
+    const proj = Object.assign({}, data, {
+        id: 'proj_' + Date.now(),
+        sample: true,
+        created: today,
+        touched: Date.now(),
+        quoteData: Object.assign({}, data.quoteData, { quoteNumber: getNextQuoteNumber(), date: today }),
+    });
+    delete proj._comment;   // the file's note to whoever edits it, not project data
+    projectsList.unshift(proj);
+    saveProjects();
+    filterProjectsList();
+    loadProject(proj.id, false);
+    switchTab('pricing');
+    showToast('פרויקט לדוגמה נטען · זה החומרים, ומכאן ממשיכים להצעה');
 }
 
 function openRecentProject(id) {
@@ -4714,6 +4949,9 @@ function filterProjectsList() {
     renderFollowupReminders();
     try { renderMaintDueStrip(); } catch (e) {}
     try { updateMaintCount(); } catch (e) {}
+    // A quote sent by link may have been approved since the list was last drawn.
+    // Throttled inside (ten minutes per project), so a render is never a poll.
+    try { refreshApprovals(); } catch (e) {}
 }
 
 // ── Linking a project to a real client ───────────────────────────────────────
@@ -5074,8 +5312,9 @@ function renderStatistics() {
     // work list and the dashboard learned to tell the two apart and this board
     // did not — so every "כמה לוקח קבלן משתלבות?" landed in the first
     // column as money in flight. A question is not a pipeline.
-    (projectsList || []).filter(isJob)
-        .filter(p => !isStaleDraft(p))
+    // The sample project is a demo, not money: it never sits on this board.
+    const money = (projectsList || []).filter(isJob).filter(p => !isSampleProject(p));
+    money.filter(p => !isStaleDraft(p))
         .filter(p => pipeMonth === 'all' || projectMonthKey(p) === pipeMonth)
         .forEach(p => { (cols[projectPipelineStage(p)] || cols.planning).push(p); });
 
@@ -5095,11 +5334,13 @@ function renderStatistics() {
             return `<div class="pipe-card" draggable="true" data-pid="${p.id}" data-stage="${c.key}"
                 onclick="loadProject('${p.id}')" title="פתח את הפרויקט · אפשר לגרור לעמודה אחרת">
                 <div class="pipe-card-name">${escapeHtml(p.name)}</div>
+                ${approvedBadgeHtml(p)}
                 <div class="pipe-card-foot">
                     <span class="pipe-card-amt">${amt ? nis(amt) : '—'}</span>
                     ${adv}
                 </div>
                 ${(c.key === 'awaiting' && days >= 7) ? `<div class="pipe-card-age">ממתין ${days} ימים</div>` : ''}
+                ${c.key === 'executed' ? checkupPromptHtml(p) : ''}
             </div>`;
         }).join('')) : `<div class="pipe-empty">—</div>`;
         return `<div class="pipe-col" data-stage="${c.key}" style="--pipe-accent:${c.accent}">
@@ -5115,14 +5356,15 @@ function renderStatistics() {
     // costs nothing and means neither screen can be the empty one.
     boards.forEach((b) => { b.innerHTML = boardHtml; });
 
-    const totalCount = (projectsList || []).length;
-    const totalValue = (projectsList || []).reduce((s, p) => s + projectAmount(p), 0);
+    const all = (projectsList || []).filter(p => !isSampleProject(p));
+    const totalCount = all.length;
+    const totalValue = all.reduce((s, p) => s + projectAmount(p), 0);
     const paidValue = cols.paid.reduce((s, p) => s + projectAmount(p), 0);
     const openValue = totalValue - paidValue;
     // Controls: group by client, and which month the board is showing.
     const ctl = document.getElementById('pipeline-controls');
     if (ctl) {
-        const months = Array.from(new Set((projectsList || []).map(projectMonthKey).filter(Boolean))).sort().reverse().slice(0, 18);
+        const months = Array.from(new Set(all.map(projectMonthKey).filter(Boolean))).sort().reverse().slice(0, 18);
         const label = (k) => new Date(k + '-01T12:00:00').toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
         ctl.innerHTML = `
             <button type="button" class="chip ${pipeGroupByClient ? 'on' : ''}" onclick="setPipeGroup(${!pipeGroupByClient})">
@@ -5169,6 +5411,7 @@ function pipelineAdvance(projectId, to, e) {
     renderStatistics();
     filterProjectsList();
     showToast(target.toast);
+    if (to === 'executed') revealCheckupOffer(p);
     // Money that just arrived wants a receipt — offer it on the spot.
     if (to === 'paid' && !projectHasReceipt(p)) {
         setTimeout(() => showToast('אפשר להפיק קבלה ללקוח מהכרטיס בלוח'), 1200);
@@ -5925,8 +6168,9 @@ function updateMetricsDashboard() {
     let approvedCount = 0;
     let approvedSum = 0;
     // "כמה עבודות פתוחות" must not count the questions, or the number on the
-    // dashboard stops meaning anything the moment the chat gets used.
-    const jobs = projectsList.filter(isJob);
+    // dashboard stops meaning anything the moment the chat gets used. Nor the
+    // sample project: a demo is not a closed deal.
+    const jobs = projectsList.filter(isJob).filter((p) => !isSampleProject(p));
     let totalCount = jobs.length;
 
     jobs.forEach(proj => {
@@ -5974,6 +6218,7 @@ function cycleProjectStatus(projectId, e) {
     proj.statusChangedAt = Date.now(); // drives the follow-up reminders
     saveProjects();
     filterProjectsList();
+    revealCheckupOffer(proj);
 }
 
 function setProjectStatus(projectId, status, e) {
@@ -5985,6 +6230,21 @@ function setProjectStatus(projectId, status, e) {
     saveProjects();
     filterProjectsList();
     showToast(`"${proj.name}" סומן: ${status}`);
+    revealCheckupOffer(proj);
+}
+
+// A job that was just marked done and comes back for inspection: its card now
+// carries the "add to periodic checkups?" strip (checkupPromptHtml), and the
+// strip is brought into view so the question is seen where the status was
+// changed, not found a week later. Nothing to reveal when the job does not
+// come back, or when he already answered.
+function revealCheckupOffer(proj) {
+    if (!proj || !checkupPromptFor(proj)) return;
+    setTimeout(() => {
+        const strip = document.querySelector(`.project-card[data-pid="${proj.id}"] .ck-offer`)
+            || document.querySelector(`.pipe-card[data-pid="${proj.id}"] .ck-offer`);
+        if (strip && typeof strip.scrollIntoView === 'function') strip.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }, 60);
 }
 
 // ==========================================================================

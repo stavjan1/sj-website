@@ -6455,3 +6455,52 @@ body.guide-step1-card .chat-suggestions { display: none !important; }   /* rende
     .guide-card { margin-inline: var(--sp-2); padding: var(--sp-2) var(--sp-3); }
     #panel-wizard > .guide-card { margin-block-end: var(--sp-2); }
 }
+
+/* ---- Home: the resume card and the pipeline meter (Wave C) --------------- */
+/* One thing lit: the job he was in the middle of, one sentence, one button.
+   Warm without being loud, and gone the moment nothing is open. */
+.home-resume { width: 100%; margin-block-end: var(--sp-4); }
+.home-resume-card {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap;
+    padding: var(--sp-3) var(--sp-4);
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+    border-radius: var(--r-md);
+    background: color-mix(in srgb, var(--accent-soft, var(--surface-2)) 60%, var(--surface));
+    text-align: start;
+}
+.home-resume-text { font-size: var(--fs-sm); color: var(--text-2); line-height: var(--lh-body); min-width: 0; }
+.home-resume-text b { color: var(--text); font-weight: 700; }
+.home-resume-btn {
+    flex: none; border: none; cursor: pointer;
+    padding: var(--sp-2) var(--sp-4); border-radius: var(--r-pill);
+    background: var(--action, var(--accent)); color: var(--on-action, var(--on-accent));
+    font: 700 var(--fs-sm) var(--font-ui); min-height: 40px;
+}
+.home-resume-btn:hover { filter: brightness(1.05); }
+@media (max-width: 560px) { .home-resume-btn { width: 100%; } }
+
+/* Money out with customers. One quiet line under the examples. */
+.home-pipeline { margin: var(--sp-3) 0 0; font-size: var(--fs-xs); color: var(--text-3); text-align: center; }
+
+/* The offer to follow a finished job: a strip on the card, not a modal. */
+.ck-offer {
+    display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap;
+    margin-block: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3);
+    border: 1px dashed color-mix(in srgb, var(--ok-text) 55%, var(--border));
+    border-radius: var(--r-sm);
+    font-size: var(--fs-xs); color: var(--text-2);
+}
+.ck-offer b { color: var(--text); }
+.ck-offer .btn { min-height: 32px; }
+.pipe-card .ck-offer { margin-block-end: 0; }
+.pipe-card .approved-badge { margin-block-end: 4px; }
+
+/* The demo job is marked as one, wherever its name is printed. */
+.sample-tag {
+    margin-inline-start: var(--sp-2);
+    padding: 1px var(--sp-2); border-radius: var(--r-pill);
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text-3); font-size: 11px; font-weight: 600; vertical-align: middle;
+}
+.projects-empty .pe-sample { display: block; margin: var(--sp-3) auto 0; }
