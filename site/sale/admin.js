@@ -1718,7 +1718,7 @@ function openAdminUserThread(i) {
     const page = _adminUserPage;
     const t = page && page.threads && page.threads[i];
     if (!t) return;
-    return openAdminThread(t, { label: 'חזרה ל' + adminUserName(page.row), onBack: () => { _adminUserPage = page; paintAdminUserPage(); } });
+    return openAdminThread(t, { label: 'חזרה לדף של ' + adminUserName(page.row), onBack: () => { _adminUserPage = page; paintAdminUserPage(); } });
 }
 
 // The helper switch on his page: the same PUT the helpers card uses, then the

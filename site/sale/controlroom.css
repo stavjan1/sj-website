@@ -260,14 +260,18 @@
 }
 #panel-admin .table-scroll { overflow-x: auto; max-inline-size: 100%; }
 #panel-admin .table-scroll table { min-inline-size: 100%; }
-@media (max-width: 860px) {
-    .adm-head { padding-inline: 0; }
-    .adm-head-actions { margin-inline-start: 0; }
-    .adm-filters { flex-direction: column; }
-}
 .adm-filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .adm-filters .search-bar { flex: 1 1 220px; max-width: none; }
 .adm-filters select { flex: 0 1 200px; }
+@media (max-width: 860px) {
+    .adm-head { padding-inline: 0; }
+    .adm-head-actions { margin-inline-start: 0; }
+    /* Stacked: the row basis must not become a height — flex: 1 1 220px in a
+       column made the search box 220px tall on every phone. After the base
+       rules on purpose: same specificity, so order decides. */
+    .adm-filters { flex-direction: column; align-items: stretch; }
+    .adm-filters .search-bar, .adm-filters select { flex: 0 0 auto; width: 100%; }
+}
 
 /* ============================================================
    THE CARDS — the seven screens.

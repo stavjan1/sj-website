@@ -436,7 +436,7 @@ test('users: the drawer shows the person in six sections, in order', () => {
     assert.ok(!/ממסר פחת/.test(sec('convos')), 'another user\'s thread leaked into the page');
     assert.match(sec('convos'), /2 שיחות · מתוך פיד השיחות/, 'the thread count does not name the feed');
     const openThread = fnBody(ADMIN, 'function openAdminUserThread(');
-    assert.match(openThread, /openAdminThread\(t, \{ label: 'חזרה ל'/, 'a thread from the page does not open with a back link');
+    assert.match(openThread, /openAdminThread\(t, \{ label: 'חזרה [^']+' \+ adminUserName\(page\.row\), onBack:/, 'a thread from the page does not open with a back link to the person');
     assert.match(fnBody(ADMIN, 'async function openAdminThread('), /class="au-back" onclick="adminThreadBack\(\)"/, 'the thread view has no back link');
     assert.match(fnBody(ADMIN, 'function adminThreadBack('), /b\.onBack\(\)/, 'the back link goes nowhere');
     // 4 · helper prices, this address only, with the window.
