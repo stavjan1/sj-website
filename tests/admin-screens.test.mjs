@@ -514,3 +514,186 @@ test('users: every action calls an endpoint that exists, and nothing fetches per
     assert.match(PANEL, /id="admin-users-q"[^>]*oninput="renderAdminUsersTable\(\)"/, 'the search box does not re-render the table');
     assert.match(fnBody(HELPER, 'async function renderAdminHelpers('), /window\._adminHelperSet = new Set\(helpers\)/, 'the helper badge has no source');
 });
+
+// ---- deeper screens (5/9, later the same day) --------------------------------
+// The conversations feed narrows in the browser; the AI screen puts two models
+// in one table; the overview's attention list names only what the ledger
+// wrote. Each rule below runs the real function over a fake payload, so a
+// filter that starts costing a request, or a signal that starts reading a
+// field the server never sends, fails here first.
+const AI_API = read('functions/api/_ai.js');
+const ANALYTICS_API = read('functions/api/analytics.js');
+const CSS_PANELS = read('site/sale/css/panels.css');
+
+test('convos: the four filters narrow the cached feed, newest first, with no request', () => {
+    // The markup: three selects and the search box, each re-rendering from the cache.
+    for (const id of ['admin-convo-user', 'admin-convo-days', 'admin-convo-verdict']) {
+        assert.match(PANEL, new RegExp(`id="${id}"[^>]*onchange="renderAdminConvoList\\(\\)"`), `#${id} does not re-render the list`);
+    }
+    assert.match(PANEL, /id="admin-convo-days"[\s\S]{0,400}value="today"[\s\S]{0,200}value="7"[\s\S]{0,200}value="30"/, 'the date filter lost a window');
+    assert.match(PANEL, /id="admin-convo-user"[^>]*>\s*<option value="">כל המשתמשים<\/option>\s*<\/select>/, 'the user select is not filled from the payload');
+    assert.match(fnBody(ADMIN, 'async function adminLoadConvos('), /adminFillConvoUsers\(\);/, 'a fresh feed does not refill the user select');
+    const list = fnBody(ADMIN, 'function renderAdminConvoList(');
+    assert.ok(!/adminRes\(|fetch\(/.test(list), 'the list renderer fetches');
+    assert.match(list, /adminFilterConvos\(_adminConvos,/, 'the renderer does not go through the pure filter');
+    assert.match(list, /מוצגות \$\{rows\.length\} מתוך \$\{_adminConvos\.length\}/, 'a narrowed list does not say how much of the feed it is');
+    assert.match(list, /onclick="openAdminConvo\(\$\{i\}\)"/, 'a row no longer opens the thread');
+    assert.match(list, /_adminConvoView = rows;/, 'the click index is not the filtered list');
+
+    // The filter itself, over a fake feed.
+    const ctx = createContext({ Date, Number, String, Array, Math });
+    runInContext(fnBody(ADMIN, 'function adminFilterConvos(') + ';globalThis.f = adminFilterConvos;', ctx);
+    const now = new Date(2026, 8, 5, 15, 0, 0).getTime();   // 15:00 local, 5/9/2026
+    const T = [
+        { email: 'avi@x.com', id: 'p1', title: 'מזגן', asked: 'כמה', answered: '450', when: now - 2 * 3600e3, verdict: 'way_off' },
+        { email: 'bat@x.com', id: 'p2', title: 'לוח', asked: 'לוח חדש', answered: '…', when: now - 20 * 3600e3 },
+        { email: 'avi@x.com', id: 'p3', title: 'פחת', asked: 'ממסר', answered: '…', when: now - 3 * DAY, verdict: 'spot_on' },
+        { email: 'gad@x.com', id: 'p4', title: 'שקעים', asked: 'עשרה שקעים', answered: '…', when: now - 12 * DAY },
+        { email: 'gad@x.com', id: 'p5', title: 'ישן', asked: 'ישן', answered: '…', when: now - 45 * DAY },
+    ];
+    // Array.from: the vm hands back arrays of its own realm, and strict
+    // deepEqual compares prototypes.
+    const ids = (r) => Array.from(r, (t) => t.id);
+    // Wire order is not trusted: a shuffled feed still comes out newest first.
+    assert.deepEqual(ids(ctx.f([T[3], T[0], T[4], T[1], T[2]], { now })), ['p1', 'p2', 'p3', 'p4', 'p5'], 'not newest first');
+    assert.deepEqual(ids(ctx.f(T, { user: 'avi@x.com', now })), ['p1', 'p3'], 'the user filter');
+    assert.deepEqual(ids(ctx.f(T, { user: 'AVI@x.com', now })), ['p1', 'p3'], 'the user filter is case-sensitive');
+    // "היום" is since local midnight: 20 hours ago at 15:00 is yesterday.
+    assert.deepEqual(ids(ctx.f(T, { days: 'today', now })), ['p1'], 'the today filter');
+    assert.deepEqual(ids(ctx.f(T, { days: '7', now })), ['p1', 'p2', 'p3'], 'the 7-day filter');
+    assert.deepEqual(ids(ctx.f(T, { days: '30', now })), ['p1', 'p2', 'p3', 'p4'], 'the 30-day filter');
+    assert.deepEqual(ids(ctx.f(T, { mode: 'priced', now })), ['p1', 'p3'], 'the priced filter');
+    assert.deepEqual(ids(ctx.f(T, { mode: 'unpriced', now })), ['p2', 'p4', 'p5'], 'the unpriced filter');
+    assert.deepEqual(ids(ctx.f(T, { mode: 'way_off', now })), ['p1'], 'the "ממש לא" filter');
+    assert.deepEqual(ids(ctx.f(T, { q: 'ממסר', now })), ['p3'], 'the text search');
+    // Filters stack.
+    assert.deepEqual(ids(ctx.f(T, { user: 'avi@x.com', days: '7', mode: 'unpriced', now })), [], 'stacked filters');
+    assert.deepEqual(ids(ctx.f(T, { user: 'gad@x.com', days: '30', now })), ['p4'], 'stacked filters');
+    assert.deepEqual(ids(ctx.f(null, { now })), [], 'a missing feed is an empty list, not a throw');
+});
+
+test('ai: two models, two sequential runs, one table whose verdict is arithmetic', () => {
+    // The row and the runner.
+    const panel = fnBody(ADMIN, 'function modelsPanelHtml(');
+    assert.match(panel, /השווה שני מודלים/, 'the compare row is gone');
+    assert.match(panel, /id="mdl-cmp-a"[\s\S]{0,200}id="mdl-cmp-b"[\s\S]{0,300}onclick="compareModels\(\)"/, 'two selects and one button');
+    const run = fnBody(ADMIN, 'async function compareModels(');
+    assert.match(run, /for \(const model of \[a, b\]\) \{[\s\S]*?await adminRes\('\/api\/model-eval', \{\s*method: 'POST'/, 'the runs are not sequential POSTs to /api/model-eval');
+    assert.ok(!/Promise\.all/.test(run), 'the two runs fire at once');
+    assert.match(run, /const system = evalSystemBlocks\(\);/, 'the compare does not send the system blocks the app sends');
+    assert.match(run, /JSON\.stringify\(\{ system, model \}\)/, 'the body shape drifted from runModelTraps');
+    assert.match(fnBody(ADMIN, 'async function runModelTraps('), /JSON\.stringify\(\{ system: evalSystemBlocks\(\), model \}\)/, 'runModelTraps changed its body shape — keep the two in step');
+    assert.match(run, /if \(a === b\)/, 'the same model twice is not refused');
+    assert.match(run, /if \(_cmpBusy\) return;/, 'no double-click guard');
+    assert.match(run, /finally\s*\{[\s\S]{0,80}_cmpBusy = false;/, 'the guard is not released in a finally');
+    assert.match(run, /compareTableHtml\(runs\[0\], runs\[1\]/, 'the result is not the one table');
+    assert.match(CSS_PANELS, /\.mdl-cmp-ok \{[^}]*var\(--ok-text\)/, 'the pass mark has no colour');
+
+    // The table, from two fake eval payloads in the server's shape.
+    const ctx = createContext({ Date, Number, String, Array, Object, Math,
+        escapeHtml: (s) => String(s == null ? '' : s), crNum: (n) => String(Number(n || 0)) });
+    runInContext(fnBody(ADMIN, 'function compareTableHtml(') + ';globalThis.t = compareTableHtml;', ctx);
+    const traps = [['t1', 'כבל 6×4'], ['t2', 'ביקור'], ['t3', 'JSON']];
+    const run_ = (model, passes, chars, ms, error) => ({
+        ok: true, model,
+        passed: passes.filter(Boolean).length, total: traps.length,
+        avgMs: Math.round(ms.reduce((s, x) => s + x, 0) / traps.length),
+        avgChars: Math.round(chars.reduce((s, x) => s + x, 0) / traps.length),
+        results: traps.map(([id, title], i) => ({ id, title, why: '', pass: passes[i], failed: passes[i] ? [] : ['שגה'], error: error && i === 2 ? error : null, ms: ms[i], chars: chars[i], excerpt: '' })),
+    });
+    const A = run_('gemini-3.5-flash-lite', [true, true, false], [300, 200, 100], [900, 800, 700]);
+    const B = run_('gemini-3.6-flash', [true, true, true], [500, 400, 300], [1500, 1400, 1300]);
+    const html = ctx.t(A, B, 0);
+    const rows = [...html.matchAll(/<tr>([\s\S]*?)<\/tr>/g)].map((m) => m[1]);
+    assert.equal(rows.length, 1 + traps.length + 1, 'header + one row per trap + totals');
+    assert.match(rows[0], /gemini-3\.5-flash-lite<\/th><th dir="ltr">gemini-3\.6-flash/, 'the columns are not the two models');
+    assert.match(rows[1], /כבל 6×4/, 'the first row is not the first trap');
+    assert.equal((rows[3].match(/✗/g) || []).length, 1, 'the failed trap does not show ✗ in its column');
+    assert.equal((rows[3].match(/✓/g) || []).length, 1, 'the passed trap does not show ✓ in the other column');
+    assert.match(rows[3], /100 תווים/, 'a cell does not carry the answer length');
+    assert.match(rows[4], /<b>2\/3<\/b>[^<]*<small>עבר · 200 תווים · 800 ms/, 'the totals row for A');
+    assert.match(rows[4], /<b>3\/3<\/b>[^<]*<small>עבר · 400 תווים · 1400 ms/, 'the totals row for B');
+    assert.match(html, /קצר יותר: gemini-3\.5-flash-lite · עובר יותר: gemini-3\.6-flash/, 'the verdict is not the arithmetic');
+    assert.ok(!/מומלץ|כדאי|עדיף/.test(html), 'the verdict recommends');
+    assert.match(html, /class="table-scroll"><table class="au-table/, 'the table does not scroll in its own frame');
+    // Ties say so; a failed request says so in place of a length.
+    const tie = ctx.t(A, run_('gemini-x', [true, true, false], [300, 200, 100], [1, 1, 1]), 0);
+    assert.match(tie, /קצר יותר: שווים · עובר יותר: שווים/, 'a tie invents a winner');
+    const err = ctx.t(A, run_('gemini-x', [true, true, false], [300, 200, 0], [1, 1, 1], 'status 503'), 0);
+    assert.match(err, /✗<\/span> <small>שגיאה<\/small>/, 'a failed request is shown as a length');
+    assert.match(ctx.t(A, B, new Date(2026, 8, 5, 14, 32).getTime()), /הורץ 14:32/, 'the table does not say when it ran');
+});
+
+test('overview: the attention list reads only fields the ledger writes', () => {
+    const attn = fnBody(ADMIN, 'function crPaintAttention(');
+    // Every field read off an AI event is one recordAiUse / pushEvent /
+    // analytics.js writes. The list is derived from the servers' own source.
+    const EVENT_FIELDS = new Set(['label', 'outcome', 'model', 'at', 'date']);
+    assert.match(AI_API, /await pushEvent\(env, \{ label, outcome, model: model \|\| null, \.\.\.\(extra \|\| \{\}\) \}\);/, 'the event shape moved');
+    assert.match(AI_API, /list\.push\(\{ \.\.\.ev, at: new Date\(\)\.toISOString\(\) \}\);/, 'the event is no longer stamped with `at`');
+    assert.match(ANALYTICS_API, /events\.push\(\.\.\.list\.map\(\(e\) => \(\{ \.\.\.e, date: d \}\)\)\);/, 'the event is no longer stamped with `date`');
+    for (const m of AI_API.matchAll(/recordAiUse\(env, [^,]+, [^,]+, [^,]+,\s*\{([^}]*)\}/g)) {
+        for (const k of m[1].matchAll(/(\w+):/g)) EVENT_FIELDS.add(k[1]);
+    }
+    assert.ok(EVENT_FIELDS.has('status') && EVENT_FIELDS.has('note'), 'the extras the ledger writes were not found');
+    // The engine block only: the verdict and helper blocks below it read
+    // other payloads with their own `e`.
+    const engine = attn.slice(0, attn.indexOf('// Prices:'));
+    assert.ok(engine.length > 200, 'the engine block of the attention list moved');
+    const eventReads = new Set([...engine.matchAll(/\b(?:e|last)\.(\w+)/g)].map((m) => m[1]));
+    for (const f of eventReads) assert.ok(EVENT_FIELDS.has(f), `the attention list reads e.${f}, which no event carries`);
+    // Every field read off today's pool row is one analytics.js builds.
+    const shapeAt = ANALYTICS_API.indexOf('todayPools[label] = {');
+    const todayShape = ANALYTICS_API.slice(shapeAt, ANALYTICS_API.indexOf('};', shapeAt));
+    const POOL_FIELDS = new Set([...todayShape.matchAll(/^\s*(\w+)[,:]/gm)].map((m) => m[1]));
+    const poolReads = new Set([...attn.matchAll(/\bt\.(\w+)/g)].map((m) => m[1]));
+    for (const f of poolReads) assert.ok(POOL_FIELDS.has(f), `the attention list reads t.${f}, which today's row does not carry`);
+    assert.match(attn, /outcome === 'fail' && e\.label !== 'all'/, 'the full-outage marker is counted as a model failure too');
+
+    // Over a fake analytics payload: one line per real signal, none invented.
+    const els = { 'admin-attention-body': { innerHTML: '' } };
+    const ctx = createContext({ Date, Number, String, Array, Object, Math, Set,
+        document: { getElementById: (id) => els[id] || null },
+        escapeHtml: (s) => String(s == null ? '' : s), crNum: (n) => String(Number(n || 0)),
+        AI_POOL_LABELS: { 'gemini:primary': 'Gemini · מפתח ראשי', 'gemini:backup': 'Gemini · מפתח גיבוי', all: 'כשל מלא · כל הספקים' } });
+    runInContext(['let _crCache = {}; let _crErr = {};', fnBody(ADMIN, 'function crEl('), attn,
+        'function setCache(c, e) { _crCache = c; _crErr = e || {}; }'].join('\n'), ctx);
+    const nowIso = new Date().toISOString();
+    const today = nowIso.slice(0, 10);
+    const lines = () => [...els['admin-attention-body'].innerHTML.matchAll(/adm-attn-text">([^<]*)</g)].map((m) => m[1]);
+
+    runInContext(`setCache(${JSON.stringify({
+        analytics: { ai: {
+            today: { 'gemini:primary': { used: 80, cap: 100, pct: 80, exhausted: false }, 'gemini:backup': { used: 3, cap: null, pct: null, exhausted: true }, all: { used: 1, cap: null, pct: null, exhausted: false } },
+            events: [
+                { label: 'all', outcome: 'fail', model: null, note: 'כל הספקים נכשלו', at: nowIso, date: today },
+                { label: 'gemini:primary', outcome: 'fail', model: 'gemini-3.5-flash-lite', status: 503, at: nowIso, date: today },
+                { label: 'gemini:primary', outcome: 'fail', model: 'gemini-3.5-flash-lite', status: 500, at: nowIso, date: today },
+                { label: 'gemini:backup', outcome: 'quota', model: 'gemini-3.5-flash-lite', status: 429, at: nowIso, date: today },
+                { label: 'gemini:primary', outcome: 'fail', model: 'gemini-3.5-flash-lite', status: 503, at: '2026-01-01T10:00:00.000Z', date: '2026-01-01' },
+            ],
+        } },
+        feedback: { entries: [{ verdict: 'way_off', at: nowIso }, { verdict: 'spot_on', at: '2026-01-01T10:00:00.000Z' }] },
+        helpers: { prices: { 'bat@x.com': { i1: { price: 100, at: nowIso } } } },
+        funnel: { funnel: { capped: false } },
+        telegram: { configured: true },
+    })}); crPaintAttention();`, ctx);
+    const L = lines();
+    assert.equal(L.filter((s) => s.includes('כשל AI מלא היום')).length, 1, 'the full outage is not one line');
+    const failed = L.filter((s) => s.startsWith('מודל נכשל היום'));
+    assert.equal(failed.length, 1, 'the failed-model signal is not one line');
+    assert.match(failed[0], /\(2 פעמים\) · gemini-3\.5-flash-lite · Gemini · מפתח ראשי · 503/, 'the failed-model line does not name model, key and status from the ledger (and only today, and not the outage marker)');
+    assert.equal(L.filter((s) => s.includes('נגמרה המכסה היום')).length, 1, 'the exhausted key is not one line');
+    assert.equal(L.filter((s) => s.includes('ב-80% מהתקרה היומית')).length, 1, 'the key near its cap is not one line');
+    assert.equal(L.filter((s) => s.includes('משובי "ממש לא"')).length, 1, 'the fresh way_off verdict');
+    assert.equal(L.filter((s) => s.includes('מחירים חדשים מעוזרים')).length, 1, 'the helper price');
+    assert.equal(L.length, 6, `six real signals, got ${L.length}: ${L.join(' | ')}`);
+    assert.ok(L.indexOf(failed[0]) > L.findIndex((s) => s.includes('כשל AI מלא')), 'a warn sorts before a bad');
+
+    // Nothing today → silence, not a chore.
+    runInContext(`setCache(${JSON.stringify({ analytics: { ai: { today: {}, events: [] } }, feedback: { entries: [] }, helpers: { prices: {} }, funnel: { funnel: {} }, telegram: { configured: true } })}); crPaintAttention();`, ctx);
+    assert.match(els['admin-attention-body'].innerHTML, /שקט\./, 'an empty day invents a chore');
+    // A quota event alone is not a model failure.
+    runInContext(`setCache(${JSON.stringify({ analytics: { ai: { today: {}, events: [{ label: 'gemini:primary', outcome: 'quota', model: 'x', at: nowIso, date: today }] } }, telegram: { configured: true } })}); crPaintAttention();`, ctx);
+    assert.ok(!/מודל נכשל/.test(els['admin-attention-body'].innerHTML), 'a spent quota is reported as a model failure');
+});
