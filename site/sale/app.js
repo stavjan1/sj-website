@@ -2019,13 +2019,38 @@ function guideStepState(proj) {
     const hist = Array.isArray(proj && proj.chatHistory) ? proj.chatHistory : [];
     const firstUser = hist.findIndex((m) => m && m.role === 'user');
     const priced = firstUser > -1 && hist.slice(firstUser + 1).some((m) => m && m.role === 'model');
-    const sentAt = Number(g.sentAt) || Number(proj && proj.quoteOutAt) || 0;
-    const d3 = !!done[2] || sentAt > 0;
-    const d2 = !!done[1] || d3;
+    // "Sent" is a fact the app can vouch for: the WhatsApp / share sheet went
+    // out (guide.sentAt, also stamped by his own "שלחתי" tap), or the status
+    // moved past טיוטה. quoteOutAt alone is NOT a send — it is stamped when a
+    // PDF is downloaded or a link is made, and a PDF printed to read on the
+    // couch is not a quote the customer holds. Review, 5.9.2026.
+    const status = (proj && proj.status) || 'טיוטה';
+    const outAt = Number(proj && proj.quoteOutAt) || 0;
+    const sentAt = Number(g.sentAt)
+        || (status !== 'טיוטה' ? (Number(proj.statusChangedAt) || outAt) : 0);
+    const d3 = !!done[2] || sentAt > 0 || status !== 'טיוטה';
+    // A quote that left the machine, sent or not, was built: 1 and 2 are behind him.
+    const d2 = !!done[1] || d3 || outAt > 0;
     const d1 = !!done[0] || mats.length > 0 || priced || d2;
     const flags = [d1, d2, d3];
     const firstOpen = flags.indexOf(false);
-    return { done: flags, step: firstOpen === -1 ? 3 : firstOpen + 1, sentAt };
+    return { done: flags, step: firstOpen === -1 ? 3 : firstOpen + 1, sentAt, outAt };
+}
+
+// Has a number reached this job? The table's rows or total, or money already
+// in the quote (he may have written the items by hand). guideOnPriced walks
+// him to the table only when there is something on it to look at, and the
+// step-1 card says "ask for the numbers" when the agent answered in prose.
+function guideHasNumbers(proj) {
+    if (!proj) return false;
+    if ((proj.materials || []).some((m) => m && (m.name || m.description))) return true;
+    const q = proj.quoteData || {};
+    if (Number(q.basePrice) > 0 || (q.items || []).some((i) => Number(i && i.price) > 0)) return true;
+    return guideTableTotal(proj) > 0;
+}
+function guideTableTotal(proj) {
+    if (typeof pricingTotals !== 'function') return 0;
+    try { return Number(pricingTotals(proj).total) || 0; } catch (e) { return 0; }
 }
 
 function guideActiveProject() {
@@ -2108,7 +2133,7 @@ function renderGuideCards() {
     if (g.step !== st.step) g.step = st.step;
 
     let html = '';
-    if (cur === 'create' && st.sentAt) {
+    if (cur === 'create' && st.done[2]) {
         // The stopping point: the road is complete, and this line stays as the
         // project's last word. Dismissing (×) only folds it.
         html = _guideSentCardHtml(proj, st, _guideFreshSent.has(proj.id));
@@ -2122,7 +2147,7 @@ function renderGuideCards() {
         html = _guideCard('עין מהירה על החומרים והמחירים — תקן מה שצריך.',
             `<button type="button" class="btn btn-accent btn-small" onclick="guideContinueToQuote()">המשך להצעה <i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>`);
     } else if (cur === 'create') {
-        html = _guideCreateCardHtml(proj);
+        html = _guideCreateCardHtml(proj, st);
     }
     if (!html) return;
     slot.innerHTML = html;
@@ -2151,6 +2176,13 @@ function _guideCard(text, btns, extra) {
 // rather than repeat them. When the pricing answer has landed, the card is the
 // door to the next step.
 function _guideWizardCardHtml(proj, st) {
+    if (st.done[0] && !guideHasNumbers(proj)) {
+        // The agent answered in prose and nothing reached the table. Walking
+        // him to an empty table would be a dead end with a tick on it; the
+        // honest step is the one nextstep.js's 'price-empty' card names.
+        return _guideCard('התמחור לא החזיר מספרים. בקש פירוט מלא — שעות, חומרים וסך הכל.',
+            `<button type="button" class="btn btn-accent btn-small" onclick="sendSuggestedChatPrompt('פרט את התמחור: שעות עבודה, רשימת חומרים עם כמויות ומחירים, וסך הכל.')">בקש פירוט מלא</button>`);
+    }
     if (st.done[0]) {
         return _guideCard('התמחור התקבל. עכשיו עין מהירה על הכמויות.',
             `<button type="button" class="btn btn-accent btn-small" onclick="guideGo(2)">המשך לאישור כמויות <i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>`);
@@ -2184,16 +2216,39 @@ function _guideOffHintHtml(proj) {
 }
 
 // Step 3, before the send. A quote with no money in it is not "ready", and
-// saying so would be the kind of lie this whole layer exists to avoid: when
-// the pricing table has numbers nextstep.js already offers to carry them
-// over (and this card yields to it); when nothing was priced at all, the
+// saying so would be the kind of lie this whole layer exists to avoid. When
+// the pricing table has numbers and the quote does not, the one move that
+// carries them across is ptToQuote — said HERE, not left to nextstep.js,
+// whose 'draft-empty' card is muted for anyone with two quotes in history
+// and needs proj.stage === 'draft', which the road's own door never sets
+// (review, 5.9.2026: the old text sent a priced job back to step 1, whose
+// card sent it forward again — a loop). When nothing was priced at all, the
 // honest instruction is to go back and get a price.
-function _guideCreateCardHtml(proj) {
+function _guideCreateCardHtml(proj, st) {
     const q = proj.quoteData || {};
     const hasMoney = Number(q.basePrice) > 0 || (q.items || []).some((i) => Number(i && i.price) > 0);
     if (!hasMoney) {
+        const table = guideTableTotal(proj);
+        if (table > 0) {
+            return _guideCard(`בטבלת התמחור יש ${Math.round(table).toLocaleString('he-IL')} ₪ — בנה מהם את ההצעה.`,
+                `<button type="button" class="btn btn-accent btn-small" onclick="ptToQuote()">בניית ההצעה מהטבלה</button>`);
+        }
         return _guideCard('עוד אין מחיר בהצעה. חזור לתיאור העבודה ותן לסוכן לתמחר.',
             `<button type="button" class="btn btn-secondary btn-small" onclick="guideGo(1)"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i> לתיאור העבודה</button>`);
+    }
+    // The PDF came down, or a link was made, and the status still says טיוטה:
+    // the quote left the machine, and whether it reached the customer is a
+    // fact only he knows. One question, and his answer flips the status —
+    // nothing here flips it for him (review, 5.9.2026). nextstep's 'quote-out'
+    // asks the same thing where it is not muted (this card yields to it), and
+    // "עוד לא שלחתי" there is an answer — not asked again; the plain "send it"
+    // card below is what he then needs.
+    const notYet = !!(proj.nextStepOff && proj.nextStepOff['quote-out']);
+    if (st && st.outAt > 0 && !notYet) {
+        const when = formatHebrewDate(new Date(st.outAt).toISOString());
+        return _guideCard(`ההצעה יצאה ב-${when} (PDF או קישור). שלחת אותה ללקוח?`,
+            `<button type="button" class="btn btn-accent btn-small" onclick="guideMarkSent()">שלחתי ללקוח</button>`
+            + `<button type="button" class="btn btn-whatsapp btn-small" onclick="shareWhatsApp()">📲 שלח בוואטסאפ</button>`);
     }
     return _guideCard('ההצעה מוכנה. שלח ללקוח.',
         `<button type="button" class="btn btn-whatsapp btn-small" onclick="shareWhatsApp()">📲 שלח בוואטסאפ</button>`
@@ -2201,10 +2256,16 @@ function _guideCreateCardHtml(proj) {
 }
 
 // The stopping point. Every sentence here is checked against the code:
+//   * it is only shown while the ball IS with the customer: status טיוטה or
+//     נשלח, not approved, not closed. A job he already marked בוצע or שולם,
+//     or one the customer approved by link, gets the fact instead of the
+//     wait (review, 5.9.2026).
 //   * the /q/ link: checkQuoteApproval (market.js) asks the server when the
-//     project is next OPENED and stamps approvedAt — the list then shows
-//     "אושרה על ידי הלקוח". It does not move the status and it does not push
-//     a notification, so the card says exactly that much.
+//     project is next OPENED and stamps approvedAt — the list then shows the
+//     badge approvedBadgeHtml paints ("הלקוח אישר"). It does not move the
+//     status and it does not push a notification, so the card says exactly
+//     that much — and only when the send that happened carried a live link
+//     (guide.sentLink, stamped by guideQuoteSent).
 //   * the follow-up: getDueFollowups counts a job in status 'נשלח' for
 //     FOLLOWUP_AFTER_DAYS days into the bell (renderReminderBell). That is the
 //     only reminder this app has, and it is in-app: no SMS, no push, no mail.
@@ -2214,17 +2275,33 @@ function _guideCreateCardHtml(proj) {
 //   * without a link, the customer's yes arrives by phone, and the next
 //     move is his: mark it בוצע on the money board (pipelineAdvance).
 function _guideSentCardHtml(proj, st, expanded) {
+    const status = proj.status || 'טיוטה';
+    // Finished (הושלם / שולם / closed): the road's three ticks already say it.
+    if (proj.closedAs || (status !== 'טיוטה' && status !== 'נשלח')) return '';
+    if (proj.approvedAt) {
+        const ok = formatHebrewDate(new Date(Number(proj.approvedAt) || proj.approvedAt).toISOString());
+        return `<div class="gc-row gc-folded"><p class="gc-text"><i class="fa-solid fa-check" aria-hidden="true"></i> ${escapeHtml(`הלקוח אישר ב-${ok} — סמן את העבודה "בוצע" בלוח הכסף.`)}</p>`
+            + `<button type="button" class="gc-more" onclick="switchTab('money')">ללוח הכסף</button></div>`;
+    }
     const when = st.sentAt ? formatHebrewDate(new Date(st.sentAt).toISOString()) : '';
-    const line = `נשלח ב-${when} · ממתין ללקוח`;
+    const line = `נשלח${when ? ' ב-' + when : ''} · ממתין ללקוח`;
     if (!expanded) {
         return `<div class="gc-row gc-folded"><p class="gc-text"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> ${escapeHtml(line)}</p>`
             + `<button type="button" class="gc-more" onclick="expandGuideSentCard()">מה עכשיו?</button></div>`;
     }
     const days = typeof FOLLOWUP_AFTER_DAYS === 'number' ? FOLLOWUP_AFTER_DAYS : 3;
-    const sentStatus = (proj.status || '') === 'נשלח';
+    const sentStatus = status === 'נשלח';
+    const g = proj.guide || {};
+    // Did the customer get a link he can approve with? The send stamps it;
+    // an older job is judged by whether its stored link still matches the
+    // quote (currentShareLink) — after an edit the customer holds a stale one.
+    let hasLink = typeof g.sentLink === 'boolean' ? g.sentLink : false;
+    if (typeof g.sentLink !== 'boolean' && typeof currentShareLink === 'function') {
+        try { hasLink = !!currentShareLink(proj); } catch (e) { hasLink = false; }
+    }
     const next = [];
-    if (proj.shareLink) {
-        next.push('כשהלקוח יאשר בקישור, בפעם הבאה שתפתח את העבודה היא תסומן "אושרה על ידי הלקוח".');
+    if (hasLink) {
+        next.push('כשהלקוח יאשר בקישור, בפעם הבאה שתפתח את העבודה היא תסומן ברשימה "הלקוח אישר".');
     } else {
         // The board's columns after בוצע are חשבונית and תשלום — it tracks them
         // for every plan; ISSUING the invoice is Business-only (invoicingAllowed),
@@ -2271,8 +2348,19 @@ function guideContinueToQuote() {
     const proj = guideActiveProject();
     if (!proj) return;
     guideMarkDone(proj, 2);
+    // The table's numbers travel with him. ptToQuote is the one path that
+    // moves the table's money into the quote (and it goToDraft()s itself);
+    // a plain tab switch left a 13,000 ₪ table next to a 0 ₪ quote. Only
+    // when the quote is still empty — what he already wrote there is his.
     let staged = true;
     try { staged = STAGE_ORDER[getProjectStage(proj)] >= 1; } catch (e) { staged = false; }
+    const q = proj.quoteData || {};
+    const quoteHasMoney = Number(q.basePrice) > 0 || (q.items || []).some((i) => Number(i && i.price) > 0);
+    if (staged && !quoteHasMoney && typeof ptToQuote === 'function' && typeof quoteItemsFromTable === 'function') {
+        let rows = [];
+        try { rows = quoteItemsFromTable(proj) || []; } catch (e) { rows = []; }
+        if (rows.length) { ptToQuote(); return; }
+    }
     if (staged && typeof goToDraft === 'function') goToDraft(); else switchTab('create');
 }
 
@@ -2301,8 +2389,16 @@ function guideCanAutoAdvance(proj) {
 
 function guideOnPriced(proj) {
     if (!proj || !isJob(proj)) return;
-    const wasNew = guideMarkDone(proj, 1);
+    guideMarkDone(proj, 1);
     try { renderCtxCrumb(); renderGuideCards(); } catch (e) {}
+    // An answer in prose that put nothing on the table is not a reason to
+    // walk him to the table: the step-1 card asks for the numbers instead,
+    // and the walk waits for the answer that brings them (guide.walked is
+    // the "first time" — not the tick, which a prose answer earns too).
+    if (!guideHasNumbers(proj)) return;
+    const g = ensureGuide(proj);
+    const wasNew = !g.walked;
+    if (wasNew) { g.walked = true; saveProjects(); }
     if (!wasNew || !guideCanAutoAdvance(proj)) return;
     clearTimeout(_guideAdvanceTimer);
     _guideAdvanceTimer = setTimeout(() => {
@@ -2312,19 +2408,25 @@ function guideOnPriced(proj) {
     }, 1800);
 }
 
-// The quote left — WhatsApp, the customer link, or the PDF. Called beside
-// markQuoteOut on each of those paths. The road is complete; the status moves
-// to 'נשלח' by itself when it was still a draft, because that is the status
-// every waiting-list and follow-up rule in the app hangs off, and a quote that
-// left while its status said "טיוטה" got no reminder and no place on the
-// waiting rail. A status he already moved further along is never pulled back.
-function guideQuoteSent() {
+// The quote was SENT — the WhatsApp text or the share sheet went out
+// (shareWhatsApp), or he tapped "שלחתי ללקוח" (guideMarkSent). The road is
+// complete; the status moves to 'נשלח' by itself when it was still a draft,
+// because that is the status every waiting-list and follow-up rule in the app
+// hangs off, and a quote that left while its status said "טיוטה" got no
+// reminder and no place on the waiting rail. A status he already moved
+// further along is never pulled back. `link` says whether the customer got a
+// /q/ link to approve with — the after-send card's first sentence hangs on it.
+// A PDF download or a link that was only copied is NOT this: that is
+// guideQuoteOut, which records nothing and only repaints (review, 5.9.2026 —
+// the follow-up clock used to start on a PDF he printed to read at home).
+function guideQuoteSent(opts) {
     const proj = guideActiveProject();
     if (!proj) return;
     const g = ensureGuide(proj);
     g.done = [true, true, true];
     g.step = 3;
-    g.sentAt = Date.now();
+    if (!(Number(g.sentAt) > 0)) g.sentAt = Date.now();   // the first send is the date; a re-send does not move it
+    if (opts && typeof opts.link === 'boolean') g.sentLink = opts.link;
     if ((proj.status || 'טיוטה') === 'טיוטה') {
         proj.status = 'נשלח';
         proj.statusChangedAt = Date.now();
@@ -2334,6 +2436,27 @@ function guideQuoteSent() {
     try { filterProjectsList(); } catch (e) {}
     try { updateActiveProjectBanner(proj); } catch (e) {}
     renderGuideCards();
+}
+
+// The quote left the machine without being sent: a PDF came down, or a link
+// was made and copied. markQuoteOut has already stamped quoteOutAt; nothing
+// else is recorded, and the step-3 card now asks him whether it reached the
+// customer. Only a repaint.
+function guideQuoteOut() {
+    try { renderCtxCrumb(); } catch (e) {}
+    renderGuideCards();
+}
+
+// His answer to that question. Whether the customer holds a link is judged
+// by the stored one still matching the quote — the same rule the WhatsApp
+// text uses to decide whether to include it.
+function guideMarkSent() {
+    const proj = guideActiveProject();
+    if (!proj) return;
+    let link = false;
+    if (typeof currentShareLink === 'function') { try { link = !!currentShareLink(proj); } catch (e) { link = false; } }
+    guideQuoteSent({ link });
+    showToast('סומן "נשלח" · עכשיו הכדור אצל הלקוח');
 }
 
 // ── The switch ──────────────────────────────────────────────────────────────
@@ -4065,7 +4188,9 @@ function coachSay(id, delay) {
 // — no migration, and an old backup restored tomorrow still lands correctly.
 function isAsk(p) { return !!p && p.kind === 'ask'; }
 function isJob(p) { return !!p && p.kind !== 'ask'; }
-function countJobs() { return projectsList.filter(isJob).length; }
+// The sample is a demo of the road, not a slot on the plan: a guest (cap 1)
+// who loaded it could not open his own first job (review, 5.9.2026).
+function countJobs() { return projectsList.filter((p) => isJob(p) && !isSampleProject(p)).length; }
 // Newest first, conversations and jobs together: this is the Claude-style list,
 // and there the sidebar does not care what a thread later turned into.
 function allConversations() {
@@ -8670,7 +8795,9 @@ async function shareQuoteLink() {
         proj.shareFingerprint = quoteShareFingerprint(q);
         markQuoteOut();
         saveProjects();
-        try { guideQuoteSent(); } catch (e) {}
+        // Copied, not sent: the guide asks him on the quote screen whether it
+        // reached the customer, and his tap is what moves the status.
+        try { guideQuoteOut(); } catch (e) {}
         try {
             await navigator.clipboard.writeText(link);
             showToast('הקישור הועתק · שלח ללקוח בוואטסאפ');
@@ -9210,7 +9337,7 @@ async function downloadPDF() {
         showToast('מנוע ה-PDF לא נטען, נפתח חלון הדפסה (בחר "שמירה כ-PDF").', 'error');
         saveToHistory(false);
         markQuoteOut();
-        try { guideQuoteSent(); } catch (e) {}
+        try { guideQuoteOut(); } catch (e) {}   // printed, not sent
         setTimeout(() => window.print(), 300);
         return;
     }
@@ -9248,7 +9375,7 @@ async function downloadPDF() {
             showToast('קובץ PDF הורד בהצלחה');
             saveToHistory(false);
             markQuoteOut();
-            try { guideQuoteSent(); } catch (e) {}
+            try { guideQuoteOut(); } catch (e) {}   // downloaded, not sent
             recordQuoteStat(); // anonymous labor-price benchmark (silent)
         })
         .catch(err => {
@@ -9445,7 +9572,7 @@ async function shareWhatsApp() {
                     });
                     markQuoteOut();
                     saveToHistory(false);
-                    try { guideQuoteSent(); } catch (e) {}
+                    try { guideQuoteSent({ link: false }); } catch (e) {}   // the file went, the text carries no link
                     return;
                 } catch (e) {
                     // The share sheet was dismissed: nothing else should open.
@@ -9460,7 +9587,7 @@ async function shareWhatsApp() {
     const encodedMsg = encodeURIComponent(whatsappShareText(lines, shareLink));
     window.open(`https://api.whatsapp.com/send?text=${encodedMsg}`, '_blank', 'noopener');
     markQuoteOut();
-    try { guideQuoteSent(); } catch (e) {}
+    try { guideQuoteSent({ link: !!shareLink }); } catch (e) {}
 }
 
 function saveToHistory(showToastFlag = true) {

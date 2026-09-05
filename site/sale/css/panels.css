@@ -6455,6 +6455,19 @@ body.guide-step1-card .chat-suggestions { display: none !important; }   /* rende
     .guide-card { margin-inline: var(--sp-2); padding: var(--sp-2) var(--sp-3); }
     #panel-wizard > .guide-card { margin-block-end: var(--sp-2); }
 }
+/* Under 360px (iPhone SE 1, small Androids) the row is ~28px short of the
+   three circles and the road, being the only flexible child, was the one to
+   collapse — one squashed disc, the current step clipped away. Here the road
+   never shrinks; what gives is the anchor's arrow (its word stays — the word
+   is the point) and the 🧭 switch, which the settings row still mirrors. */
+@media (max-width: 359px) {
+    .ctx-bar .ctx-road { flex: 0 0 auto; min-width: 0; }
+    .road-n { width: 18px; height: 18px; font-size: 10px; }
+    .road-sep { width: 4px; }
+    .ctx-bar .ctx-works svg { display: none; }
+    .ctx-bar .ctx-works { padding: 0 var(--sp-2); }
+    .ctx-bar .ctx-road:not([hidden]) ~ .ctx-guide { display: none; }
+}
 
 /* ---- Home: the resume card and the pipeline meter (Wave C) --------------- */
 /* One thing lit: the job he was in the middle of, one sentence, one button.

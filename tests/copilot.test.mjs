@@ -132,9 +132,22 @@ test('step math: a later step done implies the earlier ones, and the lit step is
     assert.deepEqual([...st.done], [true, true, true], 'a quote that left was priced and confirmed, whatever the flags');
     assert.equal(st.step, 3, 'the road ends at 3; there is no step 4');
 
+    // Review, 5.9.2026: quoteOutAt is stamped on a PDF download and on a
+    // copied link — neither is a send. A PDF printed to read at home must not
+    // tick "הצעה ושליחה", start the follow-up clock, or say "ממתין ללקוח".
     st = guideStepState(job({ quoteOutAt: 1700000000000 }));
-    assert.equal(st.done[2], true, "the app's own quoteOutAt stamp counts as sent");
-    assert.equal(st.sentAt, 1700000000000);
+    assert.equal(st.done[2], false, 'quoteOutAt alone (a download, a copied link) is not a send');
+    assert.deepEqual([...st.done], [true, true, false], 'but a quote that left was built: 1 and 2 are behind him');
+    assert.equal(st.step, 3, 'and the road stands on 3, where the question "שלחת?" is asked');
+    assert.equal(st.outAt, 1700000000000, 'the date the quote left is exposed for that question');
+    assert.equal(st.sentAt, 0);
+
+    st = guideStepState(job({ status: 'נשלח', statusChangedAt: 1700000000000 }));
+    assert.deepEqual([...st.done], [true, true, true], 'a status he moved past טיוטה is a send, whatever the stamps');
+    assert.equal(st.sentAt, 1700000000000, 'dated by the status change');
+    st = guideStepState(job({ status: 'שולם', quoteOutAt: 5 }));
+    assert.equal(st.done[2], true, 'a paid job was sent');
+    assert.equal(st.sentAt, 5, 'falls back to quoteOutAt for a date');
 
     assert.doesNotThrow(() => guideStepState(null), 'a missing project is not a crash');
     assert.doesNotThrow(() => guideStepState(job({ guide: 'garbage', materials: 'nope' })));
@@ -221,6 +234,62 @@ test('step 2 button marks step 2 done and walks to the quote', () => {
     assert.match(fnBody('switchTab'), /if \(tabId === 'create'\) \{\s*const gp = guideActiveProject\(\);\s*if \(gp && guideStepState\(gp\)\.done\[0\]\) guideMarkDone\(gp, 2\);/);
 });
 
+test('step 3 with money on the table and none in the quote says "build it from the table" — whatever nextstep.js is doing', () => {
+    // Review, 5.9.2026: the card sent a priced job back to step 1 ("עוד אין
+    // מחיר"), whose card sent it forward again — a loop. nextstep's
+    // 'draft-empty' is muted after two quotes and needs proj.stage === 'draft',
+    // which the road's own door never sets, so the guide says it itself.
+    const proj = job({ materials: [{ name: 'כבל', checked: true }] });
+    const mk = (extra) => loadGuide(Object.assign({
+        activeProjectId: 'p1', projectsList: [proj],
+        pricingTotals: () => ({ total: 13680 }),
+        document: fakeDoc(['ctx-road', 'ctx-guide', 'guide-card-wizard', 'guide-card-pricing', 'guide-card-create'],
+            { query: (sel) => sel === '.content-panel.active' ? { id: 'panel-create' } : null }),
+    }, extra));
+    const ctx = mk({ nextStepFor: () => null });                  // muted, or the stage never reached 'draft'
+    const slot = ctx.document.els['guide-card-create'];
+    ctx.renderGuideCards();
+    assert.equal(slot.hidden, false);
+    assert.ok(slot.innerHTML.includes('בטבלת התמחור יש 13,680 ₪'), 'the money is named');
+    assert.match(slot.innerHTML, /onclick="ptToQuote\(\)"/, 'and the one button carries it over');
+    assert.ok(!slot.innerHTML.includes('חזור לתיאור העבודה'), 'no loop back to step 1');
+    // nextstep already saying it on this screen: the guide yields, one card.
+    const busy = mk({ nextStepFor: () => ({ id: 'draft-empty', home: 'draft' }) });
+    busy.renderGuideCards();
+    assert.equal(busy.document.els['guide-card-create'].hidden, true);
+    // Nothing priced anywhere: the honest step is still "go get a price".
+    const bare = mk({ pricingTotals: () => ({ total: 0 }), nextStepFor: () => null, projectsList: [job({})] });
+    bare.renderGuideCards();
+    assert.ok(bare.document.els['guide-card-create'].innerHTML.includes('עוד אין מחיר בהצעה'));
+    // And step 2's button takes the table's rows with it when the quote is empty.
+    const cont = fnBody('guideContinueToQuote');
+    assert.match(cont, /if \(rows\.length\) \{ ptToQuote\(\); return; \}/, 'step 2 → ptToQuote when there are rows and the quote is empty');
+    assert.match(cont, /quoteHasMoney/, 'what he already wrote in the quote is his');
+});
+
+test('the sample project is not a slot on the plan', () => {
+    // Review, 5.9.2026: a guest (cap 1) who loaded the sample could not open
+    // his own first job — "פרויקט חדש" opened the upgrade modal.
+    assert.match(fnBody('countJobs'), /isJob\(p\) && !isSampleProject\(p\)/);
+});
+
+test('the "describe the job" card goes quiet the moment he speaks', () => {
+    // Review, 5.9.2026: the card and its cloned chips stayed for the whole
+    // planning conversation; a chip click sent a second job into the thread.
+    const send = fnBody('sendChatMessage', chatJs);
+    const plan = send.slice(send.indexOf("activeChatMode === 'plan'"));
+    assert.match(plan, /renderSpecCard\(activeProject\);\s*\n(?:\s*\/\/[^\n]*\n)*\s*try \{ renderGuideCards\(\); \} catch \(e\) \{\}/, 'plan branch re-renders the card after his turn');
+    assert.match(send, /activeProject\.chatHistory\.push\(userMsg\);[\s\S]*?try \{ renderGuideCards\(\); \} catch \(e\) \{\}[\s\S]*?await runPricingAgent/, 'price branch too');
+});
+
+test('under 360px the road keeps its three circles', () => {
+    const tiny = css.slice(css.indexOf('@media (max-width: 359px) {'));
+    assert.ok(tiny.length > 0, 'a sub-360 rule exists');
+    assert.match(tiny, /\.ctx-bar \.ctx-road \{ flex: 0 0 auto;/, 'the road no longer shrinks');
+    assert.match(tiny, /\.ctx-bar \.ctx-works svg \{ display: none; \}/, 'the arrow gives way, the word stays');
+    assert.match(tiny, /\.ctx-road:not\(\[hidden\]\) ~ \.ctx-guide \{ display: none; \}/, 'the switch gives way (settings mirror it)');
+});
+
 // ── 3. Auto-advance ─────────────────────────────────────────────────────────
 test('the pricing answer hands the project to the guide from the one place it lands', () => {
     const agent = fnBody('runPricingAgent', chatJs);
@@ -257,7 +326,7 @@ test('auto-advance is gated on the guide switch, the open tab, and an empty, idl
 });
 
 test('guideOnPriced marks step 1 once, and a second answer does not walk him again', () => {
-    const proj = job({});
+    const proj = job({ materials: [{ name: 'כבל', checked: true, price: 10, qty: 1 }] });
     const doc = fakeDoc(['chat-user-input'], { query: (sel) => sel === '#panel-wizard.active' ? {} : null });
     const ctx = loadGuide({ activeProjectId: 'p1', projectsList: [proj], document: doc,
         renderCtxCrumb() {}, setTimeout: (fn) => { ctx.timerFn = fn; return 1; } });
@@ -273,15 +342,78 @@ test('guideOnPriced marks step 1 once, and a second answer does not walk him aga
     assert.equal(ctx.timerFn, null, 'a question has no road');
 });
 
+test('an answer in prose does not walk him to an empty table; the answer that brings numbers does', () => {
+    // Review, 5.9.2026: applyMaterialsFromResponse leaves the table empty when
+    // the reply carries no JSON, and the walk landed him on "עין מהירה על
+    // החומרים" over nothing. nextstep's own 'price-empty' card cannot fire on
+    // that path (the only user turn after priceThisProject is the handoff).
+    const proj = job({ chatHistory: [{ role: 'model' }, { role: 'user', content: 'x' }, { role: 'model', content: 'בערך 3000 ₪' }] });
+    const doc = fakeDoc(['chat-user-input', 'ctx-road', 'ctx-guide', 'guide-card-wizard', 'guide-card-pricing', 'guide-card-create'],
+        { query: (sel) => sel === '#panel-wizard.active' ? {} : sel === '.content-panel.active' ? { id: 'panel-wizard' } : null });
+    const ctx = loadGuide({ activeProjectId: 'p1', projectsList: [proj], document: doc,
+        renderCtxCrumb() {}, setTimeout: (fn) => { ctx.timerFn = fn; return 1; } });
+    ctx.guideOnPriced(proj);
+    assert.equal(proj.guide.done[0], true, 'the agent answered: step 1 is ticked');
+    assert.equal(ctx.timerFn, undefined, 'but nothing to look at on the table, so no walk');
+    const card = ctx.document.els['guide-card-wizard'];
+    assert.equal(card.hidden, false);
+    assert.ok(card.innerHTML.includes('התמחור לא החזיר מספרים'), 'the card asks for the numbers instead');
+    assert.match(card.innerHTML, /onclick="sendSuggestedChatPrompt\('פרט את התמחור:/, 'with the same request nextstep offers');
+    assert.ok(!card.innerHTML.includes('התמחור התקבל'), 'and does not call an empty table "received"');
+    // The detailed answer lands with rows: this is the first real pricing, and the walk happens now.
+    proj.materials = [{ name: 'כבל', checked: true, price: 10, qty: 1 }];
+    proj.chatHistory.push({ role: 'user', content: 'פרט' }, { role: 'model', content: '{...}' });
+    ctx.guideOnPriced(proj);
+    assert.equal(typeof ctx.timerFn, 'function', 'the answer with numbers arms the walk');
+    ctx.renderGuideCards();
+    assert.ok(card.innerHTML.includes('התמחור התקבל'), 'and the card is the door to step 2');
+});
+
 // ── 4. The stopping point ───────────────────────────────────────────────────
-test('the after-send hook is called from all three send paths, beside markQuoteOut', () => {
-    for (const fn of ['shareWhatsApp', 'shareQuoteLink', 'downloadPDF']) {
+test('only WhatsApp is a send; a download or a copied link only repaints, and asks', () => {
+    // Review, 5.9.2026: guideQuoteSent used to fire on downloadPDF and on the
+    // link's clipboard write — "ההצעה נשלחה" over a toast that said "שלח
+    // ללקוח", status flipped, follow-up clock running on a printed draft.
+    const wa = fnBody('shareWhatsApp');
+    const outs = (wa.match(/markQuoteOut\(\);/g) || []).length;
+    const sent = (wa.match(/try \{ guideQuoteSent\(\{ link: [^}]+\}\); \} catch \(e\) \{\}/g) || []).length;
+    assert.ok(outs > 0, 'shareWhatsApp stamps quoteOutAt');
+    assert.equal(sent, outs, `shareWhatsApp: every markQuoteOut has the send hook beside it, with the link flag (${sent}/${outs})`);
+    assert.match(wa, /guideQuoteSent\(\{ link: false \}\)/, 'the file share carries no link in its text');
+    assert.match(wa, /guideQuoteSent\(\{ link: !!shareLink \}\)/, 'the text share carries the link only when currentShareLink still matches');
+    for (const fn of ['shareQuoteLink', 'downloadPDF']) {
         const body = fnBody(fn);
-        const outs = (body.match(/markQuoteOut\(\);/g) || []).length;
-        const hooks = (body.match(/try \{ guideQuoteSent\(\); \} catch \(e\) \{\}/g) || []).length;
-        assert.ok(outs > 0, `${fn} stamps quoteOutAt`);
-        assert.equal(hooks, outs, `${fn}: every markQuoteOut has the guide hook beside it (${hooks}/${outs})`);
+        const o = (body.match(/markQuoteOut\(\);/g) || []).length;
+        const h = (body.match(/try \{ guideQuoteOut\(\); \} catch \(e\) \{\}/g) || []).length;
+        assert.ok(o > 0, `${fn} stamps quoteOutAt`);
+        assert.equal(h, o, `${fn}: every markQuoteOut repaints the guide (${h}/${o})`);
+        assert.ok(!body.includes('guideQuoteSent'), `${fn} is not a send`);
     }
+    // The question, on the quote screen, and his answer.
+    const proj = job({ quoteOutAt: Date.UTC(2026, 8, 4), quoteData: { basePrice: 1200 } });
+    const ctx = loadGuide({
+        activeProjectId: 'p1', projectsList: [proj],
+        document: fakeDoc(['ctx-road', 'ctx-guide', 'guide-card-wizard', 'guide-card-pricing', 'guide-card-create'],
+            { query: (sel) => sel === '.content-panel.active' ? { id: 'panel-create' } : null }),
+    });
+    const slot = ctx.document.els['guide-card-create'];
+    ctx.renderGuideCards();
+    assert.equal(slot.hidden, false);
+    assert.ok(slot.innerHTML.includes('ההצעה יצאה ב-2026-09-04'), 'the fact: it left, and when');
+    assert.ok(slot.innerHTML.includes('שלחת אותה ללקוח?'), 'the question');
+    assert.ok(!slot.innerHTML.includes('ההצעה נשלחה'), 'no claim it was sent');
+    assert.match(slot.innerHTML, /onclick="guideMarkSent\(\)">שלחתי ללקוח</, 'his answer is one tap');
+    assert.match(slot.innerHTML, /onclick="shareWhatsApp\(\)"/, 'or the real send');
+    assert.equal(proj.status, 'טיוטה', 'nothing flipped the status for him');
+    ctx.guideMarkSent();
+    assert.equal(proj.status, 'נשלח');
+    assert.ok(proj.guide.sentAt > 0);
+    assert.equal(proj.guide.sentLink, false, 'no link on the project: the card will not promise link approval');
+    assert.ok(slot.innerHTML.includes('ההצעה נשלחה. עכשיו הכדור אצל הלקוח.'), 'now it is sent');
+    const first = proj.guide.sentAt;
+    ctx.guideQuoteSent({ link: true });
+    assert.equal(proj.guide.sentAt, first, 'a re-send does not move the date');
+    assert.equal(proj.guide.sentLink, true, 'but records that this time a link went');
 });
 
 test('guideQuoteSent completes the road, stamps sentAt, and moves a draft to נשלח without pulling a later status back', () => {
@@ -327,7 +459,11 @@ test('the after-send card says only what the code does — checked both ways aga
     // The /q/ link: checkQuoteApproval stamps approvedAt when the project is opened,
     // and the list shows the badge. It does NOT move the status or the money board.
     assert.match(app, /function checkQuoteApproval\(proj\)/);
-    assert.ok(app.includes('אושרה על ידי הלקוח'), 'the badge the card names exists');
+    assert.ok(fnBody('approvedBadgeHtml').includes('הלקוח אישר'), 'the badge the card names exists');
+    assert.ok(texts.includes('"הלקוח אישר"'), 'the card quotes the badge as it really reads');
+    assert.ok(!texts.includes('אושרה על ידי הלקוח'), 'not a label that no longer exists');
+    assert.ok(!texts.includes('🎉'), 'no confetti on the card');
+    assert.match(cardFn, /g\.sentLink/, 'link approval is promised only when the send carried a link');
     assert.ok(texts.includes('בפעם הבאה שתפתח את העבודה'), 'approval is discovered on open, and the card says so');
     assert.ok(!texts.includes('תעבור ללוח הכסף'), 'approval does not move the job to the money board, so the card must not say it does');
     // Without a link, the yes arrives by phone and the next move is his.
@@ -355,6 +491,21 @@ test('re-opening a sent project shows the folded line, and "מה עכשיו?" un
     assert.ok(slot.innerHTML.includes('ההצעה נשלחה. עכשיו הכדור אצל הלקוח.'));
     assert.ok(slot.innerHTML.includes('יספור אותה'), 'free plan wording');
     assert.ok(slot.innerHTML.includes('נתראה כשהוא עונה.'));
+    // The customer approved by link: the wait is over, and the card says the next move.
+    proj.approvedAt = Date.UTC(2026, 8, 6);
+    ctx.renderGuideCards();
+    assert.ok(slot.innerHTML.includes('הלקוח אישר ב-2026-09-06'), 'an approved job is not "ממתין ללקוח"');
+    assert.ok(slot.innerHTML.replace(/&quot;/g, '"').includes('סמן את העבודה "בוצע"'));
+    assert.ok(!slot.innerHTML.includes('ממתין ללקוח'));
+    delete proj.approvedAt;
+    // Marked בוצע / paid / closed: the road's ticks already say it; no wait card.
+    for (const done of [{ status: 'הושלם' }, { status: 'שולם' }, { status: 'נשלח', closedAs: 'lost' }]) {
+        Object.assign(proj, done);
+        ctx.renderGuideCards();
+        assert.equal(slot.hidden, true, `${JSON.stringify(done)}: no "ממתין ללקוח" on a finished job`);
+        delete proj.closedAs;
+    }
+    proj.status = 'נשלח';
     // Guidance off still shows this line: it is a fact about the job, not advice.
     const off = mk();
     off.appState.settings.guideOn = false;

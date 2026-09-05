@@ -1941,6 +1941,9 @@ async function sendChatMessage() {
         saveProjects();
         renderChatHistory(activeProject);
         renderSpecCard(activeProject);
+        // He spoke: the guide's "describe the job" card (and its chips) goes
+        // quiet now, not when the pricing answer lands three turns later.
+        try { renderGuideCards(); } catch (e) {}
         inputArea.value = '';
         const bar = document.getElementById('plan-action-bar');
         if (bar) bar.style.display = 'none';
@@ -1960,6 +1963,7 @@ async function sendChatMessage() {
 
     // Render and scroll to bottom
     renderChatHistory(activeProject);
+    try { renderGuideCards(); } catch (e) {}
     inputArea.value = '';
 
     await runPricingAgent(activeProject, userText.length);
