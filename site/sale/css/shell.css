@@ -121,6 +121,18 @@ body:not(.in-project) .proj-tab { display: none !important; }
   font: 700 10px/16px var(--font-ui); text-align: center;
 }
 
+/* A tab that was just born (the growing rail, app.js syncRailStages): a dot
+   until the first visit, and a short arrival. Buttons start with the hidden
+   attribute — panels.css [hidden]{display:none!important} keeps them out of
+   both the column and the phone row — and are un-hidden from the data. */
+.nav-btn.rail-new::after {
+  content: ''; position: absolute; inset-block-start: 6px; inset-inline-end: 14px;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+}
+@keyframes rail-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.nav-btn.rail-in { animation: rail-in .24s ease-out; }
+@media (prefers-reduced-motion: reduce) { .nav-btn.rail-in { animation: none; } }
+
 /* rail footer: theme, user, logout */
 .sidebar-footer {
   display: flex; flex-direction: column; align-items: center; gap: var(--sp-2);
@@ -193,11 +205,15 @@ body.in-project.in-project-stage #project-banner { display: flex; }
     width: auto; height: 3px;
   }
   .step-num { display: none; }
-  /* only the field-core tabs + "more" live in the bar */
-  /* Four destinations fit a phone's bottom bar, which is exactly why the
-     drawer could go. Project-scoped tabs still appear only inside a project
-     (.proj-tab is toggled by the app), so the bar never holds more than five. */
+  /* The bar never holds more than six — at 320px that is ~53px each, the
+     floor for a 10px label. Outside a job: בית · עבודות · לקוחות · avatar,
+     then כסף once it is born, then תזרים for a payer (the growing rail —
+     the same hidden attribute as on desktop). */
   .nav-btn.mobile-hide { display: none; }
+  /* Inside a job the three steps REPLACE the destinations: בית · עבודות · 1 ·
+     2 · 3 · avatar. בית stays — the resume card there is the co-pilot's way
+     back. Tapping עבודות closes the job and the destinations return. */
+  body.in-project .nav-menu .nav-btn:not(.mobile-core):not(#tab-home) { display: none; }
   /* The account lives in the bar as your photo alone — the name and role are
      in the menu it opens, and a phone bar has no room to say them twice. */
   .sidebar-footer { display: flex; align-items: center; padding: 0 var(--sp-1); }

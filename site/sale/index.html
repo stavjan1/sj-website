@@ -110,13 +110,18 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     <span>לקוחות</span>
                 </button>
-                <button class="nav-btn" id="tab-money" onclick="switchTab('money')">
+                <!-- The growing rail (Stav, 5.9.2026): a first-timer sees only the
+                     places he can use today. כסף is born the moment his first
+                     quote leaves the machine; תזרים exists only for the plans that
+                     own it. Both start hidden and syncRailStages() (app.js)
+                     un-hides them from the data before the first paint. -->
+                <button class="nav-btn" id="tab-money" onclick="switchTab('money')" hidden>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/><circle cx="17.5" cy="14.5" r="1.5"/></svg>
                     <span>כסף</span>
                 </button>
-                <button class="nav-btn" id="tab-pro" onclick="switchTab('pro')" title="PRO — תזרים מזומנים">
+                <button class="nav-btn" id="tab-pro" onclick="switchTab('pro')" title="PRO — תזרים מזומנים" hidden>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></svg>
-                    <span>PRO</span>
+                    <span>תזרים</span>
                 </button>
                 <!-- מאגר מחירים and הגדרות moved into the account menu.
                      Stav, 30/08: "את הגדרות ומאגר מחירים הייתי מכניס תחת הרשימה
@@ -371,7 +376,7 @@
 
                 <div class="subtabs" role="tablist" aria-label="תצוגת כסף" id="money-subtabs">
                     <button type="button" class="subtab active" data-sub="board" role="tab" aria-selected="true" onclick="setMoneyView('board')">לוח הכסף</button>
-                    <button type="button" class="subtab" data-sub="docs" role="tab" aria-selected="false" onclick="setMoneyView('docs')">חשבוניות וקבלות</button>
+                    <button type="button" class="subtab" data-sub="docs" role="tab" aria-selected="false" id="money-subtab-docs" onclick="setMoneyView('docs')">חשבוניות וקבלות</button>
                 </div>
                 <!-- The money board: every project as a card in the column that says
                      where its money is. Drag a card, or use the button on it. -->
@@ -1778,6 +1783,13 @@
                                     <label class="guide-setting-row" for="set-guide-on">
                                         <input type="checkbox" id="set-guide-on" checked onchange="setGuideOn(this.checked)">
                                         <span><b>🧭 הדרכה מלווה</b><small>בתוך עבודה: הצעד הבא בכרטיס אחד, ומעבר לשלב הבא כשהקודם נגמר. הכפתור 🧭 בראש העבודה עושה את אותו הדבר.</small></span>
+                                    </label>
+                                    <!-- The one concession to "show me everything": כסף before
+                                         the first quote. It never exposes תזרים — a locked screen
+                                         is not a place. -->
+                                    <label class="guide-setting-row" for="set-rail-all">
+                                        <input type="checkbox" id="set-rail-all" onchange="setRailAll(this.checked)">
+                                        <span><b>הצג את כל הלשוניות מההתחלה</b><small>כסף מופיע בסרגל אחרי ההצעה הראשונה; כאן אפשר להראות אותו מיד.</small></span>
                                     </label>
                                 </div>
                                 <div class="form-group">

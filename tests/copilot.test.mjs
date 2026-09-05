@@ -69,6 +69,7 @@ function loadGuide(ctx0 = {}) {
         appState: { settings: {} }, projectsList: [], activeProjectId: null,
         CTX_STEPS: { wizard: 1, pricing: 1, create: 1 },
         isJob: (p) => !!p && p.kind !== 'ask',
+        isSampleProject: (p) => !!(p && p.sample === true),
         saveProjects() { ctx.saved = (ctx.saved || 0) + 1; },
         persistSettings() { ctx.persisted = (ctx.persisted || 0) + 1; },
         switchTab(t) { ctx.switched = t; },
