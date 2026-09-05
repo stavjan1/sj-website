@@ -519,6 +519,9 @@ function applyTierGates() {
     try { syncPlanChip(); } catch (e) {}
     // Model-class pills: lock "advanced" for plans without it.
     syncModelClass();
+    // Where תזרים appears for a payer — from the sj_tier_info cache at first
+    // paint, or when the server answers. Silently: he bought it, he knows.
+    try { syncRailStages(); } catch (e) {}
 
     // Settings → "המסלול שלי" card.
     const badge = document.getElementById('tier-badge');
@@ -1315,6 +1318,9 @@ function applyDatabaseObject(cloudData) {
         localStorage.setItem('sj_app_users', JSON.stringify(localUsers));
     }
     if (cloudData.lastUpdated) localStorage.setItem(getStorageKey('sj_db_last_updated'), String(cloudData.lastUpdated));
+    // A new device starts with an empty list; the merged one may say he has
+    // been sending quotes for a year. Settings arrived wholesale too.
+    try { syncRailStages(); } catch (e) {}
 }
 
 // Debounced save, protects the free-tier KV write budget (1k/day). Multiple
@@ -1671,7 +1677,10 @@ function initUserSession() {
     }
     loadSettings();
     loadHistory();
-    loadProjects();
+    loadProjects();   // also fills invoicesList
+    // The growing rail, BEFORE the first paint: a veteran's rail is complete in
+    // the first frame — no dot, no animation, nothing to notice.
+    try { syncRailStages(); } catch (e) {}
     loadPriceCatalog();
     loadSystemCatalog(); // async, non-blocking: shared baseline prices
     loadSternPricing();
@@ -2206,7 +2215,8 @@ function _guideWizardCardHtml(proj, st) {
 // where the switch is. Pinned to the project it first appeared on, so it is
 // seen for as long as that job is open and then never again.
 function guideSentCount() {
-    return (projectsList || []).filter((p) => isJob(p) && ((p.guide && Number(p.guide.sentAt) > 0) || Number(p.quoteOutAt) > 0)).length;
+    // The demo job is not one of his five.
+    return (projectsList || []).filter((p) => isJob(p) && !isSampleProject(p) && ((p.guide && Number(p.guide.sentAt) > 0) || Number(p.quoteOutAt) > 0)).length;
 }
 function _guideOffHintHtml(proj) {
     const s = appState.settings || (appState.settings = {});
@@ -2289,9 +2299,14 @@ function _guideSentCardHtml(proj, st, expanded) {
     }
     const when = st.sentAt ? formatHebrewDate(new Date(st.sentAt).toISOString()) : '';
     const line = `נשלח${when ? ' ב-' + when : ''} · ממתין ללקוח`;
+    // The board holds this quote now, so the card has a door to it (the rail
+    // has one too; railStage says whether it exists for this account).
+    const boardOpen = typeof railStage === 'function' && railStage('money');
     if (!expanded) {
         return `<div class="gc-row gc-folded"><p class="gc-text"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> ${escapeHtml(line)}</p>`
-            + `<button type="button" class="gc-more" onclick="expandGuideSentCard()">מה עכשיו?</button></div>`;
+            + `<button type="button" class="gc-more" onclick="expandGuideSentCard()">מה עכשיו?</button>`
+            + (boardOpen ? `<button type="button" class="gc-more" onclick="switchTab('money')">ללוח הכסף</button>` : '')
+            + `</div>`;
     }
     const days = typeof FOLLOWUP_AFTER_DAYS === 'number' ? FOLLOWUP_AFTER_DAYS : 3;
     const sentStatus = status === 'נשלח';
@@ -2304,6 +2319,9 @@ function _guideSentCardHtml(proj, st, expanded) {
         try { hasLink = !!currentShareLink(proj); } catch (e) { hasLink = false; }
     }
     const next = [];
+    // First, under the headline: the rail just grew, and this is what the new
+    // tab holds. Only when the tab exists for this account.
+    if (boardOpen) next.push('מעכשיו יש "כסף" בסרגל — כל הצעה שיצאה יושבת שם עד שהיא משולמת.');
     if (hasLink) {
         next.push('כשהלקוח יאשר בקישור, בפעם הבאה שתפתח את העבודה היא תסומן ברשימה "הלקוח אישר".');
     } else {
@@ -2437,6 +2455,10 @@ function guideQuoteSent(opts) {
     }
     _guideFreshSent.add(proj.id);
     saveProjects();
+    // The moment כסף is born in the rail: the card below says where the quote
+    // went, and the rail grows to match it. (railStage lives outside this
+    // block, so it is reached by name — the guide's tests load this block alone.)
+    if (typeof railStage === 'function' && railStage('money')) railReveal('money', { announce: true });
     try { filterProjectsList(); } catch (e) {}
     try { updateActiveProjectBanner(proj); } catch (e) {}
     renderGuideCards();
@@ -2445,8 +2467,10 @@ function guideQuoteSent(opts) {
 // The quote left the machine without being sent: a PDF came down, or a link
 // was made and copied. markQuoteOut has already stamped quoteOutAt; nothing
 // else is recorded, and the step-3 card now asks him whether it reached the
-// customer. Only a repaint.
+// customer. Only a repaint — and the quiet birth of כסף: dot and phone toast,
+// no extra card line, because the card at this moment is asking one question.
 function guideQuoteOut() {
+    if (typeof railStage === 'function' && railStage('money')) railReveal('money', { announce: true });
     try { renderCtxCrumb(); } catch (e) {}
     renderGuideCards();
 }
@@ -3142,10 +3166,15 @@ function setClientsView(view) {
 // ── What ships first ────────────────────────────────────────────────────────
 //
 // Stav, 22/08: the pricing chat goes to production before the money side does.
-// Invoices, receipts and cash flow are real and working, but they are his
-// alone until they are ready for customers, so everyone else sees a waiting
-// card instead of a half-finished ledger. One switch decides it everywhere.
-function moneyEnabled() { return isAdmin(); }
+// Invoices, receipts and cash flow were his alone until ready for customers.
+// 5.9.2026, the growing rail: the BOARD is local data (every project in the
+// column that says where its money is) and opens to everyone — otherwise the
+// tab the co-pilot promises would be born onto a "בקרוב" card. Issuing
+// documents (SmartBee) is still the owner's alone. moneyEnabled() is Stav's
+// veto switch: flip it back to isAdmin() and the tab re-hides everywhere,
+// because the rail's unlock rule (railStage) reads it.
+function moneyEnabled() { return true; }
+function moneyDocsEnabled() { return isAdmin(); }
 
 function setMoneyView(view) {
     const docs = document.getElementById('money-view-docs');
@@ -3163,6 +3192,11 @@ function setMoneyView(view) {
     }
     if (soon) soon.hidden = true;
     if (subtabs) subtabs.hidden = false;
+    // The documents view is the owner's: no sub-tab, and a deep link to it
+    // lands on the board.
+    const docsTab = document.getElementById('money-subtab-docs');
+    if (docsTab) docsTab.hidden = !moneyDocsEnabled();
+    if (!moneyDocsEnabled() && view === 'docs') view = 'board';
     const onBoard = view !== 'docs';   // the board is where כסף opens
     docs.hidden = onBoard;
     if (board) board.hidden = !onBoard;
@@ -3172,6 +3206,95 @@ function setMoneyView(view) {
         b.setAttribute('aria-selected', String(on));
     });
     try { onBoard ? renderStatistics() : renderAccounting(); } catch (e) {}
+}
+
+// ── The growing rail ────────────────────────────────────────────────────────
+// The rail shows only places you can use today. כסף is born the moment the
+// first quote leaves the machine; תזרים exists only for the plans that own it.
+// Derived from the data (projectsList, tier) so phone and desktop agree, and
+// monotonic: a tab that appeared never disappears. Stav, 5.9.2026.
+const RAIL_STAGED = ['money', 'pro'];
+function _railSettings() {
+    const s = appState.settings || (appState.settings = {});
+    if (!s.railSeen || typeof s.railSeen !== 'object') s.railSeen = {};
+    return s;
+}
+// The same predicate as finance.js's hasProAccess(), which lives inside its
+// IIFE: the owner always; paying plans on their own numbers.
+function proTierActive() {
+    if (isAdmin()) return true;
+    const t = (typeof userTier !== 'undefined' && userTier && userTier.tier) || '';
+    return t === 'pro' || t === 'business';
+}
+// A real quote has left this account: sent, or out as a PDF / copied link
+// (a quote that left the machine is one the board can hold — the review-5.9
+// rule that quoteOutAt is not a "send" stays for the follow-up clock only),
+// or a status he moved past טיוטה himself. The sample job never counts.
+function moneyReached() {
+    return (projectsList || []).some((p) => isJob(p) && !isSampleProject(p)
+        && (Number(p.guide && p.guide.sentAt) > 0 || Number(p.quoteOutAt) > 0 || (p.status || 'טיוטה') !== 'טיוטה'))
+        || (invoicesList || []).length > 0;
+}
+function railStage(id) {
+    const s = _railSettings();
+    if (id === 'money') return moneyEnabled() && (isAdmin() || !!s.railAll || Number(s.railSeen.money) > 0 || moneyReached());
+    // railAll never exposes תזרים: a button that opens a locked screen is a door to a wall.
+    if (id === 'pro') return proTierActive();
+    return true;
+}
+// Un-hide one button. announce=true is the in-session moment (dot, animation,
+// phone toast); announce=false is a silent sync (init, cloud, deep link).
+function railReveal(id, opts) {
+    const btn = document.getElementById('tab-' + id);
+    if (!btn || !btn.hidden) return false;
+    btn.hidden = false;
+    const s = _railSettings();
+    if (opts && opts.announce) {
+        btn.classList.add('rail-in', 'rail-new');
+        setTimeout(() => btn.classList.remove('rail-in'), 400);
+        if (id === 'money' && window.matchMedia('(max-width: 768px)').matches) showToast('נפתח לך "כסף" בסרגל');
+    } else if (!s.railSeen[id]) {
+        s.railSeen[id] = Date.now();   // discovered at init: never show a dot for it later
+        persistSettings();
+    }
+    return true;
+}
+// First visit to a tab that was born with a dot: the dot goes, and the tab is
+// sticky from here on (railSeen keeps it even if every sent job is deleted).
+function railMarkSeen(id) {
+    const btn = document.getElementById('tab-' + id);
+    if (btn) btn.classList.remove('rail-new');
+    const s = _railSettings();
+    if (!s.railSeen[id]) { s.railSeen[id] = Date.now(); persistSettings(); }
+}
+// Never hides — monotonic by construction. Runs before the first paint
+// (initUserSession), after a cloud merge, after a status change, after the
+// tier arrives; also keeps the settings checkbox honest.
+function syncRailStages() {
+    RAIL_STAGED.forEach((id) => { if (railStage(id)) railReveal(id, { announce: false }); });
+    const rb = document.getElementById('set-rail-all');
+    if (rb) rb.checked = !!_railSettings().railAll;
+}
+function setRailAll(on) {
+    const s = _railSettings();
+    s.railAll = !!on;
+    persistSettings();
+    syncRailStages();
+}
+// The one pitch this feature adds: after the first "שולם" on a non-paying
+// account, one dismissable line on the board. × is remembered for good.
+function dismissProInvite() {
+    const s = _railSettings();
+    s.proInviteDismissed = Date.now();
+    persistSettings();
+    renderStatistics();
+}
+function proInviteHtml() {
+    const s = _railSettings();
+    if (!s.proInviteOffer || s.proInviteDismissed || proTierActive()) return '';
+    return '<div class="pipe-invite" role="note"><span>רוצה לראות את זה מול חשבון הבנק? זה בתזרים של PRO.</span>'
+        + '<button type="button" class="pipe-invite-link" onclick="openPlansDialog()">להשוואת מסלולים</button>'
+        + '<button type="button" class="pipe-invite-x" aria-label="סגור" title="סגור" onclick="dismissProInvite()">×</button></div>';
 }
 
 // How many clients are due, the number on the "שירות תקופתי" view.
@@ -3189,9 +3312,15 @@ function switchTab(tabId, opts) {
     let subView = null;
     if (tabId === 'archive') { tabId = 'clients'; subView = 'list'; }
     else if (tabId === 'checkups') { tabId = 'projects'; subView = 'maint'; }
-    else if (tabId === 'accounting') { tabId = 'money'; subView = 'docs'; }
+    else if (tabId === 'accounting') { tabId = 'money'; subView = moneyDocsEnabled() ? 'docs' : 'board'; }
     else if (tabId === 'statistics') { tabId = 'money'; subView = 'board'; }
     else if (tabId === 'finance') { tabId = 'pro'; }
+
+    // The door rule: a screen you can stand in has a door in the rail. A deep
+    // link, the back stack, the bell, the resume card — whatever brought him
+    // here, the button exists before the screen paints. Money only: PRO's
+    // button never opens a locked screen.
+    if (tabId === 'money' && railStage('money')) railReveal('money', { announce: false });
 
     // Pipeline is a view of the work list; leaving it re-marks the toggle.
     if (tabId === 'projects' || tabId === 'statistics') setTimeout(() => {
@@ -3244,7 +3373,9 @@ function switchTab(tabId, opts) {
     });
     const targetTabBtn = document.getElementById(`tab-${tabId}`);
     if (targetTabBtn) targetTabBtn.classList.add('active');
-    
+    // First visit to a tab that was born with a dot: the dot has done its job.
+    if (targetTabBtn && targetTabBtn.classList.contains('rail-new')) railMarkSeen(tabId);
+
     // Update content panels visibility
     document.querySelectorAll('.content-panel').forEach(panel => {
         panel.classList.remove('active');
@@ -4014,6 +4145,13 @@ function renderPipelineMeter() {
     if (!el) return;
     const sum = pipelineSum(projectsList);
     const nis = '₪' + Math.round(sum).toLocaleString('he-IL');
+    // Money in flight is a door to the board; a ₪0 line is plain text — a door
+    // that points at nothing must not exist.
+    const boardOpen = typeof railStage === 'function' && railStage('money');
+    if (sum > 0 && boardOpen) {
+        el.innerHTML = `<button type="button" class="home-pipeline-btn" onclick="switchTab('money')">${escapeHtml(`צבר הצעות פעילות: ${nis} ממתינות לאישור`)} ←</button>`;
+        return;
+    }
     el.textContent = sum > 0
         ? `צבר הצעות פעילות: ${nis} ממתינות לאישור`
         : 'צבר הצעות פעילות: ₪0 — שלח הצעה ראשונה';
@@ -4048,6 +4186,7 @@ function refreshApprovals() {
         .then((results) => {
             if (!results.some(Boolean)) return;
             saveProjects();
+            try { syncRailStages(); } catch (e) {}
             filterProjectsList();
         })
         .finally(() => { _approvalRefreshBusy = false; });
@@ -5458,7 +5597,7 @@ function renderStatistics() {
             else if (c.key === 'awaiting') adv = `<button class="pipe-adv" onclick="pipelineAdvance('${p.id}','paid',event)" title="התקבל תשלום: סמן שולם">שולם <i class="fa-solid fa-arrow-left"></i></button>`;
             // Paid, and no receipt issued for it yet: the next thing you owe the
             // customer is a receipt, so the card offers to produce one.
-            else if (c.key === 'paid' && !projectHasReceipt(p)) adv = `<button class="pipe-adv is-receipt" onclick="pipelineIssueReceipt('${p.id}',event)" title="הפק קבלה ללקוח"><i class="fa-solid fa-receipt"></i> צור קבלה</button>`;
+            else if (c.key === 'paid' && moneyDocsEnabled() && !projectHasReceipt(p)) adv = `<button class="pipe-adv is-receipt" onclick="pipelineIssueReceipt('${p.id}',event)" title="הפק קבלה ללקוח"><i class="fa-solid fa-receipt"></i> צור קבלה</button>`;
             const days = projectIdleDays(p);
             return `<div class="pipe-card" draggable="true" data-pid="${p.id}" data-stage="${c.key}"
                 onclick="loadProject('${p.id}')" title="פתח את הפרויקט · אפשר לגרור לעמודה אחרת">
@@ -5508,7 +5647,9 @@ function renderStatistics() {
     // Waiting longer than 30 days since the status changed = late money.
     const lateValue = cols.awaiting.filter(p => projectIdleDays(p) >= 30).reduce((s2, p) => s2 + projectAmount(p), 0);
     const heads = Array.from(document.querySelectorAll('.pipe-summary, .pipeline-summary'));
-    const headHtml = `
+    // The PRO invitation (proInviteHtml) rides above the numbers: one row,
+    // spanning the grid, until he closes it.
+    const headHtml = proInviteHtml() + `
         <div class="pipe-stat"><span class="pipe-stat-num">${totalCount}</span><span class="pipe-stat-lbl">פרויקטים</span></div>
         <div class="pipe-stat"><span class="pipe-stat-num">${nis(totalValue)}</span><span class="pipe-stat-lbl">שווי צבר כולל</span></div>
         <div class="pipe-stat"><span class="pipe-stat-num" style="color:var(--warn-text)">${nis(openValue)}</span><span class="pipe-stat-lbl">פתוח (טרם שולם)</span></div>
@@ -5537,12 +5678,20 @@ function pipelineAdvance(projectId, to, e) {
     p.awaitingPayment = target.awaiting;
     p.statusChangedAt = Date.now();
     saveProjects();
+    try { syncRailStages(); } catch (e) {}
+    // The first money that came in on a non-paying account: from here on the
+    // board carries one line about תזרים until he closes it or upgrades.
+    if (to === 'paid') {
+        const s = _railSettings();
+        if (!proTierActive() && !s.proInviteDismissed && !s.proInviteOffer) { s.proInviteOffer = true; persistSettings(); }
+    }
     renderStatistics();
     filterProjectsList();
     showToast(target.toast);
     if (to === 'executed') revealCheckupOffer(p);
-    // Money that just arrived wants a receipt — offer it on the spot.
-    if (to === 'paid' && !projectHasReceipt(p)) {
+    // Money that just arrived wants a receipt — offer it on the spot (the
+    // receipt screen is the owner's; see moneyDocsEnabled).
+    if (to === 'paid' && moneyDocsEnabled() && !projectHasReceipt(p)) {
         setTimeout(() => showToast('אפשר להפיק קבלה ללקוח מהכרטיס בלוח'), 1200);
     }
 }
@@ -6357,6 +6506,7 @@ function setProjectStatus(projectId, status, e) {
     proj.status = status;
     proj.statusChangedAt = Date.now();
     saveProjects();
+    try { syncRailStages(); } catch (e) {}   // a status past טיוטה is money the board can hold
     filterProjectsList();
     showToast(`"${proj.name}" סומן: ${status}`);
     revealCheckupOffer(proj);
