@@ -521,9 +521,11 @@ function deletePage(id) {
 function renderTabs() {
     const bar = $('tabs'); if (!bar) return;
     const chip = (id, label, extra) => `<button type="button" class="tab${tab === id ? ' on' : ''}" data-id="${id}" onclick="setTab('${id}')" ${extra || ''}>${escapeHtml(label)}</button>`;
+    // The + comes right after הכל: with many pages the strip scrolls, and a
+    // button at its far end was the one thing the phone could not reach.
     bar.innerHTML = chip('all', 'הכל')
-        + tree.pages.map((p) => chip(p.id, (p.x ? '◌ ' : '') + (p.name || 'לשונית'), `ondblclick="renamePage('${p.id}')" title="${p.x ? 'לא מוצגת בכללי · ' : ''}לחיצה כפולה לשינוי שם"`)).join('')
-        + `<button type="button" class="tab add" onclick="addPage()" title="לשונית חדשה">＋</button>`;
+        + `<button type="button" class="tab add" onclick="addPage()" title="לשונית חדשה" aria-label="לשונית חדשה">＋</button>`
+        + tree.pages.map((p) => chip(p.id, (p.x ? '◌ ' : '') + (p.name || 'לשונית'), `ondblclick="renamePage('${p.id}')" title="${p.x ? 'לא מוצגת בכללי · ' : ''}לחיצה כפולה לשינוי שם"`)).join('');
     const tools = $('tab-tools'); if (!tools) return;
     if (tab === 'all') {
         tools.innerHTML = `<button type="button" class="btn small" id="btn-linkkind" onclick="toggleLinkKind()" title="איזה קו הנקודה הכחולה מותחת">${linkKind === 'in' ? 'קו: משייך ללשונית' : 'קו: חוצה'}</button>`;

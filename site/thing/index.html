@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700&family=Rubik:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/assets/tokens.css?v=512">
+    <link rel="stylesheet" href="/assets/tokens.css?v=513">
     <link rel="manifest" id="manifest-link" href="/thing/manifest.webmanifest">
     <meta name="theme-color" content="#F7F6F3">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -213,7 +213,10 @@
             padding: 6px 10px; background: color-mix(in srgb, var(--bg) 82%, transparent);
             backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-bottom: 1px solid var(--border);
         }
-        #tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 1; }
+        /* min-width: 0 — a flex item will not shrink below its content by default, so with
+           three pages the strip pushed past the screen instead of scrolling (Stav, 5.9.2026:
+           "הלמעלה נחסם ואז אני לא מצליח להוסיף דפים"). The + sits right after הכל so it never scrolls away. */
+        #tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
         #tabs::-webkit-scrollbar { display: none; }
         .tab {
             flex: none; min-height: 32px; padding: 0 14px; border-radius: var(--r-pill); border: 1px solid var(--border-strong);
@@ -222,7 +225,7 @@
         .tab.on { background: var(--text); color: var(--bg); border-color: var(--text); }
         .tab.add { padding: 0 10px; color: var(--text-2); }
         #tab-tools { display: flex; gap: 6px; flex: none; }
-        @media (max-width: 480px) { #tabbar { top: 52px; } }
+        @media (max-width: 480px) { #tabbar { top: 52px; gap: 6px; padding: 6px 8px; } #tab-tools .btn { font-size: 11px; padding: 0 8px; } }
 
         /* Page groups in "הכל" carry their name */
         .cluster {
@@ -532,6 +535,6 @@
 
     <div class="toast" id="toast"></div>
 
-    <script src="thing.js?v=512"></script>
+    <script src="thing.js?v=513"></script>
 </body>
 </html>

@@ -6,12 +6,12 @@
 // (a deploy still arrives on the next open with signal) and from the cache
 // when the network is gone. The API is never cached — a stale tree served as
 // fresh would be worse than "לא מקוון".
-const CACHE = 'thing-shell-v6';
+const CACHE = 'thing-shell-v7';
 const SHELL = ['/thing/', '/thing/index.html', '/thing/thing.js', '/assets/tokens.css'];
 // Bare /thing/thing.js is a year-old copy at the edge (the page asks for
 // thing.js?v=NNN and the edge caches per URL), so the precache fetches the
 // versioned URL and stores it under the bare key the runtime path uses.
-const ASSET_QUERY = '?v=512';
+const ASSET_QUERY = '?v=513';
 const versioned = (u) => (/\.(js|css)$/.test(u) ? u + ASSET_QUERY : u);
 
 self.addEventListener('install', (e) => {
