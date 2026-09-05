@@ -217,18 +217,23 @@ async function addHelperItem() {
 }
 
 // ── Admin: who is a helper, and what everyone wrote ─────────────────────────
+// Two containers, two screens: the helpers themselves (add/remove) sit with
+// the users, every price they wrote sits with the prices. One fetch feeds both.
 
 async function renderAdminHelpers() {
     const body = document.getElementById('admin-helpers-body');
+    const pricesBox = document.getElementById('admin-helper-prices-body');
     if (!body || typeof isAdmin !== 'function' || !isAdmin()) return;
     body.innerHTML = '<p class="input-help">טוען…</p>';
+    if (pricesBox) pricesBox.innerHTML = '<p class="input-help">טוען…</p>';
     let data;
     try {
         const res = await adminRes('/api/helper-prices?admin=1');
         data = await res.json();
-        if (!res.ok) { body.innerHTML = '<p class="input-help">' + helperEsc((data.error && data.error.message) || 'שגיאה') + '</p>'; return; }
+        if (!res.ok) { body.innerHTML = '<p class="input-help">' + helperEsc((data.error && data.error.message) || 'שגיאה') + '</p>'; if (pricesBox) pricesBox.innerHTML = body.innerHTML; return; }
     } catch (e) {
         body.innerHTML = '<p class="input-help">לא נטען.</p>';
+        if (pricesBox) pricesBox.innerHTML = body.innerHTML;
         return;
     }
     const helpers = data.helpers || [];
@@ -236,7 +241,7 @@ async function renderAdminHelpers() {
     const items = data.items || [];
     const byId = Object.fromEntries(items.map((it) => [it.id, it]));
     const list = helpers.length
-        ? helpers.map((em) => `<li>${helperEsc(em)} <span class="input-help">· ${Object.keys(prices[em] || {}).length} מחירים</span>
+        ? helpers.map((em) => `<li>${helperEsc(em)} <span class="input-help">· ${Object.keys(prices[em] || {}).length} מחירים · מאז ההתחלה</span>
             <button type="button" class="btn btn-small btn-secondary" onclick="setHelper('${helperEsc(em)}', false)">הסר</button></li>`).join('')
         : '<li class="input-help">עדיין אין עוזרים.</li>';
     // Every price, attributed — this is the admin's view, the only place names appear.
@@ -248,17 +253,18 @@ async function renderAdminHelpers() {
     }
     rows.sort((a, b) => a.name.localeCompare(b.name, 'he') || a.em.localeCompare(b.em));
     const table = rows.length
-        ? `<table style="width:100%;font-size:var(--fs-sm);border-collapse:collapse"><thead><tr><th style="text-align:right">סעיף</th><th style="text-align:right">מי</th><th style="text-align:left">₪</th></tr></thead><tbody>`
+        ? `<p class="input-help" style="margin:0 0 8px">${rows.length} מחירים מ-${Object.keys(prices).length} עוזרים · מאז ההתחלה</p>
+          <div class="table-scroll"><table style="width:100%;font-size:var(--fs-sm);border-collapse:collapse"><thead><tr><th style="text-align:right">סעיף</th><th style="text-align:right">מי</th><th style="text-align:left">₪</th></tr></thead><tbody>`
           + rows.map((r) => `<tr><td>${helperEsc(r.name)} <span class="input-help">${helperEsc(r.unit)}</span></td><td>${helperEsc(r.em.split('@')[0])}</td><td style="text-align:left">${helperFmt(r.price)}</td></tr>`).join('')
-          + '</tbody></table>'
+          + '</tbody></table></div>'
         : '<p class="input-help">עוד לא נרשם אף מחיר.</p>';
     body.innerHTML = `
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
             <input type="email" id="admin-helper-email" class="model-select-input" placeholder="מייל של חבר (חשבון גוגל)" style="flex:1;min-width:220px">
             <button type="button" class="btn btn-small btn-accent" onclick="setHelper(null, true)">הוסף עוזר</button>
         </div>
-        <ul style="margin:0 0 14px;padding-inline-start:18px;line-height:2">${list}</ul>
-        ${table}`;
+        <ul style="margin:0;padding-inline-start:18px;line-height:2">${list}</ul>`;
+    if (pricesBox) pricesBox.innerHTML = table;
 }
 
 async function setHelper(email, on) {

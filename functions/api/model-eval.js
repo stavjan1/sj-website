@@ -40,6 +40,18 @@ export async function onRequestGet(context) {
   const configured = await loadModelClass(env);
   const key = keyFor(env, 'gemini');
 
+  // Who set the override and when, for the panel to say so beside "רץ עכשיו".
+  // Overrides saved before this field existed carry neither — the panel says
+  // "לא ידוע" for those rather than inventing a date.
+  let override = null;
+  try {
+    const raw = env.SJ_DATA ? await env.SJ_DATA.get('config:models') : null;
+    if (raw) {
+      const cfg = JSON.parse(raw);
+      override = { savedAt: cfg.savedAt || null, by: cfg.by || null };
+    }
+  } catch { override = null; }
+
   // Ask Google what it actually serves today rather than trusting a list baked
   // into this file — a hardcoded catalogue is exactly what went stale before.
   let available = null;
@@ -69,6 +81,7 @@ export async function onRequestGet(context) {
   return jsonResponse({
     ok: true,
     configured,
+    override,
     shipped: MODEL_CLASS,             // what the code defaults to, before any override
     allowed: PROVIDERS.gemini.models, // what this server will accept
     available,
@@ -171,6 +184,8 @@ export async function onRequestPut(context) {
     await env.SJ_DATA.delete('config:models');   // back to the shipped defaults
     return jsonResponse({ ok: true, cleared: true, configured: MODEL_CLASS });
   }
+  cfg.savedAt = Date.now();
+  cfg.by = gate.email || null;
   await env.SJ_DATA.put('config:models', JSON.stringify(cfg));
   return jsonResponse({ ok: true, configured: await loadModelClass(env) });
 }

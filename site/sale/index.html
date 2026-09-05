@@ -2341,278 +2341,152 @@
                     <div class="card-body" id="admin-auth-status"></div>
                 </div>
 
-                <!-- One glance before the detail: today, across everything. -->
-                <div class="admin-overview" id="admin-overview"></div>
-
-                <!-- Thirteen cards on one scroll answered four unrelated
-                     questions at once, which is why none of them could be
-                     found a second time. Grouped by the question they answer,
-                     not by the order they happened to get built in. -->
-                <div class="spec-chips" id="admin-tabs" style="margin:4px 0 12px;" role="tablist">
-                    <button type="button" class="spec-chip active" data-tab="room" onclick="setAdminTab('room')">
-                        <i class="fa-solid fa-gauge-high" aria-hidden="true"></i> מסך מצב</button>
-                    <button type="button" class="spec-chip" data-tab="stats" onclick="setAdminTab('stats')">
-                        <i class="fa-solid fa-chart-line" aria-hidden="true"></i> סטטיסטיקה</button>
-                    <button type="button" class="spec-chip" data-tab="ai" onclick="setAdminTab('ai')">
+                <!-- Seven screens, one question each, in the order the questions
+                     get asked: what is happening, who, what did they say, is
+                     the engine right, are the prices right, who is coming, is
+                     anything broken. A card lives on exactly one screen — the
+                     wrapper carries data-admin-tab, and setAdminTab shows one
+                     wrapper at a time. Stav, 5/9: conversations under the AI
+                     keys, detail lists that could not be closed, and a screen
+                     naming a default the server had overridden. -->
+                <div class="spec-chips" id="admin-tabs" role="tablist">
+                    <button type="button" class="spec-chip active" data-tab="overview" aria-controls="admin-tab-overview" onclick="setAdminTab('overview')">
+                        <i class="fa-solid fa-gauge-high" aria-hidden="true"></i> סקירה</button>
+                    <button type="button" class="spec-chip" data-tab="users" aria-controls="admin-tab-users" onclick="setAdminTab('users')">
+                        <i class="fa-solid fa-users" aria-hidden="true"></i> משתמשים</button>
+                    <button type="button" class="spec-chip" data-tab="convos" aria-controls="admin-tab-convos" onclick="setAdminTab('convos')">
+                        <i class="fa-solid fa-comments" aria-hidden="true"></i> שיחות</button>
+                    <button type="button" class="spec-chip" data-tab="ai" aria-controls="admin-tab-ai" onclick="setAdminTab('ai')">
                         <i class="fa-solid fa-microchip" aria-hidden="true"></i> מנוע ה-AI</button>
-                    <button type="button" class="spec-chip" data-tab="content" onclick="setAdminTab('content')">
-                        <i class="fa-solid fa-database" aria-hidden="true"></i> ידע ומאגרים</button>
-                    <button type="button" class="spec-chip" data-tab="users" onclick="setAdminTab('users')">
-                        <i class="fa-solid fa-users" aria-hidden="true"></i> משתמשים ומערכת</button>
+                    <button type="button" class="spec-chip" data-tab="prices" aria-controls="admin-tab-prices" onclick="setAdminTab('prices')">
+                        <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i> מחירים וידע</button>
+                    <button type="button" class="spec-chip" data-tab="traffic" aria-controls="admin-tab-traffic" onclick="setAdminTab('traffic')">
+                        <i class="fa-solid fa-chart-line" aria-hidden="true"></i> תנועה ושיווק</button>
+                    <button type="button" class="spec-chip" data-tab="system" aria-controls="admin-tab-system" onclick="setAdminTab('system')">
+                        <i class="fa-solid fa-heart-pulse" aria-hidden="true"></i> מערכת</button>
                 </div>
 
-                <!-- The control room. One screen, nothing scrolls, and every number that
-                     could change a decision is in view at once — the four tabs below hold
-                     the detail behind each tile. Every tile paints the moment its own
-                     request lands, so a slow endpoint delays its own square and nothing
-                     else, and a tile that fails says so inside its own frame. -->
-                <div class="ctlroom" data-admin-tab="room" id="admin-room">
-                    <div class="cr-bar">
-                        <div class="cr-brand">
-                            <span class="cr-dot live" id="cr-health-dot"></span>
-                            <b>חדר בקרה</b>
-                            <span class="cr-sub" id="cr-health-text">טוען…</span>
+                <!-- ═══ 1 · סקירה ═══ six numbers for today and the list of what
+                     needs a hand. No clock and no auto-refresh: the numbers are
+                     as fresh as the last click on "רענון", and say when that was. -->
+                <div class="adm-screen" data-admin-tab="overview" id="admin-tab-overview" role="tabpanel">
+                    <div class="adm-head">
+                        <div>
+                            <h3 class="adm-title">סקירה</h3>
+                            <p class="adm-purpose">מה קורה היום, במבט אחד. כל מספר נושא את חלון הזמן שלו ומוביל למסך שמאחוריו.</p>
                         </div>
-                        <div class="cr-actions">
-                            <span class="cr-clock" id="cr-clock">—</span>
-                            <select id="cr-range" class="cr-select" onchange="renderControlRoom(true)" aria-label="טווח הנתונים">
-                                <option value="7">7 ימים</option>
-                                <option value="30" selected>30 יום</option>
-                                <option value="90">90 יום</option>
-                            </select>
-                            <button type="button" class="cr-btn" onclick="renderControlRoom(true)" title="רענון" aria-label="רענון">
-                                <i class="fa-solid fa-rotate" aria-hidden="true"></i>
-                            </button>
+                        <div class="adm-head-actions">
+                            <span class="adm-stamp" id="admin-overview-stamp"></span>
+                            <button type="button" class="btn btn-secondary btn-small" onclick="renderAdminOverview(true)" aria-label="רענון"><i class="fa-solid fa-rotate" aria-hidden="true"></i> רענון</button>
                         </div>
                     </div>
-                    <div class="cr-grid">
-                        <div class="cr-kpis" id="cr-kpis"></div>
-                            <div class="cr-tile cr-t-traffic">
-                                <div class="cr-head">
-                                    <h3 class="cr-title"><i class="fa-solid fa-chart-area" aria-hidden="true"></i> תנועה · מי נכנס</h3>
-                                    <span class="cr-meta" id="cr-traffic-meta"></span>
-                                    <button type="button" class="cr-more" onclick="setAdminTab('stats')">פירוט</button>
-                                </div>
-                                <div class="cr-body" id="cr-traffic">
-                                    <div class="cr-skel"></div><div class="cr-skel" style="inline-size:70%"></div><div class="cr-skel" style="inline-size:40%"></div>
-                                </div>
-                            </div>
-                            <div class="cr-tile cr-t-funnel">
-                                <div class="cr-head">
-                                    <h3 class="cr-title"><i class="fa-solid fa-filter" aria-hidden="true"></i> משפך · ממי יוצא לקוח</h3>
-                                    <span class="cr-meta" id="cr-funnel-meta"></span>
-                                    <button type="button" class="cr-more" onclick="setAdminTab('stats')">פירוט</button>
-                                </div>
-                                <div class="cr-body" id="cr-funnel">
-                                    <div class="cr-skel"></div><div class="cr-skel" style="inline-size:70%"></div><div class="cr-skel" style="inline-size:40%"></div>
-                                </div>
-                            </div>
-                            <div class="cr-tile cr-t-ai">
-                                <div class="cr-head">
-                                    <h3 class="cr-title"><i class="fa-solid fa-microchip" aria-hidden="true"></i> מנועי AI · לחץ על המפתחות</h3>
-                                    <span class="cr-meta" id="cr-ai-meta"></span>
-                                    <button type="button" class="cr-more" onclick="setAdminTab('ai')">פירוט</button>
-                                </div>
-                                <div class="cr-body" id="cr-ai">
-                                    <div class="cr-skel"></div><div class="cr-skel" style="inline-size:70%"></div><div class="cr-skel" style="inline-size:40%"></div>
-                                </div>
-                            </div>
-                            <div class="cr-tile cr-t-quality">
-                                <div class="cr-head">
-                                    <h3 class="cr-title"><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i> דיוק התמחור</h3>
-                                    <span class="cr-meta" id="cr-quality-meta"></span>
-                                    <button type="button" class="cr-more" onclick="setAdminTab('ai')">פירוט</button>
-                                </div>
-                                <div class="cr-body" id="cr-quality">
-                                    <div class="cr-skel"></div><div class="cr-skel" style="inline-size:70%"></div><div class="cr-skel" style="inline-size:40%"></div>
-                                </div>
-                            </div>
-                            <div class="cr-tile cr-t-users">
-                                <div class="cr-head">
-                                    <h3 class="cr-title"><i class="fa-solid fa-users" aria-hidden="true"></i> משתמשים · פעילות אחרונה</h3>
-                                    <span class="cr-meta" id="cr-users-meta"></span>
-                                    <button type="button" class="cr-more" onclick="setAdminTab('users')">פירוט</button>
-                                </div>
-                                <div class="cr-body" id="cr-users">
-                                    <div class="cr-skel"></div><div class="cr-skel" style="inline-size:70%"></div><div class="cr-skel" style="inline-size:40%"></div>
-                                </div>
-                            </div>
-                            <div class="cr-tile cr-t-feed">
-                                <div class="cr-head">
-                                    <h3 class="cr-title"><i class="fa-solid fa-bolt" aria-hidden="true"></i> יומן אירועים</h3>
-                                    <span class="cr-meta" id="cr-feed-meta"></span>
-                                    <button type="button" class="cr-more" onclick="setAdminTab('stats')">פירוט</button>
-                                </div>
-                                <div class="cr-body" id="cr-feed">
-                                    <div class="cr-skel"></div><div class="cr-skel" style="inline-size:70%"></div><div class="cr-skel" style="inline-size:40%"></div>
-                                </div>
-                            </div>
-                            <div class="cr-tile cr-t-health">
-                                <div class="cr-head">
-                                    <h3 class="cr-title"><i class="fa-solid fa-heart-pulse" aria-hidden="true"></i> בריאות המערכת</h3>
-                                    <span class="cr-meta" id="cr-health-meta"></span>
-                                    <button type="button" class="cr-more" onclick="setAdminTab('users')">פירוט</button>
-                                </div>
-                                <div class="cr-body" id="cr-health">
-                                    <div class="cr-skel"></div><div class="cr-skel" style="inline-size:70%"></div><div class="cr-skel" style="inline-size:40%"></div>
-                                </div>
-                            </div>
+                    <div class="admin-overview" id="admin-overview"></div>
+                    <div class="section-card" id="admin-attention-card">
+                        <div class="card-header"><h3><i class="fa-solid fa-bell" aria-hidden="true"></i> דורש תשומת לב</h3></div>
+                        <div class="card-body" id="admin-attention-body"><p class="input-help">טוען…</p></div>
                     </div>
                 </div>
 
-                <!-- Usage funnel: who signs up, who talks, who produces quotes -->
-                <!-- The defect-report bot, turned on from here: paste the BotFather
-                     token and the server registers the webhook itself. -->
-                <div class="section-card" data-admin-tab="stats" id="admin-telegram-card" style="margin-bottom:16px;">
-                    <div class="card-header"><h3><i class="fa-brands fa-telegram" aria-hidden="true"></i> בוט דוחות הליקויים</h3></div>
-                    <div class="card-body" id="admin-telegram-body"><p class="input-help">טוען…</p></div>
-                </div>
-
-                <div class="section-card" data-admin-tab="stats" id="admin-funnel-card">
-                    <div class="card-header"><h3>משפך שימוש · מי באמת משתמש</h3></div>
-                    <div class="card-body" id="admin-funnel-body">
-                        <p class="input-help">נטען עם פתיחת הפאנל…</p>
-                    </div>
-                </div>
-
-                <!-- Traffic + Clarity friction signals, site vs. זרם side by side -->
-                <div class="section-card" data-admin-tab="stats" style="border-color:rgba(240,192,64,0.25);margin-bottom:20px;">
-                    <div class="card-header flex-header">
-                        <h3><i class="fa-solid fa-chart-line" style="color:var(--warn-text);"></i> כמה נכנסו · תנועה ומפת חום</h3>
-                        <div style="display:flex;gap:8px;align-items:center;">
-                            <select id="admin-traffic-days" class="model-select-input" onchange="renderAdminTraffic()"
-                                    aria-label="טווח לפירוט המלא (ארבעת המספרים הגדולים תמיד יום/שבוע/חודש/שנה)" style="min-width:110px;">
-                                <option value="7">7 ימים</option>
-                                <option value="30" selected>30 יום</option>
-                                <option value="90">90 יום</option>
-                            </select>
-                            <button class="btn btn-secondary btn-small" onclick="renderAdminTraffic()"><i class="fa-solid fa-rotate"></i> רענן</button>
+                <!-- ═══ 2 · משתמשים ═══ who is here, and one door per person. -->
+                <div class="adm-screen" data-admin-tab="users" id="admin-tab-users" role="tabpanel">
+                    <div class="adm-head">
+                        <div>
+                            <h3 class="adm-title">משתמשים</h3>
+                            <p class="adm-purpose">מי רשום, מתי היה פה לאחרונה ובאיזה מסלול. לחיצה על משתמש פותחת את הדף שלו בצד.</p>
                         </div>
                     </div>
-                    <div class="card-body" style="display:flex;flex-direction:column;gap:16px;">
-                        <p class="input-help" style="margin:0;">מונים משלנו (לא ניתנים לחסימה), בהפרדה בין האתר לזרם. הכניסות שלך לא נספרות, התחברות כאדמין מסמנת את המכשיר; בכל דפדפן אחר שלך היכנס פעם אחת לכתובת עם <code>?notrack=1</code>.</p>
-                        <div id="admin-traffic-body"><p class="input-help">טוען…</p></div>
-                        <div id="admin-clarity-body"></div>
+                    <div class="adm-cards adm-cols-2">
+                        <div class="section-card" id="admin-users-card">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-users" style="color:var(--warn-text);"></i> משתמשי המערכת</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="admin-users-list" style="display:flex;flex-direction:column;gap:8px;">
+                                    <!-- populated by JS -->
+                                </div>
+                                <button class="btn btn-secondary" style="margin-top:14px;width:100%;" onclick="adminRefreshUserList()">
+                                    <i class="fa-solid fa-rotate"></i> רענן רשימת משתמשים
+                                </button>
+                            </div>
+                        </div>
+                        <div class="section-card" id="admin-helpers-card">
+                            <div class="card-header"><h3><i class="fa-solid fa-handshake-angle" aria-hidden="true"></i> עוזרים · מי כותב מחירים</h3></div>
+                            <div class="card-body" id="admin-helpers-body"><p class="input-help">טוען…</p></div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- AI pools: what each key served today, and which one went quiet -->
-                <!-- Every conversation, across every user. The reason the
-                     pricing agent can be tuned against reality: what people
-                     actually type, not what a spec imagined they would.
+                <!-- ═══ 3 · שיחות ═══ every conversation, across every user.
+                     The reason the pricing agent can be tuned against reality:
+                     what people actually type, not what a spec imagined.
                      Stav, 28/08: "אני רוצה שיהיה לי גישה לראות את כל השיחות של
                      כל משתמש. כדי ללמוד. הAI בווצאפ זה ככה וגם פה זה חשוב." -->
-                <div class="section-card" data-admin-tab="ai" style="border-color:rgba(240,192,64,0.25);margin-bottom:20px;">
-                    <div class="card-header flex-header">
-                        <h3><i class="fa-solid fa-comments" style="color:var(--warn-text);"></i> מה אנשים באמת שואלים</h3>
-                        <button class="btn btn-secondary btn-small" onclick="renderAdminConvos()"><i class="fa-solid fa-rotate"></i> רענן</button>
-                    </div>
-                    <div class="card-body" style="display:flex;flex-direction:column;gap:16px;">
-                        <p class="input-help" style="margin:0;">כל השיחות של כל המשתמשים, החדשה קודם. הרשימה מציגה תצוגה מקדימה בלבד; לחיצה על שיחה פותחת אותה במלואה. זה המקום ללמוד מה חסר לסוכן התמחור — שאלה שהוא לא ידע לענות עליה כאן היא הבאג הבא.</p>
-                        <div class="search-bar">
-                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                            <input type="text" id="admin-convo-q" placeholder="חיפוש בשיחות…" oninput="renderAdminConvoList()">
+                <div class="adm-screen" data-admin-tab="convos" id="admin-tab-convos" role="tabpanel">
+                    <div class="adm-head">
+                        <div>
+                            <h3 class="adm-title">שיחות</h3>
+                            <p class="adm-purpose">מה אנשים באמת שואלים, החדש קודם. שאלה שהסוכן לא ידע לענות עליה כאן היא הבאג הבא.</p>
                         </div>
-                        <div id="admin-convos-body"><p class="input-help">לחץ "רענן" כדי לטעון.</p></div>
                     </div>
-                </div>
-
-                <div class="section-card" data-admin-tab="ai" style="border-color:rgba(240,192,64,0.25);margin-bottom:20px;">
-                    <div class="card-header flex-header">
-                        <h3><i class="fa-solid fa-microchip" style="color:var(--warn-text);"></i> מנועי ה-AI · ניצול מפתחות</h3>
-                        <button class="btn btn-secondary btn-small" onclick="renderAdminAi()"><i class="fa-solid fa-rotate"></i> רענן</button>
-                    </div>
-                    <div class="card-body" style="display:flex;flex-direction:column;gap:16px;">
-                        <p class="input-help" style="margin:0;">כמה בקשות הגיש כל מפתח היום, ומתי מפתח נגמר ונפלנו לגיבוי. קבע תקרה יומית לכל מפתח כדי לראות אחוז: בלי תקרה מוצג מספר בלבד, כי מספר מומצא גרוע מכלום.</p>
-                        <div id="admin-ai-body"><p class="input-help">טוען…</p></div>
-                    </div>
-                </div>
-
-                <!-- Which model serves customers, and whether a newer one passes -->
-                <div class="section-card" data-admin-tab="ai" style="border-color:rgba(240,192,64,0.25);margin-bottom:20px;">
-                    <div class="card-header flex-header">
-                        <h3><i class="fa-solid fa-flask" style="color:var(--warn-text);"></i> המודל שמשרת לקוחות</h3>
-                        <button class="btn btn-secondary btn-small" onclick="renderAdminModels()"><i class="fa-solid fa-rotate"></i> בדוק מה חדש</button>
-                    </div>
-                    <div class="card-body" style="display:flex;flex-direction:column;gap:16px;">
-                        <p class="input-help" style="margin:0;">אין כאן עדכון אוטומטי של מודל, בכוונה: סוכן התמחור עונה בפרוטוקול נוקשה והמספרים שלו מגיעים ללקוחות אמיתיים. כאן רואים אם יצא מודל חדש, מריצים עליו את מבחני המלכודות: ורק אחר כך מחליפים.</p>
-                        <div id="admin-models-body"><p class="input-help">טוען…</p></div>
-                    </div>
-                </div>
-
-                <!-- Was the price right? The verdicts collected under each
-                     pricing answer, read back as rates per job type. Every
-                     other card here measures whether the machine ANSWERED;
-                     this is the only one that measures whether it was RIGHT. -->
-                <div class="section-card" data-admin-tab="ai" style="border-color:rgba(240,192,64,0.25);margin-bottom:20px;">
-                    <div class="card-header flex-header">
-                        <h3><i class="fa-solid fa-scale-balanced" style="color:var(--warn-text);"></i> האם המחירים נכונים</h3>
-                        <button class="btn btn-secondary btn-small" onclick="renderAdminFeedback()"><i class="fa-solid fa-rotate"></i> רענן</button>
-                    </div>
-                    <div class="card-body" style="display:flex;flex-direction:column;gap:16px;">
-                        <p class="input-help" style="margin:0;">המשוב שאתה נותן מתחת לכל תמחור. "ממש לא" שולח לך התראה בטלגרם מיד; השאר נאסף בשקט, כי מה שמעניין הוא היחס ולא המקרה הבודד. הטיה שלילית = הבוט מתמחר גבוה מדי, חיובית = נמוך מדי.</p>
-                        <div id="admin-feedback-body"><p class="input-help">טוען…</p></div>
-                    </div>
-                </div>
-
-                <!-- Who helps price-check, and whose help is worth counting.
-                     Separate from the rates card above: that one is about
-                     prices, this one is about people. -->
-                <div class="section-card" data-admin-tab="ai" style="border-color:rgba(240,192,64,0.25);margin-bottom:20px;">
-                    <div class="card-header flex-header">
-                        <h3><i class="fa-solid fa-handshake-angle" style="color:var(--warn-text);"></i> מי עוזר לתמחר</h3>
-                        <button class="btn btn-secondary btn-small" onclick="renderAdminFeedback()"><i class="fa-solid fa-rotate"></i> רענן</button>
-                    </div>
-                    <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
-                        <div id="admin-contrib-body"><p class="input-help">טוען…</p></div>
-                    </div>
-                </div>
-
-                        <!-- Clarity analytics token — feeds the automated site-analyst routine -->
-                        <div class="section-card" data-admin-tab="stats" style="border-color:rgba(240,192,64,0.25);">
-                            <div class="card-header">
-                                <h3><i class="fa-solid fa-chart-line" style="color:var(--warn-text);"></i> חיבור Clarity (אנליטיקס)</h3>
+                    <div class="section-card" id="admin-convos-card">
+                        <div class="card-header flex-header">
+                            <h3><i class="fa-solid fa-comments" style="color:var(--warn-text);"></i> כל השיחות</h3>
+                            <button class="btn btn-secondary btn-small" onclick="renderAdminConvos()"><i class="fa-solid fa-rotate"></i> רענן</button>
+                        </div>
+                        <div class="card-body" style="display:flex;flex-direction:column;gap:16px;">
+                            <p class="input-help" style="margin:0;">הרשימה מציגה תצוגה מקדימה בלבד; לחיצה על שיחה פותחת אותה במלואה בצד.</p>
+                            <div class="adm-filters">
+                                <div class="search-bar">
+                                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                                    <input type="text" id="admin-convo-q" placeholder="חיפוש בשיחות…" oninput="renderAdminConvoList()">
+                                </div>
+                                <select id="admin-convo-verdict" class="model-select-input" onchange="renderAdminConvoList()" aria-label="סינון לפי משוב">
+                                    <option value="">הכל</option>
+                                    <option value="priced">עם משוב מחיר</option>
+                                    <option value="unpriced">בלי משוב מחיר</option>
+                                    <option value="way_off">"ממש לא" בלבד</option>
+                                </select>
                             </div>
-                            <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
-                                <p class="input-help" style="margin:0;line-height:1.7;">
-                                    מזין כאן פעם אחת את טוקן ה-API של Clarity, ומכאן רוטינת האנליסט של קלוד
-                                    מושכת נתוני שימוש (מצרפיים בלבד) כל 3 ימים ומתכננת שיפורים.
-                                    יצירת הטוקן: clarity.microsoft.com ← פרויקט SJ ← Settings ← Data Export ← Generate new API token.
-                                </p>
-                                <div class="form-group" style="margin-bottom:0;">
-                                    <input type="password" id="admin-clarity-token" placeholder="הדבק כאן את הטוקן" dir="ltr" style="text-align:left;">
-                                </div>
-                                <div style="display:flex;gap:8px;align-items:center;">
-                                    <button class="btn btn-accent btn-small" onclick="adminSaveClarityToken()"><i class="fa-solid fa-save"></i> שמור טוקן</button>
-                                    <span class="input-help" id="admin-clarity-status" style="margin:0;"></span>
-                                </div>
+                            <div id="admin-convos-body"><p class="input-help">לחץ "רענן" כדי לטעון.</p></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ 4 · מנוע ה-AI ═══ which model answers customers, whether a
+                     newer one passes the traps, and how hard the keys are pushed. -->
+                <div class="adm-screen" data-admin-tab="ai" id="admin-tab-ai" role="tabpanel">
+                    <div class="adm-head">
+                        <div>
+                            <h3 class="adm-title">מנוע ה-AI</h3>
+                            <p class="adm-purpose">איזה מודל עונה ללקוחות עכשיו, מה ברירת המחדל בקוד, ומה המפתחות עשו היום.</p>
+                        </div>
+                    </div>
+                    <div class="adm-cards">
+                        <!-- Which model serves customers, and whether a newer one passes -->
+                        <div class="section-card" id="admin-models-card" style="border-color:rgba(240,192,64,0.25);">
+                            <div class="card-header flex-header">
+                                <h3><i class="fa-solid fa-flask" style="color:var(--warn-text);"></i> המודל שמשרת לקוחות</h3>
+                                <button class="btn btn-secondary btn-small" onclick="renderAdminModels()"><i class="fa-solid fa-rotate"></i> בדוק מה חדש</button>
+                            </div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:16px;">
+                                <p class="input-help" style="margin:0;">אין כאן עדכון אוטומטי של מודל, בכוונה: סוכן התמחור עונה בפרוטוקול נוקשה והמספרים שלו מגיעים ללקוחות אמיתיים. כאן רואים אם יצא מודל חדש, מריצים עליו את מבחני המלכודות: ורק אחר כך מחליפים.</p>
+                                <div id="admin-models-body"><p class="input-help">טוען…</p></div>
                             </div>
                         </div>
 
-                <!-- Pricing benchmark stats — aggregate only, zero client PII -->
-                <div class="section-card" data-admin-tab="stats" style="border-color:rgba(240,192,64,0.25);margin-bottom:20px;">
-                    <div class="card-header flex-header">
-                        <h3><i class="fa-solid fa-chart-column" style="color:var(--warn-text);"></i> ניהול סטטיסטיקות תמחור</h3>
-                        <button class="btn btn-secondary btn-small" onclick="renderAdminStats()"><i class="fa-solid fa-rotate"></i> רענן</button>
-                    </div>
-                    <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
-                        <p class="input-help" style="margin:0;">נתונים מצרפיים בלבד (מחיר עבודה לפי סוג עבודה), ללא שום פרטי לקוח. התצוגה למשתמשים כבויה עד שתדליק, כדי שיצטברו מספיק נתונים.</p>
-                        <div class="admin-stats-kpis tkpis" id="admin-stats-kpis"></div>
-                        <div class="admin-stats-live">
-                            <label class="toggle-line">
-                                <input type="checkbox" id="admin-stats-live-toggle" onchange="adminSetStatsLive(this.checked)">
-                                <span><b>הצג את הסטטיסטיקה למשתמשים</b>, פס "עבודה כזו תומחרה ב-X" בעורך ההצעה</span>
-                            </label>
-                            <span class="input-help" id="admin-stats-live-note" style="margin:0;"></span>
+                        <div class="section-card" id="admin-ai-card" style="border-color:rgba(240,192,64,0.25);">
+                            <div class="card-header flex-header">
+                                <h3><i class="fa-solid fa-microchip" style="color:var(--warn-text);"></i> מנועי ה-AI · ניצול מפתחות</h3>
+                                <button class="btn btn-secondary btn-small" onclick="renderAdminAi()"><i class="fa-solid fa-rotate"></i> רענן</button>
+                            </div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:16px;">
+                                <p class="input-help" style="margin:0;">כמה בקשות הגיש כל מפתח היום, ומתי מפתח נגמר ונפלנו לגיבוי. קבע תקרה יומית לכל מפתח כדי לראות אחוז: בלי תקרה מוצג מספר בלבד, כי מספר מומצא גרוע מכלום.</p>
+                                <div id="admin-ai-body"><p class="input-help">טוען…</p></div>
+                            </div>
                         </div>
-                        <div id="admin-stats-table"></div>
-                    </div>
-                </div>
 
-                <div class="settings-grid">
-                    <!-- AI API Key (shared) -->
-                    <div style="display:flex;flex-direction:column;gap:20px;">
-                        <div class="section-card" data-admin-tab="ai" style="border-color:rgba(240,192,64,0.25);">
+                        <!-- AI API Key (shared) -->
+                        <div class="section-card" id="admin-keys-card" style="border-color:rgba(240,192,64,0.25);">
                             <div class="card-header">
                                 <h3><i class="fa-solid fa-key" style="color:var(--warn-text);"></i> מפתחות AI (בשרת)</h3>
                             </div>
@@ -2631,49 +2505,76 @@
                                 </p>
                             </div>
                         </div>
+                    </div>
+                </div>
 
-
-                        <!-- Tier management: assign plans to users by email (no payments yet) -->
-                        <div class="section-card" data-admin-tab="users" id="admin-helpers-card" style="border-color:rgba(240,192,64,0.25);margin-bottom:16px;">
-                            <div class="card-header"><h3>עוזרים · מי כותב מחירים</h3></div>
-                            <div class="card-body" id="admin-helpers-body"><p class="input-help">טוען…</p></div>
+                <!-- ═══ 5 · מחירים וידע ═══ what the bot knows, and whether the
+                     prices it gives are right. -->
+                <div class="adm-screen" data-admin-tab="prices" id="admin-tab-prices" role="tabpanel">
+                    <div class="adm-head">
+                        <div>
+                            <h3 class="adm-title">מחירים וידע</h3>
+                            <p class="adm-purpose">הידע שהבוט מתמחר ממנו, מי כתב אילו מחירים, והאם התמחור יצא נכון.</p>
                         </div>
-                        <div class="section-card" data-admin-tab="users" style="border-color:rgba(240,192,64,0.25);">
-                            <div class="card-header">
-                                <h3><i class="fa-solid fa-user-tag" style="color:var(--warn-text);"></i> ניהול מסלולים</h3>
+                    </div>
+                    <div class="adm-cards adm-cols-2">
+                        <!-- Was the price right? The verdicts collected under each
+                             pricing answer, read back as rates per job type. Every
+                             other card here measures whether the machine ANSWERED;
+                             this is the only one that measures whether it was RIGHT. -->
+                        <div class="section-card" id="admin-feedback-card" style="border-color:rgba(240,192,64,0.25);">
+                            <div class="card-header flex-header">
+                                <h3><i class="fa-solid fa-scale-balanced" style="color:var(--warn-text);"></i> האם המחירים נכונים</h3>
+                                <button class="btn btn-secondary btn-small" onclick="renderAdminFeedback()"><i class="fa-solid fa-rotate"></i> רענן</button>
+                            </div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:16px;">
+                                <p class="input-help" style="margin:0;">המשוב שאתה נותן מתחת לכל תמחור. "ממש לא" שולח לך התראה בטלגרם מיד; השאר נאסף בשקט, כי מה שמעניין הוא היחס ולא המקרה הבודד. הטיה שלילית = הבוט מתמחר גבוה מדי, חיובית = נמוך מדי.</p>
+                                <div id="admin-feedback-body"><p class="input-help">טוען…</p></div>
+                            </div>
+                        </div>
+
+                        <!-- Who helps price-check, and whose help is worth counting.
+                             Separate from the rates card: that one is about
+                             prices, this one is about people. -->
+                        <div class="section-card" id="admin-contrib-card" style="border-color:rgba(240,192,64,0.25);">
+                            <div class="card-header flex-header">
+                                <h3><i class="fa-solid fa-handshake-angle" style="color:var(--warn-text);"></i> מי עוזר לתמחר</h3>
+                                <button class="btn btn-secondary btn-small" onclick="renderAdminFeedback()"><i class="fa-solid fa-rotate"></i> רענן</button>
                             </div>
                             <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
-                                <p class="input-help" style="margin:0;">
-                                    שיוך מסלול ידני למשתמש (עד שיש סליקה). <strong>free</strong> = ברירת המחדל,
-                                    <strong>pro</strong> / <strong>business</strong> = בתשלום.
-                                </p>
-                                <div class="form-group" style="margin-bottom:0;">
-                                    <label class="input-help" style="margin-bottom:4px;display:block;">אימייל משתמש</label>
-                                    <input type="email" id="admin-tier-email" placeholder="user@gmail.com" dir="ltr" style="text-align:left;">
+                                <div id="admin-contrib-body"><p class="input-help">טוען…</p></div>
+                            </div>
+                        </div>
+
+                        <!-- Every price a helper wrote, attributed. The list of
+                             helpers themselves is on the users screen. -->
+                        <div class="section-card" id="admin-helper-prices-card">
+                            <div class="card-header"><h3><i class="fa-solid fa-pen-ruler" aria-hidden="true"></i> מחירי העוזרים · מי כתב מה</h3></div>
+                            <div class="card-body" id="admin-helper-prices-body"><p class="input-help">טוען…</p></div>
+                        </div>
+
+                        <!-- Pricing benchmark stats — aggregate only, zero client PII -->
+                        <div class="section-card" id="admin-stats-card" style="border-color:rgba(240,192,64,0.25);">
+                            <div class="card-header flex-header">
+                                <h3><i class="fa-solid fa-chart-column" style="color:var(--warn-text);"></i> ניהול סטטיסטיקות תמחור</h3>
+                                <button class="btn btn-secondary btn-small" onclick="renderAdminStats()"><i class="fa-solid fa-rotate"></i> רענן</button>
+                            </div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
+                                <p class="input-help" style="margin:0;">נתונים מצרפיים בלבד (מחיר עבודה לפי סוג עבודה), ללא שום פרטי לקוח. התצוגה למשתמשים כבויה עד שתדליק, כדי שיצטברו מספיק נתונים.</p>
+                                <div class="admin-stats-kpis tkpis" id="admin-stats-kpis"></div>
+                                <div class="admin-stats-live">
+                                    <label class="toggle-line">
+                                        <input type="checkbox" id="admin-stats-live-toggle" onchange="adminSetStatsLive(this.checked)">
+                                        <span><b>הצג את הסטטיסטיקה למשתמשים</b>, פס "עבודה כזו תומחרה ב-X" בעורך ההצעה</span>
+                                    </label>
+                                    <span class="input-help" id="admin-stats-live-note" style="margin:0;"></span>
                                 </div>
-                                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                                    <select id="admin-tier-select" class="model-select-input" style="flex:1;min-width:120px;">
-                                        <option value="free">חינם (free)</option>
-                                        <option value="pro">Pro</option>
-                                        <option value="business">עסקי (business)</option>
-                                    </select>
-                                    <button class="btn btn-secondary btn-small" onclick="adminLookupTier()"><i class="fa-solid fa-magnifying-glass"></i> בדוק</button>
-                                    <button class="btn btn-accent btn-small" onclick="adminSetTier()"><i class="fa-solid fa-save"></i> שייך מסלול</button>
-                                </div>
-                                <p class="input-help" id="admin-tier-status" style="display:none;"></p>
-                                <details style="border-top:1px solid var(--border-color);padding-top:10px;">
-                                    <summary class="input-help" style="cursor:pointer;">עריכת מגבלות המסלולים (JSON)</summary>
-                                    <textarea id="admin-tier-config" rows="8" dir="ltr" style="width:100%;margin-top:8px;font-family:monospace;font-size:0.75rem;"></textarea>
-                                    <div style="display:flex;gap:8px;margin-top:8px;">
-                                        <button class="btn btn-secondary btn-small" onclick="adminLoadTierConfig()"><i class="fa-solid fa-download"></i> טען נוכחי</button>
-                                        <button class="btn btn-accent btn-small" onclick="adminSaveTierConfig()"><i class="fa-solid fa-upload"></i> שמור לשרת</button>
-                                    </div>
-                                </details>
+                                <div id="admin-stats-table" class="table-scroll"></div>
                             </div>
                         </div>
 
                         <!-- System catalog workspace: upload → analyze → everyone's catalog -->
-                        <div class="section-card" data-admin-tab="content" style="border-color:rgba(240,192,64,0.25);">
+                        <div class="section-card" id="admin-syscat-card" style="border-color:rgba(240,192,64,0.25);">
                             <div class="card-header">
                                 <h3><i class="fa-solid fa-database" style="color:var(--warn-text);"></i> ניהול מאגרים · המאגר של כולם</h3>
                             </div>
@@ -2717,7 +2618,7 @@
                         </div>
 
                         <!-- Field pricing knowledge map (the DB behind every pricing chat) -->
-                        <div class="section-card" data-admin-tab="content" style="border-color:rgba(240,192,64,0.25);">
+                        <div class="section-card" id="admin-pmap-card" style="border-color:rgba(240,192,64,0.25);">
                             <div class="card-header">
                                 <h3><i class="fa-solid fa-map" style="color:var(--warn-text);"></i> מפת התמחור (DB)</h3>
                             </div>
@@ -2732,26 +2633,103 @@
                                 <p class="input-help" id="admin-pricing-map-status"></p>
                             </div>
                         </div>
-
                     </div>
+                </div>
 
-                    <!-- Right: Status + users -->
-                    <div style="display:flex;flex-direction:column;gap:20px;">
-                        <div class="section-card" data-admin-tab="users" style="border-color:rgba(240,192,64,0.25);">
-                            <div class="card-header">
-                                <h3><i class="fa-solid fa-users" style="color:var(--warn-text);"></i> משתמשי המערכת</h3>
-                            </div>
-                            <div class="card-body">
-                                <div id="admin-users-list" style="display:flex;flex-direction:column;gap:8px;">
-                                    <!-- populated by JS -->
+                <!-- ═══ 6 · תנועה ושיווק ═══ who comes in, who becomes a user,
+                     where they get stuck, and the bot that brings in defect reports. -->
+                <div class="adm-screen" data-admin-tab="traffic" id="admin-tab-traffic" role="tabpanel">
+                    <div class="adm-head">
+                        <div>
+                            <h3 class="adm-title">תנועה ושיווק</h3>
+                            <p class="adm-purpose">כמה נכנסו, מי מהם הפך למשתמש, איפה נתקעו, ומה מצב בוט הליקויים.</p>
+                        </div>
+                    </div>
+                    <div class="adm-cards adm-cols-2">
+                        <!-- Traffic + Clarity friction signals, site vs. זרם side by side -->
+                        <div class="section-card adm-span" id="admin-traffic-card" style="border-color:rgba(240,192,64,0.25);">
+                            <div class="card-header flex-header">
+                                <h3><i class="fa-solid fa-chart-line" style="color:var(--warn-text);"></i> כמה נכנסו · תנועה ומפת חום</h3>
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <select id="admin-traffic-days" class="model-select-input" onchange="renderAdminTraffic()"
+                                            aria-label="טווח לפירוט המלא (ארבעת המספרים הגדולים תמיד יום/שבוע/חודש/שנה)" style="min-width:110px;">
+                                        <option value="7">7 ימים</option>
+                                        <option value="30" selected>30 יום</option>
+                                        <option value="90">90 יום</option>
+                                    </select>
+                                    <button class="btn btn-secondary btn-small" onclick="renderAdminTraffic()"><i class="fa-solid fa-rotate"></i> רענן</button>
                                 </div>
-                                <button class="btn btn-secondary" style="margin-top:14px;width:100%;" onclick="adminRefreshUserList()">
-                                    <i class="fa-solid fa-rotate"></i> רענן רשימת משתמשים
-                                </button>
+                            </div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:16px;">
+                                <p class="input-help" style="margin:0;">מונים משלנו (לא ניתנים לחסימה), בהפרדה בין האתר לזרם. הכניסות שלך לא נספרות, התחברות כאדמין מסמנת את המכשיר; בכל דפדפן אחר שלך היכנס פעם אחת לכתובת עם <code>?notrack=1</code>.</p>
+                                <div class="adm-chart">
+                                    <div class="adm-chart-head"><span>צפיות ליום · כל הנכסים יחד</span><span class="cr-meta" id="cr-traffic-meta"></span></div>
+                                    <div id="cr-traffic"></div>
+                                </div>
+                                <div id="admin-traffic-body"><p class="input-help">טוען…</p></div>
+                                <div id="admin-clarity-body"></div>
                             </div>
                         </div>
 
-                        <div class="section-card" data-admin-tab="users" style="border-color:rgba(240,192,64,0.25);">
+                        <div class="section-card" id="admin-funnel-card">
+                            <div class="card-header"><h3>משפך שימוש · מי באמת משתמש</h3></div>
+                            <div class="card-body" id="admin-funnel-body">
+                                <p class="input-help">נטען עם פתיחת הפאנל…</p>
+                            </div>
+                        </div>
+
+                        <!-- The defect-report bot, turned on from here: paste the BotFather
+                             token and the server registers the webhook itself. -->
+                        <div class="section-card" id="admin-telegram-card">
+                            <div class="card-header"><h3><i class="fa-brands fa-telegram" aria-hidden="true"></i> בוט דוחות הליקויים</h3></div>
+                            <div class="card-body" id="admin-telegram-body"><p class="input-help">טוען…</p></div>
+                        </div>
+
+                        <!-- Clarity analytics token — feeds the automated site-analyst routine -->
+                        <div class="section-card" id="admin-clarity-card" style="border-color:rgba(240,192,64,0.25);">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-chart-line" style="color:var(--warn-text);"></i> חיבור Clarity (אנליטיקס)</h3>
+                            </div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:10px;">
+                                <p class="input-help" style="margin:0;line-height:1.7;">
+                                    מזין כאן פעם אחת את טוקן ה-API של Clarity, ומכאן רוטינת האנליסט של קלוד
+                                    מושכת נתוני שימוש (מצרפיים בלבד) כל 3 ימים ומתכננת שיפורים.
+                                    יצירת הטוקן: clarity.microsoft.com ← פרויקט SJ ← Settings ← Data Export ← Generate new API token.
+                                </p>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <input type="password" id="admin-clarity-token" placeholder="הדבק כאן את הטוקן" dir="ltr" style="text-align:left;">
+                                </div>
+                                <div style="display:flex;gap:8px;align-items:center;">
+                                    <button class="btn btn-accent btn-small" onclick="adminSaveClarityToken()"><i class="fa-solid fa-save"></i> שמור טוקן</button>
+                                    <span class="input-help" id="admin-clarity-status" style="margin:0;"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ 7 · מערכת ═══ plans, health, version, and what happened. -->
+                <div class="adm-screen" data-admin-tab="system" id="admin-tab-system" role="tabpanel">
+                    <div class="adm-head">
+                        <div>
+                            <h3 class="adm-title">מערכת</h3>
+                            <p class="adm-purpose">מסלולים ומגבלות, בריאות המערכת, הגרסה שרצה, ויומן האירועים.</p>
+                        </div>
+                    </div>
+                    <div class="adm-cards adm-cols-2">
+                        <!-- Is anything broken. The rows are the questions asked at 2am. -->
+                        <div class="section-card" id="admin-health-card">
+                            <div class="card-header flex-header">
+                                <h3><span class="cr-dot live" id="cr-health-dot"></span> בריאות המערכת</h3>
+                                <span class="cr-meta" id="cr-health-meta"></span>
+                            </div>
+                            <div class="card-body">
+                                <p class="input-help adm-health-line" id="cr-health-text" style="margin:0 0 8px;">טוען…</p>
+                                <div id="cr-health"><p class="input-help">טוען…</p></div>
+                            </div>
+                        </div>
+
+                        <div class="section-card" id="admin-status-card" style="border-color:rgba(240,192,64,0.25);">
                             <div class="card-header">
                                 <h3><i class="fa-solid fa-circle-info" style="color:var(--warn-text);"></i> מצב מערכת</h3>
                             </div>
@@ -2759,7 +2737,52 @@
                                 <div>מפתח ראשי: <span id="admin-status-key" style="color:var(--color-success);">—</span></div>
                                 <div>מפתח גיבוי: <span id="admin-status-key2" style="color:var(--color-success);">—</span></div>
                                 <div>סנכרון ענן (חשבון Google): <span id="admin-status-drive">—</span></div>
+                                <div>גרסה שרצה בדף הזה: <span id="admin-status-version" dir="ltr">—</span></div>
                             </div>
+                        </div>
+
+                        <!-- Tier management: assign plans to users by email (no payments yet) -->
+                        <div class="section-card" id="admin-tiers-card" style="border-color:rgba(240,192,64,0.25);">
+                            <div class="card-header">
+                                <h3><i class="fa-solid fa-user-tag" style="color:var(--warn-text);"></i> ניהול מסלולים</h3>
+                            </div>
+                            <div class="card-body" style="display:flex;flex-direction:column;gap:12px;">
+                                <p class="input-help" style="margin:0;">
+                                    שיוך מסלול ידני למשתמש (עד שיש סליקה). <strong>free</strong> = ברירת המחדל,
+                                    <strong>pro</strong> / <strong>business</strong> = בתשלום.
+                                </p>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label class="input-help" style="margin-bottom:4px;display:block;">אימייל משתמש</label>
+                                    <input type="email" id="admin-tier-email" placeholder="user@gmail.com" dir="ltr" style="text-align:left;">
+                                </div>
+                                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                                    <select id="admin-tier-select" class="model-select-input" style="flex:1;min-width:120px;">
+                                        <option value="free">חינם (free)</option>
+                                        <option value="pro">Pro</option>
+                                        <option value="business">עסקי (business)</option>
+                                    </select>
+                                    <button class="btn btn-secondary btn-small" onclick="adminLookupTier()"><i class="fa-solid fa-magnifying-glass"></i> בדוק</button>
+                                    <button class="btn btn-accent btn-small" onclick="adminSetTier()"><i class="fa-solid fa-save"></i> שייך מסלול</button>
+                                </div>
+                                <p class="input-help" id="admin-tier-status" style="display:none;"></p>
+                                <details style="border-top:1px solid var(--border-color);padding-top:10px;">
+                                    <summary class="input-help" style="cursor:pointer;">עריכת מגבלות המסלולים (JSON)</summary>
+                                    <textarea id="admin-tier-config" rows="8" dir="ltr" style="width:100%;margin-top:8px;font-family:monospace;font-size:0.75rem;"></textarea>
+                                    <div style="display:flex;gap:8px;margin-top:8px;">
+                                        <button class="btn btn-secondary btn-small" onclick="adminLoadTierConfig()"><i class="fa-solid fa-download"></i> טען נוכחי</button>
+                                        <button class="btn btn-accent btn-small" onclick="adminSaveTierConfig()"><i class="fa-solid fa-upload"></i> שמור לשרת</button>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+
+                        <!-- What happened: three logs read as one column in time order. -->
+                        <div class="section-card" id="admin-feed-card">
+                            <div class="card-header flex-header">
+                                <h3><i class="fa-solid fa-bolt" aria-hidden="true"></i> יומן אירועים</h3>
+                                <span class="cr-meta" id="cr-feed-meta"></span>
+                            </div>
+                            <div class="card-body" id="cr-feed"><p class="input-help">טוען…</p></div>
                         </div>
                     </div>
                 </div>
@@ -2788,6 +2811,18 @@
             </div>
         </div>
     </div>
+
+    <!-- The admin drawer. Every "פירוט" in the admin panel opens here — a
+         conversation, a user, the full traffic table — instead of growing a
+         list under its card that nothing could close (Stav, 5/9). One drawer,
+         one X, Escape closes; the app's .stern-drawer chrome does the slide. -->
+    <aside class="stern-drawer admin-drawer" id="admin-drawer" role="dialog" aria-modal="false" aria-labelledby="admin-drawer-title">
+        <div class="drawer-header">
+            <h3 id="admin-drawer-title"></h3>
+            <button type="button" class="btn-close admin-drawer-close" onclick="closeAdminDrawer()" aria-label="סגירה">&times;</button>
+        </div>
+        <div class="drawer-body" id="admin-drawer-body"></div>
+    </aside>
 
     <!-- Lock Screen -->
     <div id="lock-screen" class="lock-screen-container" style="display: none;">

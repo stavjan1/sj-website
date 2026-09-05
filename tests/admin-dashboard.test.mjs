@@ -213,33 +213,36 @@ test('exactly one button offers to reconnect', () => {
   assert.ok(sites <= 3, `adminAuthHtml appears at ${sites} sites; a card is rendering its own button`);
 });
 
-test('every admin card belongs to exactly one tab', () => {
-  // Thirteen cards on one scroll answered four unrelated questions at once. The
-  // grouping is declared in the HTML rather than listed in JS, so a card added
-  // later picks its own home — and a card that forgets to would silently become
-  // unreachable, visible under no tab at all.
+test('every admin card sits inside exactly one screen', () => {
+  // Rewritten for the seven-screen layout (5/9/2026): the grouping moved from
+  // a data-admin-tab on every card to one wrapper per screen, so a card picks
+  // its home by where it sits. A card outside every wrapper would be visible
+  // under every tab at once — or under none. tests/admin-screens.test.mjs pins
+  // the seven screens themselves; this only guards the containment.
   const panel = HTML.slice(HTML.indexOf('ניהול מערכת · Admin'));
   const body = panel.slice(0, panel.indexOf('</section>'));
-  const cards = body.match(/class="section-card"[^>]*/g) || [];
-  const untagged = cards.filter((c) => !/data-admin-tab=/.test(c) && !/admin-auth-card/.test(c));
-  assert.deepEqual(untagged, [], `card with no tab would be unreachable: ${untagged.join(' | ')}`);
+  const firstScreen = body.indexOf('data-admin-tab=');
+  assert.ok(firstScreen > -1, 'the screen wrappers are gone');
+  const before = body.slice(0, firstScreen);
+  const loose = (before.match(/class="section-card"[^>]*/g) || []).filter((c) => !/admin-auth-card/.test(c));
+  assert.deepEqual(loose, [], `card above the screens would show on every tab: ${loose.join(' | ')}`);
 
-  // And every tab in the bar has at least one card behind it.
+  // And every tab in the bar has a screen behind it.
   const tabs = [...body.matchAll(/data-tab="(\w+)"/g)].map((m) => m[1]);
   const homes = new Set([...body.matchAll(/data-admin-tab="(\w+)"/g)].map((m) => m[1]));
   assert.ok(tabs.length >= 4, 'the tab bar is missing');
   for (const t of tabs) assert.ok(homes.has(t), `tab "${t}" opens onto nothing`);
 });
 
-test('the recovery strip and the headline numbers are never behind a tab', () => {
-  // They answer "can this screen read anything" and "what happened today",
-  // which are true whichever question is being asked.
+test('the recovery strip is never behind a tab', () => {
+  // It answers "can this screen read anything", which is true whichever
+  // question is being asked. The day's headline numbers used to sit beside it;
+  // they are the overview screen now (the first tab, and the default).
   const panel = HTML.slice(HTML.indexOf('ניהול מערכת · Admin'));
   const body = panel.slice(0, panel.indexOf('</section>'));
-  const auth = body.slice(body.indexOf('id="admin-auth-card"') - 120, body.indexOf('id="admin-auth-card"') + 40);
-  assert.ok(!/data-admin-tab/.test(auth), 'the reconnect strip can be hidden by a tab');
-  const overview = body.slice(body.indexOf('id="admin-overview"') - 120, body.indexOf('id="admin-overview"') + 40);
-  assert.ok(!/data-admin-tab/.test(overview), 'the day\'s headline numbers can be hidden by a tab');
+  const auth = body.indexOf('id="admin-auth-card"');
+  const firstScreen = body.indexOf('data-admin-tab=');
+  assert.ok(auth > -1 && auth < firstScreen, 'the reconnect strip can be hidden by a tab');
 });
 
 test('a re-render keeps the tab you were on', () => {

@@ -93,5 +93,7 @@ test('a friend has a door, a reason on the lock card, and a way in when he is no
     const css = readFileSync(new URL('../site/sale/css/panels.css', import.meta.url), 'utf8');
     assert.ok(css.includes('.helper-row.has-price .helper-row-name::before'), 'a saved row must look saved');
     const app = readFileSync(new URL('../site/sale/app.js', import.meta.url), 'utf8');
-    assert.ok(app.includes("switchTab(wantedPanel() === 'helper' ? 'helper' : 'home')"), 'sign-in must land on the helper screen when asked');
+    // The admin gained a deep link of its own beside this one (?panel=admin),
+    // so the line is matched by its helper half rather than verbatim.
+    assert.ok(/const want = wantedPanel\(\);\s*switchTab\(want === 'helper' \? 'helper' :/.test(app), 'sign-in must land on the helper screen when asked');
 });

@@ -84,6 +84,14 @@ function adminRefreshStatus() {
     // this is the hour-long browser session that syncs projects to Drive. The
     // old label sent its reader hunting for a broken database that was fine.
     if (cloudEl) { cloudEl.textContent = googleAccessToken ? 'פעיל ✓' : 'לא מחובר'; cloudEl.style.color = googleAccessToken ? 'var(--color-success)' : 'var(--warn-text)'; }
+    // The build this page is actually running: the ?v= the page loaded its
+    // scripts with. Read off the DOM, not typed in, so it cannot lie.
+    const verEl = document.getElementById('admin-status-version');
+    if (verEl) {
+        const tag = document.querySelector('script[src*="app.js?v="]');
+        const m = tag && String(tag.getAttribute('src') || '').match(/[?&]v=([^&]+)/);
+        verEl.textContent = m ? 'v' + m[1] : 'לא ידוע';
+    }
 }
 
 // ===== System catalog (admin) =====
@@ -140,16 +148,24 @@ function adminRefreshSystemCatalogInfo() {
         note.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> זוהה שינוי, המאגר האישי שונה מהמפורסם. מומלץ לנתח ואז לפרסם.';
     }
 
-    // "המאגר של כולם" — the currently-published list, search-free compact view.
+    // "המאגר של כולם" — the published list opens in the drawer. Four hundred
+    // rows used to sit inline under the card, with nothing to close them.
     const list = document.getElementById('admin-syscat-list');
     if (list) {
         const items = systemCatalog || [];
         list.innerHTML = items.length
-            ? items.slice(0, 400).map(it =>
-                `<div class="asc-row"><span class="asc-name">${escapeHtml(it.name)}</span><span class="asc-price">${it.price} ₪${it.unit ? ` <em>(${escapeHtml(it.unit)})</em>` : ''}</span></div>`).join('')
-              + (items.length > 400 ? `<div class="asc-row" style="justify-content:center;color:var(--text-muted);">…ועוד ${items.length - 400}</div>` : '')
+            ? `<button type="button" class="btn btn-secondary btn-small" onclick="openAdminSystemCatalog()">
+                   <i class="fa-solid fa-list" aria-hidden="true"></i> פירוט · ${items.length} פריטים מפורסמים</button>`
             : '<p class="input-help">עדיין לא פורסם מאגר מערכת.</p>';
     }
+}
+
+function openAdminSystemCatalog() {
+    const items = systemCatalog || [];
+    openAdminDrawer(`המאגר של כולם · ${items.length} פריטים`,
+        `<div class="admin-syscat-list">${items.slice(0, 400).map(it =>
+            `<div class="asc-row"><span class="asc-name">${escapeHtml(it.name)}</span><span class="asc-price">${it.price} ₪${it.unit ? ` <em>(${escapeHtml(it.unit)})</em>` : ''}</span></div>`).join('')
+          + (items.length > 400 ? `<div class="asc-row" style="justify-content:center;color:var(--text-muted);">…ועוד ${items.length - 400}</div>` : '')}</div>`);
 }
 
 // Admin workspace import — feeds the personal catalog using the same
@@ -243,7 +259,8 @@ async function adminRevertPricingMap() {
 }
 
 // Registered-users list — real accounts from the cloud (KV `user:*`), admin
-// only. Each row expands to that user's projects, fetched lazily on open.
+// only. Each row is a door: it opens that user's page in the admin drawer,
+// with his plan and his projects fetched on open.
 async function adminRefreshUserList() {
     const container = document.getElementById('admin-users-list');
     if (!container) return;
@@ -270,50 +287,48 @@ async function adminRefreshUserList() {
             <button type="button" class="btn btn-secondary btn-small" style="margin-inline-start:8px;" onclick="adminTestMail(this)">
                 <i class="fa-solid fa-paper-plane" aria-hidden="true"></i> שלח מייל בדיקה
             </button></p>`;
-        container.innerHTML = summary + users.map(u => {
+        container.innerHTML = summary + `<div class="table-scroll">` + users.map(u => {
             const last = u.lastUpdated ? new Date(u.lastUpdated).toLocaleDateString('he-IL') : '—';
             const joined = u.firstSeen ? new Date(u.firstSeen).toLocaleDateString('he-IL') : null;
             return `<div class="admin-user" data-email="${escapeHtml(u.email)}">
-                <button class="admin-user-head" onclick="adminToggleUser(this)">
-                    <span class="au-caret"><i class="fa-solid fa-chevron-down"></i></span>
+                <button type="button" class="admin-user-head" onclick="openAdminUser(this.closest('.admin-user').dataset.email)">
+                    <span class="au-caret"><i class="fa-solid fa-chevron-left"></i></span>
                     <span class="au-email" dir="ltr">${escapeHtml(u.email)}</span>
                     <span class="au-meta">${joined ? 'נרשם ' + joined + ' · ' : ''}${u.projects} פרויקטים · עודכן ${last}</span>
                     <span class="au-plan plan-${escapeHtml(u.tier || 'free')}">${escapeHtml(TIER_LABELS[u.tier] || u.tier || 'free')}</span>
                 </button>
-                <div class="admin-user-body" style="display:none;"></div>
             </div>`;
-        }).join('');
+        }).join('') + `</div>`;
     } catch (e) {
         container.innerHTML = adminErrorHtml(e);
     }
 }
 
-async function adminToggleUser(btn) {
-    const wrap = btn.closest('.admin-user');
-    const body = wrap.querySelector('.admin-user-body');
-    const email = wrap.dataset.email;
-    const isOpen = body.style.display !== 'none';
-    wrap.classList.toggle('open', !isOpen);
-    if (isOpen) { body.style.display = 'none'; return; }
-    body.style.display = 'block';
-    if (body.dataset.loaded) return; // fetched once, cached
-    body.innerHTML = '<p class="input-help" style="margin:6px 0;">טוען פרויקטים…</p>';
+// One user's page, in the drawer: his plan, and his projects. It used to
+// unfold under his row and stay there.
+async function openAdminUser(email) {
+    if (!email) return;
+    const body = openAdminDrawer(email, '<p class="input-help" style="margin:6px 0;">טוען פרויקטים…</p>');
+    if (!body) return;
     try {
         const res = await adminRes('/api/admin-users?user=' + encodeURIComponent(email));
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
+        // The drawer may already show somebody else by the time this lands.
+        const title = document.getElementById('admin-drawer-title');
+        if (!title || title.textContent !== email) return;
         const projects = d.projects || [];
         const nis = (n) => n ? '₪' + Math.round(n).toLocaleString('he-IL') : '—';
         body.innerHTML = `<div class="au-tier">מסלול:
             <select class="model-select-input au-tier-sel" onchange="adminSetTierFor('${escapeHtml(email)}', this.value, this)">
                 ${['free', 'pro', 'business'].map((t) => `<option value="${t}" ${((d.tier || 'free') === t) ? 'selected' : ''}>${escapeHtml(TIER_LABELS[t] || t)}</option>`).join('')}
-            </select></div>` + (projects.length
+            </select></div>
+            <h4 class="tcol-title" style="margin:12px 0 4px;">פרויקטים · ${projects.length}</h4>` + (projects.length
             ? projects.map(p => `<div class="au-proj">
                     <span class="au-proj-name">${escapeHtml(p.name)}</span>
                     <span class="au-proj-meta"><span class="status-badge status-badge-${escapeHtml(p.status)}">${escapeHtml(p.status)}</span> ${nis(p.amount)}</span>
                 </div>`).join('')
             : '<p class="input-help" style="margin:6px 0;">אין פרויקטים.</p>');
-        body.dataset.loaded = '1';
     } catch (e) {
         body.innerHTML = adminErrorHtml(e);
     }
@@ -1694,7 +1709,10 @@ function initUserSession() {
     // get the correction to 'home' afterwards, so a phone that entered as a
     // guest landed on the project list and had to find the chat itself
     // (Stav, 25/08: "זה נפתח בדיפולט על הפרויקטים ולא עם הצ'אט").
-    switchTab(wantedPanel() === 'helper' ? 'helper' : 'home');
+    // ?panel=admin(&screen=…) is the admin's own deep link; for anyone else it
+    // is just the home screen, the gate is server-side anyway.
+    const want = wantedPanel();
+    switchTab(want === 'helper' ? 'helper' : (want === 'admin' && isAdmin() ? 'admin' : 'home'));
     try { syncConversationsLayout(); } catch (e) {}   // the wide-screen thread column
     updateUserProfileUI();
     try { syncChatGreeting(); } catch (e) {}   // greet whoever is actually here
@@ -3300,12 +3318,10 @@ function proInviteHtml() {
 // How many clients are due, the number on the "שירות תקופתי" view.
 
 function switchTab(tabId, opts) {
-    // The control room locks the shell's scroll while it is on screen, and a
-    // lock that outlives its screen is a page that will not scroll for reasons
-    // nobody can see. Leaving the admin panel by any route releases it.
+    // An admin drawer left open behind another screen is a panel nobody asked
+    // for. Leaving the admin panel by any route closes it.
     if (tabId !== 'admin') {
-        document.body.classList.remove('cr-lock');
-        try { crStopClock(); } catch (e) {}
+        try { closeAdminDrawer(); } catch (e) {}
     }
 
     // Old names, new homes. Every existing caller keeps working.
@@ -7295,46 +7311,42 @@ function renderAdminAuthStatus() {
     show(adminAuthHtml('צריך אישור מגוגל כדי למשוך את הנתונים.'));
 }
 
-// ---- Admin: four questions, four tabs -------------------------------------
+// ---- Admin: seven questions, seven screens --------------------------------
 //
-// Thirteen cards on one scroll, answering four unrelated questions at once:
-// who came, what the AI did, what the bot knows, and who the users are.
-// Nothing on that page could be found a second time, and the cards that
-// mattered most sat below the fold behind the ones that mattered least.
+// Eighteen cards under five tabs, laid out in the order they got built: the
+// conversations sat under the AI keys, and nothing could be found a second
+// time (Stav, 5/9). One screen per question now, in the order the questions
+// get asked — סקירה, משתמשים, שיחות, מנוע ה-AI, מחירים וידע, תנועה ושיווק,
+// מערכת. Each screen is one wrapper carrying data-admin-tab in the HTML, so a
+// card picks its home by where it sits, not by a list kept in step here.
 //
-// Grouped by the question each card answers, declared in the HTML as
-// data-admin-tab, so a new card picks its own home instead of needing a list
-// here kept in step by hand. The recovery strip and the day's headline numbers
-// stay above the tabs: they are true whichever question is being asked.
-let _adminTab = 'room';
+// A screen deep-links: /sale/?panel=admin&screen=convos opens on that screen.
+// Nothing writes the URL back — the app keeps one address per screen change
+// for the phone's back gesture (pushHistoryStep), and a second writer would
+// fight it.
+const ADMIN_SCREENS = ['overview', 'users', 'convos', 'ai', 'prices', 'traffic', 'system'];
+let _adminTab = (() => {
+    try {
+        const want = new URLSearchParams(location.search).get('screen') || '';
+        return ADMIN_SCREENS.includes(want) ? want : 'overview';
+    } catch (e) { return 'overview'; }
+})();
 
 function setAdminTab(tab) {
-    _adminTab = tab || 'room';
+    _adminTab = ADMIN_SCREENS.includes(tab) ? tab : 'overview';
     document.querySelectorAll('#admin-tabs .spec-chip').forEach((b) => {
         const on = b.dataset.tab === _adminTab;
         b.classList.toggle('active', on);
         b.setAttribute('aria-selected', on ? 'true' : 'false');
     });
-    document.querySelectorAll('#panel-admin [data-admin-tab]').forEach((card) => {
-        card.hidden = card.dataset.adminTab !== _adminTab;
+    document.querySelectorAll('#panel-admin [data-admin-tab]').forEach((screen) => {
+        screen.hidden = screen.dataset.adminTab !== _adminTab;
     });
-    // Some of these cards are one column of a two-column grid, and a grid whose
-    // children are all hidden still reserves its gap and its margin. Collapse
-    // the wrappers that have nothing left to show.
-    document.querySelectorAll('#panel-admin .section-grid, #panel-admin .admin-grid, #panel-admin .settings-grid').forEach((g) => {
-        const cards = [...g.querySelectorAll('[data-admin-tab]')];
-        if (cards.length) g.hidden = cards.every((c) => c.hidden);
-    });
-
-    // The room is a screen, not a card. It takes over the panel's height (the
-    // shell scrolls by default and the whole point is that this one does not),
-    // hides the page header whose title it already carries, and drops the
-    // headline strip it duplicates. Leaving it puts all three back.
-    const inRoom = _adminTab === 'room';
-    document.body.classList.toggle('cr-lock', inRoom);
-    const strip = document.getElementById('admin-overview');
-    if (strip) strip.hidden = inRoom;
-    if (inRoom) { renderControlRoom(); crStartAuto(); } else crStopClock();
+    // A drawer opened from one screen has no business over the next one.
+    try { closeAdminDrawer(); } catch (e) {}
+    // The overview refreshes itself on entry, throttled inside: a chip click
+    // is not a request, and one refresh is a few dozen KV reads.
+    if (_adminTab === 'overview') renderAdminOverview();
 }
 
 // ---- Admin: was the price right? ------------------------------------------
@@ -7398,12 +7410,16 @@ function adminFeedbackHtml(d) {
             ${e.price ? '· ' + Number(e.price).toLocaleString('he-IL') + ' ₪' : ''}
             — ${escapeHtml(VERDICT_LABELS[e.verdict] || e.verdict)}${e.note ? ' · ' + escapeHtml(e.note) : ''}</span></li>`).join('');
 
-    return `<p style="margin:0;font-size:0.95rem;"><b>${total}</b> משובים נאספו.</p>
-        <table class="admin-stats-tbl">
+    // The server keeps its last 200 verdicts, so "200" is a window and "37" is
+    // the whole history; the line says which.
+    const win = total >= 200 ? '200 המשובים האחרונים' : 'מאז ההתחלה';
+    return `${crQualityHtml(d)}
+        <p style="margin:0;font-size:0.95rem;"><b>${total}</b> משובים · ${win}</p>
+        <div class="table-scroll"><table class="admin-stats-tbl">
             <thead><tr><th>סוג עבודה</th><th>משובים</th><th>הטיה</th><th>"ממש לא"</th></tr></thead>
             <tbody>${rows}</tbody>
-        </table>
-        ${recent ? `<h5 class="tcol-title"><i class="fa-solid fa-comment"></i> מי אמר מה</h5>
+        </table></div>
+        ${recent ? `<h5 class="tcol-title"><i class="fa-solid fa-comment"></i> מי אמר מה · 10 האחרונים</h5>
                    <ul class="tlist">${recent}</ul>` : ''}`;
 }
 
@@ -7449,14 +7465,14 @@ function adminContributorsHtml(rows) {
     }).join('');
 
     return `<p style="margin:0;font-size:0.95rem;">
-            <b>${rows.length}</b> אנשים ענו · <b>${answers}</b> תשובות, מתוכן <b>${usable}</b> נספרות.</p>
+            <b>${rows.length}</b> אנשים ענו · <b>${answers}</b> תשובות, מתוכן <b>${usable}</b> נספרות · מאז ההתחלה.</p>
         <p class="input-help" style="margin:0;">"בקרה" = עבודות שאתה כבר תמחרת וידוע מה נכון בהן.
             מי שנכשל בהן שוב ושוב, או עונה מהר מכדי לקרוא, מפסיק להישקל: הוא ממשיך לקבל את הבונוסים
             שהרוויח ולא מקבל הודעה על כך.</p>
-        <table class="admin-stats-tbl">
+        <div class="table-scroll"><table class="admin-stats-tbl">
             <thead><tr><th>מי</th><th>תשובות</th><th>בקרה</th><th>מהיר מדי</th><th>מצב</th></tr></thead>
             <tbody>${body}</tbody>
-        </table>`;
+        </table></div>`;
 }
 
 // ---- Admin: aggregate stats dashboard (no PII) ----
@@ -7470,9 +7486,9 @@ async function renderAdminStats() {
         const d = await res.json();
         if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
         if (kpis) kpis.innerHTML = `
-            <div class="ask"><span class="asv">${(d.total || 0).toLocaleString('he-IL')}</span><span class="asl">הצעות סה"כ</span></div>
-            <div class="ask"><span class="asv">${(d.thisMonth || 0).toLocaleString('he-IL')}</span><span class="asl">החודש</span></div>
-            <div class="ask"><span class="asv">${(d.buckets || []).length}</span><span class="asl">קטגוריות פעילות</span></div>`;
+            <div class="ask"><span class="asv">${(d.total || 0).toLocaleString('he-IL')}</span><span class="asl">הצעות · מאז ההתחלה</span></div>
+            <div class="ask"><span class="asv">${(d.thisMonth || 0).toLocaleString('he-IL')}</span><span class="asl">הצעות · החודש</span></div>
+            <div class="ask"><span class="asv">${(d.buckets || []).length}</span><span class="asl">קטגוריות · מאז ההתחלה</span></div>`;
         const toggle = document.getElementById('admin-stats-live-toggle');
         if (toggle) toggle.checked = !!d.live;
         const note = document.getElementById('admin-stats-live-note');
@@ -10387,7 +10403,7 @@ function renderAdminAll(opts) {
     }
     const jobs = [
         () => renderAdminAuthStatus(),
-        () => renderControlRoom(true),   // the one screen, first
+        () => renderAdminOverview(true),  // the first screen, first
         () => renderAdminTraffic(),          // pulls clarity + AI + models with it
         () => renderAdminStats(),
         () => adminLoadPricingMap(),
