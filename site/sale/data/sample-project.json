@@ -1,0 +1,106 @@
+{
+  "_comment": "A sample project the empty list offers to load (loadSampleProject in app.js). Same shape createNewProject builds, so every renderer takes it as-is; id, created, touched, quoteNumber and date are stamped at load time. Flagged sample:true so the pipeline meter, the money board and the stats never count it.",
+  "sample": true,
+  "kind": "job",
+  "name": "עמדת טעינה 11kW בחניון",
+  "autoName": false,
+  "status": "טיוטה",
+  "stage": "pricing",
+  "category": "",
+  "clientPhone": "050-0000000",
+  "clientEmail": "",
+  "consumablesPct": 5,
+  "laborMode": "sum",
+  "laborHours": 10,
+  "laborPrice": 2900,
+  "laborItems": [
+    { "name": "פריסת קו הזנה 28 מ' בתעלה מתכתית, כולל חיזוקים וקידוח מעבר", "mode": "sum", "price": 1600 },
+    { "name": "עבודה בלוח: מא\"ז, פחת Type A, חיווט ושילוט", "mode": "sum", "price": 700 },
+    { "name": "תליית העמדה, חיבור, הפעלה והדרכת הלקוח", "mode": "sum", "price": 600 }
+  ],
+  "materials": [
+    { "name": "עמדת טעינה ביתית קבועה (MODE 3) 11kW תלת-פאזי, עם כבל Type 2 מובנה", "details": "יחידה: קומפ", "qty": 1, "unit": "קומפלט", "price": 4690, "suggested": 4690, "checked": true, "source": "catalog" },
+    { "name": "כבל נחושת N2XY/FR-1 בחתך 5X6 ממ\"ר", "details": "יחידה: מ'", "qty": 30, "unit": "מטר", "price": 39, "suggested": 39, "checked": true, "source": "catalog" },
+    { "name": "תעלת פח מגולוון 60X40 מ\"מ עם מכסה, כולל זוויות ומחברים", "details": "יחידה: מ'", "qty": 28, "unit": "מטר", "price": 34, "suggested": 34, "checked": true, "source": "catalog" },
+    { "name": "מא\"ז אופיין C לזרם 3X16A, כושר ניתוק 10kA", "details": "יחידה: יח'", "qty": 1, "unit": "יח'", "price": 95, "suggested": 95, "checked": true, "source": "catalog" },
+    { "name": "ממסר פחת 4X25A 30mA TYPE A 10kA", "details": "יחידה: יח'", "qty": 1, "unit": "יח'", "price": 500, "suggested": 500, "checked": true, "source": "catalog" },
+    { "name": "מפסק זרם פקט 4X25 אמפר בתיבה מוגנת מים IP65 (מנתק ליד העמדה)", "details": "יחידה: יח'", "qty": 1, "unit": "יח'", "price": 275, "suggested": 275, "checked": true, "source": "catalog" },
+    { "name": "קופסת הסתעפות פלסטית \"כבה מאליו\" IP65 עם כניסות אוטומות", "details": "יחידה: יח'", "qty": 2, "unit": "יח'", "price": 32, "suggested": 32, "checked": true, "source": "catalog" },
+    { "name": "שלט סנדביץ' חרוט 40X80 מ\"מ (עמדת טעינה · מא\"ז מס')", "details": "יחידה: יח'", "qty": 2, "unit": "יח'", "price": 49, "suggested": 49, "checked": true, "source": "catalog" },
+    { "name": "דיבלים, ברגים ומחזיקי תעלה לבטון", "details": "לכל 1 מ' תעלה", "qty": 1, "unit": "סט", "price": 120, "suggested": 120, "checked": true, "source": "catalog" }
+  ],
+  "extras": {
+    "inspector": { "on": true, "mode": "sum", "qty": 0 }
+  },
+  "fees": [],
+  "scope": [
+    "פריסת קו הזנה תלת-פאזי 5X6 מהלוח הראשי עד החניה, 28 מ' בתעלת פח",
+    "הגנות בלוח: מא\"ז 3X16A + פחת Type A 30mA",
+    "מנתק מוגן מים ליד העמדה",
+    "תליית עמדת 11kW על קיר בטון, חיבור, הפעלה ובדיקה",
+    "בדיקת חשמלאי בודק ואישור למתקן"
+  ],
+  "tools": [
+    "מקדחה פטישון + מקדחי בטון 8/10",
+    "במה מתרוממת קטנה (חניון · תקרה 3.2 מ')",
+    "מודד בידוד ומודד לולאה",
+    "לוחץ נעלי כבל 6 ממ\"ר"
+  ],
+  "spec": {
+    "jobType": "charger",
+    "stdFor": "charger",
+    "answers": {
+      "site_photos": { "value": "", "source": "std", "skipped": true },
+      "charger_power": { "value": "11kW תלת-פאזי (3×16A)", "source": "user", "skipped": false },
+      "connection_size": { "value": "3×25 תלת-פאזי", "source": "user", "skipped": false },
+      "earthing_system": { "value": "הארקת יסוד + פס הארקה נפרד בלוח", "source": "std", "skipped": false },
+      "panel_state": { "value": "לוח מודרני עם פחת ו-8 מודולים פנויים", "source": "user", "skipped": false },
+      "meter_source": { "value": "מונה הדירה/הבית", "source": "user", "skipped": false },
+      "route_type": { "value": "תעלה גלויה על הקיר (עה\"ט)", "source": "user", "skipped": false },
+      "distance_m": { "value": "28", "source": "user", "skipped": false },
+      "distance_basis": { "value": "נמדד בתוואי הפריסה בפועל", "source": "user", "skipped": false },
+      "parking_context": { "value": "חניון תת-קרקעי · נדרשת במה מתרוממת או פיגום", "source": "user", "skipped": false },
+      "site_access": { "value": "נדרש מפתח או קוד לשער/חניון", "source": "user", "skipped": false },
+      "mounting": { "value": "קיר בטון", "source": "user", "skipped": false }
+    }
+  },
+  "planChatHistory": [
+    {
+      "role": "model",
+      "parts": [{ "text": "תאר לי את העבודה במילים שלך — ואחזיר לך **מחיר** מיד, לפי ההנחות המקובלות לעבודה כזאת. את מה שאני מניח אמלא בכרטיס האפיון, ואשאל רק על מה שבאמת מזיז את המספר." }]
+    },
+    {
+      "role": "user",
+      "parts": [{ "text": "התקנת עמדת טעינה 11kW בחניון תת-קרקעי של בניין משותף. הלוח של הדירה בקומת הקרקע, 28 מטר עד החניה, תלת-פאזי 3×25, לוח מודרני עם מקום. צריך במה כי התקרה גבוהה." }]
+    },
+    {
+      "role": "model",
+      "parts": [{ "text": "עבודה סטנדרטית של עמדת 11kW עם קו הזנה 28 מ' בתעלת פח בחניון. מילאתי את כרטיס האפיון לפי מה שאמרת; שתי הנחות שכדאי לאשר: הארקת יסוד עם פס נפרד בלוח, והזנה ממונה הדירה (לא ממונה הרכוש המשותף).\n\n**הערכה ראשונית:** בסביבות 13,500 ₪ לפני מע\"מ לפי מחירי המאגר, תוספת 20% על חומרים ו-5% חומרי עזר — כולל עמדה, קו, הגנות ובודק. המספר המדויק בטבלת התמחור." }]
+    }
+  ],
+  "chatHistory": [
+    {
+      "role": "model",
+      "parts": [{ "text": "האפיון הושלם. רשימת החומרים והעבודה מוכנה בטבלת התמחור — בדוק את המחירים, סמן מה שנכנס להצעה, ואז \"החל על ההצעה\"." }]
+    }
+  ],
+  "quoteData": {
+    "clientName": "ישראל ישראלי",
+    "clientSub": "רח' הדוגמה 12, תל אביב · חניון תת-קרקעי",
+    "quoteNumber": "",
+    "date": "",
+    "subject": "התקנת עמדת טעינה 11kW בחניון תת-קרקעי",
+    "items": [
+      { "title": "פרק א': קו הזנה", "description": "פריסת קו הזנה תלת-פאזי 5X6 ממ\"ר מהלוח הראשי עד החניה, 28 מ' בתעלת פח מגולוונת עם מכסה, כולל קידוח מעבר וחיזוקים לבטון.", "price": 0 },
+      { "title": "פרק ב': הגנות בלוח", "description": "מא\"ז 3X16A אופיין C, ממסר פחת 4X25A 30mA Type A, חיווט, שילוט ומנתק מוגן מים ליד העמדה.", "price": 0 },
+      { "title": "פרק ג': העמדה", "description": "אספקה, תליית עמדת טעינה 11kW תלת-פאזית (MODE 3, כבל Type 2 מובנה) על קיר בטון, חיבור, הפעלה, בדיקה והדרכה.", "price": 0 },
+      { "title": "פרק ד': בדיקה ואישור", "description": "בדיקת חשמלאי בודק ומסירת אישור למתקן.", "price": 0 }
+    ],
+    "basePrice": 0,
+    "vatType": "exclude",
+    "finalPrice": 0,
+    "summary": "",
+    "showItemizedPrices": false,
+    "customerType": "private"
+  }
+}

@@ -403,6 +403,10 @@
                             </span>
                             <span id="home-greeting">שלום</span>
                         </h1>
+                        <!-- The one job he was in the middle of, and one button that
+                             opens it at the step he left. Hidden when nothing is open
+                             (renderResumeCard). -->
+                        <div class="home-resume" id="home-resume" hidden></div>
                         <p class="home-sub">מה העבודה שאתה מתמחר עכשיו?</p>
 
                         <div class="home-ask">
@@ -420,6 +424,10 @@
                             <button type="button" class="chip" onclick="fillHomeExample(this)">הוספת 6 נקודות חשמל בסלון</button>
                             <button type="button" class="chip" onclick="fillHomeExample(this)">בדיקת תקלה · קצר במעגל</button>
                         </div>
+
+                        <!-- Money out with customers: quotes sent and not yet answered
+                             (renderPipelineMeter). -->
+                        <p class="home-pipeline" id="home-pipeline"></p>
 
                         <div class="home-side" id="home-side">
                             <span class="home-side-head">ממשיכים</span>

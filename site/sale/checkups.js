@@ -202,6 +202,33 @@ function maintSave() {
     showToast('נקבע, ' + ckFmtDate(next) + ' · תזכורת ' + maintLeadLabel(maintLeadsFor(proj)) + ' לפני');
 }
 
+// Follow a job WITHOUT the dialog: the record maintSave writes, with the
+// interval decided by the job type (see checkupIntervalFor in app.js) and the
+// first visit one interval from today. Used by the "add to periodic checkups?"
+// offer on a job that was just marked done, so the answer is one tap and the
+// project lands on the שירות תקופתי tab exactly as if the dialog had been
+// filled in. Lead times stay on the global default; the card can change them.
+function maintFollowProject(projectId, months) {
+    const proj = projectsList.find((p) => p.id === projectId);
+    const m = Number(months) || 0;
+    if (!proj || m <= 0) return false;
+    proj.kind = 'maintenance';
+    proj.maintenance = Object.assign({}, proj.maintenance, {
+        months: m,
+        next: maintAddMonths(ckToday(), m),
+        repeats: MAINT_REPEATS_DEFAULT,
+        leadDays: null,
+        eventId: (proj.maintenance && proj.maintenance.eventId) || null
+    });
+    touchProject(proj);
+    saveProjects();
+    filterProjectsList();
+    try { renderStatistics(); } catch (e) {}
+    try { renderReminderBell(); } catch (e) {}
+    showToast('נוסף למעקב · ' + ckFmtDate(proj.maintenance.next));
+    return true;
+}
+
 // Stop following a job from the periodic-service list, without opening the
 // dialog first: the row on that screen is where you decide it is over.
 async function maintStop(projectId) {
@@ -1230,6 +1257,10 @@ function renderProjectsList(list) {
                 <button type="button" class="btn btn-accent" onclick="startFirstProject()">
                     <i class="fa-solid fa-plus"></i> פרויקט חדש
                 </button>
+                <button type="button" class="btn btn-secondary pe-sample" onclick="loadSampleProject()"
+                        title="עבודה אמיתית, מאופיינת ומתומחרת, כדי לראות את הדרך עד ההצעה. אפשר למחוק אותה כמו כל עבודה">
+                    🔍 טען פרויקט לדוגמה — עמדת טעינה 11kW בחניון
+                </button>
             </div>`;
         return;
     }
@@ -1282,14 +1313,15 @@ function renderProjectsList(list) {
                 <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg>
             </button>
             <div class="project-info">
-                <div class="project-title">${escapeHtml(cardTitle)}${closed ? `<span class="closed-tag">${escapeHtml(CLOSE_LABELS[closed] || '')}</span>` : ''}</div>
+                <div class="project-title">${escapeHtml(cardTitle)}${closed ? `<span class="closed-tag">${escapeHtml(CLOSE_LABELS[closed] || '')}</span>` : ''}${isSampleProject(p) ? '<span class="sample-tag">דוגמה</span>' : ''}</div>
+                ${checkupPromptHtml(p)}
                 ${goneQuiet ? `<div class="stale-strip">
                     <span><i class="fa-solid fa-bell"></i> נשלחה הצעה לפני ${staleDays(p)} ימים ואין תשובה</span>
                     <button type="button" class="btn btn-secondary btn-small" onclick="ackStaleProject('${p.id}', event)">אישור, אני יודע</button>
                 </div>` : ''}
                 <div class="project-meta">
                     <span><i class="fa-solid fa-calendar"></i> ${formatHebrewDate(p.created)}</span>
-                    ${p.approvedAt ? `<span class="approved-badge" title="${escapeHtml('אושרה בקישור' + (p.approvedBy ? ' על ידי ' + p.approvedBy : ''))}"><i class="fa-solid fa-circle-check"></i> אושרה על ידי הלקוח</span>` : ''}
+                    ${approvedBadgeHtml(p)}
                     ${maintBadgeHtml(p)}
                     <button type="button" class="proj-cat-chip ${p.category ? 'has-cat' : ''}"
                             onclick="event.stopPropagation(); openCategoryPicker('${p.id}')" title="שיוך לקטגוריה">

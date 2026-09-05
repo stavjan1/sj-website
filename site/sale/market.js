@@ -662,19 +662,42 @@ function formatPriceString(val) {
 async function checkQuoteApproval(proj) {
     if (!proj || !proj.shareToken || proj.approvedAt) return;
     try {
-        const res = await fetch('/api/quote-share?t=' + encodeURIComponent(proj.shareToken));
-        const body = await res.json().catch(() => ({}));
-        const approved = body && body.data && body.data.approved;
-        if (!approved || !approved.at) return;
-        proj.approvedAt = approved.at;
-        proj.approvedBy = approved.name || '';
-        // The status vocabulary stays as it is (draft / sent / done / paid) —
-        // approval is a fact about the quote, shown as its own mark, not a
-        // fifth status that every filter and board would have to learn.
+        const approved = await fetchQuoteApproval(proj);
+        if (!applyQuoteApproval(proj, approved)) return;
         saveProjects();
         filterProjectsList();
-        showToast(`הלקוח אישר את ההצעה${approved.name ? ': ' + approved.name : ''}`);
     } catch (e) { /* offline, or the link was deleted */ }
+}
+
+// The one GET. Resolves to the approval stamp `{ at, name, note }` or null;
+// throws on a network failure so the caller decides what silence means. The
+// home's batched refresh (refreshApprovals in app.js) uses this too, so the
+// server is asked in exactly one way.
+async function fetchQuoteApproval(proj) {
+    if (!proj || !proj.shareToken) return null;
+    const res = await fetch('/api/quote-share?t=' + encodeURIComponent(proj.shareToken));
+    const body = await res.json().catch(() => ({}));
+    const approved = body && body.data && body.data.approved;
+    return approved && approved.at ? approved : null;
+}
+
+// Stamp the project, and say so ONCE. The status vocabulary stays as it is
+// (draft / sent / done / paid) — approval is a fact about the quote, shown as
+// its own mark, not a fifth status that every filter and board would have to
+// learn. approvalToastAt is the flag that keeps a refresh from repeating the
+// toast on every render after the first. Returns true when something changed;
+// the caller saves.
+function applyQuoteApproval(proj, approved) {
+    if (!proj || !approved || !approved.at) return false;
+    const fresh = !proj.approvedAt;
+    proj.approvedAt = approved.at;
+    proj.approvedBy = approved.name || '';
+    if (fresh && !proj.approvalToastAt) {
+        proj.approvalToastAt = Date.now();
+        const who = (approved.name || (proj.quoteData && proj.quoteData.clientName) || '').trim();
+        showToast(who ? `הלקוח ${who} אישר את ההצעה!` : 'הלקוח אישר את ההצעה!');
+    }
+    return fresh;
 }
 
 // ── The terms that decide arguments later ───────────────────────────────────
