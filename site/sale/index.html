@@ -263,6 +263,17 @@
                     <span>כל העבודות</span>
                 </button>
                 <span class="ctx-crumb" id="ctx-crumb" aria-label="מיקום" hidden></span>
+                <!-- The road. Inside a job it replaces the crumb's step: three
+                     steps in the trade's words, the one you stand on lit, the
+                     finished ones ticked. Painted by renderGuideBar() (app.js)
+                     from proj.guide and the project's own facts. -->
+                <ol class="ctx-road" id="ctx-road" aria-label="שלבי העבודה" hidden></ol>
+                <!-- The guide's switch, where the guide is: off hides every
+                     card, the road stays. Mirrored by a row in הגדרות. -->
+                <button type="button" class="ctx-guide" id="ctx-guide" onclick="toggleGuide()"
+                        aria-pressed="true" aria-label="הדרכה מלווה" title="הדרכה מלווה" hidden>
+                    <span aria-hidden="true">🧭</span>
+                </button>
                 <!-- Daylight on a roof: the light theme is one tap from every
                      screen. It was only inside the account menu, which is two
                      taps and a menu nobody opens with a glove on. Same cycle as
@@ -708,6 +719,9 @@
                         <h2><i class="fa-solid fa-comments text-accent"></i> שיחה</h2>
                     </div>
                 </div>
+                <!-- Step 1 of the guide: one sentence, and the chat's own send
+                     is the button. Filled by renderGuideCards() (app.js). -->
+                <div class="guide-card" id="guide-card-wizard" hidden></div>
 
                 <div class="split-view">
                     
@@ -864,6 +878,8 @@
                     <h2><i class="fa-solid fa-table-list text-accent" aria-hidden="true"></i> טבלת תמחור</h2>
                     <p class="section-subtitle">מה נכנס להצעה, כמה יחידות, מה המחיר המוצע, ומה המחיר שלך.</p>
                 </div>
+                <!-- Step 2 of the guide: a quick eye, then one button on. -->
+                <div class="guide-card" id="guide-card-pricing" hidden></div>
                 <div id="pricing-table"></div>
                 <div class="pt-foot" id="pricing-foot"></div>
 
@@ -998,7 +1014,11 @@
             </section>
 
             <section id="panel-create" class="content-panel">
-                <div class="chat-mode-toggle stage-rail" id="draft-stage-rail" role="group" aria-label="שלבי העבודה">
+                <!-- Kept in the DOM for goToStage/renderStageRail, hidden: the
+                     ctx-bar's road (#ctx-road) draws these three steps now, and
+                     two copies one row apart is the duplication Stav asked to
+                     end on 22/08. -->
+                <div class="chat-mode-toggle stage-rail" id="draft-stage-rail" role="group" aria-label="שלבי העבודה" hidden>
                     <button type="button" class="mode-pill" onclick="goToStage('plan')"><span class="stage-num">1</span> אפיון</button>
                     <i class="fa-solid fa-angle-left stage-arrow" aria-hidden="true"></i>
                     <button type="button" class="mode-pill" onclick="goToStage('price')"><span class="stage-num">2</span> תמחור</button>
@@ -1006,6 +1026,9 @@
                     <button type="button" class="mode-pill active" onclick="goToStage('draft')"><span class="stage-num">3</span> הצעה</button>
                 </div>
                 <div class="next-step" id="next-step-draft" hidden></div>
+                <!-- Step 3 of the guide — and after the send, the stopping
+                     point: what happens next, only what the code really does. -->
+                <div class="guide-card" id="guide-card-create" hidden></div>
                 <div class="split-view">
                     
                     <!-- Right Side: Form and Controls -->
@@ -1704,6 +1727,12 @@
                                             <i class="fa-solid fa-moon"></i> לילה
                                         </button>
                                     </div>
+                                </div>
+                                <div class="form-group guide-setting">
+                                    <label class="guide-setting-row" for="set-guide-on">
+                                        <input type="checkbox" id="set-guide-on" checked onchange="setGuideOn(this.checked)">
+                                        <span><b>🧭 הדרכה מלווה</b><small>בתוך עבודה: הצעד הבא בכרטיס אחד, ומעבר לשלב הבא כשהקודם נגמר. הכפתור 🧭 בראש העבודה עושה את אותו הדבר.</small></span>
+                                    </label>
                                 </div>
                                 <div class="form-group">
                                     <label style="font-weight:600; margin-bottom:8px; display:block;">תזכורות תחזוקה</label>

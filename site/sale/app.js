@@ -1876,9 +1876,17 @@ function renderCtxCrumb() {
     const proj = activeProjectId ? (projectsList || []).find((p) => p.id === activeProjectId) : null;
     const show = !!proj && !!CTX_STEPS[cur];
     works.hidden = !show;
-    crumb.hidden = !show;
     crumb.textContent = show ? ctxCrumbText(proj, cur) : '';
     crumb.title = crumb.textContent;
+    // Inside a job the road (renderGuideBar) says the step, and the banner
+    // below already names the customer and the work — so the crumb would say
+    // the same thing twice on one screen. It stays for a conversation, which
+    // has no road, and it keeps its text as the road's accessible name.
+    const road = show && isJob(proj);
+    crumb.hidden = !show || road;
+    renderGuideBar(road ? proj : null, cur);
+    const roadEl = document.getElementById('ctx-road');
+    if (roadEl && road) roadEl.setAttribute('aria-label', crumb.textContent);
 }
 
 // The button used to sit alone in a bar of its own, which cost a whole row on
@@ -1957,6 +1965,398 @@ function placeBackButton() {
     // is actually left in the bar cannot go stale when a fourth arrives.
     const stillHere = Array.from(bar.children).some((el) => !el.hidden);
     bar.classList.toggle('is-empty', !stillHere);
+}
+
+// ── The guide: one road, one lit step, one instruction ──────────────────────
+// Stav, 4.9.2026: the electrician should never wonder what to do next. The
+// ctx-bar shows the whole road in one line — three steps, the current one lit,
+// the finished ones ticked — and the open screen carries ONE card with one
+// sentence and one button. When a step completes, the app moves him to the
+// next one and explains it. The road ends at a point chosen in advance: the
+// quote left, the ball is with the customer, and the card says what actually
+// happens next — only what the code really does.
+//
+// The three steps are the three project tabs, in the trade's words rather than
+// the rail's: "describe the job", "confirm the quantities", "quote and send".
+// Persisted per project on the ROOT as proj.guide = { step, done: [1,2,3],
+// sentAt, off } — never inside quoteData, which is rebuilt from a fixed key
+// list on every keystroke and would drop it silently (nextstep.js learned that
+// the hard way). Everything the road shows is derived from persisted facts
+// plus these flags; the DOM is never the source of truth.
+const GUIDE_STEPS = [
+    { n: 1, tab: 'wizard',  label: 'תיאור העבודה' },
+    { n: 2, tab: 'pricing', label: 'אישור כמויות' },
+    { n: 3, tab: 'create',  label: 'הצעה ושליחה' },
+];
+
+// The one switch. Absent means on: the guide is the default for someone new,
+// and turning it off is an explicit act (settings.guideOn === false).
+function guideOn() {
+    return !(appState && appState.settings && appState.settings.guideOn === false);
+}
+
+function ensureGuide(proj) {
+    if (!proj.guide || typeof proj.guide !== 'object') proj.guide = { step: 1, done: [false, false, false], sentAt: null };
+    if (!Array.isArray(proj.guide.done) || proj.guide.done.length !== 3) proj.guide.done = [false, false, false];
+    return proj.guide;
+}
+
+// Pure — no DOM, no globals beyond the project handed in — so the tests run it
+// in node:vm on fake projects. A later step done implies the earlier ones: a
+// quote that went out was priced and confirmed, whatever the flags say.
+//   1 done → the pricing agent answered him (a model turn after his own — the
+//            opening greeting is also a model turn), or materials exist, or flagged.
+//   2 done → flagged by the continue button / by opening stage 3.
+//   3 done → the quote left (guide.sentAt, or the app's own quoteOutAt stamp).
+function guideStepState(proj) {
+    const g = (proj && proj.guide) || {};
+    const done = Array.isArray(g.done) ? g.done : [];
+    const mats = Array.isArray(proj && proj.materials)
+        ? proj.materials.filter((m) => m && (m.name || m.description)) : [];
+    // "Priced" is a model reply to something HE wrote. The thread opens with a
+    // model greeting (createNewProject), so "any model message" would tick
+    // step 1 on a job nobody has described yet.
+    const hist = Array.isArray(proj && proj.chatHistory) ? proj.chatHistory : [];
+    const firstUser = hist.findIndex((m) => m && m.role === 'user');
+    const priced = firstUser > -1 && hist.slice(firstUser + 1).some((m) => m && m.role === 'model');
+    const sentAt = Number(g.sentAt) || Number(proj && proj.quoteOutAt) || 0;
+    const d3 = !!done[2] || sentAt > 0;
+    const d2 = !!done[1] || d3;
+    const d1 = !!done[0] || mats.length > 0 || priced || d2;
+    const flags = [d1, d2, d3];
+    const firstOpen = flags.indexOf(false);
+    return { done: flags, step: firstOpen === -1 ? 3 : firstOpen + 1, sentAt };
+}
+
+function guideActiveProject() {
+    const proj = activeProjectId ? (projectsList || []).find((p) => p.id === activeProjectId) : null;
+    // A conversation has no stages, so it has no road.
+    return proj && isJob(proj) ? proj : null;
+}
+
+// Flags a step done and remembers where the road now points.
+function guideMarkDone(proj, n) {
+    const g = ensureGuide(proj);
+    if (g.done[n - 1]) return false;
+    g.done[n - 1] = true;
+    g.step = guideStepState(proj).step;
+    saveProjects();
+    return true;
+}
+
+// ── The road in the ctx-bar ─────────────────────────────────────────────────
+// Lit = the tab you are standing on; ticked = done. Each step is a button to
+// its tab, the same calls the rail makes, so the road is also a way to move.
+function renderGuideBar(proj, cur) {
+    const road = document.getElementById('ctx-road');
+    const tog = document.getElementById('ctx-guide');
+    const show = !!proj && !!CTX_STEPS[cur];
+    if (tog) {
+        tog.hidden = !show;
+        tog.setAttribute('aria-pressed', guideOn() ? 'true' : 'false');
+        tog.classList.toggle('is-off', !guideOn());
+        tog.title = guideOn() ? 'הדרכה מלווה פועלת · לחץ לכיבוי' : 'הדרכה מלווה כבויה · לחץ להפעלה';
+    }
+    if (!road) return;
+    road.hidden = !show;
+    if (!show) { road.innerHTML = ''; return; }
+    const st = guideStepState(proj);
+    road.innerHTML = GUIDE_STEPS.map((s, i) => {
+        const done = st.done[i];
+        const here = s.tab === cur;
+        const cls = ['road-step', done ? 'is-done' : '', here ? 'is-current' : ''].filter(Boolean).join(' ');
+        const state = here ? 'aria-current="step"' : '';
+        return (i ? '<li class="road-sep" aria-hidden="true"></li>' : '')
+            + `<li class="${cls}"><button type="button" onclick="guideGo(${s.n})" ${state} title="${escapeHtml(s.label)}">`
+            + `<span class="road-n">${done ? '✓' : s.n}</span><span class="road-l">${escapeHtml(s.label)}</span></button></li>`;
+    }).join('');
+}
+
+// A step on the road is a door to its tab — the same door the rail opens.
+function guideGo(n) {
+    const s = GUIDE_STEPS.find((x) => x.n === n);
+    if (!s || !activeProjectId) return;
+    switchTab(s.tab);
+}
+
+// ── One card per step ───────────────────────────────────────────────────────
+// The cards on the three screens. Only the open screen's slot is filled; the
+// other two are emptied so a card never survives a walk to another tab.
+// nextstep.js paints its own card when the screen would otherwise leave him at
+// a dead end (an empty pricing table, a 0 ₪ draft); when it has something to
+// say on this screen, this card yields — two hints on one screen are none.
+const GUIDE_SLOTS = { wizard: 'guide-card-wizard', pricing: 'guide-card-pricing', create: 'guide-card-create' };
+// Projects whose quote left during THIS session: their after-send card opens
+// in full once; a reload, or the ×, folds it to one line.
+const _guideFreshSent = new Set();
+
+function renderGuideCards() {
+    const slots = {};
+    Object.keys(GUIDE_SLOTS).forEach((k) => {
+        const el = document.getElementById(GUIDE_SLOTS[k]);
+        if (el) { el.hidden = true; el.innerHTML = ''; slots[k] = el; }
+    });
+    document.body.classList.remove('guide-step1-card');
+    if (!guideOn()) return;
+    const proj = guideActiveProject();
+    if (!proj) return;
+    const cur = ((document.querySelector('.content-panel.active') || {}).id || '').replace('panel-', '');
+    const slot = slots[cur];
+    if (!slot) return;
+    const g = ensureGuide(proj);
+    const st = guideStepState(proj);
+    if (g.step !== st.step) g.step = st.step;
+
+    let html = '';
+    if (cur === 'create' && st.sentAt) {
+        // The stopping point: the road is complete, and this line stays as the
+        // project's last word. Dismissing (×) only folds it.
+        html = _guideSentCardHtml(proj, st, _guideFreshSent.has(proj.id));
+    } else if (g.off) {
+        return;                                        // he closed the cards on this job
+    } else if (_guideNextStepBusy(proj, cur)) {
+        return;                                        // nextstep.js is already talking here
+    } else if (cur === 'wizard') {
+        html = _guideWizardCardHtml(proj, st);
+    } else if (cur === 'pricing') {
+        html = _guideCard('עין מהירה על החומרים והמחירים — תקן מה שצריך.',
+            `<button type="button" class="btn btn-accent btn-small" onclick="guideContinueToQuote()">המשך להצעה <i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>`);
+    } else if (cur === 'create') {
+        html = _guideCreateCardHtml(proj);
+    }
+    if (!html) return;
+    slot.innerHTML = html;
+    slot.hidden = false;
+}
+
+function _guideNextStepBusy(proj, cur) {
+    if (typeof nextStepFor !== 'function') return false;
+    let card = null;
+    try { card = nextStepFor(proj); } catch (e) { card = null; }
+    if (!card) return false;
+    return (card.home === 'wizard' && cur === 'wizard') || (card.home === 'draft' && cur === 'create');
+}
+
+function _guideCard(text, btns, extra) {
+    return `<div class="gc-row"><p class="gc-text">${text}</p>`
+        + `<button type="button" class="gc-x" onclick="dismissGuideCard()" aria-label="סגור את ההדרכה בעבודה הזאת" title="סגור בעבודה הזאת">×</button></div>`
+        + (btns ? `<div class="gc-btns">${btns}</div>` : '')
+        + (extra || '');
+}
+
+// Step 1. While the thread is empty the instruction is to describe the job,
+// and the chat's own starter chips ride along (cloned from the composer's row,
+// which the stylesheet then hides so they are not on screen twice). Once he
+// has written, the chat's own bars are the guidance — the card goes quiet
+// rather than repeat them. When the pricing answer has landed, the card is the
+// door to the next step.
+function _guideWizardCardHtml(proj, st) {
+    if (st.done[0]) {
+        return _guideCard('התמחור התקבל. עכשיו עין מהירה על הכמויות.',
+            `<button type="button" class="btn btn-accent btn-small" onclick="guideGo(2)">המשך לאישור כמויות <i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>`);
+    }
+    const spoke = [].concat(proj.planChatHistory || [], proj.chatHistory || [])
+        .some((m) => m && m.role === 'user' && !m.handoff);
+    if (spoke) return '';
+    const chips = Array.from(document.querySelectorAll('.chat-suggestions .chip'))
+        .map((c) => `<button type="button" class="chip" onclick="${escapeHtml(c.getAttribute('onclick') || '')}">${escapeHtml(c.textContent.trim())}</button>`)
+        .join('');
+    if (chips) document.body.classList.add('guide-step1-card');
+    return _guideCard('תאר את העבודה במשפט אחד, כמו לקולגה בוואטסאפ.', '',
+        (chips ? `<div class="gc-chips">${chips}</div>` : '') + _guideOffHintHtml(proj));
+}
+
+// After five quotes have gone out he knows the road; one line, once, says
+// where the switch is. Pinned to the project it first appeared on, so it is
+// seen for as long as that job is open and then never again.
+function guideSentCount() {
+    return (projectsList || []).filter((p) => isJob(p) && ((p.guide && Number(p.guide.sentAt) > 0) || Number(p.quoteOutAt) > 0)).length;
+}
+function _guideOffHintHtml(proj) {
+    const s = appState.settings || (appState.settings = {});
+    if (!s.guideHintProject) {
+        if (guideSentCount() < 5) return '';
+        s.guideHintProject = proj.id;
+        persistSettings();
+    }
+    if (s.guideHintProject !== proj.id) return '';
+    return '<p class="gc-hint">אפשר לכבות את ההדרכה בכפתור 🧭 שלמעלה.</p>';
+}
+
+// Step 3, before the send. A quote with no money in it is not "ready", and
+// saying so would be the kind of lie this whole layer exists to avoid: when
+// the pricing table has numbers nextstep.js already offers to carry them
+// over (and this card yields to it); when nothing was priced at all, the
+// honest instruction is to go back and get a price.
+function _guideCreateCardHtml(proj) {
+    const q = proj.quoteData || {};
+    const hasMoney = Number(q.basePrice) > 0 || (q.items || []).some((i) => Number(i && i.price) > 0);
+    if (!hasMoney) {
+        return _guideCard('עוד אין מחיר בהצעה. חזור לתיאור העבודה ותן לסוכן לתמחר.',
+            `<button type="button" class="btn btn-secondary btn-small" onclick="guideGo(1)"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i> לתיאור העבודה</button>`);
+    }
+    return _guideCard('ההצעה מוכנה. שלח ללקוח.',
+        `<button type="button" class="btn btn-whatsapp btn-small" onclick="shareWhatsApp()">📲 שלח בוואטסאפ</button>`
+        + `<button type="button" class="gc-quiet" onclick="downloadPDF()">הורד PDF</button>`);
+}
+
+// The stopping point. Every sentence here is checked against the code:
+//   * the /q/ link: checkQuoteApproval (market.js) asks the server when the
+//     project is next OPENED and stamps approvedAt — the list then shows
+//     "אושרה על ידי הלקוח". It does not move the status and it does not push
+//     a notification, so the card says exactly that much.
+//   * the follow-up: getDueFollowups counts a job in status 'נשלח' for
+//     FOLLOWUP_AFTER_DAYS days into the bell (renderReminderBell). That is the
+//     only reminder this app has, and it is in-app: no SMS, no push, no mail.
+//     On the free plan the bell only COUNTS it — the follow-up row itself is
+//     locked behind Pro (renderReminderPopover) — so the free wording says
+//     "count", not "remind".
+//   * without a link, the customer's yes arrives by phone, and the next
+//     move is his: mark it בוצע on the money board (pipelineAdvance).
+function _guideSentCardHtml(proj, st, expanded) {
+    const when = st.sentAt ? formatHebrewDate(new Date(st.sentAt).toISOString()) : '';
+    const line = `נשלח ב-${when} · ממתין ללקוח`;
+    if (!expanded) {
+        return `<div class="gc-row gc-folded"><p class="gc-text"><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i> ${escapeHtml(line)}</p>`
+            + `<button type="button" class="gc-more" onclick="expandGuideSentCard()">מה עכשיו?</button></div>`;
+    }
+    const days = typeof FOLLOWUP_AFTER_DAYS === 'number' ? FOLLOWUP_AFTER_DAYS : 3;
+    const sentStatus = (proj.status || '') === 'נשלח';
+    const next = [];
+    if (proj.shareLink) {
+        next.push('כשהלקוח יאשר בקישור, בפעם הבאה שתפתח את העבודה היא תסומן "אושרה על ידי הלקוח".');
+    } else {
+        // The board's columns after בוצע are חשבונית and תשלום — it tracks them
+        // for every plan; ISSUING the invoice is Business-only (invoicingAllowed),
+        // so the card says "tracks", not "issues".
+        next.push('כשהלקוח יגיד כן, סמן את העבודה "בוצע" בלוח הכסף — משם היא ממשיכה לחשבונית ולתשלום.');
+    }
+    if (sentStatus) {
+        const pro = typeof tierAllows === 'function' && tierAllows('reminders');
+        next.push(pro
+            ? `העבודה סומנה "נשלח". אם הוא לא יענה תוך ${days} ימים, הפעמון למעלה יזכיר לך לשלוח לו הודעת מעקב.`
+            : `העבודה סומנה "נשלח". אם הוא לא יענה תוך ${days} ימים, הפעמון למעלה יספור אותה בין ההצעות שממתינות לתשובה.`);
+    }
+    return `<div class="gc-row"><p class="gc-text gc-strong">ההצעה נשלחה. עכשיו הכדור אצל הלקוח.</p>`
+        + `<button type="button" class="gc-x" onclick="foldGuideSentCard()" aria-label="קפל" title="קפל">×</button></div>`
+        + `<ul class="gc-next">${next.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`
+        + `<p class="gc-bye">נתראה כשהוא עונה.</p>`;
+}
+
+function expandGuideSentCard() {
+    if (activeProjectId) _guideFreshSent.add(activeProjectId);
+    renderGuideCards();
+}
+function foldGuideSentCard() {
+    if (activeProjectId) _guideFreshSent.delete(activeProjectId);
+    renderGuideCards();
+}
+
+// × on a step card: this job, no more cards. The road stays — it is where you
+// are, not advice — and the after-send line stays, because it is a fact.
+function dismissGuideCard() {
+    const proj = guideActiveProject();
+    if (!proj) return;
+    ensureGuide(proj).off = true;
+    saveProjects();
+    renderGuideCards();
+}
+
+// Step 2's one button: the quantities are confirmed, on to the quote.
+// goToDraft (chat.js) carries the stage bookkeeping — proj.stage, the rail,
+// the terms — but its gate refuses a job whose stage never left planning and
+// says so in a toast, which from this button would read as a dead end. On
+// such a job the plain tab is the honest move: the road already lit step 3.
+function guideContinueToQuote() {
+    const proj = guideActiveProject();
+    if (!proj) return;
+    guideMarkDone(proj, 2);
+    let staged = true;
+    try { staged = STAGE_ORDER[getProjectStage(proj)] >= 1; } catch (e) { staged = false; }
+    if (staged && typeof goToDraft === 'function') goToDraft(); else switchTab('create');
+}
+
+// ── Hooks the rest of the app calls ─────────────────────────────────────────
+// The pricing answer landed (runPricingAgent, chat.js). Step 1 is done; if he
+// is standing on the chat with nothing half-typed, the app walks him to the
+// quantities after a beat — long enough to see the answer finish, short
+// enough that he does not wonder what to press. Only the FIRST time: a second
+// pricing answer means he came back to the chat on purpose.
+let _guideAdvanceTimer = null;
+let _guideTypedAt = 0;
+document.addEventListener('input', (e) => {
+    if (e.target && e.target.id === 'chat-user-input') _guideTypedAt = Date.now();
+}, true);
+
+function guideCanAutoAdvance(proj) {
+    if (!guideOn() || !proj || proj.id !== activeProjectId) return false;
+    if (proj.guide && proj.guide.off) return false;
+    if (!document.querySelector('#panel-wizard.active')) return false;
+    const input = document.getElementById('chat-user-input');
+    if (!input) return true;
+    if (input.value.trim()) return false;                                   // something half-written
+    if (document.activeElement === input && Date.now() - _guideTypedAt < 4000) return false;   // mid-thought
+    return true;
+}
+
+function guideOnPriced(proj) {
+    if (!proj || !isJob(proj)) return;
+    const wasNew = guideMarkDone(proj, 1);
+    try { renderCtxCrumb(); renderGuideCards(); } catch (e) {}
+    if (!wasNew || !guideCanAutoAdvance(proj)) return;
+    clearTimeout(_guideAdvanceTimer);
+    _guideAdvanceTimer = setTimeout(() => {
+        if (!guideCanAutoAdvance(proj)) return;      // he started typing meanwhile
+        switchTab('pricing');
+        showToast('התמחור התקבל · עין מהירה על הכמויות');
+    }, 1800);
+}
+
+// The quote left — WhatsApp, the customer link, or the PDF. Called beside
+// markQuoteOut on each of those paths. The road is complete; the status moves
+// to 'נשלח' by itself when it was still a draft, because that is the status
+// every waiting-list and follow-up rule in the app hangs off, and a quote that
+// left while its status said "טיוטה" got no reminder and no place on the
+// waiting rail. A status he already moved further along is never pulled back.
+function guideQuoteSent() {
+    const proj = guideActiveProject();
+    if (!proj) return;
+    const g = ensureGuide(proj);
+    g.done = [true, true, true];
+    g.step = 3;
+    g.sentAt = Date.now();
+    if ((proj.status || 'טיוטה') === 'טיוטה') {
+        proj.status = 'נשלח';
+        proj.statusChangedAt = Date.now();
+    }
+    _guideFreshSent.add(proj.id);
+    saveProjects();
+    try { filterProjectsList(); } catch (e) {}
+    try { updateActiveProjectBanner(proj); } catch (e) {}
+    renderGuideCards();
+}
+
+// ── The switch ──────────────────────────────────────────────────────────────
+function setGuideOn(on) {
+    if (!appState.settings) appState.settings = {};
+    appState.settings.guideOn = !!on;
+    persistSettings();
+    syncGuideControls();
+    try { renderCtxCrumb(); } catch (e) {}
+    renderGuideCards();
+}
+function toggleGuide() {
+    setGuideOn(!guideOn());
+    showToast(guideOn() ? 'ההדרכה המלווה פועלת' : 'ההדרכה המלווה כבויה · אפשר להדליק בהגדרות או בכפתור 🧭');
+}
+function syncGuideControls() {
+    const box = document.getElementById('set-guide-on');
+    if (box) box.checked = guideOn();
+    const tog = document.getElementById('ctx-guide');
+    if (tog) {
+        tog.setAttribute('aria-pressed', guideOn() ? 'true' : 'false');
+        tog.classList.toggle('is-off', !guideOn());
+    }
 }
 
 
@@ -2788,6 +3188,16 @@ function switchTab(tabId, opts) {
     }
     if (tabId === 'pricing') {
         try { renderPricingTable(); } catch (e) {}
+    }
+    // The guide. Standing on the quote screen with a priced job is the
+    // confirmation step 2 asks for — he looked at the quantities and moved on,
+    // whichever door he used; a tick nobody has to earn twice.
+    if (tabId === 'create') {
+        const gp = guideActiveProject();
+        if (gp && guideStepState(gp).done[0]) guideMarkDone(gp, 2);
+    }
+    if (tabId === 'wizard' || tabId === 'pricing' || tabId === 'create') {
+        try { renderGuideCards(); } catch (e) {}
     }
     // Refresh the in-project rail's active step (desktop stage nav).
     updateProjectRail();
@@ -5933,6 +6343,8 @@ function loadSettings() {
             // and the paper disagreed on every quote anyone had ever sent.
             // ?? keeps an explicit false the electrician chose himself.
             _setCheck('pdf-show-signature', appState.settings.pdfShowSignature ?? true);
+            // The guide switch: absent means on (see guideOn).
+            try { syncGuideControls(); } catch (e) {}
 
             // Apply saved theme (explicit user choice wins; otherwise follow the OS)
             applySystemTheme(themePref());
@@ -5950,6 +6362,7 @@ function loadSettings() {
         applySystemBackground('none');
         renderMaintenanceSetting();
         updatePdfCustomStyles();
+        try { syncGuideControls(); } catch (e) {}
     }
 }
 
@@ -7997,6 +8410,7 @@ async function shareQuoteLink() {
         proj.shareFingerprint = quoteShareFingerprint(q);
         markQuoteOut();
         saveProjects();
+        try { guideQuoteSent(); } catch (e) {}
         try {
             await navigator.clipboard.writeText(link);
             showToast('הקישור הועתק · שלח ללקוח בוואטסאפ');
@@ -8536,6 +8950,7 @@ async function downloadPDF() {
         showToast('מנוע ה-PDF לא נטען, נפתח חלון הדפסה (בחר "שמירה כ-PDF").', 'error');
         saveToHistory(false);
         markQuoteOut();
+        try { guideQuoteSent(); } catch (e) {}
         setTimeout(() => window.print(), 300);
         return;
     }
@@ -8573,6 +8988,7 @@ async function downloadPDF() {
             showToast('קובץ PDF הורד בהצלחה');
             saveToHistory(false);
             markQuoteOut();
+            try { guideQuoteSent(); } catch (e) {}
             recordQuoteStat(); // anonymous labor-price benchmark (silent)
         })
         .catch(err => {
@@ -8769,6 +9185,7 @@ async function shareWhatsApp() {
                     });
                     markQuoteOut();
                     saveToHistory(false);
+                    try { guideQuoteSent(); } catch (e) {}
                     return;
                 } catch (e) {
                     // The share sheet was dismissed: nothing else should open.
@@ -8783,6 +9200,7 @@ async function shareWhatsApp() {
     const encodedMsg = encodeURIComponent(whatsappShareText(lines, shareLink));
     window.open(`https://api.whatsapp.com/send?text=${encodedMsg}`, '_blank', 'noopener');
     markQuoteOut();
+    try { guideQuoteSent(); } catch (e) {}
 }
 
 function saveToHistory(showToastFlag = true) {

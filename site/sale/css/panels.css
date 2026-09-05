@@ -6337,3 +6337,121 @@ th.pv-price { text-align: end; }
     .pt-side-check { min-height: 44px; align-items: center; }
     .pt-side-check input { width: 22px; height: 22px; margin: 0; }
 }
+
+/* ============================================================================
+   THE GUIDE (Wave C, Stav 4.9.2026) — the road in the ctx-bar, one card per
+   step, the switch. Painted by renderGuideBar / renderGuideCards in app.js.
+   The road is where you are, not advice, so it stays when the guide is off;
+   the cards are the advice, so they go. No fill, no glow, no motion beyond a
+   fade — a working electrician in a van.
+   ============================================================================ */
+
+/* ── The road: 1 ─ 2 ─ 3, the current lit, the finished ticked ─────────── */
+.ctx-road {
+    display: flex; align-items: center; gap: var(--sp-1);
+    flex: 1 1 auto; min-width: 0;
+    margin: 0; padding: 0; list-style: none;
+    overflow: hidden;
+}
+.ctx-road[hidden] { display: none; }
+.road-step { display: inline-flex; min-width: 0; }
+.road-step button {
+    display: inline-flex; align-items: center; gap: 6px;
+    min-height: 30px; padding: 0 var(--sp-2);
+    background: none; border: 1px solid transparent; border-radius: var(--r-pill);
+    color: var(--text-3); font: 600 var(--fs-xs) var(--font-ui);
+    white-space: nowrap; cursor: pointer;
+    transition: background var(--t-fast), color var(--t-fast);
+}
+.road-step button:hover { background: var(--surface-2); color: var(--text); }
+.road-n {
+    width: 20px; height: 20px; flex: none;
+    display: grid; place-items: center;
+    border: 1.5px solid currentColor; border-radius: 50%;
+    font-size: 11px; font-weight: 800; line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+.road-step.is-done button { color: var(--ok-text); }
+.road-step.is-done .road-n { background: var(--ok-text); border-color: transparent; color: var(--bg); }
+.road-step.is-current button { color: var(--text); background: var(--accent-soft); border-color: var(--accent); }
+.road-step.is-current .road-n { background: var(--accent); border-color: transparent; color: var(--on-accent); }
+.road-sep { width: 12px; height: 1px; flex: none; background: var(--border-strong); }
+
+/* The switch: a twin of the bell, so it lives where the bell lives. */
+.ctx-guide {
+    position: relative; width: 36px; height: 36px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: none; border: 1px solid transparent; border-radius: var(--r-pill);
+    font-size: 17px; line-height: 1; cursor: pointer;
+    transition: opacity var(--t-fast), background var(--t-fast);
+}
+.ctx-guide:hover { background: var(--surface-2); border-color: var(--border); }
+.ctx-guide.is-off { opacity: .4; filter: grayscale(1); }
+.ctx-guide[hidden] { display: none; }
+
+/* ── The card: one sentence, one button ─────────────────────────────────── */
+.guide-card {
+    display: block; flex-shrink: 0;
+    margin: 0 0 var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    border: 1px solid var(--border);
+    border-inline-start: 3px solid var(--accent);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    animation: gc-in var(--t-fast);
+}
+.guide-card[hidden] { display: none !important; }
+@keyframes gc-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .guide-card { animation: none; } }
+
+.gc-row { display: flex; align-items: flex-start; gap: var(--sp-2); }
+.gc-text {
+    flex: 1 1 auto; min-width: 0; margin: 0;
+    font: 600 var(--fs-sm)/var(--lh-body) var(--font-ui); color: var(--text);
+}
+.gc-text.gc-strong { font-weight: 800; }
+.gc-x {
+    flex: none; width: 28px; height: 28px; margin: -4px -6px 0 0;
+    display: grid; place-items: center;
+    background: none; border: 0; border-radius: var(--r-pill);
+    color: var(--text-3); font-size: 18px; line-height: 1; cursor: pointer;
+}
+.gc-x:hover { background: var(--surface-2); color: var(--text); }
+.gc-btns, .gc-chips {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+    margin-block-start: var(--sp-2);
+}
+/* "הורד PDF" / "מה עכשיו?" are escapes, not the action: findable, not loud. */
+.gc-quiet, .gc-more {
+    background: none; border: 0; padding: 0; cursor: pointer;
+    font: 500 var(--fs-xs)/1 var(--font-ui); color: var(--text-3);
+    text-decoration: underline; text-underline-offset: 3px;
+}
+.gc-quiet:hover, .gc-more:hover { color: var(--text-2); }
+.gc-more { flex: none; }
+.gc-hint { margin: var(--sp-2) 0 0; font-size: var(--fs-xs); color: var(--text-3); }
+/* After the send: what happens next, as a list of facts, then goodbye. */
+.gc-next {
+    margin: var(--sp-2) 0 0; padding-inline-start: 1.2em;
+    font-size: var(--fs-xs); line-height: var(--lh-body); color: var(--text-2);
+}
+.gc-next li + li { margin-block-start: 4px; }
+.gc-bye { margin: var(--sp-2) 0 0; font-size: var(--fs-xs); color: var(--text-3); }
+.gc-folded .gc-text { font-weight: 500; color: var(--text-2); }
+.gc-folded .gc-text i { color: var(--warn-text); margin-inline-end: 4px; }
+/* Step 1 borrows the chat's starter chips; the composer's own row hides so
+   the same three are not on screen twice. */
+body.guide-step1-card .chat-suggestions { display: none !important; }   /* renderChatHistory sets display inline */
+
+/* On a phone the ctx-bar row leaves the road about 80px between "כל העבודות"
+   and the three icons (measured at 375px), so the road is its three circles —
+   number, tick, lit — and no words: the panel header and the card name the
+   step, and each circle keeps its name as the button's title. */
+@media (max-width: 767px) {
+    .ctx-road { gap: 0; justify-content: center; }
+    .road-step button { padding: 0 2px; min-height: 34px; }
+    .road-l { display: none; }
+    .road-sep { width: 6px; }
+    .guide-card { margin-inline: var(--sp-2); padding: var(--sp-2) var(--sp-3); }
+    #panel-wizard > .guide-card { margin-block-end: var(--sp-2); }
+}
