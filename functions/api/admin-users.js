@@ -1,7 +1,7 @@
 // Cloudflare Pages Function — admin registered-users list (admin only).
 //
-//   GET /api/admin-users            → [{ email, projects, history, lastUpdated, tier }]
-//   GET /api/admin-users?user=<em>  → { email, tier, projects:[{name,status,created,amount}] }
+//   GET /api/admin-users            → [{ email, name, projects, history, lastUpdated, firstSeen, tier }]
+//   GET /api/admin-users?user=<em>  → { email, name, tier, projects:[{name,status,created,amount}] }
 //
 // Enumerates the `user:<email>` KV records written by /api/data. Admin-gated by
 // the verified Google email (never trust a client flag). Returns only lightweight
@@ -19,6 +19,15 @@ const USER_PREFIX = 'user:';
 function projectAmount(p) {
   const qd = (p && p.quoteData) || {};
   return Number(qd.finalPrice || qd.total || 0) || 0;
+}
+
+// The name the user typed into his business details, if he typed one. It is
+// in the record the list already reads, so showing it costs nothing; a user
+// with no name is shown by his address, never by a guess.
+function recordName(db) {
+  const biz = db && db.settings && db.settings.businessDetails;
+  const name = biz && typeof biz.name === 'string' ? biz.name.trim() : '';
+  return name ? name.slice(0, 80) : '';
 }
 
 export async function onRequestGet(context) {
@@ -45,7 +54,7 @@ export async function onRequestGet(context) {
       amount: projectAmount(p),
     }));
     const tier = await getTierForEmail(env, target);
-    return jsonResponse({ ok: true, email: target, tier, projects });
+    return jsonResponse({ ok: true, email: target, name: recordName(db), tier, projects });
   }
 
   // --- All users (summaries) ---
@@ -60,6 +69,7 @@ export async function onRequestGet(context) {
       const db = raw ? safeParse(raw) : null;
       users.push({
         email: em,
+        name: recordName(db),
         projects: db && Array.isArray(db.projects) ? db.projects.length : 0,
         history: db && Array.isArray(db.history) ? db.history.length : 0,
         lastUpdated: (db && db.lastUpdated) || null,

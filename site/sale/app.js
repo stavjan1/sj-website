@@ -258,81 +258,9 @@ async function adminRevertPricingMap() {
     await adminLoadPricingMap();   // reload the default for editing
 }
 
-// Registered-users list — real accounts from the cloud (KV `user:*`), admin
-// only. Each row is a door: it opens that user's page in the admin drawer,
-// with his plan and his projects fetched on open.
-async function adminRefreshUserList() {
-    const container = document.getElementById('admin-users-list');
-    if (!container) return;
-    if (!isAdmin()) {
-        container.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">התחבר כמנהל כדי לראות משתמשים.</p>';
-        return;
-    }
-    container.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">טוען…</p>';
-    try {
-        const res = await adminRes('/api/admin-users');
-        const d = await res.json();
-        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
-        const users = d.users || [];
-        if (users.length === 0) {
-            container.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem;">אין משתמשים רשומים עדיין.</p>';
-            return;
-        }
-        // Signup summary strip: total + new registrations this calendar month.
-        const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
-        const newThisMonth = users.filter(u => u.firstSeen && u.firstSeen >= monthStart.getTime()).length;
-        const summary = `<p style="font-size:0.85rem;color:var(--text-secondary);margin:0 0 10px;">
-            סה"כ <b>${users.length}</b> נרשמים · <b>${newThisMonth}</b> חדשים החודש
-            <span style="color:var(--text-secondary)">${signupMailNote(d)}</span>
-            <button type="button" class="btn btn-secondary btn-small" style="margin-inline-start:8px;" onclick="adminTestMail(this)">
-                <i class="fa-solid fa-paper-plane" aria-hidden="true"></i> שלח מייל בדיקה
-            </button></p>`;
-        container.innerHTML = summary + `<div class="table-scroll">` + users.map(u => {
-            const last = u.lastUpdated ? new Date(u.lastUpdated).toLocaleDateString('he-IL') : '—';
-            const joined = u.firstSeen ? new Date(u.firstSeen).toLocaleDateString('he-IL') : null;
-            return `<div class="admin-user" data-email="${escapeHtml(u.email)}">
-                <button type="button" class="admin-user-head" onclick="openAdminUser(this.closest('.admin-user').dataset.email)">
-                    <span class="au-caret"><i class="fa-solid fa-chevron-left"></i></span>
-                    <span class="au-email" dir="ltr">${escapeHtml(u.email)}</span>
-                    <span class="au-meta">${joined ? 'נרשם ' + joined + ' · ' : ''}${u.projects} פרויקטים · עודכן ${last}</span>
-                    <span class="au-plan plan-${escapeHtml(u.tier || 'free')}">${escapeHtml(TIER_LABELS[u.tier] || u.tier || 'free')}</span>
-                </button>
-            </div>`;
-        }).join('') + `</div>`;
-    } catch (e) {
-        container.innerHTML = adminErrorHtml(e);
-    }
-}
-
-// One user's page, in the drawer: his plan, and his projects. It used to
-// unfold under his row and stay there.
-async function openAdminUser(email) {
-    if (!email) return;
-    const body = openAdminDrawer(email, '<p class="input-help" style="margin:6px 0;">טוען פרויקטים…</p>');
-    if (!body) return;
-    try {
-        const res = await adminRes('/api/admin-users?user=' + encodeURIComponent(email));
-        const d = await res.json();
-        if (!res.ok) throw new Error((d.error && d.error.message) || res.status);
-        // The drawer may already show somebody else by the time this lands.
-        const title = document.getElementById('admin-drawer-title');
-        if (!title || title.textContent !== email) return;
-        const projects = d.projects || [];
-        const nis = (n) => n ? '₪' + Math.round(n).toLocaleString('he-IL') : '—';
-        body.innerHTML = `<div class="au-tier">מסלול:
-            <select class="model-select-input au-tier-sel" onchange="adminSetTierFor('${escapeHtml(email)}', this.value, this)">
-                ${['free', 'pro', 'business'].map((t) => `<option value="${t}" ${((d.tier || 'free') === t) ? 'selected' : ''}>${escapeHtml(TIER_LABELS[t] || t)}</option>`).join('')}
-            </select></div>
-            <h4 class="tcol-title" style="margin:12px 0 4px;">פרויקטים · ${projects.length}</h4>` + (projects.length
-            ? projects.map(p => `<div class="au-proj">
-                    <span class="au-proj-name">${escapeHtml(p.name)}</span>
-                    <span class="au-proj-meta"><span class="status-badge status-badge-${escapeHtml(p.status)}">${escapeHtml(p.status)}</span> ${nis(p.amount)}</span>
-                </div>`).join('')
-            : '<p class="input-help" style="margin:6px 0;">אין פרויקטים.</p>');
-    } catch (e) {
-        body.innerHTML = adminErrorHtml(e);
-    }
-}
+// The registered-users screen — the table, the per-user page in the drawer,
+// the actions — lives in sale/admin.js beside the conversations feed it joins
+// its counts from (adminRefreshUserList, renderAdminUsersTable, openAdminUser).
 
 // ==========================================================================
 // AI model selection + usage meter
@@ -752,8 +680,9 @@ async function adminSetTierFor(email, tier, el) {
         const data = await res.json();
         if (!res.ok) throw new Error((data.error && data.error.message) || res.status);
         showToast(data.email + ' → ' + (TIER_LABELS[data.tier] || data.tier));
-        // The badge on the closed row is now stale; the list is cheap to redraw.
-        adminRefreshUserList();
+        // The chip on his row and his page are now stale. Redrawn from the
+        // cache, not refetched: a refetch is one KV read per registered user.
+        adminNoteTier(data.email, data.tier);
     } catch (e) {
         showToast('השיוך נכשל: ' + e.message, 'error');
     }

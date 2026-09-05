@@ -79,11 +79,19 @@ test('one refresh cannot spend the day\'s storage budget', () => {
     assert.equal((API.match(/cacheTtl: 300/g) || []).length, 2,
         'both storage reads must be cached — a repeat refresh should cost almost nothing');
 
-    const fn = ADMIN.slice(ADMIN.indexOf('async function renderAdminConvos'));
-    const body = fn.slice(0, fn.indexOf('\n}'));
-    assert.match(body, /if \(_convosLoading\) return;/, 'the double-click guard is gone');
+    // The fetch lives in adminLoadConvos since the users screen started
+    // sharing the feed (5/9); the guard moved with it, and the screen's own
+    // renderer still refuses a second click while a load is in flight.
+    const load = ADMIN.slice(ADMIN.indexOf('async function adminLoadConvos'));
+    const body = load.slice(0, load.indexOf('\n}'));
+    assert.match(body, /if \(_convosLoading\) return false;/, 'the double-click guard is gone');
     assert.match(body, /finally\s*\{[\s\S]{0,80}_convosLoading = false;/,
         'the guard is not released in a finally — one failed load would lock the button forever');
+    const render = ADMIN.slice(ADMIN.indexOf('async function renderAdminConvos'));
+    assert.match(render.slice(0, render.indexOf('\n}')), /if \(_convosLoading\) return;/, 'the screen renderer no longer checks the guard');
+    // And the second consumer of the feed goes through the same guarded loader.
+    assert.match(ADMIN, /async function adminLoadConvosForUsers[\s\S]{0,200}await adminLoadConvos\(\)/,
+        'the users screen fetches the feed on its own, outside the guard');
 });
 
 test('one unreadable record does not discard the whole scan', () => {

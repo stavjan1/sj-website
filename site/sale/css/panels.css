@@ -2111,22 +2111,12 @@ i[class^="fa-"], i[class*=" fa-"] {
 .mdl-trap { font-size: var(--fs-xs); color: var(--text-2); }
 .mdl-trap-fail { color: var(--danger); }
 
-/* Users list */
-.admin-user { border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); overflow: hidden; }
-.admin-user-head {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
-    cursor: pointer;
-    flex-wrap: wrap;
-}
-.admin-user-head:hover { background: var(--surface-2); }
-.admin-user-body { padding: var(--sp-2) var(--sp-3); border-block-start: 1px solid var(--border); }
+/* Users — the table on the screen and the person's page in the drawer.
+   The row list with a body that unfolded under each user is gone (5/9);
+   the table rows open the drawer, and these are the pieces both share. */
 .au-email { font-weight: 600; color: var(--text); direction: ltr; }
-.au-meta, .au-proj-meta { font-size: var(--fs-xs); color: var(--text-3); }
-.au-tier { margin-inline-start: auto; }
-.au-caret { color: var(--text-3); }
+.au-proj-meta { font-size: var(--fs-xs); color: var(--text-3); }
+.au-tier { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-block: var(--sp-2); }
 .au-proj { display: flex; justify-content: space-between; gap: var(--sp-2); padding: var(--sp-1) 0; border-block-end: 1px dashed var(--border); font-size: var(--fs-xs); }
 .au-proj-name { color: var(--text); }
 
