@@ -4274,9 +4274,8 @@ i[class^="fa-"], i[class*=" fa-"] {
 .cp-disc { flex-wrap: wrap; }
 /* Both live inside two different row shapes (the picker's and the catalog
    list's), so they are styled by their own class rather than by a parent. */
-.cp-sku, .cp-was { display: block; color: var(--text-3); font-size: 10px; font-weight: 500; }
+.cp-was { display: block; color: var(--text-3); font-size: 10px; font-weight: 500; }
 .cp-was { text-align: start; }
-.cp-row.cp-sup .cp-name { white-space: normal; }
 
 /* money board: drag states, receipt button, waiting age */
 .pipe-card { cursor: grab; }
@@ -6328,6 +6327,62 @@ th.pv-price { text-align: end; }
 .pt-side-empty { color: var(--text-3); font-size: var(--fs-sm); }
 .pt-side-label { font-size: var(--fs-xs); font-weight: 600; color: var(--text-2); }
 .pt-side textarea { width: 100%; resize: vertical; }
+
+/* ── "＋ הוסף חומר": the materials picker ──────────────────────────────────
+   A side panel like the other two; on a phone it stands up from the bottom
+   instead, because a 94vw column sliding in over a 360px screen is a page,
+   not a panel, and the keyboard needs the search field near it. */
+.pt-empty-state { display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); padding: var(--sp-4) var(--sp-4) var(--sp-6); }
+.pt-empty-state .pt-empty { padding: 0; }
+.pt-side-picker .drawer-body { gap: var(--sp-4); }
+.pt-side-picker .drawer-search .search-bar { max-width: none; }
+.mp-list { display: flex; flex-direction: column; gap: 2px; }
+.mp-list > .cp-group:first-child { margin-block-start: 0; }
+.mp-row {
+    display: flex; align-items: center; gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-2); border: 1px solid transparent; border-radius: var(--r-sm);
+}
+.mp-row:hover { background: var(--surface-2); border-color: var(--border); }
+.mp-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.mp-name { font: 500 var(--fs-sm)/1.3 var(--font-ui); color: var(--text); overflow-wrap: anywhere; }
+.mp-meta { font: 600 var(--fs-xs) var(--font-ui); color: var(--text-2); display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--sp-2); }
+.mp-tag { font-style: normal; font-weight: 700; color: var(--ok-text); }
+.mp-step { display: inline-flex; align-items: stretch; flex: none; border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
+.mp-step-btn {
+    width: 32px; min-height: 32px; background: var(--surface-2); border: 0; cursor: pointer;
+    color: var(--text); font: 700 var(--fs-md) var(--font-ui); line-height: 1;
+}
+.mp-step-btn:hover { background: var(--border); }
+/* By id: the drawer-wide input rule is (0,3,1) and would win over classes. */
+#mat-picker .mp-step .mp-qty { width: 44px; min-height: 32px; padding: 0 2px; border: 0; border-radius: 0; text-align: center; font-weight: 600; -moz-appearance: textfield; }
+.mp-qty::-webkit-outer-spin-button, .mp-qty::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.mp-add { flex: none; }
+.mp-status { margin: var(--sp-2) 0 0; }
+.mp-link { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; }
+.mp-free { display: flex; flex-direction: column; gap: var(--sp-2); padding-block-start: var(--sp-3); border-block-start: 1px solid var(--border); }
+.mp-free .pt-side-h { margin: 0; }
+.mp-free-row { display: grid; grid-template-columns: 64px 1fr 1fr auto; gap: var(--sp-2); align-items: center; }
+#mat-picker .mp-free-row input, #mat-picker .mp-free-row select { width: 100%; min-width: 0; min-height: 36px; }
+
+@media (pointer: coarse) {
+    .mp-step-btn { width: 44px; min-height: 44px; }
+    #mat-picker .mp-step .mp-qty { min-height: 44px; }
+    .mp-add, #mat-picker .mp-free-row input, #mat-picker .mp-free-row select, .mp-free-row .btn { min-height: 44px; }
+}
+@media (max-width: 768px) {
+    .pt-side-picker {
+        inset-inline: 0; inset-block: auto 0;
+        width: 100%; height: 88vh; max-height: 88dvh;
+        border-inline-start: 0; border-block-start: 1px solid var(--border);
+        border-radius: var(--r-md) var(--r-md) 0 0;
+        transform: translateY(100%);
+    }
+    .pt-side-picker.open { transform: none; }
+    .pt-side-picker .drawer-body { padding-block-end: calc(var(--sp-4) + env(safe-area-inset-bottom)); }
+    .mp-row { flex-wrap: wrap; }
+    .mp-main { flex-basis: 100%; }
+    .mp-step { margin-inline-start: auto; }
+}
 
 @media (pointer: coarse) {
     .pt-quiet-btn, .pt-side-close { min-height: 44px; min-width: 44px; }

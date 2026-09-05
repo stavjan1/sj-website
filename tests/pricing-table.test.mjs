@@ -118,8 +118,10 @@ test('an item the catalog does not have can be put into it', () => {
     // His question: what happens to a line the chat knows and ארכה does not.
     assert.match(app, /function ptSaveToCatalog/, 'the save-to-catalog button is gone');
     assert.match(app, /priceCatalog\.unshift\(\{ name: m\.name\.trim\(\), price/, 'saving no longer writes the item');
-    // And the reverse: adding from the catalog respects a price he already set.
-    assert.match(app, /const mine = priceBookGet\(it\.name\);/, 'the catalog add ignores his own price');
+    // And the reverse: adding from the catalog respects a price he already set
+    // (the picker asks mpMyPrice, which asks the price book first).
+    assert.match(app, /function mpMyPrice\(name\) \{\n    const book = priceBookGet\(name\);/, 'the catalog add ignores his own price');
+    assert.match(app, /myPrice: mpMyPrice/, 'the picker does not consult his price');
 });
 
 test('the quote is built from the rows, in the order a customer reads them', () => {

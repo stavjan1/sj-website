@@ -939,6 +939,44 @@
                     <div class="drawer-body" id="pricing-tools-body"></div>
                 </aside>
 
+                <!-- "＋ הוסף חומר" (Stav, 5.9.2026): the materials list by hand,
+                     without the chat. Search his prices, his recent items and
+                     the supplier catalogue; each row adds straight into the
+                     table behind. A side panel on a desk, a bottom sheet on a
+                     phone. Painted by renderMatPicker in chat.js; the unit
+                     list is filled from MATERIAL_UNITS, the table's own. -->
+                <aside class="stern-drawer pt-side pt-side-picker" id="mat-picker" role="dialog" aria-modal="false" aria-labelledby="mat-picker-title">
+                    <div class="drawer-header">
+                        <h3 id="mat-picker-title">＋ הוסף חומר</h3>
+                        <button type="button" class="btn-close pt-side-close" onclick="closePricingSide()" aria-label="סגירה">&times;</button>
+                    </div>
+                    <div class="drawer-search">
+                        <div class="search-bar">
+                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                            <input type="search" id="mat-picker-q" placeholder='שם או מק"ט… למשל מא"ז 3x25' autocomplete="off" enterkeyhint="search" oninput="mpOnSearch()" onkeydown="mpSearchKey(event)" aria-label="חיפוש חומר">
+                        </div>
+                    </div>
+                    <div class="drawer-body">
+                        <div class="mp-list" id="mat-picker-list"></div>
+                        <section class="mp-free" aria-labelledby="mp-free-title">
+                            <h4 class="pt-side-h" id="mp-free-title">שורה חופשית</h4>
+                            <p class="input-help pt-side-help">למה שאין באף מאגר. המספר שלך נשאר שלך.</p>
+                            <input type="text" id="mp-free-name" placeholder="שם הפריט" maxlength="200" aria-label="שם הפריט">
+                            <div class="mp-free-row">
+                                <input type="number" id="mp-free-qty" min="1" step="1" value="1" inputmode="numeric" aria-label="כמות">
+                                <select id="mp-free-unit" aria-label="יחידה"></select>
+                                <input type="number" id="mp-free-price" min="0" step="1" placeholder="מחיר ליחידה" inputmode="decimal" aria-label="מחיר ליחידה">
+                                <button type="button" class="btn btn-secondary btn-small" onclick="mpAddFree()">הוסף</button>
+                            </div>
+                        </section>
+                        <label class="cp-disc">
+                            <span>הנחת סוחר על מחירי הספק</span>
+                            <input type="number" id="cp-disc" min="0" max="60" step="1" onchange="setTradeDiscount(this.value)" aria-label="אחוז הנחת סוחר">
+                            <span>%</span>
+                        </label>
+                    </div>
+                </aside>
+
                 <!-- Card 3: toolkit checklist (from AI 'tools' in stage 3) -->
                             <div id="wizard-tools-card" class="wizard-dash-card" style="display:none;">
                                 <h5 class="wizard-dash-title"><i class="fa-solid fa-screwdriver-wrench text-accent"></i> ארגז הכלים</h5>

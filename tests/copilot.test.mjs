@@ -188,7 +188,8 @@ test('a step on the road opens its tab through switchTab, like the rail', () => 
 // ── 2. One card per step, and the × ─────────────────────────────────────────
 test('each step carries one sentence and the button the task named', () => {
     assert.ok(appJs.includes('תאר את העבודה במשפט אחד, כמו לקולגה בוואטסאפ.'), 'step 1');
-    assert.ok(appJs.includes('עין מהירה על החומרים והמחירים — תקן מה שצריך.'), 'step 2');
+    // Wave E: step 2 has a second door — his own hands — and the card says so.
+    assert.ok(appJs.includes('עין מהירה על החומרים והמחירים — תקן מה שצריך, או הוסף חומרים בעצמך.'), 'step 2');
     assert.match(appJs, /המשך להצעה <i class="fa-solid fa-arrow-left"/, 'step 2 button');
     assert.ok(appJs.includes('ההצעה מוכנה. שלח ללקוח.'), 'step 3');
     assert.match(appJs, /onclick="shareWhatsApp\(\)">📲 שלח בוואטסאפ</, 'step 3 button is the existing WhatsApp share');

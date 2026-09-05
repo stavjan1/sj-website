@@ -2144,8 +2144,12 @@ function renderGuideCards() {
     } else if (cur === 'wizard') {
         html = _guideWizardCardHtml(proj, st);
     } else if (cur === 'pricing') {
-        html = _guideCard('עין מהירה על החומרים והמחירים — תקן מה שצריך.',
-            `<button type="button" class="btn btn-accent btn-small" onclick="guideContinueToQuote()">המשך להצעה <i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>`);
+        // Step 2 has two doors in: the agent's list, or his own hands. A job
+        // whose materials came only from the picker is priced for the road
+        // just the same (guideStepState reads the rows, not the chat).
+        html = _guideCard('עין מהירה על החומרים והמחירים — תקן מה שצריך, או הוסף חומרים בעצמך.',
+            `<button type="button" class="btn btn-accent btn-small" onclick="guideContinueToQuote()">המשך להצעה <i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>`
+            + `<button type="button" class="btn btn-secondary btn-small" onclick="openMatPicker()">＋ הוסף חומר</button>`);
     } else if (cur === 'create') {
         html = _guideCreateCardHtml(proj, st);
     }
