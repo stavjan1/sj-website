@@ -2279,6 +2279,9 @@ async function catalogPriceMaterials(proj) {
         priced.forEach((row, i) => {
             const m = proj.materials[i];
             if (!m || !row || !row.matched) return;
+            // A line he priced himself — his catalogue ('mine'), or a free row
+            // — is the truth. The catalogue may refresh its own lines, never his.
+            if (m.source === 'mine' || m.source === 'free') return;
             // UNIT price only. qty and unit stay the row's own — the total is
             // matLineTotal = qty × price, so a per-metre price against qty 15
             // is exactly right, and the same swap against a row whose qty had
@@ -3534,9 +3537,7 @@ function renderPricingTable() {
                         <span>חומרי עזר</span>
                         <input type="number" class="pt-cons-pct" min="0" max="${CONSUMABLES_MAX_PCT}" step="1" value="${consPct}" ${consPct > 0 ? '' : 'disabled'} onchange="setConsumablesPct(this.value)" aria-label="אחוז חומרי עזר">%
                     </label>
-                    <button type="button" class="btn btn-secondary btn-small" onclick="openCatalogPicker()">
-                        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> הוספה מהמאגר
-                    </button>
+                    <button type="button" class="btn btn-accent btn-small pt-add-mat" onclick="openMatPicker()" aria-controls="mat-picker" aria-expanded="false">＋ הוסף חומר</button>
                     <button type="button" class="btn btn-secondary btn-small" onclick="ptAddMaterial()">
                         <i class="fa-solid fa-plus" aria-hidden="true"></i> שורה חדשה
                     </button>
@@ -3545,7 +3546,11 @@ function renderPricingTable() {
             <div class="pt-cols pt-cols-mat">
                 <span></span><span>פריט</span><span>פירוט</span><span>כמות ויחידה</span><span>מוצע</span><span>המחיר שלי</span><span>סה"כ</span><span></span>
             </div>
-            ${matRows || '<p class="pt-empty">אין עדיין חומרים. אפשר להוסיף מהמאגר, או לבקש מהסוכן רשימה בשיחה.</p>'}
+            ${matRows || `
+            <div class="pt-empty-state">
+                <p class="pt-empty">אין עדיין חומרים. אפשר להוסיף חומרים מהמאגר בלי הצ'אט.</p>
+                <button type="button" class="btn btn-accent btn-small" onclick="openMatPicker()">＋ הוסף חומר</button>
+            </div>`}
         </section>
 
         <section class="pt-block">
@@ -3602,14 +3607,19 @@ function ptInCatalog(name) {
     const key = _pbKey(name);
     return !!key && (priceCatalog || []).some((it) => _pbKey(it.name) === key);
 }
+// A row he added by hand carries its source: 'mine' is his catalogue price,
+// 'free' a number he typed with no catalogue behind it, 'recent' a line off
+// the shelf of things he used lately, 'catalog' the supplier's.
 function ptSourceShort(m) {
-    if (priceBookGet(m.name) !== null) return 'המחיר שלך';
-    if (m.source === 'catalog' || ptInCatalog(m.name)) return 'מהמאגר';
+    if (priceBookGet(m.name) !== null || m.source === 'mine') return 'המחיר שלך';
+    if (m.source === 'free') return 'ידני';
+    if (m.source === 'catalog' || m.source === 'recent' || ptInCatalog(m.name)) return 'מהמאגר';
     return 'הערכה';
 }
 function ptSourceLabel(m) {
-    if (priceBookGet(m.name) !== null) return 'המחיר ששמרת לפריט הזה';
-    if (m.source === 'catalog' || ptInCatalog(m.name)) return 'מחיר מתוך מאגר המחירים שלך';
+    if (priceBookGet(m.name) !== null || m.source === 'mine') return 'המחיר ששמרת לפריט הזה';
+    if (m.source === 'free') return 'שורה שהוספת בעצמך. המספר שלך, ואף מאגר לא ידרוס אותו';
+    if (m.source === 'catalog' || m.source === 'recent' || ptInCatalog(m.name)) return 'מחיר מתוך מאגר המחירים שלך';
     return 'הערכה של הסוכן, לא מחיר מחירון. שווה לתקן למחיר שאתה משלם, ואז לשמור אותו במאגר';
 }
 
@@ -3964,6 +3974,8 @@ async function ptToQuote() {
         proj.quoteData.kompletText = items[0].description;
         if (items[0].description) rememberKomplet(proj, items[0].description);
     }
+    // What went on a quote is what he uses: it goes on the picker's shelf.
+    try { mpRememberRecent((proj.materials || []).filter((m) => m && m.checked && String(m.name || '').trim())); } catch (e) {}
     touchProject(proj);
     saveProjects();
     appState.currentQuote = { id: proj.id, ...proj.quoteData };
@@ -4152,21 +4164,42 @@ function copyListText() {
         .catch(() => showToast('ההעתקה נכשלה', 'error'));
 }
 
-// ---- add from the catalog ----
-// ── The supplier catalog behind the picker ───────────────────────────────────
-// 7,364 real items with real prices ship with the app (data/materials, ARCA's
-// catalog, read through /api/materials). Until now only the pricing agent could
-// see them: the picker searched his own saved prices and said "המאגר ריק" to
-// everyone who had not filled one in yet. A table is only as good as the list
-// behind it, so the picker searches both — his own prices first, because a
-// price he typed beats any catalog, then the supplier's.
+// ---- add materials by hand: the picker ----
+// ── "＋ הוסף חומר" ────────────────────────────────────────────────────────────
 //
-// Two things the supplier's numbers are NOT, both stated on screen rather than
-// hidden in a doc: they are before VAT, and they are retail. An electrician
-// buys at a trade discount, so the picker carries that percentage, remembers
-// it, and shows what it does to the number before anything is added.
+// Stav (5.9.2026): "במקום שהרכיבים יהיו רק דרך הצ'אט — שיהיה אפשר פשוט להזין
+// לסל את המוצרים." The conversation stays one door to the materials list; this
+// is the other. An electrician standing in a customer's kitchen types "מא"ז
+// 3x25", taps הוסף, types the next one — the whole list by hand in under a
+// minute on a phone, and never a word to the agent.
+//
+// Three sources feed the list, in this order, and the order is the rule:
+//   (a) המחירים שלי — his own catalogue. A price he set beats any supplier's,
+//       so a supplier line he has a price for is shown AT his price and says so.
+//   (b) לאחרונה — the last 20 distinct materials he added or quoted, on this
+//       device. The same twenty items go on almost every job; with the search
+//       empty they are the list, so most adds are one tap.
+//   (c) the supplier catalogue (7,364 real items through /api/materials), asked
+//       once per pause in typing and remembered per query for the session —
+//       the endpoint is public and capped at 60 calls a minute per address.
+//
+// Every add goes through the same row shape and the same save the chat uses
+// (_ptSave → saveProjects + renderPricingTable), so consumables, markup, the
+// totals, the quote and the PDF follow with no special case anywhere.
+//
+// The supplier's numbers are retail and before VAT, and the panel says so on
+// the group heading rather than in a doc. The trade discount he told us about
+// is applied on the way in, and the raw retail stays on the row as `suggested`
+// so the discount is always checkable.
 let _cpSupplier = { q: '', items: [], loading: false, error: '', meta: null };
 let _cpTimer = null;
+const _mpCache = new Map();     // query → { items, meta }, for this session
+let _mpRows = [];               // what the panel shows right now, in order
+const MP_RECENT_KEY = 'sj_mat_recent';
+const MP_RECENT_MAX = 20;
+const MP_DEBOUNCE_MS = 250;
+const MP_MIN_CHARS = 2;
+const MP_SUPPLIER_LIMIT = 24;
 
 function tradeDiscount() {
     const v = Number((appState.settings || {}).tradeDiscount);
@@ -4178,7 +4211,7 @@ function setTradeDiscount(value) {
     appState.settings = appState.settings || {};
     appState.settings.tradeDiscount = v;
     persistSettings();
-    renderCatalogPicker();
+    renderMatPicker();
 }
 
 // What a retail line actually costs him, given the discount he told us about.
@@ -4189,166 +4222,335 @@ function tradePrice(retail) {
     return Math.round(p * (1 - d / 100) * 100) / 100;
 }
 
-function openCatalogPicker() {
-    const old = document.getElementById('cat-picker');
-    if (old) old.remove();
+// ── Pure helpers: no DOM, no globals beyond what is handed in ──────────────
+// (tests/materials-picker.test.mjs runs these in node:vm on fakes.)
+
+// One identity for "the same material": the supplier's number when both
+// sides have one, his spelling of the name when either does not. His own
+// catalogue rarely carries SKUs, so "מא"ז 3X32A" from his list and the same
+// name from the supplier's are one item — while two supplier products that
+// happen to share a name but not a number stay two.
+function mpSameItem(a, b) {
+    const sa = String((a && a.sku) || '').trim();
+    const sb = String((b && b.sku) || '').trim();
+    if (sa && sb) return sa === sb;
+    const key = _pbKey(a && a.name);
+    return !!key && key === _pbKey(b && b.name);
+}
+
+// A run of digits is a part number, not a word: search the catalogue by SKU.
+function mpIsSkuQuery(q) {
+    return /^\d{4,}$/.test(String(q || '').trim());
+}
+
+function mpMatches(needle, it) {
+    if (!needle) return true;
+    const name = String((it && it.name) || '').toLowerCase();
+    const sku = String((it && it.sku) || '');
+    return name.includes(needle) || (!!sku && sku.includes(needle));
+}
+
+// The list the panel shows, built from the three sources in their order and
+// deduplicated by mpSameItem — the first source that names an item owns it. Every
+// entry carries what the row will need: name, unit, unit price, the supplier's
+// retail as `suggested`, sku, and the source that priced it.
+//   mine      — his catalogue entries ({name, price, unit, sku?})
+//   recent    — the remembered list ({name, unit, price, sku, origin})
+//   supplier  — /api/materials items ({sku, name, price, unit})
+//   myPrice   — name → his price or null (the price book, then his catalogue)
+//   toCost    — retail → what he pays (tradePrice)
+// With the search empty the shelf is shown FIRST: the point of the shelf is
+// one tap for the twenty things that go on every job. His catalogue still
+// owns a name both lists carry (the dedupe runs in source order), so the
+// price shown is his either way.
+function mpMergeSources({ q, mine, recent, supplier, myPrice, toCost }) {
+    const needle = String(q || '').trim().toLowerCase();
+    const out = [];
+    const take = (row) => {
+        if (!row || !String(row.name || '').trim()) return;
+        if (out.some((r) => mpSameItem(r, row))) return;
+        out.push(row);
+    };
+    (mine || []).filter((it) => mpMatches(needle, it)).slice(0, 20).forEach((it) => take({
+        name: it.name, unit: it.unit || '', price: Number(it.price) || 0,
+        suggested: Number(it.price) || 0, sku: it.sku || '', source: 'mine', group: 'mine',
+    }));
+    (recent || []).filter((it) => mpMatches(needle, it)).slice(0, MP_RECENT_MAX).forEach((it) => {
+        // A remembered line that was his own number stays his own number; one
+        // that came from the catalogue is a recent, and the catalogue may
+        // refresh it later.
+        const own = it.origin === 'mine' || it.origin === 'free';
+        take({
+            name: it.name, unit: it.unit || '', price: Number(it.price) || 0,
+            suggested: Number(it.suggested != null ? it.suggested : it.price) || 0,
+            sku: it.sku || '', source: own ? it.origin : 'recent', group: 'recent',
+        });
+    });
+    (supplier || []).slice(0, MP_SUPPLIER_LIMIT).forEach((it) => {
+        const retail = Number(it.price) || 0;
+        const own = typeof myPrice === 'function' ? myPrice(it.name) : null;
+        take({
+            name: it.name, unit: it.unit || '', sku: it.sku || '',
+            price: own != null ? own : (typeof toCost === 'function' ? toCost(retail) : retail),
+            suggested: retail, source: own != null ? 'mine' : 'catalog', group: 'supplier',
+        });
+    });
+    if (!needle) return out.filter((r) => r.group === 'recent').concat(out.filter((r) => r.group !== 'recent'));
+    return out;
+}
+
+// A picked entry becomes a table row — the SAME shape materialRowFromModel
+// makes for the chat: { name, qty, unit, price (unit), details, checked },
+// plus sku and source. Clamped, because names come from a supplier's pages.
+function mpRowFromPick(pick, qty) {
+    const n = Number(qty);
+    const price = Number(pick && pick.price) || 0;
+    const suggested = Number(pick && pick.suggested != null ? pick.suggested : price) || 0;
+    return {
+        name: String((pick && pick.name) || '').trim().slice(0, 200),
+        qty: n > 0 ? n : 1,
+        unit: String((pick && pick.unit) || '').trim().slice(0, 20),
+        price,
+        suggested,
+        sku: pick && pick.sku ? String(pick.sku).trim().slice(0, 40) : '',
+        source: ['catalog', 'mine', 'recent', 'free'].includes(pick && pick.source) ? pick.source : 'free',
+        checked: true,
+        details: '',
+    };
+}
+
+// Add to the list, or add to the line: the same material a second time is
+// more of it, not a twin row the quote would then count twice.
+function mpAddRow(list, row) {
+    const existing = (list || []).find((m) => m && mpSameItem(m, row));
+    if (existing) {
+        existing.qty = matQty(existing) + matQty(row);
+        return { row: existing, merged: true };
+    }
+    list.push(row);
+    return { row, merged: false };
+}
+
+// The remembered list: newest first, one entry per material, twenty at most.
+function mpPushRecent(list, row) {
+    if (!row || !String(row.name || '').trim()) return (list || []).slice(0, MP_RECENT_MAX);
+    const entry = {
+        name: String(row.name).slice(0, 200), unit: String(row.unit || '').slice(0, 20),
+        price: Number(row.price) || 0, suggested: Number(row.suggested != null ? row.suggested : row.price) || 0,
+        sku: String(row.sku || '').slice(0, 40),
+        origin: row.source === 'recent' ? (row.origin || 'catalog') : (row.source || 'free'),
+        at: Date.now(),
+    };
+    return [entry].concat((list || []).filter((e) => e && !mpSameItem(e, entry))).slice(0, MP_RECENT_MAX);
+}
+
+// ── Storage: the recent list lives on this device, per user ────────────────
+function mpRecentList() {
+    try {
+        const raw = localStorage.getItem(getStorageKey(MP_RECENT_KEY));
+        const list = raw ? JSON.parse(raw) : [];
+        return Array.isArray(list) ? list : [];
+    } catch (e) { return []; }
+}
+function mpRememberRecent(rows) {
+    try {
+        let list = mpRecentList();
+        (rows || []).forEach((r) => { list = mpPushRecent(list, r); });
+        localStorage.setItem(getStorageKey(MP_RECENT_KEY), JSON.stringify(list));
+    } catch (e) { /* a shelf, not a record — losing it costs one extra search */ }
+}
+
+// His price for a name: the price book (what he typed on a row and kept),
+// then his catalogue by exact name. Deliberately not the loose "contains"
+// match market.js uses for the comparison screen — a wrong match here would
+// put HIS number on the wrong product and call it his.
+function mpMyPrice(name) {
+    const book = priceBookGet(name);
+    if (book !== null) return book;
+    const key = _pbKey(name);
+    const it = key ? (priceCatalog || []).find((c) => _pbKey(c && c.name) === key) : null;
+    return it && Number(it.price) > 0 ? Number(it.price) : null;
+}
+
+// ── The panel ───────────────────────────────────────────────────────────────
+function openMatPicker() {
+    const proj = _ptProj();
+    if (!proj) { showToast('אין פרויקט פתוח', 'error'); return; }
     _cpSupplier = { q: '', items: [], loading: false, error: '', meta: null };
-    const dlg = document.createElement('dialog');
-    dlg.id = 'cat-picker';
-    dlg.className = 'ck-dialog';
-    dlg.innerHTML = `
-        <h3>הוספה מהמאגר</h3>
-        <div class="search-bar">
-            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-            <input type="text" id="cat-picker-q" placeholder="חיפוש פריט, למשל: כבל 5x6" oninput="cpOnSearch()">
-        </div>
-        <label class="cp-disc">
-            <span>הנחת סוחר על מחירי הספק</span>
-            <input type="number" id="cp-disc" min="0" max="60" step="1" value="${tradeDiscount()}"
-                   onchange="setTradeDiscount(this.value)">
-            <span>%</span>
-        </label>
-        <div class="cp-list" id="cat-picker-list"></div>
-        <div class="ck-dialog-actions">
-            <button type="button" class="btn btn-secondary" onclick="document.getElementById('cat-picker').close()">סגירה</button>
-        </div>`;
-    document.body.appendChild(dlg);
-    renderCatalogPicker();
-    dlg.showModal();
-    const q = document.getElementById('cat-picker-q');
-    if (q) q.focus();
+    const q = document.getElementById('mat-picker-q');
+    if (q) q.value = '';
+    const disc = document.getElementById('cp-disc');
+    if (disc) disc.value = tradeDiscount();
+    // The free row's units are the table's units — one list, filled here so
+    // the markup cannot drift from MATERIAL_UNITS.
+    const unit = document.getElementById('mp-free-unit');
+    if (unit && !unit.options.length) {
+        unit.innerHTML = MATERIAL_UNITS.map((u) => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+    }
+    renderMatPicker();
+    openPricingSide('mat-picker');
+    // openPricingSide parks focus on ×; here the search field is the point.
+    if (q) setTimeout(() => q.focus({ preventScroll: true }), 30);
 }
 
-function cpOnSearch() {
-    renderCatalogPicker();
+function _mpQuery() {
+    return String(((document.getElementById('mat-picker-q') || {}).value) || '').trim();
+}
+
+function mpOnSearch() {
+    // His own lists answer at once; the supplier is asked after a pause.
     clearTimeout(_cpTimer);
-    // Typed queries are short and the endpoint is rate-limited; one request per
-    // pause, not one per keystroke.
-    _cpTimer = setTimeout(cpSearchSupplier, 320);
-}
-
-async function cpSearchSupplier() {
-    const el = document.getElementById('cat-picker-q');
-    const q = ((el && el.value) || '').trim();
-    if (q.length < 2) {
+    const q = _mpQuery();
+    if (q.length < MP_MIN_CHARS) {
         _cpSupplier = { q: '', items: [], loading: false, error: '', meta: null };
-        renderCatalogPicker();
+        renderMatPicker();
         return;
     }
-    if (q === _cpSupplier.q && _cpSupplier.items.length) return;
-    _cpSupplier = { q, items: [], loading: true, error: '', meta: _cpSupplier.meta };
-    renderCatalogPicker();
-    try {
-        const res = await fetch('/api/materials?limit=24&q=' + encodeURIComponent(q));
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error((data.error && data.error.message) || 'שגיאת שרת');
-        // A slower answer to an older query must not overwrite a newer one.
-        if (((document.getElementById('cat-picker-q') || {}).value || '').trim() !== q) return;
-        _cpSupplier = { q, items: Array.isArray(data.items) ? data.items : [], loading: false, error: '', meta: data.meta || null };
-    } catch (e) {
-        _cpSupplier = { q, items: [], loading: false, error: 'מאגר הספקים לא זמין כרגע', meta: null };
+    if (_mpCache.has(q)) {
+        const hit = _mpCache.get(q);
+        _cpSupplier = { q, items: hit.items, loading: false, error: '', meta: hit.meta };
+        renderMatPicker();
+        return;
     }
-    renderCatalogPicker();
+    _cpSupplier = { q, items: [], loading: true, error: '', meta: _cpSupplier.meta };
+    renderMatPicker();
+    _cpTimer = setTimeout(mpSearchSupplier, MP_DEBOUNCE_MS);
 }
 
-function renderCatalogPicker() {
-    const box = document.getElementById('cat-picker-list');
-    if (!box) return;
-    const q = (document.getElementById('cat-picker-q') || {}).value || '';
-    const needle = q.trim().toLowerCase();
-    const mine = (priceCatalog || []).filter((it) => !needle || String(it.name || '').toLowerCase().includes(needle));
+// Enter adds the first line, so "מא"ז 3x25 ⏎" is one material in.
+function mpSearchKey(e) {
+    if (!e || e.key !== 'Enter') return;
+    e.preventDefault();
+    if (_mpRows.length) mpAdd(0);
+}
 
-    const mineHtml = mine.length ? `
-        <div class="cp-group">המחירים שלי</div>
-        ${mine.slice(0, 40).map((it) => {
-            const idx = (priceCatalog || []).indexOf(it);
-            return `
-            <button type="button" class="cp-row" onclick="ptAddFromCatalog(${idx})">
-                <span class="cp-name">${escapeHtml(it.name || '')}</span>
-                <span class="cp-price">${heNum(Number(it.price) || 0)} ₪${it.unit ? ' / ' + escapeHtml(it.unit) : ''}</span>
-            </button>`;
-        }).join('')}` : '';
+async function mpSearchSupplier() {
+    const q = _mpQuery();
+    if (q.length < MP_MIN_CHARS) return;
+    if (_mpCache.has(q)) { mpOnSearch(); return; }
+    try {
+        const param = mpIsSkuQuery(q) ? 'sku=' + encodeURIComponent(q) : 'q=' + encodeURIComponent(q);
+        const res = await fetch(`/api/materials?limit=${MP_SUPPLIER_LIMIT}&${param}`);
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 429) throw new Error('יותר מדי חיפושים ברגע אחד. שנייה, ונסה שוב.');
+        if (!res.ok) throw new Error((data.error && data.error.message) || 'מאגר הספק לא זמין כרגע');
+        const items = Array.isArray(data.items) ? data.items : [];
+        _mpCache.set(q, { items, meta: data.meta || null });
+        // A slower answer to an older query must not overwrite a newer one.
+        if (_mpQuery() !== q) return;
+        _cpSupplier = { q, items, loading: false, error: '', meta: data.meta || null };
+    } catch (e) {
+        if (_mpQuery() !== q) return;
+        _cpSupplier = { q, items: [], loading: false, error: (e && e.message) || 'מאגר הספק לא זמין כרגע', meta: null };
+    }
+    renderMatPicker();
+}
+
+function renderMatPicker() {
+    const q = _mpQuery();
+    _mpRows = mpMergeSources({
+        q, mine: priceCatalog || [], recent: mpRecentList(), supplier: _cpSupplier.items,
+        myPrice: mpMyPrice, toCost: tradePrice,
+    });
+    const box = document.getElementById('mat-picker-list');
+    if (!box) return;
 
     const disc = tradeDiscount();
-    let supHtml = '';
-    if (_cpSupplier.loading) {
-        supHtml = '<div class="cp-group">מאגר הספק</div><p class="input-help">מחפש…</p>';
-    } else if (_cpSupplier.error) {
-        supHtml = `<div class="cp-group">מאגר הספק</div><p class="input-help">${escapeHtml(_cpSupplier.error)}</p>`;
-    } else if (_cpSupplier.items.length) {
-        const supplier = (_cpSupplier.meta && _cpSupplier.meta.supplier && _cpSupplier.meta.supplier.name) || 'ספק';
-        supHtml = `
-        <div class="cp-group">מאגר ${escapeHtml(supplier)} · מחיר קמעונאי לפני מע"מ${disc ? `, פחות ${disc}% הנחת סוחר` : ''}</div>
-        ${_cpSupplier.items.map((it, i) => {
-            const retail = Number(it.price) || 0;
-            const mineP = tradePrice(retail);
-            return `
-            <button type="button" class="cp-row cp-sup" onclick="ptAddFromSupplier(${i})">
-                <span class="cp-name">${escapeHtml(it.name || '')}</span>
-                <span class="cp-price">${heNum(mineP)} ₪${it.unit ? ' / ' + escapeHtml(it.unit) : ''}${
-                    disc ? `<small class="cp-was">קמעונאי ${heNum(retail)}</small>` : ''}</span>
-            </button>`;
-        }).join('')}`;
-    }
+    const supplierName = (_cpSupplier.meta && _cpSupplier.meta.supplier && _cpSupplier.meta.supplier.name) || 'הספק';
+    const heads = {
+        mine: 'המחירים שלי',
+        recent: 'לאחרונה',
+        supplier: `מאגר ${escapeHtml(supplierName)} · קמעונאי לפני מע"מ${disc ? `, פחות ${disc}% הנחת סוחר` : ''}`,
+    };
+    let lastGroup = '';
+    const rows = _mpRows.map((r, i) => {
+        const head = r.group !== lastGroup ? `<div class="cp-group">${heads[r.group] || ''}</div>` : '';
+        lastGroup = r.group;
+        const mineTag = r.source === 'mine' ? '<em class="mp-tag">המחיר שלי</em>' : '';
+        const was = r.group === 'supplier' && r.source !== 'mine' && disc
+            ? `<small class="cp-was">קמעונאי ${heNum(r.suggested)}</small>` : '';
+        return `${head}
+        <div class="mp-row" data-i="${i}">
+            <div class="mp-main">
+                <span class="mp-name">${escapeHtml(r.name)}</span>
+                <span class="mp-meta">${r.unit ? escapeHtml(r.unit) + ' · ' : ''}${heNum(r.price)} ₪ ${mineTag}${was}</span>
+            </div>
+            <span class="mp-step" role="group" aria-label="כמות">
+                <button type="button" class="mp-step-btn" onclick="mpStep(${i}, -1)" aria-label="פחות">−</button>
+                <input type="number" class="mp-qty" min="1" step="1" value="1" inputmode="numeric" aria-label="כמות">
+                <button type="button" class="mp-step-btn" onclick="mpStep(${i}, 1)" aria-label="עוד">+</button>
+            </span>
+            <button type="button" class="btn btn-accent btn-small mp-add" onclick="mpAdd(${i})">הוסף</button>
+        </div>`;
+    }).join('');
 
-    if (!mineHtml && !supHtml) {
-        box.innerHTML = needle.length >= 2
-            ? '<p class="input-help">לא נמצא פריט תואם, לא אצלך ולא אצל הספק.</p>'
-            : '<p class="input-help">כתוב מה מחפשים. החיפוש רץ גם על המחירים שלך וגם על מאגר הספק.</p>';
+    let status = '';
+    if (_cpSupplier.loading) status = '<p class="input-help mp-status">מחפש…</p>';
+    else if (_cpSupplier.error) status = `<p class="input-help mp-status">${escapeHtml(_cpSupplier.error)}</p>`;
+    else if (!_mpRows.length && q.length >= MP_MIN_CHARS) {
+        status = `<p class="input-help mp-status">אין תוצאה — <button type="button" class="mp-link" onclick="mpFreeFromQuery()">הוסף שורה חופשית</button></p>`;
+    } else if (!_mpRows.length) {
+        status = '<p class="input-help mp-status">כתוב שם או מק"ט. מה שהוספת לאחרונה יופיע כאן בפעם הבאה.</p>';
+    }
+    box.innerHTML = rows + status;
+}
+
+function _mpQtyInput(i) {
+    return document.querySelector(`#mat-picker-list .mp-row[data-i="${i}"] .mp-qty`);
+}
+function mpStep(i, delta) {
+    const input = _mpQtyInput(i);
+    if (!input) return;
+    input.value = Math.max(1, (Number(input.value) || 1) + (Number(delta) || 0));
+}
+
+function mpAdd(i) {
+    const pick = _mpRows[i];
+    if (!pick) return;
+    const input = _mpQtyInput(i);
+    mpCommit(mpRowFromPick(pick, input ? input.value : 1));
+}
+
+// The one save path. The table behind the panel repaints through _ptSave,
+// exactly as it does for a row the chat wrote.
+function mpCommit(row) {
+    const proj = _ptProj();
+    if (!proj) { showToast('אין פרויקט פתוח', 'error'); return null; }
+    if (!row.name) { showToast('אין שם לפריט', 'error'); return null; }
+    proj.materials = proj.materials || [];
+    const added = mpAddRow(proj.materials, row);
+    _ptSave(proj);
+    mpRememberRecent([added.row]);
+    showToast(`נוסף: ${added.row.name} ×${heNum(matQty(added.row))}`);
+    renderMatPicker();
+    return added.row;
+}
+
+// ── שורה חופשית: what no catalogue has ──────────────────────────────────────
+function mpAddFree() {
+    const val = (id) => String(((document.getElementById(id) || {}).value) || '').trim();
+    const name = val('mp-free-name');
+    if (!name) {
+        showToast('כתוב שם לפריט', 'error');
+        const el = document.getElementById('mp-free-name');
+        if (el) el.focus();
         return;
     }
-    box.innerHTML = mineHtml + supHtml;
+    const price = Number(val('mp-free-price')) || 0;
+    const row = mpRowFromPick({ name, unit: val('mp-free-unit'), price, suggested: price, source: 'free' }, val('mp-free-qty'));
+    if (!mpCommit(row)) return;
+    ['mp-free-name', 'mp-free-price'].forEach((id) => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const qty = document.getElementById('mp-free-qty');
+    if (qty) qty.value = 1;
+    const el = document.getElementById('mp-free-name');
+    if (el) el.focus();
 }
-
-// Adding a supplier line. The retail price is what the catalog says, so it is
-// the "מוצע"; what he pays is the discounted one, so it is "המחיר שלי" — unless
-// he has already typed a price for this item, in which case that wins, which is
-// the whole point of the price book.
-function ptAddFromSupplier(i) {
-    const it = _cpSupplier.items[i];
-    const proj = _ptProj();
-    if (!it || !proj) return;
-    const retail = Number(it.price) || 0;
-    const remembered = priceBookGet(it.name);
-    const details = [it.unit ? `יחידה: ${it.unit}` : '']
-        .filter(Boolean).join(' · ');
-    proj.materials = proj.materials || [];
-    proj.materials.push({
-        name: it.name,
-        details,
-        // The catalogue number stays ON the line but never in the visible text.
-        // Stav, 28/08: "בהוספה מהמאגר רשום את המקטים, תעיף שלא יראו בכלל
-        // בשום מקום" — a customer reading a quote has no use for a supplier's
-        // part number. But it is what lets the exact item be re-ordered, so it
-        // moves from the words to a field rather than being thrown away.
-        sku: it.sku || undefined,
-        qty: 1,
-        unit: MATERIAL_UNITS.includes(it.unit) ? it.unit : undefined,
-        price: remembered === null ? tradePrice(retail) : remembered,
-        suggested: retail,
-        checked: true,
-        source: 'supplier',
-    });
-    _ptSave(proj);
-    showToast(`${it.name} נוסף`);
-}
-
-function ptAddFromCatalog(idx) {
-    const it = (priceCatalog || [])[idx];
-    const proj = _ptProj();
-    if (!it || !proj) return;
-    const price = Number(it.price) || 0;
-    // A price he already set for this item wins over the catalog's, because
-    // that is what the price book is for.
-    const mine = priceBookGet(it.name);
-    proj.materials = proj.materials || [];
-    proj.materials.push({
-        name: it.name, details: it.unit ? `יחידה: ${it.unit}` : '',
-        qty: 1, price: mine === null ? price : mine, suggested: price,
-        checked: true, source: 'catalog',
-    });
-    _ptSave(proj);
-    showToast(`${it.name} נוסף`);
+// "אין תוצאה" → the words he typed become the free row's name.
+function mpFreeFromQuery() {
+    const el = document.getElementById('mp-free-name');
+    if (!el) return;
+    if (!el.value.trim()) el.value = _mpQuery();
+    el.focus();
 }
 
 function renderMaterialsChecklist(materials) {

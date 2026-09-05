@@ -201,7 +201,8 @@ test('the two quiet buttons live at the end of the pricing tab, with their panel
     assert.match(panel, /<aside[^>]*id="pricing-notes"/, 'the notes panel is missing');
     assert.match(panel, /<aside[^>]*id="pricing-tools"/, 'the tools panel is missing');
     assert.match(panel, /id="pricing-notes-text"[^>]*onchange="savePricingNotes\(this\.value\)"/, 'free text is not saved');
-    assert.equal((panel.match(/onclick="closePricingSide\(\)"/g) || []).length, 2, 'each panel needs its close button');
+    // Three panels since Wave E: notes, tools, and the materials picker.
+    assert.equal((panel.match(/onclick="closePricingSide\(\)"/g) || []).length, 3, 'each panel needs its close button');
     for (const fn of ['openPricingNotes', 'openPricingTools', 'closePricingSide', 'savePricingNotes']) {
         assert.match(app, new RegExp(`function ${fn}\\(`), `${fn} is not defined`);
     }

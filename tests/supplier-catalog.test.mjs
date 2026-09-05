@@ -6,6 +6,9 @@
 // pin the two things that make the wiring safe to trust — that a price he
 // typed himself still wins, and that a retail number never silently becomes
 // his cost.
+//
+// Wave E moved the picker into the "＋ הוסף חומר" panel (mpAdd → mpCommit);
+// the supplier path here is the merged list with one supplier result on it.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,7 +34,7 @@ const MATERIAL_UNITS = (() => {
 
 function load(opts = {}) {
     const start = APP.indexOf('let _cpSupplier');
-    const end = APP.indexOf('function renderMaterialsChecklist');
+    const end = APP.indexOf('// ── שורה חופשית');
     assert.ok(start > -1 && end > start, 'the catalog picker moved or was renamed');
     const project = { id: 'p1', materials: [] };
     const saved = [];
@@ -40,6 +43,8 @@ function load(opts = {}) {
         persistSettings: () => {},
         priceCatalog: opts.catalog || [],
         priceBookGet: (name) => (opts.book && name in opts.book ? opts.book[name] : null),
+        _pbKey: (name) => String(name || '').trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 80),
+        matQty: (m) => (Number(m && m.qty) > 0 ? Number(m.qty) : 1),
         MATERIAL_UNITS,
         _ptProj: () => project,
         _ptSave: (p) => saved.push(p),
@@ -48,11 +53,11 @@ function load(opts = {}) {
         heNum: (n) => String(n),
         document: { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] },
         setTimeout, clearTimeout, fetch: async () => { throw new Error('offline'); },
-        Number, String, Object, Array, Math, JSON,
+        Number, String, Object, Array, Math, JSON, Map, Set, Date,
     });
     const api = runInContext(
         APP.slice(start, end) +
-        '\n;({ tradeDiscount, setTradeDiscount, tradePrice, ptAddFromSupplier, _cpSupplier, setItems: (x) => { _cpSupplier = { q: "q", items: x, loading: false, error: "", meta: null }; } })',
+        '\n;({ tradeDiscount, setTradeDiscount, tradePrice, ptAddFromSupplier: (i) => mpAdd(i), setItems: (x) => { _cpSupplier = { q: "q", items: x, loading: false, error: "", meta: null }; renderMatPicker(); } })',
         ctx);
     return { ...api, project, ctx };
 }
@@ -83,7 +88,7 @@ test('a supplier line carries retail as the suggestion and his cost as the price
     assert.equal(row.suggested, 20, 'the catalog price is the SUGGESTION, always');
     assert.equal(row.price, 15, 'what he pays is the discounted one');
     assert.equal(row.unit, 'מטר');
-    assert.equal(row.source, 'supplier');
+    assert.equal(row.source, 'catalog');
     // The SKU still travels so the exact item can be re-ordered, but it is a
     // field now rather than words in the visible פירוט — a customer reading a
     // quote has no use for a supplier's part number (Stav, 28/08).
@@ -111,14 +116,15 @@ test('a unit the table CAN draw survives the import', () => {
     assert.equal(app.project.materials[0].unit, 'גליל');
 });
 
-test('a unit the table cannot draw is left off rather than faked', () => {
+test('a unit the table cannot list still reaches the row as itself', () => {
     // The catalog's units come from a supplier's product pages; the table has a
-    // closed list. An unknown one must not become an invented row type.
+    // closed list, but it draws a unit off the list as its own option (the
+    // "אחר…" path), so nothing is flattened to יח' or buried in a note.
     const unknown = 'צרור';
     assert.ok(!MATERIAL_UNITS.includes(unknown), 'the example must be a unit the app really lacks');
     const app = load();
     app.setItems([{ sku: '1', name: 'סרט בידוד', price: 4, unit: unknown }]);
     app.ptAddFromSupplier(0);
-    assert.equal(app.project.materials[0].unit, undefined);
-    assert.match(app.project.materials[0].details, new RegExp(unknown), 'but it is still written down');
+    assert.equal(app.project.materials[0].unit, unknown);
+    assert.equal(app.project.materials[0].details, '');
 });
