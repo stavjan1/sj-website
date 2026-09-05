@@ -1047,10 +1047,11 @@ async function compareModels() {
     }
 }
 
-// Rows are the traps, columns the two models, a cell is pass/fail and how
-// long the answer was. The totals row and the one-line verdict are arithmetic
-// over the two payloads — which model answered shorter, which passed more —
-// and nothing else: the numbers are the recommendation, the reader makes it.
+// Rows are the traps, columns the two models, a cell is pass/fail, how long
+// the answer was and how long it took. The totals row and the one-line
+// verdict are arithmetic over the two payloads — which model answered
+// shorter, which passed more — and nothing else: the numbers are the
+// recommendation, the reader makes it.
 function compareTableHtml(a, b, at) {
     const byId = (run) => { const m = {}; (run.results || []).forEach((r) => { m[r.id] = r; }); return m; };
     const ra = byId(a), rb = byId(b);
@@ -1060,7 +1061,7 @@ function compareTableHtml(a, b, at) {
     const cell = (r) => {
         if (!r) return '<td class="mdl-cmp-cell">—</td>';
         const mark = r.pass ? '<span class="mdl-cmp-ok">✓</span>' : '<span class="mdl-cmp-bad">✗</span>';
-        const chars = r.error ? 'שגיאה' : `${crNum(r.chars || 0)} תווים`;
+        const chars = r.error ? 'שגיאה' : `${crNum(r.chars || 0)} תווים · ${crNum(r.ms || 0)} ms`;
         return `<td class="mdl-cmp-cell${r.pass ? ' ok' : ' bad'}" title="${escapeHtml(r.error || (r.failed || []).join(' · ') || '')}">${mark} <small>${chars}</small></td>`;
     };
     const tot = (run) => `<td class="mdl-cmp-cell"><b>${run.passed}/${run.total}</b> <small>עבר · ${crNum(run.avgChars || 0)} תווים · ${crNum(run.avgMs || 0)} ms בממוצע</small></td>`;
@@ -1447,10 +1448,12 @@ function renderAdminConvoList(meta) {
     }
 
     // What the server scanned, and — when a filter is on — how much of it is
-    // showing, so "3 שיחות" is never mistaken for "3 שיחות בסך הכל".
+    // showing, so "3 שיחות" is never mistaken for "3 שיחות בסך הכל". `users`
+    // is every record the scan read, writers or not — so it is "נסרקו", not
+    // "אצל".
     const scanned = meta
-        ? `${meta.total} שיחות אצל ${meta.users} משתמשים${meta.usersTruncated
-            ? ` · נסרקו ${meta.users} משתמשים בלבד`
+        ? `${meta.total} שיחות · נסרקו ${meta.users} משתמשים${meta.usersTruncated
+            ? ' בלבד'
             : (meta.truncated ? ' · מוצגות האחרונות בלבד' : '')}${meta.failed ? ` · ${meta.failed} לא נקראו` : ''}`
         : `${_adminConvos.length} שיחות`;
     const head = `<p class="input-help" style="margin:0 0 8px;">${narrowed ? `מוצגות ${rows.length} מתוך ${_adminConvos.length} · ` : ''}${scanned}</p>`;
@@ -1687,7 +1690,7 @@ function renderAdminUsersTable() {
     const cm = _adminConvosMeta || {};
     const feedNote = !convos ? 'שיחות: יוצגו אחרי טעינת הפיד.'
         : (cm.usersTruncated || cm.truncated) ? `שיחות: מתוך הפיד (${cm.users} משתמשים נסרקו, ${cm.total} שיחות; קטום, המספר עשוי להיות חלקי).`
-        : `שיחות: מתוך הפיד (${cm.total} שיחות אצל ${cm.users} משתמשים).`;
+        : `שיחות: מתוך הפיד (${cm.total} שיחות · נסרקו ${cm.users} משתמשים).`;
     const notes = `<p class="input-help au-notes">שמירה אחרונה = הפעם האחרונה שהמכשיר שלו שמר לענן, לא כניסה. הצעות = בארכיון ההצעות שלו, מאז ההתחלה. ${feedNote}${helpers ? '' : ' עוזר: יוצג אחרי שכרטיס העוזרים נטען.'}</p>`;
 
     container.innerHTML = summary + table + notes;
@@ -1717,7 +1720,7 @@ async function openAdminUser(email) {
     const row = _adminUsers.find((u) => u.email === email) || { email };
     const page = { email, row, detail: null, detailErr: null, helpers: null, helpersErr: null, feedback: null, feedbackErr: null };
     _adminUserPage = page;
-    if (!openAdminDrawer(adminUserName(row), '')) return;
+    if (!openAdminDrawer(adminUserName(row), '', page)) return;
     paintAdminUserPage();
 
     const land = (k, p) => p
@@ -1739,7 +1742,9 @@ function paintAdminUserPage() {
     const el = document.getElementById('admin-drawer');
     const body = document.getElementById('admin-drawer-body');
     const head = document.getElementById('admin-drawer-title');
-    if (!page || !el || !body || !el.classList.contains('open')) return;
+    // Only while the drawer is his: a source that lands after a thread, or
+    // another screen's detail, took the drawer must not paint over it.
+    if (!page || !el || !body || !el.classList.contains('open') || _adminDrawerOwner !== page) return;
     const { email, row } = page;
     if (head) head.textContent = adminUserName(row);
     const e = escapeHtml(email);
@@ -1850,7 +1855,7 @@ function openAdminUserThread(i) {
     const page = _adminUserPage;
     const t = page && page.threads && page.threads[i];
     if (!t) return;
-    return openAdminThread(t, { label: 'חזרה לדף של ' + adminUserName(page.row), onBack: () => { _adminUserPage = page; paintAdminUserPage(); } });
+    return openAdminThread(t, { label: 'חזרה לדף של ' + adminUserName(page.row), onBack: () => { _adminUserPage = page; _adminDrawerOwner = page; paintAdminUserPage(); } });
 }
 
 // The helper switch on his page: the same PUT the helpers card uses, then the
@@ -1911,12 +1916,19 @@ async function adminDeleteUserData(email) {
 // side, with one X at the top and Escape to close. Before this each card grew
 // its own list underneath, and nothing could close them (Stav, 5/9). The
 // chrome is the app's .stern-drawer; this file only fills it.
+//
+// `owner` is whatever opened it — the user page hands itself in, so a source
+// of that page landing late paints only while the drawer is still that page;
+// once a thread or another screen's detail has taken the drawer (or it has
+// closed), the late paint is dropped.
 // ============================================================================
-function openAdminDrawer(title, html) {
+let _adminDrawerOwner = null;
+function openAdminDrawer(title, html, owner) {
     const el = document.getElementById('admin-drawer');
     const body = document.getElementById('admin-drawer-body');
     const head = document.getElementById('admin-drawer-title');
     if (!el || !body) return null;
+    _adminDrawerOwner = owner || null;
     if (head) head.textContent = title || '';
     body.innerHTML = html || '';
     body.scrollTop = 0;
@@ -1929,6 +1941,7 @@ function openAdminDrawer(title, html) {
 function closeAdminDrawer() {
     const el = document.getElementById('admin-drawer');
     document.removeEventListener('keydown', _adminDrawerEsc);
+    _adminDrawerOwner = null;
     if (!el || !el.classList.contains('open')) return;
     el.classList.remove('open');
     // Nothing keeps a stale thread or user in a drawer nobody can see.

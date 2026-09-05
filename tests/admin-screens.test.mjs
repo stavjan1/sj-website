@@ -311,7 +311,7 @@ function usersContext() {
         'let _adminUsers = [], _adminUsersMeta = null, _adminUsersLoaded = false, _usersLoading = false;',
         "let _adminUsersSort = { key: 'lastUpdated', dir: -1 };",
         'let _adminConvos = [], _adminConvosLoaded = false, _adminConvosMeta = null, _convosLoading = false;',
-        'let _adminUserPage = null; const _adminSide = {}; let _crCache = {}; let _crAt = 0;',
+        'let _adminUserPage = null, _adminDrawerOwner = null; const _adminSide = {}; let _crCache = {}; let _crAt = 0;',
         ...['function crWhen(', 'function adminUserName(', 'function adminConvoCounts(', 'function adminHelperSet(',
             'function adminSortUsers(', 'function renderAdminUsersTable(', 'function adminNoteTier(', 'function paintAdminUserPage(']
             .map((m) => fnBody(ADMIN, m)),
@@ -319,7 +319,8 @@ function usersContext() {
         // bindings (not the sandbox object) are the ones the renderers read.
         'function setData(users, convos) { _adminUsers = users.users; _adminUsersMeta = users; _adminUsersLoaded = true;'
         + ' _adminConvos = convos ? convos.threads : []; _adminConvosLoaded = !!convos; _adminConvosMeta = convos; }',
-        'function setPage(page, convosLoaded) { _adminUserPage = page; _adminConvosLoaded = convosLoaded; }',
+        'function setPage(page, convosLoaded) { _adminUserPage = page; _adminDrawerOwner = page; _adminConvosLoaded = convosLoaded; }',
+        'function setOwner(o) { _adminDrawerOwner = o; }',
     ].join('\n');
     runInContext(src, ctx);
     const rowsOf = (html) => [...html.matchAll(/<tr class="au-row"[^>]*data-email="([^"]+)"/g)].map((m) => m[1]);
@@ -368,7 +369,9 @@ test('users: the table joins its counts from the cached payloads, with no fetch 
     assert.equal(cellsOf(html, 'gad@x.com')[6], '', 'a non-helper carries a badge');
     // The field behind "last active" is named for what it is.
     assert.match(html, /שמירה אחרונה = הפעם האחרונה שהמכשיר שלו שמר לענן/, 'the last-active column does not say what it measures');
-    assert.match(html, /3 שיחות אצל 3 משתמשים/, 'the conversation count does not name the feed it came from');
+    // `users` in the payload is every record scanned, writers or not — never 'אצל'.
+    assert.match(html, /3 שיחות · נסרקו 3 משתמשים/, 'the conversation count does not name the feed it came from');
+    assert.ok(!/שיחות אצל/.test(html), 'the scan count is called a count of users with conversations');
     assert.match(html, /חדשים החודש/, 'the signup count lost its window');
 
     // Sortable by last save: the same header flips the order.
@@ -463,6 +466,37 @@ test('users: the drawer shows the person in six sections, in order', () => {
     // An admin account is not offered for deletion.
     runInContext(`setPage(${JSON.stringify({ email: 'me@x.com', row: { email: 'me@x.com', tier: 'admin' }, detail: null, helpers: null, feedback: null })}, false); paintAdminUserPage();`, ctx);
     assert.ok(!/adminDeleteUserData/.test(els['admin-drawer-body'].innerHTML), 'the admin account can be deleted from its own page');
+});
+
+test('users: a source landing late paints the page only while the drawer is still that page', () => {
+    // openAdminUser fires three requests; their completions call paintAdminUserPage.
+    // If a thread (opened from the page) or another screen's detail has taken the
+    // drawer meanwhile, the late paint must not replace it — nor may the table's
+    // 'טען שיחות' repaint a page the drawer no longer shows.
+    const { ctx, els } = usersContext();
+    const page = { email: 'avi@x.com', row: FAKE_USERS.users[0], detail: null, helpers: null, feedback: null };
+    runInContext(`setData(${JSON.stringify(FAKE_USERS)}, ${JSON.stringify(FAKE_CONVOS)}); setPage(${JSON.stringify(page)}, true); paintAdminUserPage();`, ctx);
+    assert.equal(els['admin-drawer-title'].textContent, 'avi');
+    // Something else took the drawer.
+    els['admin-drawer-title'].textContent = 'THREAD-TITLE';
+    els['admin-drawer-body'].innerHTML = '<div id="admin-convo-read"></div>';
+    runInContext("setOwner({ other: true }); paintAdminUserPage();", ctx);
+    assert.equal(els['admin-drawer-title'].textContent, 'THREAD-TITLE', 'the user page painted over the title of another owner');
+    assert.equal(els['admin-drawer-body'].innerHTML, '<div id="admin-convo-read"></div>', 'the user page painted over the body of another owner');
+    // The drawer closed: nobody owns it, nothing paints.
+    runInContext("setOwner(null); paintAdminUserPage();", ctx);
+    assert.equal(els['admin-drawer-body'].innerHTML, '<div id="admin-convo-read"></div>', 'the user page painted into a drawer nobody owns');
+    // Back from the thread hands the drawer to the page again, and it paints.
+    runInContext("setOwner(_adminUserPage); paintAdminUserPage();", ctx);
+    assert.equal(els['admin-drawer-title'].textContent, 'avi', 'the page does not paint once it owns the drawer again');
+
+    // The wiring behind it: the page opens the drawer as its owner, the thread's
+    // back link hands it back, open sets the owner and close clears it.
+    assert.match(fnBody(APP, 'async function openAdminUser('), /openAdminDrawer\(adminUserName\(row\), '', page\)/, 'the user page does not open the drawer as its owner');
+    assert.match(fnBody(ADMIN, 'function paintAdminUserPage('), /_adminDrawerOwner !== page\) return;/, 'the paint does not check who owns the drawer');
+    assert.match(fnBody(ADMIN, 'function openAdminUserThread('), /onBack: \(\) => \{ _adminUserPage = page; _adminDrawerOwner = page; paintAdminUserPage\(\); \}/, 'back from a thread does not hand the drawer to the page');
+    assert.match(fnBody(ADMIN, 'function openAdminDrawer('), /_adminDrawerOwner = owner \|\| null;/, 'opening the drawer does not record its owner');
+    assert.match(fnBody(ADMIN, 'function closeAdminDrawer('), /_adminDrawerOwner = null;/, 'closing the drawer does not clear its owner');
 });
 
 test('users: every action calls an endpoint that exists, and nothing fetches per row', () => {
@@ -610,7 +644,8 @@ test('ai: two models, two sequential runs, one table whose verdict is arithmetic
     assert.match(rows[1], /כבל 6×4/, 'the first row is not the first trap');
     assert.equal((rows[3].match(/✗/g) || []).length, 1, 'the failed trap does not show ✗ in its column');
     assert.equal((rows[3].match(/✓/g) || []).length, 1, 'the passed trap does not show ✓ in the other column');
-    assert.match(rows[3], /100 תווים/, 'a cell does not carry the answer length');
+    assert.match(rows[3], /100 תווים · 700 ms/, 'a cell does not carry the answer length and time');
+    assert.match(rows[3], /300 תווים · 1300 ms/, 'the cell in the other column does not carry its own length and time');
     assert.match(rows[4], /<b>2\/3<\/b>[^<]*<small>עבר · 200 תווים · 800 ms/, 'the totals row for A');
     assert.match(rows[4], /<b>3\/3<\/b>[^<]*<small>עבר · 400 תווים · 1400 ms/, 'the totals row for B');
     assert.match(html, /קצר יותר: gemini-3\.5-flash-lite · עובר יותר: gemini-3\.6-flash/, 'the verdict is not the arithmetic');
